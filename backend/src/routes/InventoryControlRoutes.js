@@ -79,7 +79,7 @@ import {
   getCatalogBySections,
   getPopularProducts,
 getAutoCatalogSeed,
-} from "../controllers/InventoryControl/catalogController.js";
+} from "../controllers/InventoryControl/CatalogController.js";
 
 import {
   getProductsByStore,
