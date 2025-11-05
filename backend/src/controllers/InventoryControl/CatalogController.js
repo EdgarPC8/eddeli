@@ -377,6 +377,7 @@ const mapCatalogEntryToCard = (c) => {
       name: p.name,
       primaryImageUrl: p.primaryImageUrl || null,
       unitAbbr,
+      desc:p.desc,
       standardWeightGrams: Number(p.standardWeightGrams || 0),
       categorySlug,
       type: p.type,
@@ -428,6 +429,7 @@ export const getCatalogBySection = async (req, res) => {
           attributes: [
             "id",
             "name",
+            "desc",
             "price",
             "primaryImageUrl",
             "type",
@@ -488,6 +490,7 @@ export const getCatalogBySections = async (req, res) => {
             "id",
             "name",
             "price",
+            "desc",
             "primaryImageUrl",
             "type",
             "categoryId",

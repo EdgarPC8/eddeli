@@ -1,15 +1,80 @@
 import { Customer, Order, OrderItem } from "../../models/Orders.js";
 import { Op, fn, col,literal } from 'sequelize';
 const dias = ['L', 'M', 'W', 'J', 'V', 'S', 'D'];
-import { startOfDay, endOfDay, subMonths, format, addDays, differenceInDays, parseISO  } from 'date-fns';
+import { startOfDay, endOfDay, subMonths, format, addDays, differenceInDays, parseISO,isValid as isValidDate  } from 'date-fns';
 
 import { InventoryMovement, InventoryProduct } from "../../models/Inventory.js";
 
 import { Income, Expense } from "../../models/Finance.js"; 
+// controllers/FinanceController.js
 
-// controllers/OrdersController.js (o donde tengas tus controladores)
+export const getExpensesForChart = async (req, res) => {
+  try {
+    const { startDate, endDate, referenceId, category } = req.query;
 
-// controllers/OrdersController.js
+    const where = {};
+
+    // Filtro de fecha (columna date = DATEONLY)
+    if (startDate || endDate) {
+      const s = startDate && isValidDate(parseISO(startDate)) 
+        ? format(parseISO(startDate), "yyyy-MM-dd") 
+        : null;
+      const e = endDate && isValidDate(parseISO(endDate))
+        ? format(parseISO(endDate), "yyyy-MM-dd")
+        : null;
+
+      if (s && e) where.date = { [Op.between]: [s, e] };
+      else if (s) where.date = { [Op.gte]: s };
+      else if (e) where.date = { [Op.lte]: e };
+    }
+
+    if (referenceId) where.referenceId = Number(referenceId);
+    if (category) where.category = category;
+
+    const expenses = await Expense.findAll({
+      where,
+      include: [
+        {
+          model: InventoryProduct,
+          attributes: ["name"],
+          required: false,
+        },
+      ],
+      order: [["date", "ASC"]],
+    });
+
+const shaped = expenses.map((e) => {
+  // Base común siempre:
+  const item = {
+    id: e.id,
+    date: e.date,                               // YYYY-MM-DD
+    amount: Number(e.amount ?? 0),
+    concept: e.concept ?? null,
+    category: e.category ?? null,
+    createdBy: e.createdBy ?? null,
+  };
+
+  // Solo si realmente está asociado a un producto
+  if (e.referenceId) {
+    item.referenceId = e.referenceId;
+    item.referenceType = e.referenceType ?? null;
+    item.productName = e.ERP_inventory_product?.name || `Producto #${e.referenceId}`;
+  }
+  return item;
+
+});
+
+
+    return res.json(shaped);
+  } catch (error) {
+    console.error("getExpensesForChart error:", error);
+    return res.status(500).json({
+      message: "Error al obtener gastos para gráfico",
+      error: error.message,
+    });
+  }
+};
+
 
 export const getOrdersForCharts = async (req, res) => {
   try {
@@ -36,7 +101,7 @@ export const getOrdersForCharts = async (req, res) => {
 
     const shaped = orders.map((o) => ({
       id: o.id,
-      date: format(new Date(o.createdAt), 'dd/MM/yyyy HH:mm:ss'),
+      date: format(new Date(o.date), 'dd/MM/yyyy HH:mm:ss'),
       ERP_customer: { name: o.ERP_customer?.name ?? "Cliente" },
       ERP_order_items: (o.ERP_order_items || []).map((it) => ({
         id: it.id,

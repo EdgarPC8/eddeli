@@ -12,7 +12,7 @@ import {
   getFinanceSummary,
 } from "../controllers/InventoryControl/FinanceController.js";
 import { isAuthenticated } from "../middlewares/authMiddelware.js";
-import { getOrderAnalytics, getWeeklySales,getTopProductsDailySales,getProductRotationAnalysis,getIncomeExpenseBreakdown,getCustomerSalesSummary, getOrdersForCharts } from "../controllers/InventoryControl/AnalyticsController.js";
+import { getOrderAnalytics, getWeeklySales,getTopProductsDailySales,getProductRotationAnalysis,getIncomeExpenseBreakdown,getCustomerSalesSummary, getOrdersForCharts,getExpensesForChart } from "../controllers/InventoryControl/AnalyticsController.js";
 
 
 const router = new Router();
@@ -40,5 +40,6 @@ router.get("/getProductRotationAnalysis",isAuthenticated, getProductRotationAnal
 router.get("/getIncomeExpenseBreakdown",isAuthenticated, getIncomeExpenseBreakdown);
 router.get("/getCustomerSalesSummary",isAuthenticated, getCustomerSalesSummary);
 router.get("/getOrdersForCharts",isAuthenticated, getOrdersForCharts);
+router.get("/getExpensesForChart",isAuthenticated, getExpensesForChart);
 
 export default router;

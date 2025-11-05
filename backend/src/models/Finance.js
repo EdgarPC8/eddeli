@@ -2,6 +2,8 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../database/connection.js";
 import { Account } from "./Account.js";
+import { InventoryProduct } from "./Inventory.js";
+
 
 
 
@@ -29,3 +31,11 @@ export const Expense = sequelize.define("ERP_finance_expenses", {
 
 Income.belongsTo(Account, { foreignKey: "createdBy" });
 Expense.belongsTo(Account, { foreignKey: "createdBy" });
+
+
+InventoryProduct.hasMany(Expense, {
+  foreignKey: 'referenceId',
+});
+Expense.belongsTo(InventoryProduct, {
+  foreignKey: 'referenceId',
+});

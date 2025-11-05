@@ -133,13 +133,28 @@ export const getAllProducts = async (req, res) => {
         { model: InventoryCategory, attributes: ["id", "name"] },
         { model: InventoryUnit, attributes: ["id", "name", "abbreviation"] },
       ],
-      order: [["createdAt", "DESC"]],
     });
-    res.json(products);
+
+    const finals = [];
+    const intermediates = [];
+    const raws = [];
+
+    products.forEach((p) => {
+      if (p.type === "final") finals.push(p);
+      else if (p.type === "intermediate") intermediates.push(p);
+      else raws.push(p);
+    });
+
+    // 👉 Orden final: Finales → Intermedios → Materia prima
+    const orderedProducts = [...finals, ...intermediates, ...raws];
+
+    res.json(orderedProducts);
+
   } catch (error) {
     res.status(500).json({ message: "Error al obtener productos", error });
   }
 };
+
 
 // Obtener un producto por id
 export const getProductById = async (req, res) => {

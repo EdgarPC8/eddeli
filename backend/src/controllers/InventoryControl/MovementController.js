@@ -189,7 +189,7 @@ export const registerProductionFinalFromPayload =async (req, res) => {
     const token = getHeaderToken(req);
     const user = await verifyJWT(token); // para createdBy
     let quantityGramos = 0
-    console.log("-------------------------------------------------------------------------------------------",req.body)
+    // console.log("-------------------------------------------------------------------------------------------",req.body)
 
     if (!productId || !quantity) {
       return res.status(400).json({ message: "Faltan campos obligatorios" });
