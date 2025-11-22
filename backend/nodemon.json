@@ -1,5 +1,0 @@
-{
-    "watch": ["src"], 
-    "ignore": ["src/backups/*", "src/database/*"] 
-  }
-  
