@@ -33,9 +33,9 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:4173",
   "http://localhost:8888",
-  "http://192.168.110.139:8888",
-  "http://192.168.110.139:5173",
-  "http://192.168.110.139:5174",
+  "http://192.168.1.104:8888",
+  "http://192.168.1.104:5173",
+  "http://192.168.1.104:5174",
   "https://aplicaciones.marianosamaniego.edu.ec",
   "https://www.aplicaciones.marianosamaniego.edu.ec",
 ];

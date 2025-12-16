@@ -2,18 +2,29 @@ import { Router } from "express";
 import { 
     getLogs ,
     createLicense,
+    reloadBdController,
+    uploadBackupController,
+    saveBackupController,
 } from "../controllers/ComandsController.js";
 import { downloadBackup, insertData, saveBackup } from "../database/insertData.js";
 import { isAuthenticated } from "../middlewares/authMiddelware.js";
-
-
+import multer from "multer";
 
 const router = Router();
-
+// Usamos memoria (no lo guarda en disco, lo manejamos nosotros)
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB por si acaso
+    },
+  });
 router.get("/createLicense", isAuthenticated,createLicense);
 router.get("/getLogs", isAuthenticated,getLogs);
-router.get("/saveBackup", isAuthenticated,saveBackup);
+router.get("/saveBackup", isAuthenticated,saveBackupController);
 router.get("/downloadBackup", isAuthenticated,downloadBackup);
-router.get("/reloadBD", isAuthenticated,insertData);
+router.get("/reloadBD", isAuthenticated,reloadBdController);
+
+router.post("/upload-backup", upload.single("backup"), uploadBackupController);
+
 
 export default router;

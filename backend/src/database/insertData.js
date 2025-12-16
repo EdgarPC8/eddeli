@@ -45,8 +45,8 @@ import { Expense, Income } from '../models/Finance.js';
 
 
 
-const backupFilePath = resolve('./src/database/backup.json'); // Ruta del archivo de respaldo principal
-const backups = resolve('./src/backups'); // Ruta para guardar copias de seguridad
+export const backupFilePath = resolve('./src/database/backup.json'); // Ruta del archivo de respaldo principal
+export const backups = resolve('./src/backups'); // Ruta para guardar copias de seguridad
 
 export const insertData = async () => {
 
