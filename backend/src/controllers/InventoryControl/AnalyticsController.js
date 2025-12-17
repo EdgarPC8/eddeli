@@ -286,8 +286,6 @@ export const getCustomerSalesSummary = async (req, res) => {
 
 
 
-
-
 export const getIncomeExpenseBreakdown = async (req, res) => {
   // Utils locales (dentro del controlador)
   const toNum = (v, def = 0) => {

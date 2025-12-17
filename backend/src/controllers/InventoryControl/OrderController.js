@@ -5,61 +5,733 @@ import { Customer, Order, OrderItem } from "../../models/Orders.js";
 import { Income } from "../../models/Finance.js";
 import { format } from 'date-fns';
 import { de, es } from 'date-fns/locale';
-export const markItemAsPaid = async (req, res) => {
+
+import { Op } from "sequelize";
+import { sequelize } from "../../database/connection.js";
+
+// ----------------------------------------------------------------------------------------------------------------------------
+
+const toNum = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+const isoDateOnly = (d) => {
+  if (!d) return null;
+  const dt = new Date(d);
+  if (Number.isNaN(dt.getTime())) return null;
+  // YYYY-MM-DD
+  return dt.toISOString().slice(0, 10);
+};
+
+// GET /finance/workbench/all
+export const getFinanceWorkbenchAll = async (req, res) => {
   try {
-    const { itemId } = req.params;
     const token = getHeaderToken(req);
-    const user = await verifyJWT(token);
+    await verifyJWT(token);
 
-    const item = await OrderItem.findByPk(itemId);
-    if (!item) return res.status(404).json({ message: 'Item not found' });
+    // 1) Clientes + pedidos + items + producto
+    const customers = await Customer.findAll({
+      attributes: ["id", "name", "phone", "email"],
+      include: [
+        {
+          model: Order,
+          as: "ERP_orders",
+          attributes: [
+            "id",
+            "customerId",
+            "date",
+            "createdAt",
+            "financeIncomeId", // <- ESTE ES TU groupId
+          ],
+          include: [
+            {
+              model: OrderItem,
+              as: "ERP_order_items",
+              attributes: ["id", "orderId", "productId", "quantity", "price", "paidAt"],
+              include: [
+                {
+                  model: InventoryProduct,
+                  as: "ERP_inventory_product",
+                  attributes: ["id", "name"],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      order: [
+        ["name", "ASC"],
+        [{ model: Order, as: "ERP_orders" }, "createdAt", "DESC"],
+      ],
+    });
 
-    if (item.paidAt) {
-      return res.status(400).json({ message: 'This item is already marked as paid' });
-    }
+    // 2) Grupos (deudas): Income.category = "cuentas_por_cobrar"
+    const groups = await Income.findAll({
+      where: {
+        category: "cuentas_por_cobrar",
+        referenceType: "customer", // deuda asociada al cliente
+      },
+      attributes: ["id", "date", "amount", "concept", "status", "referenceId", "createdAt"],
+      order: [["createdAt", "DESC"]],
+    });
 
-    item.paidAt = new Date();
-    await item.save();
+    // 3) Abonos: Income.referenceType = "income_debt" (referenceId = groupIncomeId)
+    const payments = await Income.findAll({
+      where: {
+        referenceType: "income_debt",
+        status: "paid",
+      },
+      attributes: ["id", "date", "amount", "concept", "referenceId", "createdAt"],
+      order: [["createdAt", "DESC"]],
+    });
 
-    // Check if all items in the order are paid
-    const allItems = await OrderItem.findAll({ where: { orderId: item.orderId } });
-    const allPaid = allItems.every(i => !!i.paidAt);
+    // ====== FORMATEO EXACTO PARA TU FRONTEND ======
 
-    if (allPaid) {
-      const order = await Order.findByPk(item.orderId);
-      order.status = 'pagado';
-      await order.save();
+    // customers array (igual que seedCustomers)
+    const outCustomers = customers.map((c) => ({
+      id: c.id,
+      name: c.name,
+      phone: c.phone ?? null,
+      email: c.email ?? null,
+    }));
 
-      // Check for existing income
-      const existingIncome = await Income.findOne({
-        where: {
-          referenceId: order.id,
-          referenceType: 'order',
-        }
-      });
+    // orders array (igual que seedOrders)
+    const outOrders = [];
+    for (const c of customers) {
+      const ordersArr = Array.isArray(c.ERP_orders) ? c.ERP_orders : [];
+      for (const o of ordersArr) {
+        const itemsArr = Array.isArray(o.ERP_order_items) ? o.ERP_order_items : [];
 
-      if (!existingIncome) {
-        const total = allItems.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-
-        await Income.create({
-          date: new Date(),
-          amount: total,
-          concept: `Order #${order.id} payment`,
-          category: 'Venta',
-          referenceId: order.id,
-          referenceType: 'order',
-          createdBy: user.accountId,
+        outOrders.push({
+          id: o.id,
+          customerId: o.customerId ?? c.id,
+          date: isoDateOnly(o.date) || isoDateOnly(o.createdAt),
+          groupId: o.financeIncomeId ?? null, // 👈 para tu componente
+          paidAt: null, // (no lo usas en pedido; el pago está en items)
+          items: itemsArr.map((it) => ({
+            id: it.id,
+            product: it.ERP_inventory_product?.name ?? "(sin nombre)",
+            qty: toNum(it.quantity),
+            price: toNum(it.price),
+            paidAt: it.paidAt ? isoDateOnly(it.paidAt) : null,
+          })),
         });
       }
     }
 
-    res.json({ message: 'Item marked as paid', item });
+    // groups array (igual que seedGroups)
+    const outGroups = groups.map((g) => ({
+      id: g.id,
+      customerId: g.referenceId, // porque referenceType="customer"
+      concept: g.concept,
+      createdAt: isoDateOnly(g.createdAt) || isoDateOnly(g.date),
+      status: g.status, // pending/paid
+      totalAmount: toNum(g.amount),
+    }));
 
+    // payments array (igual que seedPayments)
+    const outPayments = payments.map((p) => ({
+      id: p.id,
+      groupId: p.referenceId, // referenceId = debtIncomeId
+      date: isoDateOnly(p.date) || isoDateOnly(p.createdAt),
+      amount: toNum(p.amount),
+      note: p.concept ?? "Abono",
+    }));
+
+    return res.json({
+      customers: outCustomers,
+      orders: outOrders,
+      groups: outGroups,
+      payments: outPayments,
+    });
   } catch (error) {
-    console.error("Error in markItemAsPaid:", error);
-    res.status(500).json({ message: 'Error marking item as paid', error });
+    console.error("getFinanceWorkbenchAll:", error);
+    return res.status(500).json({
+      message: "Error al cargar Workbench",
+      error: String(error?.message || error),
+    });
   }
 };
+
+
+export const payOrderGroup = async (req, res) => {
+  const { groupIncomeId } = req.params;
+  const { amount, date, note } = req.body;
+
+  const payAmount = Number(amount);
+  if (!Number.isFinite(payAmount) || payAmount <= 0) {
+    return res.status(400).json({ message: "Monto inválido" });
+  }
+
+  try {
+    const token = getHeaderToken(req);
+    const user = await verifyJWT(token);
+
+    const result = await sequelize.transaction(async (t) => {
+      const debt = await Income.findByPk(groupIncomeId, { transaction: t });
+      if (!debt) return { status: 404, body: { message: "Grupo/deuda no existe" } };
+
+      if (debt.status === "paid") {
+        return { status: 400, body: { message: "Este grupo ya está pagado" } };
+      }
+
+      // Total abonado
+      const alreadyPaid = (await Income.sum("amount", {
+        where: {
+          referenceType: "income_debt",
+          referenceId: debt.id,
+          status: "paid",
+        },
+        transaction: t,
+      })) || 0;
+
+      const total = Number(debt.amount || 0);
+      const remaining = Number((total - Number(alreadyPaid)).toFixed(2));
+
+      if (payAmount > remaining + 0.0001) {
+        return { status: 400, body: { message: `Abono excede saldo. Saldo: ${remaining}` } };
+      }
+
+      const paymentDate = date ? new Date(date) : new Date();
+
+      // Crear el abono
+      const payment = await Income.create(
+        {
+          date: paymentDate,
+          amount: Number(payAmount.toFixed(2)),
+          concept: note || `Abono grupo #${debt.id}`,
+          category: "abono",
+          status: "paid",
+          counterpartyName: debt.counterpartyName || null,
+          referenceType: "income_debt",
+          referenceId: debt.id,
+          createdBy: user.accountId,
+        },
+        { transaction: t }
+      );
+
+      const newPaid = Number(alreadyPaid) + payAmount;
+      const newRemaining = Number((total - newPaid).toFixed(2));
+
+      let closed = false;
+
+      if (newRemaining <= 0.0001) {
+        // Marcar deuda pagada
+        debt.status = "paid";
+        await debt.save({ transaction: t });
+
+        // Traer pedidos del grupo
+        const groupOrders = await Order.findAll({
+          where: { financeIncomeId: debt.id },
+          include: [{ model: OrderItem, as: "ERP_order_items" }],
+          transaction: t,
+        });
+
+        // Marcar items como pagados (paidAt)
+        for (const o of groupOrders) {
+          const items = Array.isArray(o.ERP_order_items) ? o.ERP_order_items : [];
+          for (const it of items) {
+            if (!it.paidAt) {
+              it.paidAt = paymentDate;
+              await it.save({ transaction: t });
+            }
+          }
+        }
+
+        closed = true;
+      }
+
+      return {
+        status: 200,
+        body: {
+          groupIncomeId: debt.id,
+          paymentId: payment.id,
+          total,
+          alreadyPaid: Number(alreadyPaid),
+          paidNow: Number(payAmount.toFixed(2)),
+          totalPaid: Number(newPaid.toFixed(2)),
+          remaining: Number(Math.max(0, newRemaining).toFixed(2)),
+          closed,
+        },
+      };
+    });
+
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error("payOrderGroup:", error);
+    return res.status(500).json({ message: "Error registrando abono", error: String(error.message || error) });
+  }
+};
+
+
+export const createOrderGroup = async (req, res) => {
+  const { customerId, orderIds, concept } = req.body;
+
+  if (!customerId || !Array.isArray(orderIds) || orderIds.length === 0) {
+    return res.status(400).json({ message: "customerId y orderIds son requeridos" });
+  }
+
+  try {
+    const token = getHeaderToken(req);
+    const user = await verifyJWT(token);
+
+    const result = await sequelize.transaction(async (t) => {
+      const customer = await Customer.findByPk(customerId, { transaction: t });
+      if (!customer) return { status: 404, body: { message: "Cliente no existe" } };
+
+      // Traer pedidos con items
+      const orders = await Order.findAll({
+        where: {
+          id: { [Op.in]: orderIds },
+          customerId,
+        },
+        include: [
+          {
+            model: OrderItem,
+            as: "ERP_order_items",
+          },
+        ],
+        transaction: t,
+      });
+
+      if (orders.length !== orderIds.length) {
+        return { status: 400, body: { message: "Algunos pedidos no existen o no pertenecen al cliente" } };
+      }
+
+      // Validar que ninguno ya esté en grupo
+      const alreadyGrouped = orders.find((o) => o.financeIncomeId != null);
+      if (alreadyGrouped) {
+        return {
+          status: 400,
+          body: { message: `El pedido #${alreadyGrouped.id} ya está en un grupo` },
+        };
+      }
+
+      // Total = suma de items no pagados
+      let total = 0;
+      let itemsCount = 0;
+
+      for (const o of orders) {
+        const items = Array.isArray(o.ERP_order_items) ? o.ERP_order_items : [];
+        for (const it of items) {
+          if (!it.paidAt) {
+            total += toNum(it.quantity) * toNum(it.price);
+            itemsCount += 1;
+          }
+        }
+      }
+
+      total = Number(total.toFixed(2));
+
+      if (total <= 0) {
+        return { status: 400, body: { message: "No hay ítems pendientes en esos pedidos" } };
+      }
+
+      // Crear Income pendiente = “grupo/deuda”
+      const debt = await Income.create(
+        {
+          date: new Date(),
+          amount: total,
+          concept: concept || `Grupo ${customer.name}`,
+          category: "cuentas_por_cobrar",
+          status: "pending",
+          counterpartyName: customer.name,
+          referenceType: "customer",
+          referenceId: customerId,
+          createdBy: user.accountId, // ajusta si tu JWT trae idCuenta
+        },
+        { transaction: t }
+      );
+
+      // Asignar grupo a pedidos
+      await Order.update(
+        { financeIncomeId: debt.id },
+        { where: { id: { [Op.in]: orderIds } }, transaction: t }
+      );
+
+      return {
+        status: 201,
+        body: {
+          groupIncomeId: debt.id,
+          customerId,
+          concept: debt.concept,
+          total: debt.amount,
+          ordersCount: orders.length,
+          pendingItemsCount: itemsCount,
+        },
+      };
+    });
+
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error("createOrderGroup:", error);
+    return res.status(500).json({ message: "Error al crear grupo", error: String(error.message || error) });
+  }
+};
+// ----------------------------------------------------------------------------------------------------------------------------
+
+// controllers/finance/financeAudit.controller.js
+export const fixIncomeFromOrderItemsMismatch = async (req, res) => {
+  const apply = String(req.query.apply || "0") === "0"; // por defecto NO aplica
+  try {
+    const result = await sequelize.transaction(async (t) => {
+      const orders = await Order.findAll({
+        attributes: ["id", "status"],
+        include: [{ model: OrderItem, as: "ERP_order_items", attributes: ["price", "quantity"] }],
+        order: [["id", "ASC"]],
+        transaction: t,
+      });
+
+      const orderIds = orders.map(o => o.id);
+      const incomes = await Income.findAll({
+        where: { referenceType: "order", referenceId: { [Op.in]: orderIds } },
+        order: [["referenceId", "ASC"], ["id", "ASC"]],
+        transaction: t,
+      });
+
+      const incomeByOrderId = new Map();
+      for (const inc of incomes) {
+        const k = inc.referenceId;
+        if (!incomeByOrderId.has(k)) incomeByOrderId.set(k, []);
+        incomeByOrderId.get(k).push(inc);
+      }
+
+      const fixes = [];
+
+      for (const order of orders) {
+        const items = order.ERP_order_items || [];
+        const itemsTotal = Number(
+          items.reduce((sum, it) => sum + Number(it.price) * Number(it.quantity), 0).toFixed(2)
+        );
+
+        const incs = incomeByOrderId.get(order.id) || [];
+        if (incs.length === 0) continue;
+
+        const incomeTotal = Number(
+          incs.reduce((sum, inc) => sum + Number(inc.amount), 0).toFixed(2)
+        );
+
+        const diff = Number((itemsTotal - incomeTotal).toFixed(2));
+        if (Math.abs(diff) <= 0.01) continue;
+
+        const primary = incs[0];
+        const duplicates = incs.slice(1);
+
+        fixes.push({
+          orderId: order.id,
+          itemsTotal,
+          previousIncomeTotal: incomeTotal,
+          newIncomeAmount: itemsTotal,
+          previousIncomeIds: incs.map(i => i.id),
+          willUpdateIncomeId: primary.id,
+          willDeleteDuplicateIncomeIds: duplicates.map(d => d.id),
+          apply,
+        });
+
+        if (apply) {
+          // Actualiza el primero con el monto correcto
+          await primary.update(
+            {
+              amount: itemsTotal,
+              concept: primary.concept || `Order #${order.id} payment (reconciled)`,
+              category: primary.category || "Venta",
+            },
+            { transaction: t }
+          );
+
+          // Elimina duplicados (si existen)
+          if (duplicates.length > 0) {
+            await Income.destroy({
+              where: { id: { [Op.in]: duplicates.map(d => d.id) } },
+              transaction: t,
+            });
+          }
+        }
+      }
+
+      return {
+        apply,
+        fixesCount: fixes.length,
+        fixes,
+      };
+    });
+
+    return res.json(result);
+  } catch (error) {
+    console.error("fixIncomeFromOrderItemsMismatch:", error);
+    return res.status(500).json({
+      message: "Error arreglando inconsistencias",
+      error: String(error?.message || error),
+    });
+  }
+};
+
+export const markItemAsPaid = async (req, res) => {
+  const { itemId } = req.params;
+
+  try {
+    const token = getHeaderToken(req);
+    const user = await verifyJWT(token);
+
+    const result = await sequelize.transaction(async (t) => {
+      // Traemos el item con producto + orden + cliente (para concept)
+      const item = await OrderItem.findByPk(itemId, {
+        include: [
+          { model: InventoryProduct, attributes: ["id", "name"] },
+          {
+            model: Order,
+            include: [{ model: Customer, attributes: ["id", "name"] }],
+          },
+        ],
+        transaction: t,
+      });
+
+      if (!item) return { status: 404, body: { message: "Item not found" } };
+      if (item.paidAt) return { status: 400, body: { message: "Este ítem ya está pagado" } };
+
+      item.paidAt = new Date();
+      await item.save({ transaction: t });
+
+      const itemTotal = Number((Number(item.price) * Number(item.quantity)).toFixed(2));
+
+      const productName = item.ERP_inventory_product?.name || "Producto";
+      const customerName = item.ERP_order?.ERP_customer?.name || "Cliente";
+
+      const concept = `Venta ${productName} x${item.quantity} a ${customerName} (Ord #${item.orderId}) $${Number(item.price).toFixed(2)}`;
+
+      const [income, created] = await Income.findOrCreate({
+        where: { referenceType: "order_item", referenceId: item.id },
+        defaults: {
+          date: new Date(),
+          amount: itemTotal,
+          concept,
+          category: "Venta",
+          createdBy: user.accountId,
+          referenceType: "order_item",
+          referenceId: item.id,
+        },
+        transaction: t,
+      });
+
+      // Si ya existía, sincronizamos
+      if (!created) {
+        await income.update(
+          {
+            amount: itemTotal,
+            date: new Date(),
+            concept, // siempre lo actualizamos para que quede bonito
+            category: "Venta",
+          },
+          { transaction: t }
+        );
+      }
+
+      // Estado del pedido: pagado solo si todos los items están pagados
+      const allItems = await OrderItem.findAll({
+        where: { orderId: item.orderId },
+        attributes: ["paidAt"],
+        transaction: t,
+      });
+
+      const allPaid = allItems.length > 0 && allItems.every((i) => !!i.paidAt);
+
+      const order = await Order.findByPk(item.orderId, { transaction: t });
+      if (order) {
+        order.status = allPaid ? "pagado" : "pendiente";
+        await order.save({ transaction: t });
+      }
+
+      return {
+        status: 200,
+        body: { message: "Ítem marcado como pagado", item, income },
+      };
+    });
+
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error("markItemAsPaid:", error);
+    return res.status(500).json({ message: "Error", error: String(error?.message || error) });
+  }
+};
+
+
+export const updateOrderItem = async (req, res) => {
+  const { itemId } = req.params;
+  const { quantity, price, paidAt, deliveredAt } = req.body;
+
+  try {
+    const token = getHeaderToken(req);
+    const user = await verifyJWT(token);
+
+    const result = await sequelize.transaction(async (t) => {
+      const item = await OrderItem.findByPk(itemId, { transaction: t });
+      if (!item) return { status: 404, body: { message: "Ítem no encontrado" } };
+
+      // 1) updates normales
+      if (typeof quantity !== "undefined") item.quantity = Number(quantity);
+      if (typeof price !== "undefined") item.price = Number(price);
+
+      // 2) toggle pagado (si viene en el body)
+      // - paidAt: null => desmarcar pagado
+      // - paidAt: true/"now" => marcar con fecha actual
+      // - paidAt: string fecha => usar esa fecha
+      if (typeof paidAt !== "undefined") {
+        if (paidAt === null) {
+          item.paidAt = null;
+        } else if (paidAt === true || paidAt === "now") {
+          item.paidAt = new Date();
+        } else {
+          const d = new Date(paidAt);
+          if (isNaN(d.getTime())) {
+            return { status: 400, body: { message: "paidAt inválido" } };
+          }
+          item.paidAt = d;
+        }
+      }
+
+      // (Opcional) toggle entregado con la misma lógica
+      if (typeof deliveredAt !== "undefined") {
+        if (deliveredAt === null) {
+          item.deliveredAt = null;
+        } else if (deliveredAt === true || deliveredAt === "now") {
+          item.deliveredAt = new Date();
+        } else {
+          const d = new Date(deliveredAt);
+          if (isNaN(d.getTime())) {
+            return { status: 400, body: { message: "deliveredAt inválido" } };
+          }
+          item.deliveredAt = d;
+        }
+      }
+
+      await item.save({ transaction: t });
+
+      // 3) sincroniza Income SOLO si se tocó paidAt o se tocó price/quantity
+      const touchedMoney =
+        typeof paidAt !== "undefined" ||
+        typeof quantity !== "undefined" ||
+        typeof price !== "undefined";
+
+      if (touchedMoney) {
+        const existingIncome = await Income.findOne({
+          where: { referenceType: "order_item", referenceId: item.id },
+          transaction: t,
+        });
+
+        if (item.paidAt) {
+          const itemTotal = Number((Number(item.price) * Number(item.quantity)).toFixed(2));
+
+          if (existingIncome) {
+            await existingIncome.update(
+              {
+                amount: itemTotal,
+                date: new Date(),
+                concept: `Pago ítem #${item.id} (Order #${item.orderId})`,
+                category: "Venta",
+              },
+              { transaction: t }
+            );
+          } else {
+            await Income.create(
+              {
+                date: new Date(),
+                amount: itemTotal,
+                concept: `Pago ítem #${item.id} (Order #${item.orderId})`,
+                category: "Venta",
+                referenceType: "order_item",
+                referenceId: item.id,
+                createdBy: user.accountId,
+              },
+              { transaction: t }
+            );
+          }
+        } else {
+          // si quedó no pagado => income no debe existir
+          if (existingIncome) {
+            await existingIncome.destroy({ transaction: t });
+          }
+        }
+      }
+
+      // 4) recalcula estado del pedido (pagado si TODOS pagados)
+      const allItems = await OrderItem.findAll({
+        where: { orderId: item.orderId },
+        attributes: ["paidAt"],
+        transaction: t,
+      });
+
+      const allPaid = allItems.length > 0 && allItems.every((i) => !!i.paidAt);
+
+      const order = await Order.findByPk(item.orderId, { transaction: t });
+      if (order) {
+        order.status = allPaid ? "pagado" : "pendiente";
+        await order.save({ transaction: t });
+      }
+
+      return { status: 200, body: { message: "Ítem actualizado", item } };
+    });
+
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error("updateOrderItem:", error);
+    return res.status(500).json({
+      message: "Error al actualizar ítem",
+      error: String(error?.message || error),
+    });
+  }
+};
+
+
+export const unmarkItemAsPaid = async (req, res) => {
+  const { itemId } = req.params;
+
+  try {
+    const token = getHeaderToken(req);
+    await verifyJWT(token);
+
+    const result = await sequelize.transaction(async (t) => {
+      const item = await OrderItem.findByPk(itemId, { transaction: t });
+      if (!item) return { status: 404, body: { message: "Item not found" } };
+
+      if (!item.paidAt) {
+        return { status: 400, body: { message: "Este ítem no está pagado" } };
+      }
+
+      item.paidAt = null;
+      await item.save({ transaction: t });
+
+      await Income.destroy({
+        where: { referenceType: "order_item", referenceId: item.id },
+        transaction: t,
+      });
+
+      // actualizar estado del pedido
+      const allItems = await OrderItem.findAll({
+        where: { orderId: item.orderId },
+        attributes: ["paidAt"],
+        transaction: t,
+      });
+
+      const allPaid = allItems.length > 0 && allItems.every((i) => !!i.paidAt);
+
+      const order = await Order.findByPk(item.orderId, { transaction: t });
+      if (order) {
+        order.status = allPaid ? "pagado" : "pendiente";
+        await order.save({ transaction: t });
+      }
+
+      return { status: 200, body: { message: "Pago revertido", item } };
+    });
+
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error("unmarkItemAsPaid:", error);
+    return res.status(500).json({ message: "Error", error: String(error?.message || error) });
+  }
+};
+
+
+
 export const markItemAsDelivered = async (req, res) => {
   try {
     const { itemId } = req.params;
@@ -270,27 +942,8 @@ export const updateOrder = async (req, res) => {
 };
 
 
-export const updateOrderItem = async (req, res) => {
-  try {
-    const { itemId } = req.params;
-    const { quantity, price, deliveredAt, paidAt } = req.body;
 
-    const item = await OrderItem.findByPk(itemId);
-    if (!item) return res.status(404).json({ message: 'Ítem no encontrado' });
 
-    item.quantity = quantity;
-    item.price = price;
-    item.deliveredAt = deliveredAt;
-    item.paidAt = paidAt ;
-
-    // console.log("------------------",deliveredAt,paidAt)
-    await item.save();
-
-    res.json({ message: 'Ítem actualizado correctamente', item });
-  } catch (error) {
-    res.status(500).json({ message: 'Error al actualizar ítem', error });
-  }
-};
 
 
 // Cambiar el estado del pedido

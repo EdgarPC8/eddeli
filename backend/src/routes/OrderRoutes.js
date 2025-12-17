@@ -11,14 +11,41 @@ import {
     markItemAsPaid,
     updateOrderItem,
     deleteOrderItem,
-    deleteOrder
+    deleteOrder,
+    fixIncomeFromOrderItemsMismatch,
+    getFinanceWorkbenchAll,
+createOrderGroup,
+payOrderGroup,
  } from '../controllers/InventoryControl/OrderController.js';
-
 
 import { isAuthenticated } from '../middlewares/authMiddelware.js';
 
 const router = express.Router();
 
+
+router.get("/workbench/all", isAuthenticated, getFinanceWorkbenchAll);
+
+/**
+ * Crear grupo (deuda) desde pedidos
+ * POST /finance/order-groups
+ * body: { customerId, orderIds[], concept }
+ */
+router.post("/order-groups", isAuthenticated, createOrderGroup);
+
+/**
+ * Abonar a un grupo
+ * POST /finance/order-groups/:groupIncomeId/pay
+ * body: { amount, date, note }
+ */
+router.post(
+  "/order-groups/:groupIncomeId/pay",
+  isAuthenticated,
+  payOrderGroup
+);
+
+
+
+router.get('/cmd', fixIncomeFromOrderItemsMismatch);
 router.post('', isAuthenticated, createOrder);
 router.put('/:id', isAuthenticated, updateOrder);
 router.put('/:id/status', isAuthenticated, updateOrderStatus);

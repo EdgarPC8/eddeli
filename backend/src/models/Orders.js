@@ -26,7 +26,9 @@ export const Order = sequelize.define("ERP_orders", {
     type: DataTypes.DATE,
     allowNull: false,
     defaultValue: Sequelize.NOW
-  }
+  },
+  financeIncomeId: { type: DataTypes.INTEGER, allowNull: true }
+
   
 }, {
   timestamps: true,
