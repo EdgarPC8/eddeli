@@ -11,19 +11,26 @@ import { sequelize } from "../../database/connection.js";
 
 // ----------------------------------------------------------------------------------------------------------------------------
 
-const toNum = (v) => {
+// =======================
+// Helpers
+// =======================
+const toNum = (v, def = 0) => {
   const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-};
-const isoDateOnly = (d) => {
-  if (!d) return null;
-  const dt = new Date(d);
-  if (Number.isNaN(dt.getTime())) return null;
-  // YYYY-MM-DD
-  return dt.toISOString().slice(0, 10);
+  return Number.isFinite(n) ? n : def;
 };
 
-// GET /finance/workbench/all
+const isoDateOnly = (d) => {
+  if (!d) return null;
+  const dt = d instanceof Date ? d : new Date(d);
+  if (Number.isNaN(dt.getTime())) return null;
+  const yyyy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const sum = (arr, fn) => (arr || []).reduce((acc, x) => acc + toNum(fn(x)), 0);
+
 export const getFinanceWorkbenchAll = async (req, res) => {
   try {
     const token = getHeaderToken(req);
@@ -36,13 +43,7 @@ export const getFinanceWorkbenchAll = async (req, res) => {
         {
           model: Order,
           as: "ERP_orders",
-          attributes: [
-            "id",
-            "customerId",
-            "date",
-            "createdAt",
-            "financeIncomeId", // <- ESTE ES TU groupId
-          ],
+          attributes: ["id", "customerId", "date", "createdAt", "financeIncomeId"],
           include: [
             {
               model: OrderItem,
@@ -65,37 +66,118 @@ export const getFinanceWorkbenchAll = async (req, res) => {
       ],
     });
 
-    // 2) Grupos (deudas): Income.category = "cuentas_por_cobrar"
+    // 2) Grupos (deudas)
+    // OJO: tu Income NO tiene status, así que NO filtramos por status
     const groups = await Income.findAll({
       where: {
         category: "cuentas_por_cobrar",
-        referenceType: "customer", // deuda asociada al cliente
-      },
-      attributes: ["id", "date", "amount", "concept", "status", "referenceId", "createdAt"],
-      order: [["createdAt", "DESC"]],
-    });
-
-    // 3) Abonos: Income.referenceType = "income_debt" (referenceId = groupIncomeId)
-    const payments = await Income.findAll({
-      where: {
-        referenceType: "income_debt",
-        status: "paid",
+        referenceType: "customer",
       },
       attributes: ["id", "date", "amount", "concept", "referenceId", "createdAt"],
       order: [["createdAt", "DESC"]],
     });
 
-    // ====== FORMATEO EXACTO PARA TU FRONTEND ======
+    // 3) Abonos
+    // En tu payOrderGroup tú creas abonos con category: "abono" y referenceType: "income_debt"
+    const payments = await Income.findAll({
+      where: {
+        referenceType: "income_debt",
+        category: "abono",
+      },
+      attributes: ["id", "date", "amount", "concept", "referenceId", "createdAt"],
+      order: [["createdAt", "DESC"]],
+    });
 
-    // customers array (igual que seedCustomers)
-    const outCustomers = customers.map((c) => ({
+    // =========================
+    // Formato EXACTO frontend
+    // =========================
+
+    const outGroups = groups.map((g) => ({
+      id: g.id,
+      customerId: g.referenceId, // referenceType = customer
+      concept: g.concept,
+      createdAt: isoDateOnly(g.createdAt) || isoDateOnly(g.date),
+      totalAmount: Number(toNum(g.amount).toFixed(2)),
+    }));
+
+    const outPayments = payments.map((p) => ({
+      id: p.id,
+      groupId: p.referenceId, // referenceId = groupIncomeId
+      date: isoDateOnly(p.date) || isoDateOnly(p.createdAt),
+      amount: Number(toNum(p.amount).toFixed(2)),
+      note: p.concept ?? "Abono",
+    }));
+
+    // -------------------------
+    // ✅ 1) Saldo por grupo
+    // -------------------------
+    const paidByGroupId = new Map();
+    for (const p of outPayments) {
+      paidByGroupId.set(p.groupId, Number(((paidByGroupId.get(p.groupId) || 0) + toNum(p.amount)).toFixed(2)));
+    }
+
+    const remainingByGroupId = new Map();
+    for (const g of outGroups) {
+      const total = toNum(g.totalAmount);
+      const paid = toNum(paidByGroupId.get(g.id) || 0);
+      const remaining = Number(Math.max(0, total - paid).toFixed(2));
+      remainingByGroupId.set(g.id, remaining);
+    }
+
+    // -------------------------
+    // ✅ 2) Deuda por cliente:
+    // saldo de grupos + ítems sin pagar NO agrupados
+    // -------------------------
+    const debtByCustomerId = new Map();
+
+    // (a) saldo de grupos por cliente
+    for (const g of outGroups) {
+      const remaining = toNum(remainingByGroupId.get(g.id) || 0);
+      if (remaining <= 0) continue;
+
+      const prev = toNum(debtByCustomerId.get(g.customerId) || 0);
+      debtByCustomerId.set(g.customerId, Number((prev + remaining).toFixed(2)));
+    }
+
+    // (b) ítems sin pagar que aún no están en grupo (financeIncomeId = null)
+    for (const c of customers) {
+      const ordersArr = Array.isArray(c.ERP_orders) ? c.ERP_orders : [];
+      let ungroupedPending = 0;
+
+      for (const o of ordersArr) {
+        const inGroup = o.financeIncomeId != null; // ya agrupado
+        if (inGroup) continue;
+
+        const itemsArr = Array.isArray(o.ERP_order_items) ? o.ERP_order_items : [];
+        for (const it of itemsArr) {
+          if (!it.paidAt) {
+            ungroupedPending += toNum(it.quantity) * toNum(it.price);
+          }
+        }
+      }
+
+      if (ungroupedPending > 0) {
+        const prev = toNum(debtByCustomerId.get(c.id) || 0);
+        debtByCustomerId.set(c.id, Number((prev + ungroupedPending).toFixed(2)));
+      }
+    }
+
+    // customers (ordenados por debtTotal desc)
+    let outCustomers = customers.map((c) => ({
       id: c.id,
       name: c.name,
       phone: c.phone ?? null,
       email: c.email ?? null,
+      debtTotal: Number(toNum(debtByCustomerId.get(c.id) || 0).toFixed(2)),
     }));
 
-    // orders array (igual que seedOrders)
+    outCustomers.sort((a, b) => {
+      const diff = toNum(b.debtTotal) - toNum(a.debtTotal);
+      if (diff !== 0) return diff;
+      return String(a.name || "").localeCompare(String(b.name || ""), "es");
+    });
+
+    // orders array (igual que tu seedOrders)
     const outOrders = [];
     for (const c of customers) {
       const ordersArr = Array.isArray(c.ERP_orders) ? c.ERP_orders : [];
@@ -106,8 +188,8 @@ export const getFinanceWorkbenchAll = async (req, res) => {
           id: o.id,
           customerId: o.customerId ?? c.id,
           date: isoDateOnly(o.date) || isoDateOnly(o.createdAt),
-          groupId: o.financeIncomeId ?? null, // 👈 para tu componente
-          paidAt: null, // (no lo usas en pedido; el pago está en items)
+          groupId: o.financeIncomeId ?? null,
+          paidAt: null, // (si quieres, luego lo calculamos a nivel pedido)
           items: itemsArr.map((it) => ({
             id: it.id,
             product: it.ERP_inventory_product?.name ?? "(sin nombre)",
@@ -118,25 +200,6 @@ export const getFinanceWorkbenchAll = async (req, res) => {
         });
       }
     }
-
-    // groups array (igual que seedGroups)
-    const outGroups = groups.map((g) => ({
-      id: g.id,
-      customerId: g.referenceId, // porque referenceType="customer"
-      concept: g.concept,
-      createdAt: isoDateOnly(g.createdAt) || isoDateOnly(g.date),
-      status: g.status, // pending/paid
-      totalAmount: toNum(g.amount),
-    }));
-
-    // payments array (igual que seedPayments)
-    const outPayments = payments.map((p) => ({
-      id: p.id,
-      groupId: p.referenceId, // referenceId = debtIncomeId
-      date: isoDateOnly(p.date) || isoDateOnly(p.createdAt),
-      amount: toNum(p.amount),
-      note: p.concept ?? "Abono",
-    }));
 
     return res.json({
       customers: outCustomers,
