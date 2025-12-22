@@ -47,8 +47,10 @@ export const OrderItem = sequelize.define("ERP_order_items", {
   },
   paidAt: {
     type: DataTypes.DATE,
-    allowNull: true, // null means not paid yet
+    allowNull: true,
+    comment: "Fecha cuando quedó totalmente pagado (último pago)",
   },
+  
   
 }, {
   timestamps: false,

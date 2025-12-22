@@ -5,7 +5,8 @@ import { verifyJWT, getHeaderToken } from "../../libs/jwt.js";
 
 // controllers/finance.controller.js
 import { Op, fn, literal } from 'sequelize';
-import { OrderItem } from "../../models/Orders.js";
+import { Order, OrderItem } from "../../models/Orders.js";
+
 
 
 
@@ -20,16 +21,15 @@ export const getFinanceSummary = async (req, res) => {
         where: {
           paidAt: { [Op.is]: null },       // aún sin pago
           // opcional: excluye eliminados/soft-delete si existe un flag
-          // deletedAt: { [Op.is]: null }
+          
+        //    include: [{ 
+        //      model: Order, 
+        //    as: 'ERP_order', 
+        //    attributes: [], 
+        //    required: true, 
+        //    where: { status: { [Op.ne]: 'pending' } } 
+        //  }],
         },
-        // opcional: si quieres EXCLUIR órdenes canceladas
-        // include: [{
-        //   model: ERPOrder,
-        //   as: 'ERP_order',
-        //   attributes: [],
-        //   required: true,
-        //   where: { status: { [Op.ne]: 'CANCELLED' } }
-        // }],
         raw: true,
       }),
     ]);

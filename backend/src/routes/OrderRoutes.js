@@ -1,74 +1,141 @@
 // routes/orderRoutes.js
-import express from 'express';
-import { createCustomer, getAllCustomers, updateCustomer ,deleteCustomer} from '../controllers/InventoryControl/CustomerController.js';
-import { 
-    createOrder,
-    updateOrderStatus,
-    getAllOrders,
-    updateOrder,
-    markOrderAsPaid,
-    markItemAsDelivered,
-    markItemAsPaid,
-    updateOrderItem,
-    deleteOrderItem,
-    deleteOrder,
-    fixIncomeFromOrderItemsMismatch,
-    getFinanceWorkbenchAll,
-createOrderGroup,
-payOrderGroup,
- } from '../controllers/InventoryControl/OrderController.js';
+import express from "express";
+import {
+  createCustomer,
+  getAllCustomers,
+  updateCustomer,
+  deleteCustomer,
+} from "../controllers/InventoryControl/CustomerController.js";
 
-import { isAuthenticated } from '../middlewares/authMiddelware.js';
+import {
+  createOrder,
+  updateOrderStatus,
+  getAllOrders,
+  updateOrder,
+  markOrderAsPaid,
+  markItemAsDelivered,
+  markItemAsPaid,
+  updateOrderItem,
+  deleteOrderItem,
+  deleteOrder,
+  command,
+
+
+} from "../controllers/InventoryControl/OrderController.js";
+
+
+import { isAuthenticated } from "../middlewares/authMiddelware.js";
+import { 
+    // ✅ WORKBENCH
+    getFinanceWorkbenchAll,
+
+    // ✅ NUEVO: Grupos por ITEMS
+    createItemGroup,
+    updateItemGroup,
+    deleteItemGroup,
+    moveItemBetweenGroups,
+  
+    // ✅ NUEVO: Pagos/Abonos (Payment -> Income)
+    payItemGroup,
+    updateGroupPayment,
+    deleteGroupPayment,
+
+} from "../controllers/InventoryControl/OrderGroupFinanceController.js";
+
 
 const router = express.Router();
 
 
+
+
+// --------------------
+// CMD
+// --------------------
+router.get("/cmd", command);
+
+// --------------------
+// WORKBENCH
+// --------------------
 router.get("/workbench/all", isAuthenticated, getFinanceWorkbenchAll);
 
-/**
- * Crear grupo (deuda) desde pedidos
- * POST /finance/order-groups
- * body: { customerId, orderIds[], concept }
- */
-router.post("/order-groups", isAuthenticated, createOrderGroup);
+// =====================================================
+// ✅ FINANCE WORKBENCH (NUEVO)
+// =====================================================
 
 /**
- * Abonar a un grupo
- * POST /finance/order-groups/:groupIncomeId/pay
- * body: { amount, date, note }
+ * Crear grupo por items
+ * POST /workbench/item-groups
+ * body: { customerId, itemIds: number[], concept? }
  */
-router.post(
-  "/order-groups/:groupIncomeId/pay",
-  isAuthenticated,
-  payOrderGroup
-);
+router.post("/workbench/item-groups", isAuthenticated, createItemGroup);
 
+/**
+ * Editar grupo (concept/status)
+ * PUT /workbench/item-groups/:groupId
+ * body: { concept?, status? } // status: "open" | "closed" | "cancelled"
+ */
+router.put("/workbench/item-groups/:groupId", isAuthenticated, updateItemGroup);
 
+/**
+ * Eliminar grupo (solo si no tiene pagos)
+ * DELETE /workbench/item-groups/:groupId
+ */
+router.delete("/workbench/item-groups/:groupId", isAuthenticated, deleteItemGroup);
 
-router.get('/cmd', fixIncomeFromOrderItemsMismatch);
-router.post('', isAuthenticated, createOrder);
-router.put('/:id', isAuthenticated, updateOrder);
-router.put('/:id/status', isAuthenticated, updateOrderStatus);
-router.get('', isAuthenticated, getAllOrders);
+/**
+ * Mover / quitar / agregar item a grupo
+ * POST /workbench/item-groups/move-item
+ * body: { orderItemId, toGroupId }  // toGroupId = null => quitar del grupo
+ */
+router.post("/workbench/item-groups/move-item", isAuthenticated, moveItemBetweenGroups);
 
-router.put('/orders/:id/mark-paid', isAuthenticated, markOrderAsPaid);
+/**
+ * Abonar a un grupo (crea Payment + Income)
+ * POST /workbench/item-groups/:groupId/pay
+ * body: { amount, date?, note?, method? }
+ */
+router.post("/workbench/item-groups/:groupId/pay", isAuthenticated, payItemGroup);
 
-router.post('/customers', isAuthenticated, createCustomer);
-router.get('/customers', isAuthenticated, getAllCustomers);
-router.put('/customers/:id', isAuthenticated, updateCustomer);
-router.delete('/customers/:id', isAuthenticated, deleteCustomer);
+/**
+ * Editar un pago (sincroniza Income)
+ * PUT /workbench/payments/:paymentId
+ * body: { amount?, date?, note?, method?, status? }
+ */
+router.put("/workbench/payments/:paymentId", isAuthenticated, updateGroupPayment);
 
+/**
+ * Eliminar un pago (borra Income asociado)
+ * DELETE /workbench/payments/:paymentId
+ */
+router.delete("/workbench/payments/:paymentId", isAuthenticated, deleteGroupPayment);
 
-router.put('/order-items/:itemId/mark-delivered', isAuthenticated, markItemAsDelivered);
-router.put('/order-items/:itemId/mark-paid', isAuthenticated, markItemAsPaid);
-router.delete('/order-items/:id', isAuthenticated, deleteOrderItem);
-router.delete('/order/:id', isAuthenticated, deleteOrder);
+// =====================================================
+// ✅ ÓRDENES (LO TUYO NORMAL)
+// =====================================================
+router.post("", isAuthenticated, createOrder);
+router.put("/:id", isAuthenticated, updateOrder);
+router.put("/:id/status", isAuthenticated, updateOrderStatus);
+router.get("", isAuthenticated, getAllOrders);
 
+router.put("/orders/:id/mark-paid", isAuthenticated, markOrderAsPaid);
 
-router.put('/order-items/:itemId', isAuthenticated, updateOrderItem);
+// =====================================================
+// ✅ CLIENTES (LO TUYO NORMAL)
+// =====================================================
+router.post("/customers", isAuthenticated, createCustomer);
+router.get("/customers", isAuthenticated, getAllCustomers);
+router.put("/customers/:id", isAuthenticated, updateCustomer);
+router.delete("/customers/:id", isAuthenticated, deleteCustomer);
 
+// =====================================================
+// ✅ ITEMS (LO TUYO NORMAL)
+// =====================================================
+router.put("/order-items/:itemId/mark-delivered", isAuthenticated, markItemAsDelivered);
+router.put("/order-items/:itemId/mark-paid", isAuthenticated, markItemAsPaid);
 
+router.put("/order-items/:itemId", isAuthenticated, updateOrderItem);
+router.delete("/order-items/:id", isAuthenticated, deleteOrderItem);
 
-
+router.delete("/order/:id", isAuthenticated, deleteOrder);
 
 export default router;

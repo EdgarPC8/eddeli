@@ -8,526 +8,245 @@ import { de, es } from 'date-fns/locale';
 
 import { Op } from "sequelize";
 import { sequelize } from "../../database/connection.js";
+// controllers/finance/financeAudit.controller.js
 
-// ----------------------------------------------------------------------------------------------------------------------------
+export const command = async (req, res) => {
+  const customerId = 19;
 
-// =======================
-// Helpers
-// =======================
-const toNum = (v, def = 0) => {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : def;
-};
+  // Helpers
+  const toNum = (x) => Number(Number(x || 0).toFixed(2));
 
-const isoDateOnly = (d) => {
-  if (!d) return null;
-  const dt = d instanceof Date ? d : new Date(d);
-  if (Number.isNaN(dt.getTime())) return null;
-  const yyyy = dt.getFullYear();
-  const mm = String(dt.getMonth() + 1).padStart(2, "0");
-  const dd = String(dt.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-};
+  const extractOrderIdFromConcept = (txt = "") => {
+    const s = String(txt || "");
 
-const sum = (arr, fn) => (arr || []).reduce((acc, x) => acc + toNum(fn(x)), 0);
+    // Caso 1: (Ord #123)
+    let m = s.match(/\( *Ord *# *(\d+) *\)/i);
+    if (m) return Number(m[1]);
 
-export const getFinanceWorkbenchAll = async (req, res) => {
-  try {
-    const token = getHeaderToken(req);
-    await verifyJWT(token);
+    // Caso 2: Order #123 payment
+    m = s.match(/Order\s*#\s*(\d+)/i);
+    if (m) return Number(m[1]);
 
-    // 1) Clientes + pedidos + items + producto
-    const customers = await Customer.findAll({
-      attributes: ["id", "name", "phone", "email"],
-      include: [
-        {
-          model: Order,
-          as: "ERP_orders",
-          attributes: ["id", "customerId", "date", "createdAt", "financeIncomeId"],
-          include: [
-            {
-              model: OrderItem,
-              as: "ERP_order_items",
-              attributes: ["id", "orderId", "productId", "quantity", "price", "paidAt"],
-              include: [
-                {
-                  model: InventoryProduct,
-                  as: "ERP_inventory_product",
-                  attributes: ["id", "name"],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-      order: [
-        ["name", "ASC"],
-        [{ model: Order, as: "ERP_orders" }, "createdAt", "DESC"],
-      ],
-    });
-
-    // 2) Grupos (deudas)
-    // OJO: tu Income NO tiene status, así que NO filtramos por status
-    const groups = await Income.findAll({
-      where: {
-        category: "cuentas_por_cobrar",
-        referenceType: "customer",
-      },
-      attributes: ["id", "date", "amount", "concept", "referenceId", "createdAt"],
-      order: [["createdAt", "DESC"]],
-    });
-
-    // 3) Abonos
-    // En tu payOrderGroup tú creas abonos con category: "abono" y referenceType: "income_debt"
-    const payments = await Income.findAll({
-      where: {
-        referenceType: "income_debt",
-        category: "abono",
-      },
-      attributes: ["id", "date", "amount", "concept", "referenceId", "createdAt"],
-      order: [["createdAt", "DESC"]],
-    });
-
-    // =========================
-    // Formato EXACTO frontend
-    // =========================
-
-    const outGroups = groups.map((g) => ({
-      id: g.id,
-      customerId: g.referenceId, // referenceType = customer
-      concept: g.concept,
-      createdAt: isoDateOnly(g.createdAt) || isoDateOnly(g.date),
-      totalAmount: Number(toNum(g.amount).toFixed(2)),
-    }));
-
-    const outPayments = payments.map((p) => ({
-      id: p.id,
-      groupId: p.referenceId, // referenceId = groupIncomeId
-      date: isoDateOnly(p.date) || isoDateOnly(p.createdAt),
-      amount: Number(toNum(p.amount).toFixed(2)),
-      note: p.concept ?? "Abono",
-    }));
-
-    // -------------------------
-    // ✅ 1) Saldo por grupo
-    // -------------------------
-    const paidByGroupId = new Map();
-    for (const p of outPayments) {
-      paidByGroupId.set(p.groupId, Number(((paidByGroupId.get(p.groupId) || 0) + toNum(p.amount)).toFixed(2)));
-    }
-
-    const remainingByGroupId = new Map();
-    for (const g of outGroups) {
-      const total = toNum(g.totalAmount);
-      const paid = toNum(paidByGroupId.get(g.id) || 0);
-      const remaining = Number(Math.max(0, total - paid).toFixed(2));
-      remainingByGroupId.set(g.id, remaining);
-    }
-
-    // -------------------------
-    // ✅ 2) Deuda por cliente:
-    // saldo de grupos + ítems sin pagar NO agrupados
-    // -------------------------
-    const debtByCustomerId = new Map();
-
-    // (a) saldo de grupos por cliente
-    for (const g of outGroups) {
-      const remaining = toNum(remainingByGroupId.get(g.id) || 0);
-      if (remaining <= 0) continue;
-
-      const prev = toNum(debtByCustomerId.get(g.customerId) || 0);
-      debtByCustomerId.set(g.customerId, Number((prev + remaining).toFixed(2)));
-    }
-
-    // (b) ítems sin pagar que aún no están en grupo (financeIncomeId = null)
-    for (const c of customers) {
-      const ordersArr = Array.isArray(c.ERP_orders) ? c.ERP_orders : [];
-      let ungroupedPending = 0;
-
-      for (const o of ordersArr) {
-        const inGroup = o.financeIncomeId != null; // ya agrupado
-        if (inGroup) continue;
-
-        const itemsArr = Array.isArray(o.ERP_order_items) ? o.ERP_order_items : [];
-        for (const it of itemsArr) {
-          if (!it.paidAt) {
-            ungroupedPending += toNum(it.quantity) * toNum(it.price);
-          }
-        }
-      }
-
-      if (ungroupedPending > 0) {
-        const prev = toNum(debtByCustomerId.get(c.id) || 0);
-        debtByCustomerId.set(c.id, Number((prev + ungroupedPending).toFixed(2)));
-      }
-    }
-
-    // customers (ordenados por debtTotal desc)
-    let outCustomers = customers.map((c) => ({
-      id: c.id,
-      name: c.name,
-      phone: c.phone ?? null,
-      email: c.email ?? null,
-      debtTotal: Number(toNum(debtByCustomerId.get(c.id) || 0).toFixed(2)),
-    }));
-
-    outCustomers.sort((a, b) => {
-      const diff = toNum(b.debtTotal) - toNum(a.debtTotal);
-      if (diff !== 0) return diff;
-      return String(a.name || "").localeCompare(String(b.name || ""), "es");
-    });
-
-    // orders array (igual que tu seedOrders)
-    const outOrders = [];
-    for (const c of customers) {
-      const ordersArr = Array.isArray(c.ERP_orders) ? c.ERP_orders : [];
-      for (const o of ordersArr) {
-        const itemsArr = Array.isArray(o.ERP_order_items) ? o.ERP_order_items : [];
-
-        outOrders.push({
-          id: o.id,
-          customerId: o.customerId ?? c.id,
-          date: isoDateOnly(o.date) || isoDateOnly(o.createdAt),
-          groupId: o.financeIncomeId ?? null,
-          paidAt: null, // (si quieres, luego lo calculamos a nivel pedido)
-          items: itemsArr.map((it) => ({
-            id: it.id,
-            product: it.ERP_inventory_product?.name ?? "(sin nombre)",
-            qty: toNum(it.quantity),
-            price: toNum(it.price),
-            paidAt: it.paidAt ? isoDateOnly(it.paidAt) : null,
-          })),
-        });
-      }
-    }
-
-    return res.json({
-      customers: outCustomers,
-      orders: outOrders,
-      groups: outGroups,
-      payments: outPayments,
-    });
-  } catch (error) {
-    console.error("getFinanceWorkbenchAll:", error);
-    return res.status(500).json({
-      message: "Error al cargar Workbench",
-      error: String(error?.message || error),
-    });
-  }
-};
-
-
-export const payOrderGroup = async (req, res) => {
-  const { groupIncomeId } = req.params;
-  const { amount, date, note } = req.body;
-
-  const payAmount = Number(amount);
-  if (!Number.isFinite(payAmount) || payAmount <= 0) {
-    return res.status(400).json({ message: "Monto inválido" });
-  }
+    return null;
+  };
 
   try {
-    const token = getHeaderToken(req);
-    const user = await verifyJWT(token);
-
     const result = await sequelize.transaction(async (t) => {
-      const debt = await Income.findByPk(groupIncomeId, { transaction: t });
-      if (!debt) return { status: 404, body: { message: "Grupo/deuda no existe" } };
-
-      if (debt.status === "paid") {
-        return { status: 400, body: { message: "Este grupo ya está pagado" } };
-      }
-
-      // Total abonado
-      const alreadyPaid = (await Income.sum("amount", {
-        where: {
-          referenceType: "income_debt",
-          referenceId: debt.id,
-          status: "paid",
-        },
-        transaction: t,
-      })) || 0;
-
-      const total = Number(debt.amount || 0);
-      const remaining = Number((total - Number(alreadyPaid)).toFixed(2));
-
-      if (payAmount > remaining + 0.0001) {
-        return { status: 400, body: { message: `Abono excede saldo. Saldo: ${remaining}` } };
-      }
-
-      const paymentDate = date ? new Date(date) : new Date();
-
-      // Crear el abono
-      const payment = await Income.create(
-        {
-          date: paymentDate,
-          amount: Number(payAmount.toFixed(2)),
-          concept: note || `Abono grupo #${debt.id}`,
-          category: "abono",
-          status: "paid",
-          counterpartyName: debt.counterpartyName || null,
-          referenceType: "income_debt",
-          referenceId: debt.id,
-          createdBy: user.accountId,
-        },
-        { transaction: t }
-      );
-
-      const newPaid = Number(alreadyPaid) + payAmount;
-      const newRemaining = Number((total - newPaid).toFixed(2));
-
-      let closed = false;
-
-      if (newRemaining <= 0.0001) {
-        // Marcar deuda pagada
-        debt.status = "paid";
-        await debt.save({ transaction: t });
-
-        // Traer pedidos del grupo
-        const groupOrders = await Order.findAll({
-          where: { financeIncomeId: debt.id },
-          include: [{ model: OrderItem, as: "ERP_order_items" }],
-          transaction: t,
-        });
-
-        // Marcar items como pagados (paidAt)
-        for (const o of groupOrders) {
-          const items = Array.isArray(o.ERP_order_items) ? o.ERP_order_items : [];
-          for (const it of items) {
-            if (!it.paidAt) {
-              it.paidAt = paymentDate;
-              await it.save({ transaction: t });
-            }
-          }
-        }
-
-        closed = true;
-      }
-
-      return {
-        status: 200,
-        body: {
-          groupIncomeId: debt.id,
-          paymentId: payment.id,
-          total,
-          alreadyPaid: Number(alreadyPaid),
-          paidNow: Number(payAmount.toFixed(2)),
-          totalPaid: Number(newPaid.toFixed(2)),
-          remaining: Number(Math.max(0, newRemaining).toFixed(2)),
-          closed,
-        },
-      };
-    });
-
-    return res.status(result.status).json(result.body);
-  } catch (error) {
-    console.error("payOrderGroup:", error);
-    return res.status(500).json({ message: "Error registrando abono", error: String(error.message || error) });
-  }
-};
-
-
-export const createOrderGroup = async (req, res) => {
-  const { customerId, orderIds, concept } = req.body;
-
-  if (!customerId || !Array.isArray(orderIds) || orderIds.length === 0) {
-    return res.status(400).json({ message: "customerId y orderIds son requeridos" });
-  }
-
-  try {
-    const token = getHeaderToken(req);
-    const user = await verifyJWT(token);
-
-    const result = await sequelize.transaction(async (t) => {
-      const customer = await Customer.findByPk(customerId, { transaction: t });
-      if (!customer) return { status: 404, body: { message: "Cliente no existe" } };
-
-      // Traer pedidos con items
+      // =========================
+      // 1) Traer órdenes + items del cliente
+      // =========================
       const orders = await Order.findAll({
-        where: {
-          id: { [Op.in]: orderIds },
-          customerId,
-        },
+        where: { customerId },
+        attributes: ["id", "customerId", "date", "createdAt", "status"],
         include: [
           {
             model: OrderItem,
             as: "ERP_order_items",
+            attributes: ["id", "orderId", "quantity", "price", "paidAt"],
           },
         ],
+        order: [["createdAt", "ASC"]],
         transaction: t,
       });
 
-      if (orders.length !== orderIds.length) {
-        return { status: 400, body: { message: "Algunos pedidos no existen o no pertenecen al cliente" } };
-      }
+      const orderIds = orders.map((o) => o.id);
 
-      // Validar que ninguno ya esté en grupo
-      const alreadyGrouped = orders.find((o) => o.financeIncomeId != null);
-      if (alreadyGrouped) {
+      if (!orderIds.length) {
         return {
-          status: 400,
-          body: { message: `El pedido #${alreadyGrouped.id} ya está en un grupo` },
+          titulo: "AUDITORÍA — Items pagados (actual) vs Income (por ref y por concept)",
+          customerId,
+          resumen: {
+            totalPagadoActualPorItems: 0,
+            totalIncomePorReference: 0,
+            totalIncomePorConcept: 0,
+            diferenciaRef: 0,
+            diferenciaConcept: 0,
+          },
+          detallePorOrden: [],
+          itemsConIncomeDescuadrado: [],
+          nota: "El cliente no tiene órdenes.",
         };
       }
 
-      // Total = suma de items no pagados
-      let total = 0;
-      let itemsCount = 0;
-
+      // Aplanar items
+      const allItems = [];
       for (const o of orders) {
-        const items = Array.isArray(o.ERP_order_items) ? o.ERP_order_items : [];
-        for (const it of items) {
-          if (!it.paidAt) {
-            total += toNum(it.quantity) * toNum(it.price);
-            itemsCount += 1;
-          }
-        }
+        const arr = Array.isArray(o.ERP_order_items) ? o.ERP_order_items : [];
+        for (const it of arr) allItems.push(it);
       }
 
-      total = Number(total.toFixed(2));
+      const itemIds = allItems.map((it) => it.id);
 
-      if (total <= 0) {
-        return { status: 400, body: { message: "No hay ítems pendientes en esos pedidos" } };
-      }
+      // =========================
+      // 2) Total ACTUAL de items pagados (paidAt != null)
+      // =========================
+      const paidItems = allItems.filter((it) => !!it.paidAt);
 
-      // Crear Income pendiente = “grupo/deuda”
-      const debt = await Income.create(
-        {
-          date: new Date(),
-          amount: total,
-          concept: concept || `Grupo ${customer.name}`,
-          category: "cuentas_por_cobrar",
-          status: "pending",
-          counterpartyName: customer.name,
-          referenceType: "customer",
-          referenceId: customerId,
-          createdBy: user.accountId, // ajusta si tu JWT trae idCuenta
-        },
-        { transaction: t }
+      const totalPagadoActualPorItems = toNum(
+        paidItems.reduce((acc, it) => acc + toNum(it.quantity) * toNum(it.price), 0)
       );
 
-      // Asignar grupo a pedidos
-      await Order.update(
-        { financeIncomeId: debt.id },
-        { where: { id: { [Op.in]: orderIds } }, transaction: t }
-      );
-
-      return {
-        status: 201,
-        body: {
-          groupIncomeId: debt.id,
-          customerId,
-          concept: debt.concept,
-          total: debt.amount,
-          ordersCount: orders.length,
-          pendingItemsCount: itemsCount,
+      // =========================
+      // 3) Incomes por REFERENCE (order + order_item)
+      // =========================
+      const incomesByReference = await Income.findAll({
+        where: {
+          [Op.or]: [
+            { referenceType: "order", referenceId: { [Op.in]: orderIds } },
+            { referenceType: "order_item", referenceId: { [Op.in]: itemIds.length ? itemIds : [0] } },
+          ],
         },
-      };
-    });
-
-    return res.status(result.status).json(result.body);
-  } catch (error) {
-    console.error("createOrderGroup:", error);
-    return res.status(500).json({ message: "Error al crear grupo", error: String(error.message || error) });
-  }
-};
-// ----------------------------------------------------------------------------------------------------------------------------
-
-// controllers/finance/financeAudit.controller.js
-export const fixIncomeFromOrderItemsMismatch = async (req, res) => {
-  const apply = String(req.query.apply || "0") === "0"; // por defecto NO aplica
-  try {
-    const result = await sequelize.transaction(async (t) => {
-      const orders = await Order.findAll({
-        attributes: ["id", "status"],
-        include: [{ model: OrderItem, as: "ERP_order_items", attributes: ["price", "quantity"] }],
+        attributes: ["id", "date", "amount", "concept", "category", "referenceType", "referenceId", "createdAt"],
         order: [["id", "ASC"]],
         transaction: t,
       });
 
-      const orderIds = orders.map(o => o.id);
-      const incomes = await Income.findAll({
-        where: { referenceType: "order", referenceId: { [Op.in]: orderIds } },
-        order: [["referenceId", "ASC"], ["id", "ASC"]],
+      const totalIncomePorReference = toNum(
+        incomesByReference.reduce((acc, inc) => acc + toNum(inc.amount), 0)
+      );
+
+      // =========================
+      // 4) Incomes por CONCEPT (extrae orderId del texto)
+      //    Aquí NO confiamos en referenceType/referenceId,
+      //    sino en el texto (Ord #xx / Order #xx)
+      // =========================
+      const incomesCandidates = await Income.findAll({
+        where: {
+          concept: {
+            [Op.or]: [
+              { [Op.like]: "%Ord #%" },   // tu formato nuevo
+              { [Op.like]: "%Order #%" }, // tu formato viejo
+            ],
+          },
+        },
+        attributes: ["id", "date", "amount", "concept", "category", "referenceType", "referenceId", "createdAt"],
+        order: [["id", "ASC"]],
         transaction: t,
       });
 
-      const incomeByOrderId = new Map();
-      for (const inc of incomes) {
-        const k = inc.referenceId;
-        if (!incomeByOrderId.has(k)) incomeByOrderId.set(k, []);
-        incomeByOrderId.get(k).push(inc);
+      // Filtrar candidatos que pertenezcan a este cliente por orderId extraído del concept
+      const incomesByConcept = [];
+      for (const inc of incomesCandidates) {
+        const oid = extractOrderIdFromConcept(inc.concept);
+        if (!oid) continue;
+        if (!orderIds.includes(oid)) continue; // solo las órdenes del cliente
+        incomesByConcept.push({ ...inc.get({ plain: true }), extractedOrderId: oid });
       }
 
-      const fixes = [];
+      const totalIncomePorConcept = toNum(
+        incomesByConcept.reduce((acc, inc) => acc + toNum(inc.amount), 0)
+      );
 
-      for (const order of orders) {
-        const items = order.ERP_order_items || [];
-        const itemsTotal = Number(
-          items.reduce((sum, it) => sum + Number(it.price) * Number(it.quantity), 0).toFixed(2)
-        );
+      // =========================
+      // 5) Detalle POR ORDEN:
+      //   - total pagado actual por items (paidAt)
+      //   - income por referenceType=order
+      //   - income por concept (extraído)
+      // =========================
+      const incomesOrderRefMap = new Map(); // orderId -> sum(amount)
+      for (const inc of incomesByReference.filter((x) => x.referenceType === "order")) {
+        const oid = Number(inc.referenceId);
+        incomesOrderRefMap.set(oid, toNum((incomesOrderRefMap.get(oid) || 0) + toNum(inc.amount)));
+      }
 
-        const incs = incomeByOrderId.get(order.id) || [];
-        if (incs.length === 0) continue;
+      const incomesOrderConceptMap = new Map(); // orderId -> sum(amount)
+      for (const inc of incomesByConcept) {
+        const oid = Number(inc.extractedOrderId);
+        incomesOrderConceptMap.set(oid, toNum((incomesOrderConceptMap.get(oid) || 0) + toNum(inc.amount)));
+      }
 
-        const incomeTotal = Number(
-          incs.reduce((sum, inc) => sum + Number(inc.amount), 0).toFixed(2)
-        );
+      const paidByOrderFromItems = new Map(); // orderId -> sum(item line) solo paidAt
+      for (const it of paidItems) {
+        const oid = Number(it.orderId);
+        const line = toNum(toNum(it.quantity) * toNum(it.price));
+        paidByOrderFromItems.set(oid, toNum((paidByOrderFromItems.get(oid) || 0) + line));
+      }
 
-        const diff = Number((itemsTotal - incomeTotal).toFixed(2));
-        if (Math.abs(diff) <= 0.01) continue;
+      const detallePorOrden = orderIds
+        .map((oid) => {
+          const pagadoActual = toNum(paidByOrderFromItems.get(oid) || 0);
+          const incomePorOrderRef = toNum(incomesOrderRefMap.get(oid) || 0);
+          const incomePorConcept = toNum(incomesOrderConceptMap.get(oid) || 0);
 
-        const primary = incs[0];
-        const duplicates = incs.slice(1);
+          return {
+            pedidoId: oid,
+            totalPagadoActualPorItems: pagadoActual,
+            incomePorOrderReferencia: incomePorOrderRef,
+            incomePorConceptoExtraido: incomePorConcept,
+            diferenciaVsOrderRef: toNum(pagadoActual - incomePorOrderRef),
+            diferenciaVsConcept: toNum(pagadoActual - incomePorConcept),
+          };
+        })
+        .filter((x) => x.totalPagadoActualPorItems > 0 || x.incomePorOrderReferencia > 0 || x.incomePorConceptoExtraido > 0);
 
-        fixes.push({
-          orderId: order.id,
-          itemsTotal,
-          previousIncomeTotal: incomeTotal,
-          newIncomeAmount: itemsTotal,
-          previousIncomeIds: incs.map(i => i.id),
-          willUpdateIncomeId: primary.id,
-          willDeleteDuplicateIncomeIds: duplicates.map(d => d.id),
-          apply,
-        });
+      // =========================
+      // 6) Items pagados con income por item DESCUADRADO
+      //    (si existe income referenceType=order_item)
+      // =========================
+      const incomeByItemId = new Map(); // itemId -> {sum, ids}
+      for (const inc of incomesByReference.filter((x) => x.referenceType === "order_item")) {
+        const itemId = Number(inc.referenceId);
+        if (!incomeByItemId.has(itemId)) incomeByItemId.set(itemId, { sum: 0, ids: [] });
+        const obj = incomeByItemId.get(itemId);
+        obj.sum = toNum(obj.sum + toNum(inc.amount));
+        obj.ids.push(inc.id);
+      }
 
-        if (apply) {
-          // Actualiza el primero con el monto correcto
-          await primary.update(
-            {
-              amount: itemsTotal,
-              concept: primary.concept || `Order #${order.id} payment (reconciled)`,
-              category: primary.category || "Venta",
-            },
-            { transaction: t }
-          );
-
-          // Elimina duplicados (si existen)
-          if (duplicates.length > 0) {
-            await Income.destroy({
-              where: { id: { [Op.in]: duplicates.map(d => d.id) } },
-              transaction: t,
-            });
-          }
+      const itemsConIncomeDescuadrado = [];
+      for (const it of paidItems) {
+        const expected = toNum(toNum(it.quantity) * toNum(it.price));
+        const rec = incomeByItemId.get(it.id);
+        if (!rec) continue; // si no hay income por item, no lo marcamos aquí
+        const got = toNum(rec.sum);
+        const diff = toNum(expected - got);
+        if (Math.abs(diff) > 0.01) {
+          itemsConIncomeDescuadrado.push({
+            orderItemId: it.id,
+            pedidoId: it.orderId,
+            totalActualItem: expected,
+            totalIncomeItem: got,
+            diferencia: diff,
+            incomeIds: rec.ids,
+            nota: "Este item está pagado, pero el Income por order_item no coincide con el total actual (price/qty cambiaron).",
+          });
         }
       }
 
+      // =========================
+      // 7) Resumen final
+      // =========================
       return {
-        apply,
-        fixesCount: fixes.length,
-        fixes,
+        titulo: "AUDITORÍA — Items pagados (actual) vs Income (por ref y por concept)",
+        customerId,
+        resumen: {
+          totalPagadoActualPorItems,
+          totalIncomePorReference,
+          totalIncomePorConcept,
+          diferenciaRef: toNum(totalPagadoActualPorItems - totalIncomePorReference),
+          diferenciaConcept: toNum(totalPagadoActualPorItems - totalIncomePorConcept),
+          cantidadPedidos: orderIds.length,
+          cantidadItems: allItems.length,
+          cantidadItemsPagados: paidItems.length,
+          cantidadIncomesPorReference: incomesByReference.length,
+          cantidadIncomesPorConcept: incomesByConcept.length,
+        },
+        detallePorOrden,
+        itemsConIncomeDescuadrado: itemsConIncomeDescuadrado.slice(0, 200),
+        nota:
+          "Si el total actual por items no cuadra con Income, casi seguro cambiaste price/qty después de crear Incomes. Revisa itemsConIncomeDescuadrado y detallePorOrden para ubicar dónde se descuadra.",
       };
     });
 
     return res.json(result);
   } catch (error) {
-    console.error("fixIncomeFromOrderItemsMismatch:", error);
+    console.error("command audit by concept/ref:", error);
     return res.status(500).json({
-      message: "Error arreglando inconsistencias",
+      mensaje: "Error auditando por concept/reference",
       error: String(error?.message || error),
     });
   }
 };
+
 
 export const markItemAsPaid = async (req, res) => {
   const { itemId } = req.params;
@@ -807,14 +526,14 @@ export const markItemAsDelivered = async (req, res) => {
     if (item.deliveredAt) {
       return res.status(400).json({ message: 'Este ítem ya fue marcado como entregado' });
     }
-    
+
     const product = await InventoryProduct.findByPk(item.productId);
     if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
-    
+
     if (product.stock < item.quantity) {
       return res.status(400).json({ message: 'Stock insuficiente para entregar este ítem' });
     }
-    
+
 
     // 1. Deduct stock
     product.stock -= item.quantity;
@@ -876,7 +595,7 @@ export const createOrder = async (req, res) => {
     const order = await Order.create({
       customerId,
       notes,
-      date:date, // usa la fecha enviada, o la actual si no viene
+      date: date, // usa la fecha enviada, o la actual si no viene
     });
 
     const createdItems = await Promise.all(

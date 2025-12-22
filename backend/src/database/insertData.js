@@ -38,7 +38,13 @@ import {
   Order,
   OrderItem
 } from '../models/Orders.js';
-import { Expense, Income } from '../models/Finance.js';
+import { Expense, 
+  Income ,
+  ItemGroup,
+  ItemGroupItem,
+  Payment
+  
+} from '../models/Finance.js';
 
 
 
@@ -111,6 +117,9 @@ export const insertData = async () => {
     await HomeProduct.bulkCreate(jsonData.HomeProduct, { returning: true });
     await Catalog.bulkCreate(jsonData.Catalog, { returning: true });
     await StoreProduct.bulkCreate(jsonData.StoreProduct, { returning: true });
+    await ItemGroup.bulkCreate(jsonData.ItemGroup, { returning: true });
+    await ItemGroupItem.bulkCreate(jsonData.ItemGroupItem, { returning: true });
+    await Payment.bulkCreate(jsonData.Payment, { returning: true });
 
     console.log("Datos insertados correctamente desde el archivo de respaldo.");
   } catch (error) {
@@ -163,6 +172,9 @@ export const saveBackup = async () => {
     const StoreData = await Store.findAll();
     const CatalogData= await Catalog.findAll();
     const StoreProductData= await StoreProduct.findAll();
+    const ItemGroupData= await ItemGroup.findAll();
+    const ItemGroupItemData= await ItemGroupItem.findAll();
+    const PaymentData= await Payment.findAll();
 
     const backupData = {
       Roles: rolesData,
@@ -200,6 +212,9 @@ export const saveBackup = async () => {
       Store:StoreData,
       Catalog:CatalogData,
       StoreProduct:StoreProductData,
+      ItemGroup:ItemGroupData,
+      ItemGroupItem:ItemGroupItemData,
+      Payment:PaymentData,
     };
 
     await fs.mkdir(backups, { recursive: true });
