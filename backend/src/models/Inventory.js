@@ -6,24 +6,42 @@ import { Account } from './Account.js';
 
 
 
-// Tabla de movimientos de inventario (entrada, salida, ajuste)
 export const InventoryMovement = sequelize.define('ERP_inventory_movements', {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   productId: { type: DataTypes.INTEGER, allowNull: false },
   quantity: { type: DataTypes.FLOAT, allowNull: false },
-  description: { type: DataTypes.TEXT},
-  price: {
-  type: DataTypes.FLOAT,
-  allowNull: true, // solo se usa para entradas normalmente
-},
 
-  type: { type: DataTypes.ENUM("entrada", "salida","ajuste","produccion"), allowNull: false },
-  referenceType: { type: DataTypes.STRING, allowNull: true }, // ej: "order"
+  description: { type: DataTypes.TEXT },
+
+  // costo unitario (para entradas/producción y para valorar pérdidas)
+  price: { type: DataTypes.FLOAT, allowNull: true },
+
+  type: { type: DataTypes.ENUM("entrada", "salida", "ajuste", "produccion"), allowNull: false },
+
+  // NUEVO: motivo específico
+  reason: {
+    type: DataTypes.ENUM(
+      "ENTRADA_PRODUCCION",     // entra por producción propia
+      "ENTRADA_COMPRA",         // entra por compra a proveedor
   
+      "SALIDA_VENTA",           // sale por venta / entrega de pedido
+      "SALIDA_YAPA",            // sale por yapa / regalo
+      "SALIDA_DANIADO",         // sale por producto dañado
+      "SALIDA_CADUCADO",        // sale por producto caducado
+      "SALIDA_CONSUMO_INTERNO", // sale por consumo interno
+  
+      "AJUSTE_ENTRADA",         // ajuste positivo (sobrante)
+      "AJUSTE_SALIDA"           // ajuste negativo (faltante)
+    ),
+    allowNull: true
+  },
+  referenceType: { type: DataTypes.STRING, allowNull: true }, // "order", "purchase", "production", etc.
   referenceId: { type: DataTypes.INTEGER, allowNull: true },
+
   date: { type: DataTypes.DATE, defaultValue: DataTypes.NOW },
   createdBy: { type: DataTypes.INTEGER, allowNull: false }
 });
+
 
 
 // Tabla de recetas: define qué productos (insumos) componen un producto final

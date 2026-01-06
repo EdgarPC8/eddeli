@@ -41,6 +41,34 @@ export const OrderItem = sequelize.define("ERP_order_items", {
   productId: { type: DataTypes.INTEGER, allowNull: false },
   quantity: { type: DataTypes.FLOAT, allowNull: false },
   price: { type: DataTypes.FLOAT, allowNull: false },
+  soldQty: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+    defaultValue: 0,
+    comment: "Cantidad realmente vendida (cobrable)"
+  },
+  
+  damagedQty: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+    defaultValue: 0,
+    comment: "Cantidad dañada / merma"
+  },
+  
+  giftQty: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+    defaultValue: 0,
+    comment: "Cantidad entregada como yapa"
+  },
+  
+  replacedQty: {
+    type: DataTypes.FLOAT,
+    allowNull: false,
+    defaultValue: 0,
+    comment: "Cantidad entregada como reemplazo"
+  },
+  
   deliveredAt: {
     type: DataTypes.DATE,
     allowNull: true, // null means not delivered yet

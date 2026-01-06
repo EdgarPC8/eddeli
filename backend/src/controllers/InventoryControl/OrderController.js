@@ -8,10 +8,256 @@ import { de, es } from 'date-fns/locale';
 
 import { Op } from "sequelize";
 import { sequelize } from "../../database/connection.js";
+
+
+
+
+const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+// Cantidad COBRABLE (venta real)
+// - Si existe soldQty => usar soldQty
+// - Si no existe => usar quantity (compatibilidad)
+
+
+// Para detectar si un pedido es de “panadería/consignación”
+// Recomendado: un campo boolean en Order o Customer.
+// Fallback temporal: notes contiene "#PANADERIA"
+const isConsignmentOrder = (itemWithOrder) => {
+  const o = itemWithOrder?.ERP_order || itemWithOrder?.ERP_order_items?.ERP_order;
+  const c = o?.ERP_customer;
+  if (o?.isConsignment === true) return true;
+  if (c?.isBakery === true) return true;
+  if (typeof o?.notes === "string" && o.notes.includes("#PANADERIA")) return true;
+  return false;
+};
+
+
+// helpers seguros
+const toNumOrNull = (v) => {
+  if (v === undefined) return undefined;      // no vino => no tocar
+  if (v === null) return null;               // vino null => null explícito (si aplica)
+  if (v === "") return undefined;            // string vacío => NO tocar (evita pisar con 0)
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined; // si es NaN => no tocar
+};
+
+const getBillableQty = (item) => {
+  // cobrable = soldQty si existe (>=0), si no, quantity
+  const sold = Number(item.soldQty || 0);
+  if (sold > 0) return sold;
+  return Number(item.quantity || 0);
+};
+
+export const updateOrderItem = async (req, res) => {
+  const { itemId } = req.params;
+
+  const {
+    quantity,
+    price,
+    soldQty,
+    damagedQty,
+    giftQty,
+    replacedQty,
+    paidAt,
+    deliveredAt,
+  } = req.body;
+
+  try {
+    const token = getHeaderToken(req);
+    const user = await verifyJWT(token);
+
+    console.log("[updateOrderItem] itemId:", itemId);
+    console.log("[updateOrderItem] body:", req.body);
+
+    const result = await sequelize.transaction(async (t) => {
+      const item = await OrderItem.findByPk(itemId, {
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+
+      if (!item) return { status: 404, body: { message: "Ítem no encontrado" } };
+
+      // -------------------------
+      // Helpers INLINE (solo aquí)
+      // -------------------------
+      const toNumber = (v) => {
+        if (v === undefined) return undefined; // no tocar
+        if (v === null) return null;           // permitir null para fechas (no para qty)
+        if (v === "") return undefined;        // no pisar con vacío
+        const n = Number(v);
+        return Number.isFinite(n) ? n : undefined;
+      };
+
+      const toNonNeg = (v) => {
+        const n = toNumber(v);
+        if (n === undefined) return undefined;
+        if (n === null) return 0;
+        return Math.max(0, n);
+      };
+
+      const parseDateToggle = (v) => {
+        if (v === undefined) return undefined; // no tocar
+        if (v === null) return null;           // limpiar
+        if (v === true || v === "now") return new Date();
+        const d = new Date(v);
+        return isNaN(d.getTime()) ? "__INVALID__" : d;
+      };
+
+      // -------------------------
+      // Payload de UPDATE (solo campos válidos)
+      // -------------------------
+      const payload = {};
+
+      const q = toNonNeg(quantity);
+      if (q !== undefined) payload.quantity = q;
+
+      const p = toNonNeg(price);
+      if (p !== undefined) payload.price = p;
+
+      const s = toNonNeg(soldQty);
+      if (s !== undefined) payload.soldQty = s;
+
+      const d = toNonNeg(damagedQty);
+      if (d !== undefined) payload.damagedQty = d;
+
+      const g = toNonNeg(giftQty);
+      if (g !== undefined) payload.giftQty = g;
+
+      const r = toNonNeg(replacedQty);
+      if (r !== undefined) payload.replacedQty = r;
+
+      const paidParsed = parseDateToggle(paidAt);
+      if (paidParsed === "__INVALID__") {
+        return { status: 400, body: { message: "paidAt inválido" } };
+      }
+      if (paidParsed !== undefined) payload.paidAt = paidParsed;
+
+      const delParsed = parseDateToggle(deliveredAt);
+      if (delParsed === "__INVALID__") {
+        return { status: 400, body: { message: "deliveredAt inválido" } };
+      }
+      if (delParsed !== undefined) payload.deliveredAt = delParsed;
+
+      console.log("[updateOrderItem] payload:", payload);
+
+      if (Object.keys(payload).length === 0) {
+        return { status: 200, body: { message: "Nada para actualizar (payload vacío)", item } };
+      }
+
+      // -------------------------
+      // Validación de coherencia
+      // -------------------------
+      const nextQuantity = payload.quantity ?? item.quantity;
+      const nextSold = payload.soldQty ?? item.soldQty;
+      const nextDamaged = payload.damagedQty ?? item.damagedQty;
+      const nextGift = payload.giftQty ?? item.giftQty;
+      const nextReplaced = payload.replacedQty ?? item.replacedQty;
+
+      const totalSalida =
+        Number(nextSold || 0) +
+        Number(nextDamaged || 0) +
+        Number(nextGift || 0) +
+        Number(nextReplaced || 0);
+
+      if (totalSalida > Number(nextQuantity || 0) + 1e-9) {
+        return {
+          status: 400,
+          body: { message: "La suma (vendido+dañado+yapa+cambiado) no puede ser mayor que quantity" },
+        };
+      }
+
+      // -------------------------
+      // UPDATE FORZADO (siempre genera UPDATE cuando hay payload)
+      // -------------------------
+      await OrderItem.update(payload, {
+        where: { id: item.id },
+        transaction: t,
+      });
+
+      const updated = await OrderItem.findByPk(item.id, { transaction: t });
+
+      // -------------------------
+      // Income sync (solo si toca dinero)
+      // -------------------------
+      const touchedMoney =
+        ("paidAt" in payload) ||
+        ("price" in payload) ||
+        ("soldQty" in payload) ||
+        ("quantity" in payload);
+
+      if (touchedMoney) {
+        const existingIncome = await Income.findOne({
+          where: { referenceType: "order_item", referenceId: updated.id },
+          transaction: t,
+        });
+
+        const billableQty = Number(updated.soldQty || 0) > 0
+          ? Number(updated.soldQty || 0)
+          : Number(updated.quantity || 0);
+
+        if (updated.paidAt) {
+          const amount = Number((Number(updated.price || 0) * billableQty).toFixed(2));
+          const concept = `Pago ítem #${updated.id} (Order #${updated.orderId})`;
+
+          if (existingIncome) {
+            await existingIncome.update(
+              { amount, date: new Date(), concept, category: "Venta" },
+              { transaction: t }
+            );
+          } else {
+            await Income.create(
+              {
+                date: new Date(),
+                amount,
+                concept,
+                category: "Venta",
+                referenceType: "order_item",
+                referenceId: updated.id,
+                createdBy: user.accountId,
+              },
+              { transaction: t }
+            );
+          }
+        } else {
+          if (existingIncome) await existingIncome.destroy({ transaction: t });
+        }
+      }
+
+      // -------------------------
+      // Estado del pedido (pagado si todos pagados)
+      // -------------------------
+      const allItems = await OrderItem.findAll({
+        where: { orderId: updated.orderId },
+        attributes: ["paidAt"],
+        transaction: t,
+      });
+
+      const allPaid = allItems.length > 0 && allItems.every((i) => !!i.paidAt);
+
+      const order = await Order.findByPk(updated.orderId, { transaction: t });
+      if (order) {
+        order.status = allPaid ? "pagado" : "pendiente";
+        await order.save({ transaction: t });
+      }
+
+      return { status: 200, body: { message: "Ítem actualizado ✅", item: updated } };
+    });
+
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error("updateOrderItem:", error);
+    return res.status(500).json({
+      message: "Error al actualizar ítem",
+      error: String(error?.message || error),
+    });
+  }
+};
+
+
 // controllers/finance/financeAudit.controller.js
 
 export const command = async (req, res) => {
-  const customerId = 19;
+  const customerId = Number(req.query.customerId || 19);
 
   // Helpers
   const toNum = (x) => Number(Number(x || 0).toFixed(2));
@@ -42,7 +288,8 @@ export const command = async (req, res) => {
           {
             model: OrderItem,
             as: "ERP_order_items",
-            attributes: ["id", "orderId", "quantity", "price", "paidAt"],
+            // ✅ IMPORTANTE: necesitamos deliveredAt en el item para poder corregirlo
+            attributes: ["id", "orderId", "quantity", "price", "paidAt", "deliveredAt"],
           },
         ],
         order: [["createdAt", "ASC"]],
@@ -53,7 +300,8 @@ export const command = async (req, res) => {
 
       if (!orderIds.length) {
         return {
-          titulo: "AUDITORÍA — Items pagados (actual) vs Income (por ref y por concept)",
+          titulo:
+            "AUDITORÍA — Items pagados (actual) vs Income (por ref y por concept) + FIX deliveredAt(Order.createdAt)",
           customerId,
           resumen: {
             totalPagadoActualPorItems: 0,
@@ -61,6 +309,7 @@ export const command = async (req, res) => {
             totalIncomePorConcept: 0,
             diferenciaRef: 0,
             diferenciaConcept: 0,
+            itemsActualizadosDeliveredAt: 0,
           },
           detallePorOrden: [],
           itemsConIncomeDescuadrado: [],
@@ -68,7 +317,27 @@ export const command = async (req, res) => {
         };
       }
 
-      // Aplanar items
+      // =========================
+      // 1.1) FIX: deliveredAt en OrderItem = Order.createdAt (solo si está null)
+      // =========================
+      let itemsActualizadosDeliveredAt = 0;
+
+      for (const order of orders) {
+        const deliveredDate = order.createdAt; // ✅ EXACTO lo que pediste
+
+        const items = Array.isArray(order.ERP_order_items) ? order.ERP_order_items : [];
+        for (const item of items) {
+          if (!item.deliveredAt) {
+            item.deliveredAt = deliveredDate;
+            await item.save({ transaction: t });
+            itemsActualizadosDeliveredAt++;
+          }
+        }
+      }
+
+      // =========================
+      // 2) Preparar arrays
+      // =========================
       const allItems = [];
       for (const o of orders) {
         const arr = Array.isArray(o.ERP_order_items) ? o.ERP_order_items : [];
@@ -78,7 +347,7 @@ export const command = async (req, res) => {
       const itemIds = allItems.map((it) => it.id);
 
       // =========================
-      // 2) Total ACTUAL de items pagados (paidAt != null)
+      // 3) Total ACTUAL de items pagados (paidAt != null)
       // =========================
       const paidItems = allItems.filter((it) => !!it.paidAt);
 
@@ -87,13 +356,16 @@ export const command = async (req, res) => {
       );
 
       // =========================
-      // 3) Incomes por REFERENCE (order + order_item)
+      // 4) Incomes por REFERENCE (order + order_item)
       // =========================
       const incomesByReference = await Income.findAll({
         where: {
           [Op.or]: [
             { referenceType: "order", referenceId: { [Op.in]: orderIds } },
-            { referenceType: "order_item", referenceId: { [Op.in]: itemIds.length ? itemIds : [0] } },
+            {
+              referenceType: "order_item",
+              referenceId: { [Op.in]: itemIds.length ? itemIds : [0] },
+            },
           ],
         },
         attributes: ["id", "date", "amount", "concept", "category", "referenceType", "referenceId", "createdAt"],
@@ -106,17 +378,12 @@ export const command = async (req, res) => {
       );
 
       // =========================
-      // 4) Incomes por CONCEPT (extrae orderId del texto)
-      //    Aquí NO confiamos en referenceType/referenceId,
-      //    sino en el texto (Ord #xx / Order #xx)
+      // 5) Incomes por CONCEPT (extrae orderId del texto)
       // =========================
       const incomesCandidates = await Income.findAll({
         where: {
           concept: {
-            [Op.or]: [
-              { [Op.like]: "%Ord #%" },   // tu formato nuevo
-              { [Op.like]: "%Order #%" }, // tu formato viejo
-            ],
+            [Op.or]: [{ [Op.like]: "%Ord #%" }, { [Op.like]: "%Order #%" }],
           },
         },
         attributes: ["id", "date", "amount", "concept", "category", "referenceType", "referenceId", "createdAt"],
@@ -124,24 +391,18 @@ export const command = async (req, res) => {
         transaction: t,
       });
 
-      // Filtrar candidatos que pertenezcan a este cliente por orderId extraído del concept
       const incomesByConcept = [];
       for (const inc of incomesCandidates) {
         const oid = extractOrderIdFromConcept(inc.concept);
         if (!oid) continue;
-        if (!orderIds.includes(oid)) continue; // solo las órdenes del cliente
+        if (!orderIds.includes(oid)) continue;
         incomesByConcept.push({ ...inc.get({ plain: true }), extractedOrderId: oid });
       }
 
-      const totalIncomePorConcept = toNum(
-        incomesByConcept.reduce((acc, inc) => acc + toNum(inc.amount), 0)
-      );
+      const totalIncomePorConcept = toNum(incomesByConcept.reduce((acc, inc) => acc + toNum(inc.amount), 0));
 
       // =========================
-      // 5) Detalle POR ORDEN:
-      //   - total pagado actual por items (paidAt)
-      //   - income por referenceType=order
-      //   - income por concept (extraído)
+      // 6) Detalle POR ORDEN
       // =========================
       const incomesOrderRefMap = new Map(); // orderId -> sum(amount)
       for (const inc of incomesByReference.filter((x) => x.referenceType === "order")) {
@@ -177,11 +438,15 @@ export const command = async (req, res) => {
             diferenciaVsConcept: toNum(pagadoActual - incomePorConcept),
           };
         })
-        .filter((x) => x.totalPagadoActualPorItems > 0 || x.incomePorOrderReferencia > 0 || x.incomePorConceptoExtraido > 0);
+        .filter(
+          (x) =>
+            x.totalPagadoActualPorItems > 0 ||
+            x.incomePorOrderReferencia > 0 ||
+            x.incomePorConceptoExtraido > 0
+        );
 
       // =========================
-      // 6) Items pagados con income por item DESCUADRADO
-      //    (si existe income referenceType=order_item)
+      // 7) Items pagados con income por item DESCUADRADO
       // =========================
       const incomeByItemId = new Map(); // itemId -> {sum, ids}
       for (const inc of incomesByReference.filter((x) => x.referenceType === "order_item")) {
@@ -207,16 +472,18 @@ export const command = async (req, res) => {
             totalIncomeItem: got,
             diferencia: diff,
             incomeIds: rec.ids,
-            nota: "Este item está pagado, pero el Income por order_item no coincide con el total actual (price/qty cambiaron).",
+            nota:
+              "Este item está pagado, pero el Income por order_item no coincide con el total actual (price/qty cambiaron).",
           });
         }
       }
 
       // =========================
-      // 7) Resumen final
+      // 8) Resumen final
       // =========================
       return {
-        titulo: "AUDITORÍA — Items pagados (actual) vs Income (por ref y por concept)",
+        titulo:
+          "AUDITORÍA — Items pagados (actual) vs Income (por ref y por concept) + FIX deliveredAt(Order.createdAt)",
         customerId,
         resumen: {
           totalPagadoActualPorItems,
@@ -229,21 +496,113 @@ export const command = async (req, res) => {
           cantidadItemsPagados: paidItems.length,
           cantidadIncomesPorReference: incomesByReference.length,
           cantidadIncomesPorConcept: incomesByConcept.length,
+          itemsActualizadosDeliveredAt,
         },
         detallePorOrden,
         itemsConIncomeDescuadrado: itemsConIncomeDescuadrado.slice(0, 200),
         nota:
-          "Si el total actual por items no cuadra con Income, casi seguro cambiaste price/qty después de crear Incomes. Revisa itemsConIncomeDescuadrado y detallePorOrden para ubicar dónde se descuadra.",
+          "Se corrigió deliveredAt SOLO en OrderItem cuando estaba NULL, usando EXACTAMENTE Order.createdAt. 'createdBy' no es fecha.",
       };
     });
 
     return res.json(result);
   } catch (error) {
-    console.error("command audit by concept/ref:", error);
+    console.error("command audit by concept/ref + deliveredAt:", error);
     return res.status(500).json({
-      mensaje: "Error auditando por concept/reference",
+      mensaje: "Error auditando por concept/reference + deliveredAt",
       error: String(error?.message || error),
     });
+  }
+};
+
+export const closeOrderItemLogistics = async (req, res) => {
+  const { itemId } = req.params;
+  const { soldQty, damagedQty, giftQty, replacedQty } = req.body;
+
+  const token = getHeaderToken(req);
+  let user = null;
+  try { user = await verifyJWT(token); }
+  catch { return res.status(401).json({ message: "No autorizado" }); }
+
+  try {
+    const result = await sequelize.transaction(async (t) => {
+      const item = await OrderItem.findByPk(itemId, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!item) return { status: 404, body: { message: "Ítem no encontrado" } };
+
+      const delivered = num(item.quantity);
+
+      const oldSold = num(item.soldQty);
+      const oldDam = num(item.damagedQty);
+      const oldGift = num(item.giftQty);
+      const oldRep  = num(item.replacedQty);
+
+      const newSold = Math.max(0, num(soldQty));
+      const newDam  = Math.max(0, num(damagedQty));
+      const newGift = Math.max(0, num(giftQty));
+      const newRep  = Math.max(0, num(replacedQty));
+
+      if ((newSold + newDam + newGift + newRep) > delivered) {
+        return { status: 400, body: { message: "La suma (vendido+dañado+yapa+reemplazo) no puede ser mayor que lo entregado" } };
+      }
+
+      // deltas (para no duplicar movements)
+      const dSold = newSold - oldSold;
+      const dDam  = newDam  - oldDam;
+      const dGift = newGift - oldGift;
+      const dRep  = newRep  - oldRep;
+
+      // ⚠️ Recomendación: no permitir bajar (deltas negativos) sin permiso
+      const anyNegative = [dSold, dDam, dGift, dRep].some(d => d < 0);
+      if (anyNegative) {
+        return { status: 400, body: { message: "No se permite reducir valores del cierre. Use un ajuste con autorización." } };
+      }
+
+      // ✅ aquí SÍ descontamos stock (salidas reales)
+      const product = await InventoryProduct.findByPk(item.productId, { transaction: t, lock: t.LOCK.UPDATE });
+      if (!product) return { status: 404, body: { message: "Producto no encontrado" } };
+
+      const totalDeltaOut = dSold + dDam + dGift + dRep;
+      if (num(product.stock) < totalDeltaOut) {
+        return { status: 400, body: { message: "Stock insuficiente para registrar el cierre" } };
+      }
+
+      // bajar stock por total salidas
+      product.stock = num(product.stock) - totalDeltaOut;
+      await product.save({ transaction: t });
+
+      const createMov = async (qty, reason, desc) => {
+        if (qty <= 0) return;
+        await InventoryMovement.create({
+          productId: item.productId,
+          quantity: qty,
+          type: "salida",
+          reason,
+          referenceType: "order_item",
+          referenceId: item.id,
+          date: new Date(),
+          createdBy: user.accountId,
+          description: desc,
+        }, { transaction: t });
+      };
+
+      await createMov(dSold, "SALIDA_VENTA", `Cierre vendido (orderItem #${item.id})`);
+      await createMov(dDam,  "SALIDA_DANIADO", `Cierre dañado (orderItem #${item.id})`);
+      await createMov(dGift, "SALIDA_YAPA", `Cierre yapa (orderItem #${item.id})`);
+      await createMov(dRep,  "SALIDA_REEMPLAZO", `Cierre reemplazo (orderItem #${item.id})`);
+
+      // guardar campos en el item
+      await item.update(
+        { soldQty: newSold, damagedQty: newDam, giftQty: newGift, replacedQty: newRep },
+        { transaction: t }
+      );
+
+      return { status: 200, body: { message: "Cierre/logística guardado", item } };
+    });
+
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error("closeOrderItemLogistics:", error);
+    return res.status(500).json({ message: "Error", error: String(error?.message || error) });
   }
 };
 
@@ -256,30 +615,30 @@ export const markItemAsPaid = async (req, res) => {
     const user = await verifyJWT(token);
 
     const result = await sequelize.transaction(async (t) => {
-      // Traemos el item con producto + orden + cliente (para concept)
       const item = await OrderItem.findByPk(itemId, {
         include: [
-          { model: InventoryProduct, attributes: ["id", "name"] },
-          {
-            model: Order,
-            include: [{ model: Customer, attributes: ["id", "name"] }],
-          },
+          { model: InventoryProduct, as: "ERP_inventory_product", attributes: ["id", "name"] },
+          { model: Order, as: "ERP_order", include: [{ model: Customer, as: "ERP_customer", attributes: ["id", "name", "isBakery"] }] },
         ],
         transaction: t,
+        lock: t.LOCK.UPDATE,
       });
 
       if (!item) return { status: 404, body: { message: "Item not found" } };
       if (item.paidAt) return { status: 400, body: { message: "Este ítem ya está pagado" } };
 
+      // ✅ Cobrar por vendido (soldQty). Si no existe soldQty, cobra por quantity (compat).
+      const billableQty = getBillableQty(item);
+
       item.paidAt = new Date();
       await item.save({ transaction: t });
 
-      const itemTotal = Number((Number(item.price) * Number(item.quantity)).toFixed(2));
+      const itemTotal = Number((num(item.price) * billableQty).toFixed(2));
 
       const productName = item.ERP_inventory_product?.name || "Producto";
       const customerName = item.ERP_order?.ERP_customer?.name || "Cliente";
 
-      const concept = `Venta ${productName} x${item.quantity} a ${customerName} (Ord #${item.orderId}) $${Number(item.price).toFixed(2)}`;
+      const concept = `Venta ${productName} x${billableQty} a ${customerName} (Ord #${item.orderId}) $${num(item.price).toFixed(2)}`;
 
       const [income, created] = await Income.findOrCreate({
         where: { referenceType: "order_item", referenceId: item.id },
@@ -295,20 +654,14 @@ export const markItemAsPaid = async (req, res) => {
         transaction: t,
       });
 
-      // Si ya existía, sincronizamos
       if (!created) {
         await income.update(
-          {
-            amount: itemTotal,
-            date: new Date(),
-            concept, // siempre lo actualizamos para que quede bonito
-            category: "Venta",
-          },
+          { amount: itemTotal, date: new Date(), concept, category: "Venta" },
           { transaction: t }
         );
       }
 
-      // Estado del pedido: pagado solo si todos los items están pagados
+      // Recalcula estado del pedido
       const allItems = await OrderItem.findAll({
         where: { orderId: item.orderId },
         attributes: ["paidAt"],
@@ -323,10 +676,7 @@ export const markItemAsPaid = async (req, res) => {
         await order.save({ transaction: t });
       }
 
-      return {
-        status: 200,
-        body: { message: "Ítem marcado como pagado", item, income },
-      };
+      return { status: 200, body: { message: "Ítem marcado como pagado", item, income } };
     });
 
     return res.status(result.status).json(result.body);
@@ -337,131 +687,10 @@ export const markItemAsPaid = async (req, res) => {
 };
 
 
-export const updateOrderItem = async (req, res) => {
-  const { itemId } = req.params;
-  const { quantity, price, paidAt, deliveredAt } = req.body;
 
-  try {
-    const token = getHeaderToken(req);
-    const user = await verifyJWT(token);
 
-    const result = await sequelize.transaction(async (t) => {
-      const item = await OrderItem.findByPk(itemId, { transaction: t });
-      if (!item) return { status: 404, body: { message: "Ítem no encontrado" } };
 
-      // 1) updates normales
-      if (typeof quantity !== "undefined") item.quantity = Number(quantity);
-      if (typeof price !== "undefined") item.price = Number(price);
 
-      // 2) toggle pagado (si viene en el body)
-      // - paidAt: null => desmarcar pagado
-      // - paidAt: true/"now" => marcar con fecha actual
-      // - paidAt: string fecha => usar esa fecha
-      if (typeof paidAt !== "undefined") {
-        if (paidAt === null) {
-          item.paidAt = null;
-        } else if (paidAt === true || paidAt === "now") {
-          item.paidAt = new Date();
-        } else {
-          const d = new Date(paidAt);
-          if (isNaN(d.getTime())) {
-            return { status: 400, body: { message: "paidAt inválido" } };
-          }
-          item.paidAt = d;
-        }
-      }
-
-      // (Opcional) toggle entregado con la misma lógica
-      if (typeof deliveredAt !== "undefined") {
-        if (deliveredAt === null) {
-          item.deliveredAt = null;
-        } else if (deliveredAt === true || deliveredAt === "now") {
-          item.deliveredAt = new Date();
-        } else {
-          const d = new Date(deliveredAt);
-          if (isNaN(d.getTime())) {
-            return { status: 400, body: { message: "deliveredAt inválido" } };
-          }
-          item.deliveredAt = d;
-        }
-      }
-
-      await item.save({ transaction: t });
-
-      // 3) sincroniza Income SOLO si se tocó paidAt o se tocó price/quantity
-      const touchedMoney =
-        typeof paidAt !== "undefined" ||
-        typeof quantity !== "undefined" ||
-        typeof price !== "undefined";
-
-      if (touchedMoney) {
-        const existingIncome = await Income.findOne({
-          where: { referenceType: "order_item", referenceId: item.id },
-          transaction: t,
-        });
-
-        if (item.paidAt) {
-          const itemTotal = Number((Number(item.price) * Number(item.quantity)).toFixed(2));
-
-          if (existingIncome) {
-            await existingIncome.update(
-              {
-                amount: itemTotal,
-                date: new Date(),
-                concept: `Pago ítem #${item.id} (Order #${item.orderId})`,
-                category: "Venta",
-              },
-              { transaction: t }
-            );
-          } else {
-            await Income.create(
-              {
-                date: new Date(),
-                amount: itemTotal,
-                concept: `Pago ítem #${item.id} (Order #${item.orderId})`,
-                category: "Venta",
-                referenceType: "order_item",
-                referenceId: item.id,
-                createdBy: user.accountId,
-              },
-              { transaction: t }
-            );
-          }
-        } else {
-          // si quedó no pagado => income no debe existir
-          if (existingIncome) {
-            await existingIncome.destroy({ transaction: t });
-          }
-        }
-      }
-
-      // 4) recalcula estado del pedido (pagado si TODOS pagados)
-      const allItems = await OrderItem.findAll({
-        where: { orderId: item.orderId },
-        attributes: ["paidAt"],
-        transaction: t,
-      });
-
-      const allPaid = allItems.length > 0 && allItems.every((i) => !!i.paidAt);
-
-      const order = await Order.findByPk(item.orderId, { transaction: t });
-      if (order) {
-        order.status = allPaid ? "pagado" : "pendiente";
-        await order.save({ transaction: t });
-      }
-
-      return { status: 200, body: { message: "Ítem actualizado", item } };
-    });
-
-    return res.status(result.status).json(result.body);
-  } catch (error) {
-    console.error("updateOrderItem:", error);
-    return res.status(500).json({
-      message: "Error al actualizar ítem",
-      error: String(error?.message || error),
-    });
-  }
-};
 
 
 export const unmarkItemAsPaid = async (req, res) => {
@@ -472,12 +701,10 @@ export const unmarkItemAsPaid = async (req, res) => {
     await verifyJWT(token);
 
     const result = await sequelize.transaction(async (t) => {
-      const item = await OrderItem.findByPk(itemId, { transaction: t });
+      const item = await OrderItem.findByPk(itemId, { transaction: t, lock: t.LOCK.UPDATE });
       if (!item) return { status: 404, body: { message: "Item not found" } };
 
-      if (!item.paidAt) {
-        return { status: 400, body: { message: "Este ítem no está pagado" } };
-      }
+      if (!item.paidAt) return { status: 400, body: { message: "Este ítem no está pagado" } };
 
       item.paidAt = null;
       await item.save({ transaction: t });
@@ -487,7 +714,6 @@ export const unmarkItemAsPaid = async (req, res) => {
         transaction: t,
       });
 
-      // actualizar estado del pedido
       const allItems = await OrderItem.findAll({
         where: { orderId: item.orderId },
         attributes: ["paidAt"],
@@ -513,66 +739,80 @@ export const unmarkItemAsPaid = async (req, res) => {
 };
 
 
-
 export const markItemAsDelivered = async (req, res) => {
   try {
     const { itemId } = req.params;
     const token = getHeaderToken(req);
     const user = await verifyJWT(token);
 
-    const item = await OrderItem.findByPk(itemId);
-    if (!item) return res.status(404).json({ message: 'Item not found' });
-
-    if (item.deliveredAt) {
-      return res.status(400).json({ message: 'Este ítem ya fue marcado como entregado' });
-    }
-
-    const product = await InventoryProduct.findByPk(item.productId);
-    if (!product) return res.status(404).json({ message: 'Producto no encontrado' });
-
-    if (product.stock < item.quantity) {
-      return res.status(400).json({ message: 'Stock insuficiente para entregar este ítem' });
-    }
-
-
-    // 1. Deduct stock
-    product.stock -= item.quantity;
-    await product.save();
-
-    // 2. Record stock movement
-    await InventoryMovement.create({
-      productId: item.productId,
-      quantity: item.quantity,
-      type: "salida",
-      referenceType: "order",
-      referenceId: item.orderId,
-      date: new Date(),
-      createdBy: user.accountId
+    const item = await OrderItem.findByPk(itemId, {
+      include: [
+        { model: Order, as: "ERP_order", include: [{ model: Customer, as: "ERP_customer", attributes: ["id", "name", "isBakery"] }] }
+      ]
     });
 
-    // 3. Mark as delivered (set delivery timestamp)
+    if (!item) return res.status(404).json({ message: "Item not found" });
+    if (item.deliveredAt) return res.status(400).json({ message: "Este ítem ya fue marcado como entregado" });
+
+    // ✅ si es panadería/consignación: NO descontar stock aquí
+    const consignment = isConsignmentOrder(item);
+    if (consignment) {
+      item.deliveredAt = new Date();
+      await item.save();
+      return res.json({
+        message: "Ítem entregado (consignación). La salida real se registra con el cierre (vendido/dañado/yapa).",
+        item
+      });
+    }
+
+    // ✅ modo normal: descontar stock y registrar movement de venta
+    const product = await InventoryProduct.findByPk(item.productId);
+    if (!product) return res.status(404).json({ message: "Producto no encontrado" });
+
+    if (num(product.stock) < num(item.quantity)) {
+      return res.status(400).json({ message: "Stock insuficiente para entregar este ítem" });
+    }
+
+    // stock
+    product.stock = num(product.stock) - num(item.quantity);
+    await product.save();
+
+    // movement
+    await InventoryMovement.create({
+      productId: item.productId,
+      quantity: num(item.quantity),
+      type: "salida",
+      reason: "SALIDA_VENTA",
+      referenceType: "order_item",
+      referenceId: item.id,
+      date: new Date(),
+      createdBy: user.accountId,
+      description: `Entrega venta normal (orderItem #${item.id})`
+    });
+
+    // deliveredAt
     item.deliveredAt = new Date();
     await item.save();
 
-    // 4. Check if all items are delivered
+    // estado pedido entregado si todos delivered
     const allItems = await OrderItem.findAll({ where: { orderId: item.orderId } });
     const allDelivered = allItems.every(i => !!i.deliveredAt);
 
     if (allDelivered) {
       const order = await Order.findByPk(item.orderId);
-      if (order.status !== 'paid') {
-        order.status = 'entregado';
+      if (order && order.status !== "pagado") {
+        order.status = "entregado";
         await order.save();
       }
     }
 
-    res.json({ message: 'Item delivered, stock updated, and movement recorded', item });
-
+    res.json({ message: "Item delivered, stock updated, and movement recorded", item });
   } catch (error) {
     console.error("Error delivering item:", error);
-    res.status(500).json({ message: 'Error delivering item', error });
+    res.status(500).json({ message: "Error delivering item", error: String(error?.message || error) });
   }
 };
+
 // Crear un nuevo cliente
 export const createCustomer = async (req, res) => {
   try {

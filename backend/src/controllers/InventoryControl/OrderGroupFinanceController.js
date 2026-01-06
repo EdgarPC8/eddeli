@@ -105,8 +105,13 @@ const toNum = (v, def = 0) => {
     const { groupId } = req.params;
     const { amount, date, note, method } = req.body;
   
+    const toNum = (x) => Number(Number(x || 0).toFixed(2));
+    const EPS = 0.0001;
+  
     const payAmount = Number(amount);
-    if (!Number.isFinite(payAmount) || payAmount <= 0) return res.status(400).json({ message: "Monto inválido" });
+    if (!Number.isFinite(payAmount) || payAmount <= 0) {
+      return res.status(400).json({ message: "Monto inválido" });
+    }
   
     try {
       const token = getHeaderToken(req);
@@ -127,30 +132,81 @@ const toNum = (v, def = 0) => {
   
         const items = await OrderItem.findAll({
           where: { id: { [Op.in]: itemIds } },
-          attributes: ["id", "price", "quantity", "paidAt"],
+          // agrega aquí los campos que uses para el total real (dañado/yapa/etc)
+          attributes: ["id", "price", "quantity", "paidAt", "damagedQty", "giftQty"],
           transaction: t,
         });
   
-        const total = Number(items.reduce((sum, it) => sum + toNum(it.price) * toNum(it.quantity), 0).toFixed(2));
-  
-        const alreadyPaid = Number(
-          ((await Payment.sum("amount", { where: { groupId: group.id, status: "completed" }, transaction: t })) || 0).toFixed(2)
+        // ✅ total basado en "vendido cobrable"
+        // vendido = quantity - damagedQty - giftQty
+        const total = toNum(
+          items.reduce((sum, it) => {
+            const qty = toNum(it.quantity);
+            const damaged = toNum(it.damagedQty);
+            const gift = toNum(it.giftQty);
+            const billable = Math.max(0, qty - damaged - gift);
+            return sum + toNum(it.price) * billable;
+          }, 0)
         );
   
-        const remaining = Number(Math.max(0, total - alreadyPaid).toFixed(2));
-        if (payAmount > remaining + 0.0001) {
+        const alreadyPaid = toNum(
+          (await Payment.sum("amount", { where: { groupId: group.id, status: "completed" }, transaction: t })) || 0
+        );
+  
+        const remaining = toNum(Math.max(0, total - alreadyPaid));
+  
+        // =========================================================
+        // ✅ 0) AUTOCIERRE: si por cambios el saldo ya es 0,
+        //    cerramos sin crear un nuevo pago.
+        // =========================================================
+        if (remaining <= EPS) {
+          // busca fecha del último pago (si existe)
+          const lastPayment = await Payment.findOne({
+            where: { groupId: group.id, status: "completed" },
+            order: [["date", "DESC"], ["id", "DESC"]],
+            attributes: ["date"],
+            transaction: t,
+          });
+  
+          const closeDate = lastPayment?.date ? new Date(lastPayment.date) : new Date();
+  
+          group.status = "closed";
+          await group.save({ transaction: t });
+  
+          // marcar items como pagados si no tienen paidAt
+          for (const it of items) {
+            if (!it.paidAt) {
+              it.paidAt = closeDate;
+              await it.save({ transaction: t });
+            }
+          }
+  
+          return {
+            status: 200,
+            body: {
+              mensaje: "Grupo ya estaba saldado por cambios en ítems. Se cerró y se marcaron items ✅",
+              grupo: { id: group.id, status: group.status },
+              resumen: { total, abonadoAcumulado: alreadyPaid, saldo: 0, cerrado: true },
+            },
+          };
+        }
+  
+        // =========================================================
+        // 1) Validar que el abono no exceda el saldo ACTUAL
+        // =========================================================
+        if (payAmount > remaining + EPS) {
           return { status: 400, body: { message: `Abono excede saldo. Saldo: ${remaining}` } };
         }
   
         const paymentDate = date ? new Date(date) : new Date();
   
-        // 1) Crear Payment
+        // 2) Crear Payment
         const payment = await Payment.create(
           {
             customerId: group.customerId,
             groupId: group.id,
             date: paymentDate,
-            amount: Number(payAmount.toFixed(2)),
+            amount: toNum(payAmount),
             method: method || "efectivo",
             note: note || `Abono grupo #${group.id}`,
             status: "completed",
@@ -159,11 +215,11 @@ const toNum = (v, def = 0) => {
           { transaction: t }
         );
   
-        // 2) Crear Income por ese Payment
+        // 3) Crear Income por ese Payment
         const income = await Income.create(
           {
             date: paymentDate,
-            amount: Number(payAmount.toFixed(2)),
+            amount: toNum(payAmount),
             concept: payment.note || `Abono grupo #${group.id}`,
             category: "Venta",
             status: "paid",
@@ -175,20 +231,19 @@ const toNum = (v, def = 0) => {
           { transaction: t }
         );
   
-        const newPaid = Number((alreadyPaid + payAmount).toFixed(2));
-        const newRemaining = Number(Math.max(0, total - newPaid).toFixed(2));
+        const newPaid = toNum(alreadyPaid + payAmount);
+        const newRemaining = toNum(Math.max(0, total - newPaid));
   
         let closed = false;
   
-        if (newRemaining <= 0.0001) {
-          // cerrar grupo
+        // 4) Cerrar si ya quedó en 0 con el abono
+        if (newRemaining <= EPS) {
           group.status = "closed";
           await group.save({ transaction: t });
   
-          // marcar items como pagados con fecha del ÚLTIMO pago
           for (const it of items) {
             if (!it.paidAt) {
-              it.paidAt = paymentDate;
+              it.paidAt = paymentDate; // fecha del último pago
               await it.save({ transaction: t });
             }
           }
@@ -200,8 +255,9 @@ const toNum = (v, def = 0) => {
           body: {
             mensaje: "Abono registrado",
             grupo: { id: group.id, status: group.status },
-            pago: { paymentId: payment.id, incomeId: income.id, amount: Number(payAmount.toFixed(2)) },
+            pago: { paymentId: payment.id, incomeId: income.id, amount: toNum(payAmount) },
             resumen: { total, abonadoAntes: alreadyPaid, abonadoAcumulado: newPaid, saldo: newRemaining, cerrado: closed },
+            closed,
           },
         };
       });
@@ -212,6 +268,7 @@ const toNum = (v, def = 0) => {
       return res.status(500).json({ message: "Error registrando abono", error: String(error?.message || error) });
     }
   };
+  
   
   export const moveItemBetweenGroups = async (req, res) => {
     const { orderItemId, toGroupId } = req.body; 
@@ -410,7 +467,10 @@ export const getFinanceWorkbenchAll = async (req, res) => {
               {
                 model: OrderItem,
                 as: "ERP_order_items",
-                attributes: ["id", "orderId", "productId", "quantity", "price", "paidAt"],
+                attributes: ["id", "orderId", "productId", "quantity", "price", "paidAt",      "soldQty",
+                "damagedQty",
+                "giftQty",
+                "replacedQty",],
                 include: [
                   {
                     model: InventoryProduct,
@@ -593,6 +653,10 @@ export const getFinanceWorkbenchAll = async (req, res) => {
                 qty: toNum(it.quantity),
                 price: toNum(it.price),
                 paidAt: it.paidAt ? isoDateOnly(it.paidAt) : null,
+                soldQty:toNum(it.soldQty),
+                damagedQty:toNum(it.damagedQty),
+                giftQty:toNum(it.giftQty),
+                replacedQty:toNum(it.replacedQty),
 
                 // ✅ IMPORTANTÍSIMO para el frontend
                 inGroup: !!gid,
