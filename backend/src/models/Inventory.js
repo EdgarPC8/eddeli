@@ -92,7 +92,54 @@ export const InventoryUnit = sequelize.define('ERP_inventory_units', {
 }, {
   timestamps: false
 });
+export const InventoryProduct = sequelize.define('ERP_inventory_products', {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING(150), allowNull: false },
+  desc: { type: DataTypes.TEXT, defaultValue: null },
+  type: {
+    type: DataTypes.ENUM('raw', 'intermediate', 'final'),
+    defaultValue: 'raw',
+    allowNull: false,
+  },
+  unitId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: { model: 'ERP_inventory_units', key: 'id' },
+  },
 
+  categoryId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: { model: 'ERP_inventory_categories', key: 'id' },
+  },
+
+  standardWeightGrams: { type: DataTypes.FLOAT, defaultValue: 0 },
+  netWeight: { type: DataTypes.FLOAT, defaultValue: 0 },
+
+  stock: { type: DataTypes.FLOAT, defaultValue: 0 },
+  minStock: { type: DataTypes.FLOAT, defaultValue: 0 },
+
+  // 💰 Precios
+  price: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
+  wholesaleRules: { type: DataTypes.JSON, allowNull: true },
+  distributorPrice: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
+  taxRate: { type: DataTypes.DECIMAL(5,2), defaultValue: 0 }, // % IVA
+  // 📦 Identificadores
+  sku: { type: DataTypes.STRING(64), unique: true, allowNull: true },
+  barcode: { type: DataTypes.STRING(64), unique: true, allowNull: true },
+
+  // 🏷️ Estado y metadatos
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+  primaryImageUrl: { type: DataTypes.STRING(500), allowNull: true }, // imagen rápida para listado
+}, {
+  timestamps: true,
+  indexes: [
+    { fields: ['categoryId'] },
+    { fields: ['type'] },
+    { fields: ['isActive'] },
+    { unique: true, fields: ['sku'] },
+  ],
+});
 
 
 
@@ -218,54 +265,7 @@ export const Store = sequelize.define(
 );
 
 // Tabla principal de productos o insumos
-export const InventoryProduct = sequelize.define('ERP_inventory_products', {
-  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
-  name: { type: DataTypes.STRING(150), allowNull: false },
-  desc: { type: DataTypes.TEXT, defaultValue: null },
-  type: {
-    type: DataTypes.ENUM('raw', 'intermediate', 'final'),
-    defaultValue: 'raw',
-    allowNull: false,
-  },
-  unitId: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: { model: 'ERP_inventory_units', key: 'id' },
-  },
 
-  categoryId: {
-    type: DataTypes.INTEGER,
-    allowNull: true,
-    references: { model: 'ERP_inventory_categories', key: 'id' },
-  },
-
-  standardWeightGrams: { type: DataTypes.FLOAT, defaultValue: 0 },
-  netWeight: { type: DataTypes.FLOAT, defaultValue: 0 },
-
-  stock: { type: DataTypes.FLOAT, defaultValue: 0 },
-  minStock: { type: DataTypes.FLOAT, defaultValue: 0 },
-
-  // 💰 Precios
-  price: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
-  wholesaleRules: { type: DataTypes.JSON, allowNull: true },
-  distributorPrice: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
-  taxRate: { type: DataTypes.DECIMAL(5,2), defaultValue: 0 }, // % IVA
-  // 📦 Identificadores
-  sku: { type: DataTypes.STRING(64), unique: true, allowNull: true },
-  barcode: { type: DataTypes.STRING(64), unique: true, allowNull: true },
-
-  // 🏷️ Estado y metadatos
-  isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
-  primaryImageUrl: { type: DataTypes.STRING(500), allowNull: true }, // imagen rápida para listado
-}, {
-  timestamps: true,
-  indexes: [
-    { fields: ['categoryId'] },
-    { fields: ['type'] },
-    { fields: ['isActive'] },
-    { unique: true, fields: ['sku'] },
-  ],
-});
 
 export const StoreProduct = sequelize.define("ERP_store_products", {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },

@@ -26,7 +26,7 @@ const isConsignmentOrder = (itemWithOrder) => {
   const o = itemWithOrder?.ERP_order || itemWithOrder?.ERP_order_items?.ERP_order;
   const c = o?.ERP_customer;
   if (o?.isConsignment === true) return true;
-  if (c?.isBakery === true) return true;
+  // if (c?.isBakery === true) return true;
   if (typeof o?.notes === "string" && o.notes.includes("#PANADERIA")) return true;
   return false;
 };
@@ -257,7 +257,7 @@ export const updateOrderItem = async (req, res) => {
 // controllers/finance/financeAudit.controller.js
 
 export const command = async (req, res) => {
-  const customerId = Number(req.query.customerId || 19);
+  const customerId = 19;
 
   // Helpers
   const toNum = (x) => Number(Number(x || 0).toFixed(2));
@@ -288,8 +288,7 @@ export const command = async (req, res) => {
           {
             model: OrderItem,
             as: "ERP_order_items",
-            // ✅ IMPORTANTE: necesitamos deliveredAt en el item para poder corregirlo
-            attributes: ["id", "orderId", "quantity", "price", "paidAt", "deliveredAt"],
+            attributes: ["id", "orderId", "quantity", "price", "paidAt"],
           },
         ],
         order: [["createdAt", "ASC"]],
@@ -300,8 +299,7 @@ export const command = async (req, res) => {
 
       if (!orderIds.length) {
         return {
-          titulo:
-            "AUDITORÍA — Items pagados (actual) vs Income (por ref y por concept) + FIX deliveredAt(Order.createdAt)",
+          titulo: "AUDITORÍA — Items pagados (actual) vs Income (por ref y por concept)",
           customerId,
           resumen: {
             totalPagadoActualPorItems: 0,
@@ -309,7 +307,6 @@ export const command = async (req, res) => {
             totalIncomePorConcept: 0,
             diferenciaRef: 0,
             diferenciaConcept: 0,
-            itemsActualizadosDeliveredAt: 0,
           },
           detallePorOrden: [],
           itemsConIncomeDescuadrado: [],
@@ -317,27 +314,7 @@ export const command = async (req, res) => {
         };
       }
 
-      // =========================
-      // 1.1) FIX: deliveredAt en OrderItem = Order.createdAt (solo si está null)
-      // =========================
-      let itemsActualizadosDeliveredAt = 0;
-
-      for (const order of orders) {
-        const deliveredDate = order.createdAt; // ✅ EXACTO lo que pediste
-
-        const items = Array.isArray(order.ERP_order_items) ? order.ERP_order_items : [];
-        for (const item of items) {
-          if (!item.deliveredAt) {
-            item.deliveredAt = deliveredDate;
-            await item.save({ transaction: t });
-            itemsActualizadosDeliveredAt++;
-          }
-        }
-      }
-
-      // =========================
-      // 2) Preparar arrays
-      // =========================
+      // Aplanar items
       const allItems = [];
       for (const o of orders) {
         const arr = Array.isArray(o.ERP_order_items) ? o.ERP_order_items : [];
@@ -347,7 +324,7 @@ export const command = async (req, res) => {
       const itemIds = allItems.map((it) => it.id);
 
       // =========================
-      // 3) Total ACTUAL de items pagados (paidAt != null)
+      // 2) Total ACTUAL de items pagados (paidAt != null)
       // =========================
       const paidItems = allItems.filter((it) => !!it.paidAt);
 
@@ -356,16 +333,13 @@ export const command = async (req, res) => {
       );
 
       // =========================
-      // 4) Incomes por REFERENCE (order + order_item)
+      // 3) Incomes por REFERENCE (order + order_item)
       // =========================
       const incomesByReference = await Income.findAll({
         where: {
           [Op.or]: [
             { referenceType: "order", referenceId: { [Op.in]: orderIds } },
-            {
-              referenceType: "order_item",
-              referenceId: { [Op.in]: itemIds.length ? itemIds : [0] },
-            },
+            { referenceType: "order_item", referenceId: { [Op.in]: itemIds.length ? itemIds : [0] } },
           ],
         },
         attributes: ["id", "date", "amount", "concept", "category", "referenceType", "referenceId", "createdAt"],
@@ -378,12 +352,17 @@ export const command = async (req, res) => {
       );
 
       // =========================
-      // 5) Incomes por CONCEPT (extrae orderId del texto)
+      // 4) Incomes por CONCEPT (extrae orderId del texto)
+      //    Aquí NO confiamos en referenceType/referenceId,
+      //    sino en el texto (Ord #xx / Order #xx)
       // =========================
       const incomesCandidates = await Income.findAll({
         where: {
           concept: {
-            [Op.or]: [{ [Op.like]: "%Ord #%" }, { [Op.like]: "%Order #%" }],
+            [Op.or]: [
+              { [Op.like]: "%Ord #%" },   // tu formato nuevo
+              { [Op.like]: "%Order #%" }, // tu formato viejo
+            ],
           },
         },
         attributes: ["id", "date", "amount", "concept", "category", "referenceType", "referenceId", "createdAt"],
@@ -391,18 +370,24 @@ export const command = async (req, res) => {
         transaction: t,
       });
 
+      // Filtrar candidatos que pertenezcan a este cliente por orderId extraído del concept
       const incomesByConcept = [];
       for (const inc of incomesCandidates) {
         const oid = extractOrderIdFromConcept(inc.concept);
         if (!oid) continue;
-        if (!orderIds.includes(oid)) continue;
+        if (!orderIds.includes(oid)) continue; // solo las órdenes del cliente
         incomesByConcept.push({ ...inc.get({ plain: true }), extractedOrderId: oid });
       }
 
-      const totalIncomePorConcept = toNum(incomesByConcept.reduce((acc, inc) => acc + toNum(inc.amount), 0));
+      const totalIncomePorConcept = toNum(
+        incomesByConcept.reduce((acc, inc) => acc + toNum(inc.amount), 0)
+      );
 
       // =========================
-      // 6) Detalle POR ORDEN
+      // 5) Detalle POR ORDEN:
+      //   - total pagado actual por items (paidAt)
+      //   - income por referenceType=order
+      //   - income por concept (extraído)
       // =========================
       const incomesOrderRefMap = new Map(); // orderId -> sum(amount)
       for (const inc of incomesByReference.filter((x) => x.referenceType === "order")) {
@@ -438,15 +423,11 @@ export const command = async (req, res) => {
             diferenciaVsConcept: toNum(pagadoActual - incomePorConcept),
           };
         })
-        .filter(
-          (x) =>
-            x.totalPagadoActualPorItems > 0 ||
-            x.incomePorOrderReferencia > 0 ||
-            x.incomePorConceptoExtraido > 0
-        );
+        .filter((x) => x.totalPagadoActualPorItems > 0 || x.incomePorOrderReferencia > 0 || x.incomePorConceptoExtraido > 0);
 
       // =========================
-      // 7) Items pagados con income por item DESCUADRADO
+      // 6) Items pagados con income por item DESCUADRADO
+      //    (si existe income referenceType=order_item)
       // =========================
       const incomeByItemId = new Map(); // itemId -> {sum, ids}
       for (const inc of incomesByReference.filter((x) => x.referenceType === "order_item")) {
@@ -472,18 +453,16 @@ export const command = async (req, res) => {
             totalIncomeItem: got,
             diferencia: diff,
             incomeIds: rec.ids,
-            nota:
-              "Este item está pagado, pero el Income por order_item no coincide con el total actual (price/qty cambiaron).",
+            nota: "Este item está pagado, pero el Income por order_item no coincide con el total actual (price/qty cambiaron).",
           });
         }
       }
 
       // =========================
-      // 8) Resumen final
+      // 7) Resumen final
       // =========================
       return {
-        titulo:
-          "AUDITORÍA — Items pagados (actual) vs Income (por ref y por concept) + FIX deliveredAt(Order.createdAt)",
+        titulo: "AUDITORÍA — Items pagados (actual) vs Income (por ref y por concept)",
         customerId,
         resumen: {
           totalPagadoActualPorItems,
@@ -496,25 +475,23 @@ export const command = async (req, res) => {
           cantidadItemsPagados: paidItems.length,
           cantidadIncomesPorReference: incomesByReference.length,
           cantidadIncomesPorConcept: incomesByConcept.length,
-          itemsActualizadosDeliveredAt,
         },
         detallePorOrden,
         itemsConIncomeDescuadrado: itemsConIncomeDescuadrado.slice(0, 200),
         nota:
-          "Se corrigió deliveredAt SOLO en OrderItem cuando estaba NULL, usando EXACTAMENTE Order.createdAt. 'createdBy' no es fecha.",
+          "Si el total actual por items no cuadra con Income, casi seguro cambiaste price/qty después de crear Incomes. Revisa itemsConIncomeDescuadrado y detallePorOrden para ubicar dónde se descuadra.",
       };
     });
 
     return res.json(result);
   } catch (error) {
-    console.error("command audit by concept/ref + deliveredAt:", error);
+    console.error("command audit by concept/ref:", error);
     return res.status(500).json({
-      mensaje: "Error auditando por concept/reference + deliveredAt",
+      mensaje: "Error auditando por concept/reference",
       error: String(error?.message || error),
     });
   }
 };
-
 export const closeOrderItemLogistics = async (req, res) => {
   const { itemId } = req.params;
   const { soldQty, damagedQty, giftQty, replacedQty } = req.body;
@@ -618,7 +595,7 @@ export const markItemAsPaid = async (req, res) => {
       const item = await OrderItem.findByPk(itemId, {
         include: [
           { model: InventoryProduct, as: "ERP_inventory_product", attributes: ["id", "name"] },
-          { model: Order, as: "ERP_order", include: [{ model: Customer, as: "ERP_customer", attributes: ["id", "name", "isBakery"] }] },
+          { model: Order, as: "ERP_order", include: [{ model: Customer, as: "ERP_customer", attributes: ["id", "name"] }] },
         ],
         transaction: t,
         lock: t.LOCK.UPDATE,
@@ -747,7 +724,7 @@ export const markItemAsDelivered = async (req, res) => {
 
     const item = await OrderItem.findByPk(itemId, {
       include: [
-        { model: Order, as: "ERP_order", include: [{ model: Customer, as: "ERP_customer", attributes: ["id", "name", "isBakery"] }] }
+        { model: Order, as: "ERP_order", include: [{ model: Customer, as: "ERP_customer", attributes: ["id", "name"] }] }
       ]
     });
 

@@ -569,7 +569,7 @@ export const registerMovement = async (req, res) => {
       await product.save();
     }
 
-    // 2) finanzas (SOLO compras)
+    // // 2) finanzas (SOLO compras)
     if (type === "entrada" && reason === "ENTRADA_COMPRA") {
       await Expense.create({
         date: new Date(),
