@@ -254,244 +254,68 @@ export const updateOrderItem = async (req, res) => {
 };
 
 
-// controllers/finance/financeAudit.controller.js
-
 export const command = async (req, res) => {
   const customerId = 19;
 
-  // Helpers
-  const toNum = (x) => Number(Number(x || 0).toFixed(2));
-
-  const extractOrderIdFromConcept = (txt = "") => {
-    const s = String(txt || "");
-
-    // Caso 1: (Ord #123)
-    let m = s.match(/\( *Ord *# *(\d+) *\)/i);
-    if (m) return Number(m[1]);
-
-    // Caso 2: Order #123 payment
-    m = s.match(/Order\s*#\s*(\d+)/i);
-    if (m) return Number(m[1]);
-
-    return null;
-  };
-
   try {
     const result = await sequelize.transaction(async (t) => {
-      // =========================
-      // 1) Traer órdenes + items del cliente
-      // =========================
+      // 1) Traer órdenes del cliente (solo id y date)
       const orders = await Order.findAll({
         where: { customerId },
-        attributes: ["id", "customerId", "date", "createdAt", "status"],
-        include: [
-          {
-            model: OrderItem,
-            as: "ERP_order_items",
-            attributes: ["id", "orderId", "quantity", "price", "paidAt"],
-          },
-        ],
-        order: [["createdAt", "ASC"]],
+        attributes: ["id", "date"],
+        order: [["id", "ASC"]],
         transaction: t,
       });
 
-      const orderIds = orders.map((o) => o.id);
-
-      if (!orderIds.length) {
+      if (!orders.length) {
         return {
-          titulo: "AUDITORÍA — Items pagados (actual) vs Income (por ref y por concept)",
+          ok: true,
           customerId,
-          resumen: {
-            totalPagadoActualPorItems: 0,
-            totalIncomePorReference: 0,
-            totalIncomePorConcept: 0,
-            diferenciaRef: 0,
-            diferenciaConcept: 0,
-          },
-          detallePorOrden: [],
-          itemsConIncomeDescuadrado: [],
-          nota: "El cliente no tiene órdenes.",
+          updatedItems: 0,
+          note: "El cliente no tiene órdenes.",
         };
       }
 
-      // Aplanar items
-      const allItems = [];
+      // 2) Para cada orden: setear ERP_orders_items.deliveredAt = ERP_orders.date
+      //    (solo donde deliveredAt está NULL, para no pisar datos ya puestos)
+      let updatedItems = 0;
+
       for (const o of orders) {
-        const arr = Array.isArray(o.ERP_order_items) ? o.ERP_order_items : [];
-        for (const it of arr) allItems.push(it);
+        const orderDate = o.date; // ✅ la fecha que quieres copiar
+        if (!orderDate) continue;
+
+        const [count] = await OrderItem.update(
+          { deliveredAt: orderDate },
+          {
+            where: {
+              orderId: o.id,
+              deliveredAt: null, // ✅ solo items sin deliveredAt
+            },
+            transaction: t,
+          }
+        );
+
+        updatedItems += Number(count || 0);
       }
 
-      const itemIds = allItems.map((it) => it.id);
-
-      // =========================
-      // 2) Total ACTUAL de items pagados (paidAt != null)
-      // =========================
-      const paidItems = allItems.filter((it) => !!it.paidAt);
-
-      const totalPagadoActualPorItems = toNum(
-        paidItems.reduce((acc, it) => acc + toNum(it.quantity) * toNum(it.price), 0)
-      );
-
-      // =========================
-      // 3) Incomes por REFERENCE (order + order_item)
-      // =========================
-      const incomesByReference = await Income.findAll({
-        where: {
-          [Op.or]: [
-            { referenceType: "order", referenceId: { [Op.in]: orderIds } },
-            { referenceType: "order_item", referenceId: { [Op.in]: itemIds.length ? itemIds : [0] } },
-          ],
-        },
-        attributes: ["id", "date", "amount", "concept", "category", "referenceType", "referenceId", "createdAt"],
-        order: [["id", "ASC"]],
-        transaction: t,
-      });
-
-      const totalIncomePorReference = toNum(
-        incomesByReference.reduce((acc, inc) => acc + toNum(inc.amount), 0)
-      );
-
-      // =========================
-      // 4) Incomes por CONCEPT (extrae orderId del texto)
-      //    Aquí NO confiamos en referenceType/referenceId,
-      //    sino en el texto (Ord #xx / Order #xx)
-      // =========================
-      const incomesCandidates = await Income.findAll({
-        where: {
-          concept: {
-            [Op.or]: [
-              { [Op.like]: "%Ord #%" },   // tu formato nuevo
-              { [Op.like]: "%Order #%" }, // tu formato viejo
-            ],
-          },
-        },
-        attributes: ["id", "date", "amount", "concept", "category", "referenceType", "referenceId", "createdAt"],
-        order: [["id", "ASC"]],
-        transaction: t,
-      });
-
-      // Filtrar candidatos que pertenezcan a este cliente por orderId extraído del concept
-      const incomesByConcept = [];
-      for (const inc of incomesCandidates) {
-        const oid = extractOrderIdFromConcept(inc.concept);
-        if (!oid) continue;
-        if (!orderIds.includes(oid)) continue; // solo las órdenes del cliente
-        incomesByConcept.push({ ...inc.get({ plain: true }), extractedOrderId: oid });
-      }
-
-      const totalIncomePorConcept = toNum(
-        incomesByConcept.reduce((acc, inc) => acc + toNum(inc.amount), 0)
-      );
-
-      // =========================
-      // 5) Detalle POR ORDEN:
-      //   - total pagado actual por items (paidAt)
-      //   - income por referenceType=order
-      //   - income por concept (extraído)
-      // =========================
-      const incomesOrderRefMap = new Map(); // orderId -> sum(amount)
-      for (const inc of incomesByReference.filter((x) => x.referenceType === "order")) {
-        const oid = Number(inc.referenceId);
-        incomesOrderRefMap.set(oid, toNum((incomesOrderRefMap.get(oid) || 0) + toNum(inc.amount)));
-      }
-
-      const incomesOrderConceptMap = new Map(); // orderId -> sum(amount)
-      for (const inc of incomesByConcept) {
-        const oid = Number(inc.extractedOrderId);
-        incomesOrderConceptMap.set(oid, toNum((incomesOrderConceptMap.get(oid) || 0) + toNum(inc.amount)));
-      }
-
-      const paidByOrderFromItems = new Map(); // orderId -> sum(item line) solo paidAt
-      for (const it of paidItems) {
-        const oid = Number(it.orderId);
-        const line = toNum(toNum(it.quantity) * toNum(it.price));
-        paidByOrderFromItems.set(oid, toNum((paidByOrderFromItems.get(oid) || 0) + line));
-      }
-
-      const detallePorOrden = orderIds
-        .map((oid) => {
-          const pagadoActual = toNum(paidByOrderFromItems.get(oid) || 0);
-          const incomePorOrderRef = toNum(incomesOrderRefMap.get(oid) || 0);
-          const incomePorConcept = toNum(incomesOrderConceptMap.get(oid) || 0);
-
-          return {
-            pedidoId: oid,
-            totalPagadoActualPorItems: pagadoActual,
-            incomePorOrderReferencia: incomePorOrderRef,
-            incomePorConceptoExtraido: incomePorConcept,
-            diferenciaVsOrderRef: toNum(pagadoActual - incomePorOrderRef),
-            diferenciaVsConcept: toNum(pagadoActual - incomePorConcept),
-          };
-        })
-        .filter((x) => x.totalPagadoActualPorItems > 0 || x.incomePorOrderReferencia > 0 || x.incomePorConceptoExtraido > 0);
-
-      // =========================
-      // 6) Items pagados con income por item DESCUADRADO
-      //    (si existe income referenceType=order_item)
-      // =========================
-      const incomeByItemId = new Map(); // itemId -> {sum, ids}
-      for (const inc of incomesByReference.filter((x) => x.referenceType === "order_item")) {
-        const itemId = Number(inc.referenceId);
-        if (!incomeByItemId.has(itemId)) incomeByItemId.set(itemId, { sum: 0, ids: [] });
-        const obj = incomeByItemId.get(itemId);
-        obj.sum = toNum(obj.sum + toNum(inc.amount));
-        obj.ids.push(inc.id);
-      }
-
-      const itemsConIncomeDescuadrado = [];
-      for (const it of paidItems) {
-        const expected = toNum(toNum(it.quantity) * toNum(it.price));
-        const rec = incomeByItemId.get(it.id);
-        if (!rec) continue; // si no hay income por item, no lo marcamos aquí
-        const got = toNum(rec.sum);
-        const diff = toNum(expected - got);
-        if (Math.abs(diff) > 0.01) {
-          itemsConIncomeDescuadrado.push({
-            orderItemId: it.id,
-            pedidoId: it.orderId,
-            totalActualItem: expected,
-            totalIncomeItem: got,
-            diferencia: diff,
-            incomeIds: rec.ids,
-            nota: "Este item está pagado, pero el Income por order_item no coincide con el total actual (price/qty cambiaron).",
-          });
-        }
-      }
-
-      // =========================
-      // 7) Resumen final
-      // =========================
       return {
-        titulo: "AUDITORÍA — Items pagados (actual) vs Income (por ref y por concept)",
+        ok: true,
         customerId,
-        resumen: {
-          totalPagadoActualPorItems,
-          totalIncomePorReference,
-          totalIncomePorConcept,
-          diferenciaRef: toNum(totalPagadoActualPorItems - totalIncomePorReference),
-          diferenciaConcept: toNum(totalPagadoActualPorItems - totalIncomePorConcept),
-          cantidadPedidos: orderIds.length,
-          cantidadItems: allItems.length,
-          cantidadItemsPagados: paidItems.length,
-          cantidadIncomesPorReference: incomesByReference.length,
-          cantidadIncomesPorConcept: incomesByConcept.length,
-        },
-        detallePorOrden,
-        itemsConIncomeDescuadrado: itemsConIncomeDescuadrado.slice(0, 200),
-        nota:
-          "Si el total actual por items no cuadra con Income, casi seguro cambiaste price/qty después de crear Incomes. Revisa itemsConIncomeDescuadrado y detallePorOrden para ubicar dónde se descuadra.",
+        updatedItems,
+        note: "Se copió ERP_orders.date a ERP_orders_items.deliveredAt (solo donde estaba NULL).",
       };
     });
 
     return res.json(result);
   } catch (error) {
-    console.error("command audit by concept/ref:", error);
+    console.error("command set items.deliveredAt from orders.date:", error);
     return res.status(500).json({
-      mensaje: "Error auditando por concept/reference",
+      mensaje: "Error actualizando deliveredAt en items",
       error: String(error?.message || error),
     });
   }
 };
+
 export const closeOrderItemLogistics = async (req, res) => {
   const { itemId } = req.params;
   const { soldQty, damagedQty, giftQty, replacedQty } = req.body;
