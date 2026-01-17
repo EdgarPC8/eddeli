@@ -15,7 +15,7 @@ const router = Router();
 const upload = multer({
     storage: multer.memoryStorage(),
     limits: {
-      fileSize: 10 * 1024 * 1024, // 10MB por si acaso
+      fileSize: 100 * 1024 * 1024, // ✅ 100 MB EXACTOS
     },
   });
 router.get("/createLicense", isAuthenticated,createLicense);

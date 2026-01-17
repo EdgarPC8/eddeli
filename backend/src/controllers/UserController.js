@@ -2,6 +2,44 @@ import { Users } from "../models/Users.js";
 import { Roles } from "../models/Roles.js";
 
 
+// ✅ CREATE (addUser) - ignora "photo" que venga en el body
+export const addUser = async (req, res) => {
+  try {
+    // Quitamos photo del body (la foto se maneja SOLO con el endpoint de uploadPhoto)
+    const { photo, ...data } = req.body;
+
+    const newUser = await Users.create(data);
+
+    return res.json({
+      message: "agregado con éxito",
+      user: newUser,
+    });
+  } catch (error) {
+    console.error("error al crear el usuario:", error);
+    return res.status(500).json({
+      message: "Error al crear el usuario",
+      error: error.message,
+    });
+  }
+};
+
+// ✅ EDIT (updateUserData) - ignora "photo" que venga en el body
+export const updateUserData = async (req, res) => {
+  try {
+    // Quitamos photo del body (la foto se maneja SOLO con el endpoint de uploadPhoto)
+    const { photo, ...data } = req.body;
+
+    await Users.update(data, {
+      where: { id: req.params.userId },
+    });
+
+    return res.json({ message: "usuario editado con éxito" });
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message,
+    });
+  }
+};
 
 export const getUsers = async (req, res) => {
   try {
@@ -20,16 +58,7 @@ export const getUsers = async (req, res) => {
     res.status(500).json({ message: "Error en el servidor." });
   }
   };
-  export const addUser = async (req, res) => {
-    try {
-      const data= req.body;
-    const newUser = await Users.create(data);
-    res.json({ message: `agregado con éxito`,user:newUser});
-    } catch (error) {
-      // manejo de errores si ocurre algún problema durante la creación del usuario
-      console.error("error al crear el usuario:", error);
-    }
-  };
+
   
   export const getOneUser = async (req, res) => {
     const { userId } = req.params;
@@ -97,24 +126,7 @@ export const getUsers = async (req, res) => {
     }
     
   }
-  export const updateUserData = async (req, res) => {
-    const data=req.body;
-  
-    try {
-      const userUpdate = await Users.update(data,
-        {
-          where: {
-            id: req.params.userId,
-          },
-        }
-      );
-      res.json({ message: "usuario editado con éxito" });
-    } catch (error) {
-      res.status(500).json({
-        message: error.message,
-      });
-    }
-  };
+
   
 
 
