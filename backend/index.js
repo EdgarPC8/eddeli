@@ -20,6 +20,9 @@ import OrderRoutes from "./src/routes/OrderRoutes.js";
 import FinanceRoutes from "./src/routes/FinanceRoutes.js";
 
 import ImgRoutes from "./src/routes/ImgRoutes.js";
+import FilesRoutes from "./src/routes/FilesRoutes.js";
+import EditorRoutes from "./src/routes/EditorRoutes.js";
+
 
 import { initNotificationSocket } from "./src/sockets/notificationSocket.js";
 import { Server } from "socket.io";
@@ -75,6 +78,11 @@ app.use(cors(corsOptions));
 app.use(`/${api}/img`, ImgRoutes);
 
 app.use(`/${api}/img`, express.static(path.resolve(__dirname, "src/img")));
+app.use(`/${api}/files`, FilesRoutes);
+
+// Sirve los archivos guardados en src/files
+app.use(`/${api}/files`, express.static(path.resolve(__dirname, "src/files")));
+
 
 // ⚠️ Ya NO necesitas estas dos si todo estará bajo /img:
 // app.use(`/${api}/photos`, express.static(`src/img/photos`));
@@ -83,6 +91,7 @@ app.use(`/${api}/img`, express.static(path.resolve(__dirname, "src/img")));
 // ================================
 // RESTO DE RUTAS
 // ================================
+app.use(`/${api}/editor`, EditorRoutes);
 app.use(`/${api}/users`, UsersRoutes);
 app.use(`/${api}/quiz`, QuizRoutes);
 app.use(`/${api}`, AuthRoutes);

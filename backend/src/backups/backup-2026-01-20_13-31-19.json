@@ -121981,7 +121981,7 @@
       "categoryId": 1,
       "standardWeightGrams": 0,
       "netWeight": 50000,
-      "stock": 123910,
+      "stock": 125910,
       "minStock": 1500,
       "price": "41.00",
       "wholesaleRules": null,
@@ -121992,7 +121992,7 @@
       "isActive": 1,
       "primaryImageUrl": null,
       "createdAt": "2025-06-24T00:14:50.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
+      "updatedAt": "2026-01-19T15:22:20.000Z"
     },
     {
       "id": 2,
@@ -122003,7 +122003,7 @@
       "categoryId": 1,
       "standardWeightGrams": 0,
       "netWeight": 11250,
-      "stock": 43637.5,
+      "stock": 43937.5,
       "minStock": 300,
       "price": "10.00",
       "wholesaleRules": null,
@@ -122014,7 +122014,7 @@
       "isActive": 1,
       "primaryImageUrl": null,
       "createdAt": "2025-06-24T00:15:14.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
+      "updatedAt": "2026-01-19T15:22:20.000Z"
     },
     {
       "id": 3,
@@ -122025,7 +122025,7 @@
       "categoryId": 1,
       "standardWeightGrams": 0,
       "netWeight": 15000,
-      "stock": 42319.3,
+      "stock": 42985,
       "minStock": 500,
       "price": "33.30",
       "wholesaleRules": null,
@@ -122036,7 +122036,7 @@
       "isActive": 1,
       "primaryImageUrl": null,
       "createdAt": "2025-06-24T00:15:58.000Z",
-      "updatedAt": "2026-01-20T18:35:10.000Z"
+      "updatedAt": "2026-01-19T15:22:20.000Z"
     },
     {
       "id": 4,
@@ -122047,7 +122047,7 @@
       "categoryId": 1,
       "standardWeightGrams": 50,
       "netWeight": 1500,
-      "stock": 550.5,
+      "stock": 556.5,
       "minStock": 5,
       "price": "3.50",
       "wholesaleRules": null,
@@ -122058,7 +122058,7 @@
       "isActive": 1,
       "primaryImageUrl": null,
       "createdAt": "2025-06-24T00:16:38.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
+      "updatedAt": "2026-01-19T15:22:20.000Z"
     },
     {
       "id": 5,
@@ -122069,7 +122069,7 @@
       "categoryId": 1,
       "standardWeightGrams": 0,
       "netWeight": 500,
-      "stock": 822,
+      "stock": 882,
       "minStock": 50,
       "price": "4.00",
       "wholesaleRules": null,
@@ -122080,7 +122080,7 @@
       "isActive": 1,
       "primaryImageUrl": null,
       "createdAt": "2025-06-24T00:17:05.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
+      "updatedAt": "2026-01-19T15:22:20.000Z"
     },
     {
       "id": 6,
@@ -122091,7 +122091,7 @@
       "categoryId": 4,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 52625,
+      "stock": 53325,
       "minStock": 500,
       "price": "0.00",
       "wholesaleRules": null,
@@ -122102,7 +122102,7 @@
       "isActive": 1,
       "primaryImageUrl": null,
       "createdAt": "2025-06-24T00:18:40.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
+      "updatedAt": "2026-01-19T15:22:20.000Z"
     },
     {
       "id": 7,
@@ -122113,7 +122113,7 @@
       "categoryId": 1,
       "standardWeightGrams": 0,
       "netWeight": 400,
-      "stock": 16666.3,
+      "stock": 17034.4,
       "minStock": 0,
       "price": "3.15",
       "wholesaleRules": null,
@@ -122124,7 +122124,7 @@
       "isActive": 1,
       "primaryImageUrl": null,
       "createdAt": "2025-06-24T00:18:54.000Z",
-      "updatedAt": "2026-01-20T18:35:10.000Z"
+      "updatedAt": "2026-01-19T15:22:20.000Z"
     },
     {
       "id": 8,
@@ -122135,7 +122135,7 @@
       "categoryId": 1,
       "standardWeightGrams": 0,
       "netWeight": 1000,
-      "stock": 1021.55,
+      "stock": 1080.4,
       "minStock": 200,
       "price": "2.60",
       "wholesaleRules": null,
@@ -122146,7 +122146,7 @@
       "isActive": 1,
       "primaryImageUrl": null,
       "createdAt": "2025-06-24T00:21:53.000Z",
-      "updatedAt": "2026-01-20T18:35:10.000Z"
+      "updatedAt": "2026-01-19T15:22:20.000Z"
     },
     {
       "id": 9,
@@ -122157,7 +122157,7 @@
       "categoryId": 2,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 2.47,
+      "stock": 2.11,
       "minStock": 100,
       "price": "0.00",
       "wholesaleRules": null,
@@ -122168,7 +122168,7 @@
       "isActive": 1,
       "primaryImageUrl": null,
       "createdAt": "2025-06-24T00:22:41.000Z",
-      "updatedAt": "2026-01-20T18:35:10.000Z"
+      "updatedAt": "2026-01-19T15:22:20.000Z"
     },
     {
       "id": 10,
@@ -122179,7 +122179,7 @@
       "categoryId": 2,
       "standardWeightGrams": 1800,
       "netWeight": 0,
-      "stock": 796,
+      "stock": 256,
       "minStock": 0,
       "price": "0.00",
       "wholesaleRules": null,
@@ -122190,7 +122190,7 @@
       "isActive": 1,
       "primaryImageUrl": null,
       "createdAt": "2025-06-24T00:23:13.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
+      "updatedAt": "2026-01-19T15:22:20.000Z"
     },
     {
       "id": 11,
@@ -122210,9 +122210,9 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/dona-normal-decorada-de-chocolate-f4eeh.png",
+      "primaryImageUrl": "dona-normal-decorada-de-chocolate-f4eeh.png",
       "createdAt": "2025-06-24T00:28:43.000Z",
-      "updatedAt": "2026-01-20T18:35:31.000Z"
+      "updatedAt": "2026-01-19T15:23:01.000Z"
     },
     {
       "id": 12,
@@ -122232,9 +122232,9 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/dona-grande-con-manjar-6wt18.png",
+      "primaryImageUrl": "dona-grande-con-manjar-6wt18.png",
       "createdAt": "2025-07-06T18:28:39.000Z",
-      "updatedAt": "2026-01-20T18:35:33.000Z"
+      "updatedAt": "2025-12-20T17:51:20.000Z"
     },
     {
       "id": 13,
@@ -122245,7 +122245,7 @@
       "categoryId": 1,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 63400,
+      "stock": 58900,
       "minStock": 0,
       "price": "1.75",
       "wholesaleRules": null,
@@ -122256,7 +122256,7 @@
       "isActive": 1,
       "primaryImageUrl": null,
       "createdAt": "2025-07-06T19:08:20.000Z",
-      "updatedAt": "2026-01-20T18:39:14.000Z"
+      "updatedAt": "2026-01-13T14:43:20.000Z"
     },
     {
       "id": 14,
@@ -122276,7 +122276,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-pequeno-decorado-e7n8z.png",
+      "primaryImageUrl": "pastel-pequeno-decorado-e7n8z.png",
       "createdAt": "2025-07-09T03:40:13.000Z",
       "updatedAt": "2026-01-16T16:32:03.000Z"
     },
@@ -122298,7 +122298,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-pequeno-de-naranja-y9jdr.png",
+      "primaryImageUrl": "pastel-pequeno-de-naranja-y9jdr.png",
       "createdAt": "2025-07-10T13:43:51.000Z",
       "updatedAt": "2025-11-24T13:46:36.000Z"
     },
@@ -122342,7 +122342,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-mini-torta-decorado-g4z7l.png",
+      "primaryImageUrl": "pastel-mini-torta-decorado-g4z7l.png",
       "createdAt": "2025-07-15T21:42:30.000Z",
       "updatedAt": "2026-01-16T16:32:05.000Z"
     },
@@ -122364,7 +122364,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-mediano-decorado-y93o1.png",
+      "primaryImageUrl": "pastel-mediano-decorado-y93o1.png",
       "createdAt": "2025-07-15T21:43:07.000Z",
       "updatedAt": "2026-01-19T15:22:31.000Z"
     },
@@ -122377,7 +122377,7 @@
       "categoryId": 1,
       "standardWeightGrams": 0,
       "netWeight": 4500,
-      "stock": 3220,
+      "stock": 3445,
       "minStock": 500,
       "price": "14.00",
       "wholesaleRules": null,
@@ -122388,7 +122388,7 @@
       "isActive": 1,
       "primaryImageUrl": null,
       "createdAt": "2025-07-31T03:14:56.000Z",
-      "updatedAt": "2026-01-20T18:35:10.000Z"
+      "updatedAt": "2026-01-05T19:24:30.000Z"
     },
     {
       "id": 20,
@@ -122496,7 +122496,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-pequeno-vainilla-9ftdf.png",
+      "primaryImageUrl": "pastel-pequeno-vainilla-9ftdf.png",
       "createdAt": "2025-08-06T21:23:58.000Z",
       "updatedAt": "2026-01-16T16:28:28.000Z"
     },
@@ -122518,7 +122518,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-mediano-vainilla-nwl9j.png",
+      "primaryImageUrl": "pastel-mediano-vainilla-nwl9j.png",
       "createdAt": "2025-08-06T21:26:12.000Z",
       "updatedAt": "2026-01-19T15:22:11.000Z"
     },
@@ -122540,7 +122540,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-minitorta-vainilla-2edvn.png",
+      "primaryImageUrl": "pastel-minitorta-vainilla-2edvn.png",
       "createdAt": "2025-08-06T21:27:49.000Z",
       "updatedAt": "2026-01-16T16:27:54.000Z"
     },
@@ -122562,7 +122562,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-mini-torta-de-naranja-w98ka.png",
+      "primaryImageUrl": "pastel-mini-torta-de-naranja-w98ka.png",
       "createdAt": "2025-08-06T21:29:45.000Z",
       "updatedAt": "2025-11-24T13:46:19.000Z"
     },
@@ -122584,7 +122584,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-mediano-de-naranja-qh7im.png",
+      "primaryImageUrl": "pastel-mediano-de-naranja-qh7im.png",
       "createdAt": "2025-08-06T21:37:18.000Z",
       "updatedAt": "2025-11-24T13:46:53.000Z"
     },
@@ -122738,7 +122738,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/funda-de-masapan-qvs3g.png",
+      "primaryImageUrl": "funda-de-masapan-qvs3g.png",
       "createdAt": "2025-09-09T13:30:23.000Z",
       "updatedAt": "2025-12-20T15:00:53.000Z"
     },
@@ -122826,7 +122826,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/funda-de-rosca-integral-yg5qo.png",
+      "primaryImageUrl": "funda-de-rosca-integral-yg5qo.png",
       "createdAt": "2025-09-24T23:28:33.000Z",
       "updatedAt": "2026-01-08T15:57:20.000Z"
     },
@@ -122870,7 +122870,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-grande-vainilla-eggnp.png",
+      "primaryImageUrl": "pastel-grande-vainilla-eggnp.png",
       "createdAt": "2025-09-25T19:57:18.000Z",
       "updatedAt": "2026-01-16T16:36:38.000Z"
     },
@@ -122892,7 +122892,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-grande-decorado-8frv8.png",
+      "primaryImageUrl": "pastel-grande-decorado-8frv8.png",
       "createdAt": "2025-09-25T19:57:48.000Z",
       "updatedAt": "2026-01-17T16:10:49.000Z"
     },
@@ -122936,7 +122936,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/funda-de-relampago-qfl9s.png",
+      "primaryImageUrl": "funda-de-relampago-qfl9s.png",
       "createdAt": "2025-09-29T17:14:30.000Z",
       "updatedAt": "2026-01-16T16:31:54.000Z"
     },
@@ -122958,7 +122958,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/funda-de-suspiros-grandes-b9h1b.png",
+      "primaryImageUrl": "funda-de-suspiros-grandes-b9h1b.png",
       "createdAt": "2025-09-29T17:16:07.000Z",
       "updatedAt": "2025-11-22T16:39:03.000Z"
     },
@@ -123068,7 +123068,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/funda-de-pan-integral-wpz7z.png",
+      "primaryImageUrl": "funda-de-pan-integral-wpz7z.png",
       "createdAt": "2025-10-01T18:55:36.000Z",
       "updatedAt": "2026-01-12T01:52:41.000Z"
     },
@@ -123090,7 +123090,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/suspiro-grande-1b4o8.png",
+      "primaryImageUrl": "suspiro-grande-1b4o8.png",
       "createdAt": "2025-10-09T21:52:59.000Z",
       "updatedAt": "2025-11-22T16:43:25.000Z"
     },
@@ -123222,7 +123222,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/guagua-de-pan-jsfix.jpg",
+      "primaryImageUrl": "guagua-de-pan-jsfix.jpg",
       "createdAt": "2025-10-28T22:00:06.000Z",
       "updatedAt": "2025-12-05T16:33:46.000Z"
     },
@@ -123266,7 +123266,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-mini-torta-de-chocolate-zf9d6.png",
+      "primaryImageUrl": "pastel-mini-torta-de-chocolate-zf9d6.png",
       "createdAt": "2025-11-03T20:20:36.000Z",
       "updatedAt": "2025-11-22T16:39:33.000Z"
     },
@@ -123288,7 +123288,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-pequeno-de-chocolate-l8pv4.png",
+      "primaryImageUrl": "pastel-pequeno-de-chocolate-l8pv4.png",
       "createdAt": "2025-11-03T20:22:20.000Z",
       "updatedAt": "2025-11-22T16:39:52.000Z"
     },
@@ -123310,7 +123310,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-mediano-de-chocolate-72chh.png",
+      "primaryImageUrl": "pastel-mediano-de-chocolate-72chh.png",
       "createdAt": "2025-11-03T20:24:08.000Z",
       "updatedAt": "2025-11-22T16:40:07.000Z"
     },
@@ -123332,7 +123332,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-grande-de-chocolate-0urc9.png",
+      "primaryImageUrl": "pastel-grande-de-chocolate-0urc9.png",
       "createdAt": "2025-11-03T20:25:01.000Z",
       "updatedAt": "2025-11-22T16:40:25.000Z"
     },
@@ -123354,7 +123354,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pastel-grande-de-naranja-bxvki.png",
+      "primaryImageUrl": "pastel-grande-de-naranja-bxvki.png",
       "createdAt": "2025-11-03T20:36:02.000Z",
       "updatedAt": "2025-11-24T13:47:03.000Z"
     },
@@ -123376,7 +123376,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/conos-0kx4a.png",
+      "primaryImageUrl": "conos-0kx4a.png",
       "createdAt": "2025-11-18T19:44:08.000Z",
       "updatedAt": "2025-11-22T16:26:29.000Z"
     },
@@ -123398,7 +123398,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/yoyos-jnw46.png",
+      "primaryImageUrl": "yoyos-jnw46.png",
       "createdAt": "2025-11-18T19:44:58.000Z",
       "updatedAt": "2025-11-30T22:01:39.000Z"
     },
@@ -123420,7 +123420,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/torres-5w9ns.png",
+      "primaryImageUrl": "torres-5w9ns.png",
       "createdAt": "2025-11-18T19:46:22.000Z",
       "updatedAt": "2025-11-30T21:41:47.000Z"
     },
@@ -123486,7 +123486,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pack-de-donas-tgb63.png",
+      "primaryImageUrl": "pack-de-donas-tgb63.png",
       "createdAt": "2025-11-24T16:00:12.000Z",
       "updatedAt": "2025-11-24T16:06:51.000Z"
     },
@@ -123530,7 +123530,7 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/pan-de-dulce-z87ig.png",
+      "primaryImageUrl": "pan-de-dulce-z87ig.png",
       "createdAt": "2025-12-05T16:25:33.000Z",
       "updatedAt": "2025-12-05T16:29:41.000Z"
     },
@@ -170744,426 +170744,6 @@
       "createdBy": 1,
       "createdAt": "2026-01-19T15:23:01.000Z",
       "updatedAt": "2026-01-19T15:23:01.000Z"
-    },
-    {
-      "id": 3098,
-      "productId": 7,
-      "quantity": 318.33,
-      "description": "Consumo de insumo Cocoa (318.33000000000004 g) para Chocolate Liquido. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3099,
-      "productId": 3,
-      "quantity": 368.11,
-      "description": "Consumo de insumo Mantequilla (368.11 g) para Chocolate Liquido. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3100,
-      "productId": 9,
-      "quantity": 688.5,
-      "description": "Producción intermedia de Chocolate Liquido. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "entrada",
-      "reason": "ENTRADA_PRODUCCION",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3101,
-      "productId": 9,
-      "quantity": 688.5,
-      "description": "Consumo de Chocolate Liquido para Dona Normal Decorada de Chocolate. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3102,
-      "productId": 8,
-      "quantity": 47.6,
-      "description": "Consumo de insumo Grajeas (47.6 g) para Dona Normal Decorada de Chocolate. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3103,
-      "productId": 1,
-      "quantity": 2000,
-      "description": "Consumo de insumo Harina (2000 g) para Masa de Dona. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3104,
-      "productId": 2,
-      "quantity": 300,
-      "description": "Consumo de insumo Azucar (300 g) para Masa de Dona. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3105,
-      "productId": 3,
-      "quantity": 240,
-      "description": "Consumo de insumo Mantequilla (240 g) para Masa de Dona. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3106,
-      "productId": 4,
-      "quantity": 6,
-      "description": "Consumo de insumo Huevos (6 u) para Masa de Dona. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3107,
-      "productId": 5,
-      "quantity": 60,
-      "description": "Consumo de insumo Levadura (60 g) para Masa de Dona. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3108,
-      "productId": 6,
-      "quantity": 700,
-      "description": "Consumo de insumo Agua (700 g) para Masa de Dona. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3109,
-      "productId": 10,
-      "quantity": 2,
-      "description": "Producción intermedia de Masa de Dona. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "entrada",
-      "reason": "ENTRADA_PRODUCCION",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3110,
-      "productId": 10,
-      "quantity": 2,
-      "description": "Consumo de Masa de Dona para Dona Cruda. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3111,
-      "productId": 16,
-      "quantity": 170,
-      "description": "Producción intermedia de Dona Cruda. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "entrada",
-      "reason": "ENTRADA_PRODUCCION",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3112,
-      "productId": 16,
-      "quantity": 170,
-      "description": "Consumo de Dona Cruda para Dona Normal Decorada de Chocolate. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3113,
-      "productId": 11,
-      "quantity": 170,
-      "description": "Producción final de Dona Normal Decorada de Chocolate. OP:PF-1768934102372-96157",
-      "price": null,
-      "type": "produccion",
-      "reason": "ENTRADA_PRODUCCION",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:02.000Z",
-      "updatedAt": "2026-01-20T18:35:02.000Z"
-    },
-    {
-      "id": 3114,
-      "productId": 7,
-      "quantity": 49.815,
-      "description": "Consumo de insumo Cocoa (49.815000000000005 g) para Chocolate Liquido. OP:PF-1768934110568-33321",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:10.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:10.000Z",
-      "updatedAt": "2026-01-20T18:35:10.000Z"
-    },
-    {
-      "id": 3115,
-      "productId": 3,
-      "quantity": 57.605,
-      "description": "Consumo de insumo Mantequilla (57.605000000000004 g) para Chocolate Liquido. OP:PF-1768934110568-33321",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:10.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:10.000Z",
-      "updatedAt": "2026-01-20T18:35:10.000Z"
-    },
-    {
-      "id": 3116,
-      "productId": 9,
-      "quantity": 105,
-      "description": "Producción intermedia de Chocolate Liquido. OP:PF-1768934110568-33321",
-      "price": null,
-      "type": "entrada",
-      "reason": "ENTRADA_PRODUCCION",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:10.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:10.000Z",
-      "updatedAt": "2026-01-20T18:35:10.000Z"
-    },
-    {
-      "id": 3117,
-      "productId": 9,
-      "quantity": 105,
-      "description": "Consumo de Chocolate Liquido para Dona Grande con Manjar. OP:PF-1768934110568-33321",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:10.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:10.000Z",
-      "updatedAt": "2026-01-20T18:35:10.000Z"
-    },
-    {
-      "id": 3118,
-      "productId": 19,
-      "quantity": 225,
-      "description": "Consumo de insumo Manjar (225 g) para Dona Grande con Manjar. OP:PF-1768934110568-33321",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:10.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:10.000Z",
-      "updatedAt": "2026-01-20T18:35:10.000Z"
-    },
-    {
-      "id": 3119,
-      "productId": 8,
-      "quantity": 11.25,
-      "description": "Consumo de insumo Grajeas (11.25 g) para Dona Grande con Manjar. OP:PF-1768934110568-33321",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_CONSUMO_INTERNO",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:10.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:10.000Z",
-      "updatedAt": "2026-01-20T18:35:10.000Z"
-    },
-    {
-      "id": 3120,
-      "productId": 12,
-      "quantity": 15,
-      "description": "Producción final de Dona Grande con Manjar. OP:PF-1768934110568-33321",
-      "price": null,
-      "type": "produccion",
-      "reason": "ENTRADA_PRODUCCION",
-      "referenceType": "produccion",
-      "referenceId": null,
-      "date": "2026-01-20T18:35:10.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:10.000Z",
-      "updatedAt": "2026-01-20T18:35:10.000Z"
-    },
-    {
-      "id": 3121,
-      "productId": 11,
-      "quantity": 100,
-      "description": "Entrega venta normal (orderItem #601)",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order_item",
-      "referenceId": 601,
-      "date": "2026-01-20T18:35:20.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:20.000Z",
-      "updatedAt": "2026-01-20T18:35:20.000Z"
-    },
-    {
-      "id": 3122,
-      "productId": 11,
-      "quantity": 50,
-      "description": "Entrega venta normal (orderItem #600)",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order_item",
-      "referenceId": 600,
-      "date": "2026-01-20T18:35:28.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:28.000Z",
-      "updatedAt": "2026-01-20T18:35:28.000Z"
-    },
-    {
-      "id": 3123,
-      "productId": 11,
-      "quantity": 20,
-      "description": "Entrega venta normal (orderItem #598)",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order_item",
-      "referenceId": 598,
-      "date": "2026-01-20T18:35:31.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:31.000Z",
-      "updatedAt": "2026-01-20T18:35:31.000Z"
-    },
-    {
-      "id": 3124,
-      "productId": 12,
-      "quantity": 15,
-      "description": "Entrega venta normal (orderItem #599)",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order_item",
-      "referenceId": 599,
-      "date": "2026-01-20T18:35:33.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:33.000Z",
-      "updatedAt": "2026-01-20T18:35:33.000Z"
-    },
-    {
-      "id": 3125,
-      "productId": 13,
-      "quantity": 4500,
-      "description": null,
-      "price": 9.8,
-      "type": "entrada",
-      "reason": "ENTRADA_COMPRA",
-      "referenceType": null,
-      "referenceId": null,
-      "date": "2026-01-20T18:39:14.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:39:14.000Z",
-      "updatedAt": "2026-01-20T18:39:14.000Z"
     }
   ],
   "Customer": [
@@ -176106,22 +175686,22 @@
     {
       "id": 486,
       "customerId": 1,
-      "status": "pagado",
+      "status": "entregado",
       "notes": "",
       "date": "2026-01-18T15:20:14.000Z",
       "financeIncomeId": null,
       "createdAt": "2026-01-19T15:20:14.000Z",
-      "updatedAt": "2026-01-20T18:33:34.000Z"
+      "updatedAt": "2026-01-19T15:23:01.000Z"
     },
     {
       "id": 487,
       "customerId": 3,
-      "status": "pagado",
+      "status": "entregado",
       "notes": "",
       "date": "2026-01-18T15:20:29.000Z",
       "financeIncomeId": null,
       "createdAt": "2026-01-19T15:20:29.000Z",
-      "updatedAt": "2026-01-20T18:33:31.000Z"
+      "updatedAt": "2026-01-19T15:22:57.000Z"
     },
     {
       "id": 488,
@@ -176142,36 +175722,6 @@
       "financeIncomeId": null,
       "createdAt": "2026-01-19T15:21:22.000Z",
       "updatedAt": "2026-01-19T15:22:32.000Z"
-    },
-    {
-      "id": 490,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "",
-      "date": "2026-01-19T18:34:06.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-01-20T18:34:07.000Z",
-      "updatedAt": "2026-01-20T18:35:35.000Z"
-    },
-    {
-      "id": 491,
-      "customerId": 3,
-      "status": "pagado",
-      "notes": "",
-      "date": "2026-01-19T18:34:19.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-01-20T18:34:20.000Z",
-      "updatedAt": "2026-01-20T18:35:25.000Z"
-    },
-    {
-      "id": 492,
-      "customerId": 12,
-      "status": "pagado",
-      "notes": "",
-      "date": "2026-01-19T18:34:40.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-01-20T18:34:41.000Z",
-      "updatedAt": "2026-01-20T18:35:20.000Z"
     }
   ],
   "OrderItem": [
@@ -183596,7 +183146,7 @@
       "giftQty": 0,
       "replacedQty": 0,
       "deliveredAt": "2026-01-19T15:23:01.000Z",
-      "paidAt": "2026-01-19T18:33:34.000Z"
+      "paidAt": null
     },
     {
       "id": 595,
@@ -183609,7 +183159,7 @@
       "giftQty": 0,
       "replacedQty": 0,
       "deliveredAt": "2026-01-19T15:22:57.000Z",
-      "paidAt": "2026-01-19T18:33:31.000Z"
+      "paidAt": null
     },
     {
       "id": 596,
@@ -183636,58 +183186,6 @@
       "replacedQty": 0,
       "deliveredAt": "2026-01-18T15:22:31.000Z",
       "paidAt": "2026-01-18T15:22:32.000Z"
-    },
-    {
-      "id": 598,
-      "orderId": 490,
-      "productId": 11,
-      "quantity": 20,
-      "price": 0.15,
-      "soldQty": 0,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-01-20T18:35:31.000Z",
-      "paidAt": "2026-01-20T18:35:34.000Z"
-    },
-    {
-      "id": 599,
-      "orderId": 490,
-      "productId": 12,
-      "quantity": 15,
-      "price": 0.3,
-      "soldQty": 0,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-01-20T18:35:33.000Z",
-      "paidAt": "2026-01-20T18:35:35.000Z"
-    },
-    {
-      "id": 600,
-      "orderId": 491,
-      "productId": 11,
-      "quantity": 50,
-      "price": 0.15,
-      "soldQty": 0,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-01-20T18:35:28.000Z",
-      "paidAt": "2026-01-20T18:35:25.000Z"
-    },
-    {
-      "id": 601,
-      "orderId": 492,
-      "productId": 11,
-      "quantity": 100,
-      "price": 0.15,
-      "soldQty": 0,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-01-20T18:35:20.000Z",
-      "paidAt": "2026-01-20T18:35:20.000Z"
     }
   ],
   "Expense": [
@@ -188492,34 +187990,6 @@
       "createdBy": 1,
       "createdAt": "2026-01-17T16:58:47.000Z",
       "updatedAt": "2026-01-17T16:58:47.000Z"
-    },
-    {
-      "id": 347,
-      "date": "2026-01-20",
-      "amount": "9.80",
-      "concept": "Compra de Aceite Aisol",
-      "category": "Compras",
-      "referenceId": 13,
-      "referenceType": "inventory_entry",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:39:14.000Z",
-      "updatedAt": "2026-01-20T18:39:14.000Z"
-    },
-    {
-      "id": 348,
-      "date": "2026-01-20",
-      "amount": "0.60",
-      "concept": "caja de pastel grande",
-      "category": "Otro",
-      "referenceId": null,
-      "referenceType": null,
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:39:40.000Z",
-      "updatedAt": "2026-01-20T18:39:40.000Z"
     }
   ],
   "Income": [
@@ -195494,90 +194964,6 @@
       "createdBy": 1,
       "createdAt": "2026-01-19T15:22:54.000Z",
       "updatedAt": "2026-01-19T15:22:54.000Z"
-    },
-    {
-      "id": 512,
-      "date": "2026-01-20",
-      "amount": "7.50",
-      "concept": "Pago ítem #595 (Order #487)",
-      "category": "Venta",
-      "referenceId": 595,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:33:31.000Z",
-      "updatedAt": "2026-01-20T18:33:41.000Z"
-    },
-    {
-      "id": 513,
-      "date": "2026-01-20",
-      "amount": "3.00",
-      "concept": "Pago ítem #594 (Order #486)",
-      "category": "Venta",
-      "referenceId": 594,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:33:34.000Z",
-      "updatedAt": "2026-01-20T18:33:48.000Z"
-    },
-    {
-      "id": 514,
-      "date": "2026-01-20",
-      "amount": "15.00",
-      "concept": "Venta Dona Normal Decorada de Chocolate x100 a Mariano Samaniego (Ord #492) $0.15",
-      "category": "Venta",
-      "referenceId": 601,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:20.000Z",
-      "updatedAt": "2026-01-20T18:35:20.000Z"
-    },
-    {
-      "id": 515,
-      "date": "2026-01-20",
-      "amount": "7.50",
-      "concept": "Venta Dona Normal Decorada de Chocolate x50 a Maria Auxiliadora - Srta Veronica (Ord #491) $0.15",
-      "category": "Venta",
-      "referenceId": 600,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:25.000Z",
-      "updatedAt": "2026-01-20T18:35:25.000Z"
-    },
-    {
-      "id": 516,
-      "date": "2026-01-20",
-      "amount": "3.00",
-      "concept": "Venta Dona Normal Decorada de Chocolate x20 a La Salle - Señora Paulina Davila. (Ord #490) $0.15",
-      "category": "Venta",
-      "referenceId": 598,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:34.000Z",
-      "updatedAt": "2026-01-20T18:35:34.000Z"
-    },
-    {
-      "id": 517,
-      "date": "2026-01-20",
-      "amount": "4.50",
-      "concept": "Venta Dona Grande con Manjar x15 a La Salle - Señora Paulina Davila. (Ord #490) $0.30",
-      "category": "Venta",
-      "referenceId": 599,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-01-20T18:35:35.000Z",
-      "updatedAt": "2026-01-20T18:35:35.000Z"
     }
   ],
   "Store": [

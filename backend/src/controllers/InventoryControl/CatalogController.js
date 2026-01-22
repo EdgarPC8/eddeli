@@ -82,6 +82,56 @@ async function aggregateSalesFromOrders({ since, okStatuses }) {
   return { soldAllByProduct, soldWindowByProduct };
 }
 
+// GET /inventory/catalog/template-items
+export const getCatalogTemplateItems = async (req, res) => {
+  try {
+    const { onlyActive = "true", onlyValidNow = "true", storeId } = req.query;
+    const now = new Date();
+
+    const where = {};
+    if (typeof storeId !== "undefined" && storeId !== null && storeId !== "")
+      where.storeId = Number(storeId);
+    if (String(onlyActive) === "true") where.isActive = true;
+
+    const rows = await Catalog.findAll({
+      where,
+      include: [
+        {
+          model: InventoryProduct,
+          as: "product",
+          required: true,
+          attributes: [
+            "id",
+            "name",
+            "desc",
+            "price",
+            "primaryImageUrl",
+            "type",
+            "standardWeightGrams",
+            "wholesaleRules",
+          ],
+          include: productIncludeForView,
+        },
+      ],
+      order: [
+        ["section", "ASC"],
+        ["position", "ASC"],
+        ["createdAt", "DESC"],
+      ],
+    });
+
+    const list = String(onlyValidNow) === "true"
+      ? rows.filter((r) => isActiveByDates(r, now))
+      : rows;
+
+    res.json(list.map(mapCatalogEntryToCard));
+  } catch (err) {
+    console.error("getCatalogTemplateItems error:", err);
+    res.status(500).json({ message: "Error al obtener items para plantillas" });
+  }
+};
+
+
 /* =========================
    GET /inventory/analytics/getPopularProducts
    Solo products type='final', desde Orders/OrderItems

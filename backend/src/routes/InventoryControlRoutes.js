@@ -79,6 +79,7 @@ import {
   getCatalogBySections,
   getPopularProducts,
 getAutoCatalogSeed,
+getCatalogTemplateItems,
 } from "../controllers/InventoryControl/CatalogController.js";
 
 import {
@@ -107,6 +108,7 @@ router.patch("/stores/:storeId/products/:productId", toggleStoreProduct);
 router.get("/getPopularProducts", getPopularProducts);
 router.get("/getAutoCatalogSeed", getAutoCatalogSeed);
 router.get("/catalog", getCatalogEntries);
+router.get("/catalog/template-items", getCatalogTemplateItems);
 // Alias por sección (ej: /inventory/catalog/home)
 // CRUD
 router.post("/catalog", isAuthenticated, createCatalogEntry);
