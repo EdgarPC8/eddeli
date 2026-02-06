@@ -81,6 +81,14 @@ async function aggregateSalesFromOrders({ since, okStatuses }) {
 
   return { soldAllByProduct, soldWindowByProduct };
 }
+const formatPriceUSD = (value) => {
+  if (value === undefined || value === null) return null;
+
+  const n = Number(value);
+  if (Number.isNaN(n)) return null;
+
+  return `$${n.toFixed(2)}`;
+};
 
 // GET /inventory/catalog/template-items
 export const getCatalogTemplateItems = async (req, res) => {
@@ -373,76 +381,30 @@ function parseJsonMaybe(v) {
 /* =========================
    Mapeo al formato del frontend (vitrina)
 ========================= */
-const mapCatalogEntryToCard = (c) => {
-  const p = c.product || {};
+const mapCatalogEntryToCard = (row) => {
+  const product = row.product || {};
 
-  const unitAbbr =
-    p.ERP_inventory_unit?.abbreviation ||
-    p.unit?.abbreviation ||
+  const basePrice =
+    row.displayPrice ??
+    product.price ??
     null;
-
-  const categoryName =
-    p.ERP_inventory_category?.name ||
-    p.category?.name ||
-    null;
-
-  const categorySlug = categoryName ? slugify(categoryName) : null;
-
-  // Precio mostrado: override del catálogo > precio del producto
-  const price =
-    c.priceOverride != null ? Number(c.priceOverride) : Number(p.price || 0);
-
-  // Mayoristas: override del catálogo > reglas del producto
-  const catalogRules  = normalizeWholesaleRules(c.wholesaleOverrideRules);
-  const productRules  = normalizeWholesaleRules(p.wholesaleRules);
-  const wholesaleRules = catalogRules.length ? catalogRules : productRules;
-
-  const status =
-    p.status ||
-    (c.section === "bajo_pedido" ? "Bajo pedido" : "Listo ahora");
-
-  const tags = Array.isArray(p.tags) ? p.tags : [];
-
-  const isUniqueToday =
-    typeof p.isUniqueToday === "boolean"
-      ? p.isUniqueToday
-      : /único/i.test(c.badge || "");
 
   return {
-    id: c.id,
-    section: c.section,
-    badge: c.badge || null,
-    imageUrl: c.imageUrl || p.primaryImageUrl || null,
-    position: c.position || 0,
-    isActive: !!c.isActive,
+    id: row.id,
+    badge: row.badge,
+    displayName: product.name,
+    section: row.section,
+    displayPrice: formatPriceUSD(basePrice),
 
-    // 👇 NUEVO: exposiciones directas del catálogo
-    title: c.title || null,
-    subtitle: c.subtitle || null,
-    priceOverride: c.priceOverride != null ? Number(c.priceOverride) : null,
-
-    // 👇 Conveniencias para UI (opcional)
-    displayName: c.title || p.name || null,
-    displayPrice: price,
-    minOrderQty:c.minOrderQty,
-
+    imageUrl: product.primaryImageUrl,
     product: {
-      id: p.id,
-      name: p.name,
-      primaryImageUrl: p.primaryImageUrl || null,
-      unitAbbr,
-      desc:p.desc,
-      standardWeightGrams: Number(p.standardWeightGrams || 0),
-      categorySlug,
-      type: p.type,
-      price,            // precio efectivo (ya considera override)
-      status,
-      tags,
-      wholesaleRules,   // normalizado (catálogo > producto)
-      isUniqueToday,
+      id: product.id,
+      name: product.name,
+      primaryImageUrl: product.primaryImageUrl,
     },
   };
 };
+
 
 
 /* Include para endpoints de VITRINA: forzamos attributes (incluye wholesaleRules) */

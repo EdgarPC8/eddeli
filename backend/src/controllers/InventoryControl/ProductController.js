@@ -33,6 +33,96 @@ const safeUnlink = (fullPath) => {
     console.warn("No se pudo borrar archivo:", fullPath, e?.message);
   }
 };
+import path from "path";
+import fsp from "fs/promises";
+
+const normalize = (p = "") =>
+  String(p || "")
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "")
+    .replace(/\/{2,}/g, "/");
+
+export const updateProduct = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const row = await InventoryProduct.findByPk(id);
+    if (!row) return res.status(404).json({ message: "Producto no encontrado" });
+
+    const oldRel = normalize(row.primaryImageUrl || "");
+    const incomingRel = normalize(req.body.primaryImageUrl || "");
+    const updates = { ...req.body };
+
+    let moved = false;
+
+    // ===============================
+    // 1️⃣ CASO: se sube imagen nueva
+    // ===============================
+    if (req.file?.filename) {
+      const newRel =
+        req.uploadInfo?.relPath ||
+        normalize(path.posix.join(req.body.subfolder || "", req.file.filename));
+
+      updates.primaryImageUrl = newRel;
+
+      // borrar la anterior si no está en uso
+      if (oldRel && oldRel !== newRel) {
+        const used = await isImageInUseElsewhere(oldRel, row.id);
+        if (!used) safeUnlink(imagePath(oldRel));
+      }
+    }
+
+    // =================================================
+    // 2️⃣ CASO CLAVE: NO hay archivo, pero cambió la ruta
+    // =================================================
+    else if (incomingRel && incomingRel !== oldRel) {
+      const used = await isImageInUseElsewhere(oldRel, row.id);
+      if (used) {
+        return res.status(400).json({
+          message:
+            "La imagen está siendo usada por otros productos. No se puede mover.",
+        });
+      }
+
+      const fromAbs = imagePath(oldRel);
+      const toAbs = imagePath(incomingRel);
+
+      if (!fs.existsSync(fromAbs)) {
+        return res.status(404).json({
+          message: "La imagen actual no existe físicamente en el servidor",
+        });
+      }
+
+      // crea carpetas destino
+      await fsp.mkdir(path.dirname(toAbs), { recursive: true });
+
+      // mueve archivo
+      await fsp.rename(fromAbs, toAbs);
+
+      updates.primaryImageUrl = incomingRel;
+      moved = true;
+    }
+
+    // ===============================
+    // 3️⃣ Actualiza BD
+    // ===============================
+    await row.update(updates);
+
+    return res.json({
+      message: moved
+        ? "Producto actualizado y la imagen fue movida"
+        : "Producto actualizado",
+      product: row,
+    });
+  } catch (error) {
+    console.error(error);
+    return res
+      .status(500)
+      .json({ message: "Error al actualizar producto", error });
+  }
+};
+
 
 export const createProduct = async (req, res) => {
   let tempRelPath = null; // ✅ para rollback si falla
@@ -132,42 +222,6 @@ export const createProduct = async (req, res) => {
   }
 };
 
-
-export const updateProduct = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const row = await InventoryProduct.findByPk(id);
-    if (!row) return res.status(404).json({ message: "Producto no encontrado" });
-
-    const oldRelPath = row.primaryImageUrl; // ej: "EdDeli/products/old.jpg"
-    const updates = { ...req.body };
-
-    // ... (tus normalizaciones)
-
-    let newRelPath = null;
-
-    // ✅ si hay nueva imagen: construye relPath con subfolder
-    if (req.file?.filename) {
-      newRelPath = req.uploadInfo?.relPath || req.file.filename;
-      updates.primaryImageUrl = newRelPath;
-    } else {
-      delete updates.primaryImageUrl;
-    }
-    
-
-    await row.update(updates);
-
-    // ✅ borra la imagen anterior si se reemplazó por otra
-    if (newRelPath && oldRelPath && oldRelPath !== newRelPath) {
-      const used = await isImageInUseElsewhere(oldRelPath, row.id);
-      if (!used) safeUnlink(imagePath(oldRelPath));
-    }
-
-    return res.json({ message: "Producto actualizado", product: row });
-  } catch (error) {
-    return res.status(500).json({ message: "Error al actualizar producto", error });
-  }
-};
 
 
 

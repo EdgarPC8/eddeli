@@ -1,14 +1,17 @@
 // controllers/InventoryControl/StoresController.js
 import { Op } from "sequelize";
-import { join } from "path";
 import fs from "fs";
+import path from "path";
+import fsp from "fs/promises";
 import fileDirName from "../../libs/file-dirname.js";
 import { Store } from "../../models/Inventory.js";
+
 const { __dirname } = fileDirName(import.meta);
 
-// Usamos la misma carpeta de imágenes que HomeProduct
-const EDDELI_DIR = join(__dirname, "../../img/EdDeli");
-const imagePath = (filename) => join(EDDELI_DIR, filename);
+// === Config carpeta imágenes ===
+// ⚠️ Este controller está en src/controllers/... => para llegar a src/img es ../../img
+const IMG_BASE_DIR = path.join(__dirname, "../../img");
+const imagePath = (relPath) => path.join(IMG_BASE_DIR, relPath);
 
 const safeUnlink = (fullPath) => {
   try {
@@ -18,206 +21,203 @@ const safeUnlink = (fullPath) => {
   }
 };
 
-// ¿Esta imagen la usan otros stores?
-const isImageInUseByOtherStores = async (filename, currentId = null) => {
+const normalize = (p = "") =>
+  String(p || "")
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^\/+/, "")
+    .replace(/\/+$/, "")
+    .replace(/\/{2,}/g, "/");
+
+// ¿La imagen está en uso por otros stores?
+const isImageInUseElsewhere = async (filename, currentId = null) => {
   if (!filename) return false;
-  const where = currentId
-    ? { imageUrl: filename, id: { [Op.ne]: currentId } }
-    : { imageUrl: filename };
-  const count = await Store.count({ where });
+
+  const count = await Store.count({
+    where: currentId
+      ? { imageUrl: filename, id: { [Op.ne]: currentId } }
+      : { imageUrl: filename },
+  });
+
   return count > 0;
 };
 
 /**
- * GET /api/stores
- * Query:
- *  - isActive=true|false
- *  - q=texto (busca en name, address, city, province)
- *  - limit=50
- *  - offset=0
- *  - orderBy=position|name|createdAt|city|province
- *  - orderDir=ASC|DESC
- */
-export const getStores = async (req, res) => {
-  try {
-    const {
-      isActive,
-      q,
-      limit = 50,
-      offset = 0,
-      orderBy = "position",
-      orderDir = "ASC",
-    } = req.query;
-
-    const where = {};
-    if (typeof isActive !== "undefined") where.isActive = String(isActive) === "true";
-
-    if (q && q.trim()) {
-      const like = { [Op.like]: `%${q}%` };
-      where[Op.or] = [
-        { name: like },
-        { address: like },
-        { city: like },
-        { province: like },
-      ];
-    }
-
-    const rows = await Store.findAll({
-      where,
-      limit: Number(limit),
-      offset: Number(offset),
-      order: [[orderBy, orderDir], ["createdAt", "DESC"]],
-    });
-
-    res.status(200).json(rows);
-  } catch (error) {
-    console.error("Error getStores:", error);
-    res.status(500).json({ message: "Error al obtener Stores" });
-  }
-};
-
-export const getStoreById = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const row = await Store.findByPk(id);
-    if (!row) return res.status(404).json({ message: "Store no encontrado" });
-    res.status(200).json(row);
-  } catch (error) {
-    console.error("Error getStoreById:", error);
-    res.status(500).json({ message: "Error al obtener Store" });
-  }
-};
-
-/**
- * POST /api/stores
- * Body:
- *  - name (obligatorio)
- *  - address (obligatorio)
- *  - description, phone, email, city, province
- *  - position, isActive, createdBy
- *  - image: multipart/form-data (campo "image") → usa edDeliUploadSingle
+ * POST /inventory/stores
+ * multipart/form-data con edDeliUploadSingle
  */
 export const createStore = async (req, res) => {
+  let tempRelPath = null; // ✅ rollback si falla
   try {
-    const {
-      name,
-      address,
-      description = null,
-      phone = null,
-      email = null,
-      city = null,
-      province = null,
-      position = 0,
-      isActive = "true",
-      createdBy = null,
-    } = req.body;
+    const payload = { ...req.body };
 
-    if (!name || !String(name).trim()) {
+    // --- normalizaciones numéricas ---
+    ["position", "latitude", "longitude"].forEach((k) => {
+      if (k in payload && payload[k] !== null && payload[k] !== "") {
+        payload[k] = Number(payload[k]);
+      }
+    });
+
+    // --- booleanos ---
+    if ("isActive" in payload) {
+      payload.isActive = String(payload.isActive) === "true";
+    }
+
+    // --- required mínimos ---
+    if (!payload.name || !String(payload.name).trim()) {
       return res.status(400).json({ message: "El campo 'name' es obligatorio." });
     }
-    if (!address || !String(address).trim()) {
+    if (!payload.address || !String(payload.address).trim()) {
       return res.status(400).json({ message: "El campo 'address' es obligatorio." });
     }
 
-    // Si subieron archivo, úsalo; si no, respeta imageUrl si vino en el body
-    const imageUrl = req.file?.filename || req.body?.imageUrl || null;
+    payload.name = String(payload.name).trim();
+    payload.address = String(payload.address).trim();
 
-    const row = await Store.create({
-      name: String(name).trim(),
-      address: String(address).trim(),
-      description,
-      phone,
-      email,
-      city,
-      province,
-      imageUrl, // guardamos solo filename (mismo patrón que HomeProduct)
-      position: Number(position) || 0,
-      isActive: String(isActive) === "true",
-      createdBy,
-    });
+    // ✅ IMAGEN: guardar la ruta relativa EXACTA que calculó el middleware
+    // - "" => "archivo.png"
+    // - "EdDeli/stores" => "EdDeli/stores/archivo.png"
+    if (req.file?.filename) {
+      tempRelPath =
+        req.uploadInfo?.relPath ||
+        normalize(path.posix.join(req.body.subfolder || "", req.file.filename));
 
-    res.status(201).json({ message: "Creado", store: row });
+      payload.imageUrl = tempRelPath;
+    }
+
+    // ✅ NO guardar subfolder/customFileName en la tabla
+    delete payload.subfolder;
+    delete payload.customFileName;
+    delete payload.moveImage;
+
+    const row = await Store.create(payload);
+    return res.status(201).json({ message: "Creado", store: row });
   } catch (error) {
+    // rollback: si subió imagen y falló el create, borra archivo
+    if (tempRelPath) safeUnlink(imagePath(tempRelPath));
+
     console.error("Error createStore:", error);
-    res.status(500).json({ message: "Error al crear Store" });
+    return res.status(500).json({ message: "Error al crear Store", error: error?.message || error });
   }
 };
 
 /**
- * PUT /api/stores/:id
- * Body (parcial):
- *  - name, address, description, phone, email, city, province
- *  - position, isActive, clearImage
- *  - image: multipart/form-data (campo "image")
+ * PUT /inventory/stores/:id
+ * multipart/form-data con edDeliUploadSingle
  */
 export const updateStore = async (req, res) => {
   try {
     const { id } = req.params;
     const row = await Store.findByPk(id);
-    if (!row) return res.status(404).json({ message: "No encontrado" });
+    if (!row) return res.status(404).json({ message: "Store no encontrado" });
 
-    const {
-      name,
-      address,
-      description,
-      phone,
-      email,
-      city,
-      province,
-      position,
-      isActive,
-      clearImage, // "true" para limpiar
-    } = req.body;
+    const oldRel = normalize(row.imageUrl || "");
+    const incomingRel = normalize(req.body.imageUrl || "");
+    const updates = { ...req.body };
 
-    const updates = {};
+    let moved = false;
 
-    if (typeof name !== "undefined") {
-      if (!String(name).trim()) return res.status(400).json({ message: "Nombre vacío" });
-      updates.name = String(name).trim();
-    }
-    if (typeof address !== "undefined") {
-      if (!String(address).trim()) return res.status(400).json({ message: "Dirección vacía" });
-      updates.address = String(address).trim();
-    }
-    if (typeof description !== "undefined") updates.description = description;
-    if (typeof phone !== "undefined") updates.phone = phone;
-    if (typeof email !== "undefined") updates.email = email;
-    if (typeof city !== "undefined") updates.city = city;
-    if (typeof province !== "undefined") updates.province = province;
-    if (typeof position !== "undefined") updates.position = Number(position) || 0;
-    if (typeof isActive !== "undefined") updates.isActive = String(isActive) === "true";
-
-    // 1) limpiar imagen explícitamente
-    if (String(clearImage) === "true" && row.imageUrl) {
-      const used = await isImageInUseByOtherStores(row.imageUrl, row.id);
-      if (!used) safeUnlink(imagePath(row.imageUrl));
-      updates.imageUrl = null;
-    }
-
-    // 2) si subieron una NUEVA imagen
+    // ===============================
+    // 1️⃣ CASO: se sube imagen nueva
+    // ===============================
     if (req.file?.filename) {
-      if (row.imageUrl) {
-        const used = await isImageInUseByOtherStores(row.imageUrl, row.id);
-        if (!used) safeUnlink(imagePath(row.imageUrl));
+      const newRel =
+        req.uploadInfo?.relPath ||
+        normalize(path.posix.join(req.body.subfolder || "", req.file.filename));
+
+      updates.imageUrl = newRel;
+
+      // borrar anterior si no está en uso
+      if (oldRel && oldRel !== newRel) {
+        const used = await isImageInUseElsewhere(oldRel, row.id);
+        if (!used) safeUnlink(imagePath(oldRel));
       }
-      updates.imageUrl = req.file.filename;
-    } else if (typeof req.body.imageUrl !== "undefined") {
-      // mantener o poner null (si vino vacío) sin tocar archivos
-      updates.imageUrl = req.body.imageUrl || null;
     }
 
+    // =================================================
+    // 2️⃣ CASO CLAVE: NO hay archivo, pero cambió la ruta
+    // =================================================
+    else if (incomingRel && incomingRel !== oldRel) {
+      const used = await isImageInUseElsewhere(oldRel, row.id);
+      if (used) {
+        return res.status(400).json({
+          message: "La imagen está siendo usada por otros stores. No se puede mover.",
+        });
+      }
+
+      const fromAbs = imagePath(oldRel);
+      const toAbs = imagePath(incomingRel);
+
+      if (!fs.existsSync(fromAbs)) {
+        return res.status(404).json({
+          message: "La imagen actual no existe físicamente en el servidor",
+        });
+      }
+
+      await fsp.mkdir(path.dirname(toAbs), { recursive: true });
+      await fsp.rename(fromAbs, toAbs);
+
+      updates.imageUrl = incomingRel;
+      moved = true;
+    }
+
+    // ===============================
+    // Normalizaciones de campos
+    // ===============================
+    if ("position" in updates && updates.position !== "" && updates.position != null) {
+      updates.position = Number(updates.position);
+    }
+    if ("latitude" in updates && updates.latitude !== "" && updates.latitude != null) {
+      updates.latitude = Number(updates.latitude);
+    }
+    if ("longitude" in updates && updates.longitude !== "" && updates.longitude != null) {
+      updates.longitude = Number(updates.longitude);
+    }
+    if ("isActive" in updates) {
+      updates.isActive = String(updates.isActive) === "true";
+    }
+    if ("name" in updates && updates.name != null) updates.name = String(updates.name).trim();
+    if ("address" in updates && updates.address != null) updates.address = String(updates.address).trim();
+
+    // ✅ NO guardar subfolder/customFileName/moveImage
+    delete updates.subfolder;
+    delete updates.customFileName;
+    delete updates.moveImage;
+
+    // ===============================
+    // 3️⃣ Actualiza BD
+    // ===============================
     await row.update(updates);
-    res.status(200).json({ message: "Actualizado", store: row });
+
+    return res.json({
+      message: moved ? "Store actualizado y la imagen fue movida" : "Store actualizado",
+      store: row,
+    });
   } catch (error) {
     console.error("Error updateStore:", error);
-    res.status(500).json({ message: "Error al actualizar Store" });
+    return res.status(500).json({ message: "Error al actualizar Store", error: error?.message || error });
   }
 };
 
-/**
- * DELETE /api/stores/:id
- * - Borra el store y su imagen si no está usada por otros stores
- */
+export const getStores = async (req, res) => {
+  try {
+    const rows = await Store.findAll({ order: [["position", "ASC"], ["createdAt", "DESC"]] });
+    res.json(rows);
+  } catch (error) {
+    res.status(500).json({ message: "Error al obtener Stores", error });
+  }
+};
+
+export const getStoreById = async (req, res) => {
+  try {
+    const row = await Store.findByPk(req.params.id);
+    if (!row) return res.status(404).json({ message: "Store no encontrado" });
+    res.json(row);
+  } catch (error) {
+    res.status(500).json({ message: "Error al obtener Store", error });
+  }
+};
+
 export const deleteStore = async (req, res) => {
   try {
     const { id } = req.params;
@@ -225,14 +225,13 @@ export const deleteStore = async (req, res) => {
     if (!row) return res.status(404).json({ message: "Store no encontrado" });
 
     if (row.imageUrl) {
-      const used = await isImageInUseByOtherStores(row.imageUrl, row.id);
+      const used = await isImageInUseElsewhere(row.imageUrl, row.id);
       if (!used) safeUnlink(imagePath(row.imageUrl));
     }
 
     await row.destroy();
-    res.status(200).json({ message: "Store eliminado correctamente." });
+    res.json({ message: "Store eliminado" });
   } catch (error) {
-    console.error("Error deleteStore:", error);
-    res.status(500).json({ message: "Error al eliminar Store" });
+    res.status(500).json({ message: "Error al eliminar Store", error });
   }
 };

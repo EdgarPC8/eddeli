@@ -10,6 +10,9 @@ import {
     EditorDesignLayerOverride,
   } from "../../models/Editor.js";
 import { sequelize } from "../../database/connection.js";
+import { verifyJWT,getHeaderToken } from "../../libs/jwt.js";
+
+
 
 /**
  * Helpers mínimos (reutilizables)
@@ -42,14 +45,246 @@ const propsRowsToObject = (rows = []) => {
  * TEMPLATES
  * =========================
  */
+export const deleteTemplateLayer = async (req, res) => {
+  const templateId = toInt(req.params.templateId, 0);
+  const layerKey = String(req.params.layerKey || "").trim();
+
+  if (!templateId || !layerKey) {
+    return res.status(400).json({ message: "templateId y layerKey son requeridos" });
+  }
+
+  const token = getHeaderToken(req);
+  try {
+    await verifyJWT(token);
+  } catch {
+    return res.status(401).json({ message: "No autorizado" });
+  }
+
+  const t = await sequelize.transaction();
+  try {
+    // 1️⃣ buscar capa
+    const layer = await EditorTemplateLayer.findOne({
+      where: { templateId, key: layerKey },
+      transaction: t,
+    });
+
+    if (!layer) {
+      await t.rollback();
+      return res.status(404).json({ message: "Capa no encontrada" });
+    }
+
+    const layerId = layer.id;
+
+    // 2️⃣ borrar dependencias
+    await EditorLayerProp.destroy({
+      where: { layerId },
+      transaction: t,
+    });
+
+    await EditorLayerBind.destroy({
+      where: { layerId },
+      transaction: t,
+    });
+
+    // overrides en diseños
+    await EditorDesignLayerOverride.destroy({
+      where: { layerKey },
+      transaction: t,
+    });
+
+    // 3️⃣ borrar capa
+    await layer.destroy({ transaction: t });
+
+    await t.commit();
+    return res.json({ message: "Capa eliminada correctamente", layerKey });
+  } catch (error) {
+    await t.rollback();
+    console.error("deleteTemplateLayer error:", error);
+    return res.status(500).json({ message: "Error eliminando capa" });
+  }
+};
+
+export const updateTemplateDoc = async (req, res) => {
+  const id = toInt(req.params.id, 0);
+
+  const token = getHeaderToken(req);
+  let user = null;
+  try {
+    user = await verifyJWT(token);
+  } catch {
+    return res.status(401).json({ message: "No autorizado" });
+  }
+  const updatedBy = user?.accountId ? toInt(user.accountId, 0) : null;
+
+  const doc = req.body?.doc;
+  if (!doc || typeof doc !== "object") {
+    return res.status(400).json({ message: "doc requerido" });
+  }
+
+  const isPlainObject = (x) => x && typeof x === "object" && !Array.isArray(x);
+
+  const groupsIn = Array.isArray(doc.groups) ? doc.groups : [];
+  const layersIn = Array.isArray(doc.layers) ? doc.layers : [];
+
+  const inferValueType = (value) => {
+    if (typeof value === "number") return "number";
+    if (typeof value === "boolean") return "boolean";
+    if (isPlainObject(value) || Array.isArray(value)) return "json";
+    return "string";
+  };
+
+  const splitPropValue = (value) => {
+    const valueType = inferValueType(value);
+    if (valueType === "json") return { valueType, valueJson: value, valueText: null };
+    if (valueType === "boolean") return { valueType, valueJson: null, valueText: value ? "true" : "false" };
+    if (valueType === "number") return { valueType, valueJson: null, valueText: String(value) };
+    return { valueType, valueJson: null, valueText: value == null ? "" : String(value) };
+  };
+
+  const pickBindFields = (bind = {}) => {
+    if (!isPlainObject(bind)) return null;
+    return {
+      textFrom: bind.textFrom ?? null,
+      srcFrom: bind.srcFrom ?? null,
+      srcPrefix: bind.srcPrefix ?? null,
+      fallbackSrc: bind.fallbackSrc ?? null,
+      maxLen: bind.maxLen != null ? toInt(bind.maxLen, null) : null,
+    };
+  };
+
+  const t = await sequelize.transaction();
+  try {
+    const tpl = await EditorTemplate.findByPk(id, { transaction: t });
+    if (!tpl) {
+      await t.rollback();
+      return res.status(404).json({ message: "Template no encontrado" });
+    }
+
+    // 1) Update template base fields (canvas/background/name opcional)
+    const patch = {};
+    if (doc?.meta?.name != null) patch.name = String(doc.meta.name);
+    if (doc?.canvas?.width != null) patch.canvasWidth = toInt(doc.canvas.width, tpl.canvasWidth);
+    if (doc?.canvas?.height != null) patch.canvasHeight = toInt(doc.canvas.height, tpl.canvasHeight);
+    if (doc?.backgroundSrc !== undefined) patch.backgroundSrc = doc.backgroundSrc ? String(doc.backgroundSrc) : null;
+    if (updatedBy) patch.updatedBy = updatedBy;
+
+    await tpl.update(patch, { transaction: t });
+
+    // 2) BORRAR HIJOS (reemplazo completo)
+    // OJO: Si no tienes ON DELETE CASCADE, primero props/bind de layers.
+    const oldLayers = await EditorTemplateLayer.findAll({
+      where: { templateId: tpl.id },
+      transaction: t,
+    });
+
+    const oldLayerIds = oldLayers.map((x) => x.id);
+
+    if (oldLayerIds.length) {
+      await EditorLayerProp.destroy({ where: { layerId: oldLayerIds }, transaction: t });
+      await EditorLayerBind.destroy({ where: { layerId: oldLayerIds }, transaction: t });
+    }
+
+    await EditorTemplateLayer.destroy({ where: { templateId: tpl.id }, transaction: t });
+    await EditorTemplateGroup.destroy({ where: { templateId: tpl.id }, transaction: t });
+
+    // 3) INSERT groups (map key -> id)
+    const groupKeyToId = new Map();
+    for (const g of groupsIn) {
+      const key = g?.id || g?.key;
+      if (!key) continue;
+
+      const row = await EditorTemplateGroup.create(
+        {
+          templateId: tpl.id,
+          key: String(key),
+          x: toInt(g.x, 0),
+          y: toInt(g.y, 0),
+          locked: toBool(g.locked, false),
+          visible: toBool(g.visible, true),
+        },
+        { transaction: t }
+      );
+
+      groupKeyToId.set(String(key), row.id);
+    }
+
+    // 4) INSERT layers + props + bind
+    for (const l of layersIn) {
+      const layerKey = l?.id || l?.key;
+      if (!layerKey) continue;
+
+      const groupKey = l?.groupId || l?.groupKey || null;
+      const groupId = groupKey ? groupKeyToId.get(String(groupKey)) || null : null;
+
+      const layerRow = await EditorTemplateLayer.create(
+        {
+          templateId: tpl.id,
+          groupId,
+          key: String(layerKey),
+          type: String(l.type),
+          x: toInt(l.x, 0),
+          y: toInt(l.y, 0),
+          w: toInt(l.w, 100),
+          h: toInt(l.h, 100),
+          zIndex: toInt(l.zIndex, 1),
+          name: l.name ?? null,
+          visible: toBool(l.visible, true),
+          locked: toBool(l.locked, false),
+        },
+        { transaction: t }
+      );
+
+      // props
+      if (isPlainObject(l.props)) {
+        for (const [propKey, rawValue] of Object.entries(l.props)) {
+          const { valueType, valueText, valueJson } = splitPropValue(rawValue);
+          await EditorLayerProp.create(
+            {
+              layerId: layerRow.id,
+              propKey: String(propKey),
+              valueType,
+              valueText,
+              valueJson,
+            },
+            { transaction: t }
+          );
+        }
+      }
+
+      // bind
+      const bindPayload = pickBindFields(l.bind);
+      if (bindPayload) {
+        await EditorLayerBind.create(
+          { layerId: layerRow.id, ...bindPayload },
+          { transaction: t }
+        );
+      }
+    }
+
+    await t.commit();
+    return res.json({ message: "Template doc guardado", templateId: tpl.id });
+  } catch (error) {
+    await t.rollback();
+    console.error("updateTemplateDoc error:", error);
+    return res.status(500).json({ message: "Error guardando doc", error: String(error?.message || error) });
+  }
+};
 
 /**
  * POST /editor/templates/import
  * body: templateJson (o el json directo)
  */
 export const importTemplate = async (req, res) => {
+
+  const token = getHeaderToken(req);
+  let user = null;
+  try {
+    user = await verifyJWT(token);
+  } catch (e) {
+    return res.status(401).json({ message: "No autorizado" });
+  }
   const templateJson = req.body?.templateJson ?? req.body;
-  const createdBy = toInt(req.user?.id || req.body?.createdBy, 0);
+  const createdBy= user.accountId;
 
   const isPlainObject = (x) => x && typeof x === "object" && !Array.isArray(x);
 
@@ -217,16 +452,36 @@ export const importTemplate = async (req, res) => {
 
 export const listTemplates = async (req, res) => {
   try {
-    const { app, format, isActive } = req.query;
+    const { app, format, isActive, isDefault, q } = req.query;
 
     const where = {};
     if (app) where.app = String(app);
     if (format) where.format = String(format);
     if (isActive != null) where.isActive = toBool(isActive, true);
 
+    // ✅ filtro default
+    if (isDefault != null) where.isDefault = toBool(isDefault, false);
+
+    // ✅ búsqueda por nombre/id opcional
+    if (q) {
+      const s = String(q).trim();
+      if (s) {
+        where[Op.or] = [
+          { name: { [Op.like]: `%${s}%` } },
+          // id en LIKE funciona si tu dialecto lo permite; si no, quítalo
+          { id: { [Op.like]: `%${s}%` } },
+        ];
+      }
+    }
+
     const rows = await EditorTemplate.findAll({
       where,
-      order: [["id", "DESC"]],
+      // ✅ default primero, luego más recientes
+      order: [
+        ["isDefault", "DESC"],
+        ["updatedAt", "DESC"],
+        ["id", "DESC"],
+      ],
     });
 
     res.json(rows);
@@ -235,6 +490,7 @@ export const listTemplates = async (req, res) => {
     res.status(500).json({ message: "Error listando templates" });
   }
 };
+
 
 export const getTemplateById = async (req, res) => {
   try {
@@ -265,40 +521,378 @@ export const getTemplateById = async (req, res) => {
 
 export const updateTemplate = async (req, res) => {
   const id = toInt(req.params.id, 0);
-  const updatedBy = toInt(req.user?.id || req.body?.updatedBy, 0);
+
+  const token = getHeaderToken(req);
+  let user = null;
+  try {
+    user = await verifyJWT(token);
+  } catch (e) {
+    return res.status(401).json({ message: "No autorizado" });
+  }
+
+  const updatedBy = user?.accountId ? toInt(user.accountId, 0) : 0;
+
+  const doc = req.body?.doc; // 👈 doc completo
+
+  const isPlainObject = (x) => x && typeof x === "object" && !Array.isArray(x);
+
+  // helper: absolute -> relative (corta /img/)
+  const toRelativeImgPath = (v = "") => {
+    if (!v) return v;
+    const s = String(v);
+    if (!/^https?:\/\//i.test(s)) return s;
+    const idx = s.indexOf("/img/");
+    if (idx === -1) return s;
+    return s.slice(idx + 5);
+  };
+
+  // infer props
+  const inferValueType = (value) => {
+    if (typeof value === "number") return "number";
+    if (typeof value === "boolean") return "boolean";
+    if (isPlainObject(value) || Array.isArray(value)) return "json";
+    return "string";
+  };
+
+  const splitPropValue = (value) => {
+    const valueType = inferValueType(value);
+    if (valueType === "json") return { valueType, valueJson: value, valueText: null };
+    if (valueType === "boolean") return { valueType, valueJson: null, valueText: value ? "true" : "false" };
+    if (valueType === "number") return { valueType, valueJson: null, valueText: String(value) };
+    return { valueType, valueJson: null, valueText: value == null ? "" : String(value) };
+  };
+
+  const pickBindFields = (bind = {}) => {
+    if (!isPlainObject(bind)) return null;
+    return {
+      textFrom: bind.textFrom ?? null,
+      srcFrom: bind.srcFrom ?? null,
+      srcPrefix: bind.srcPrefix ?? null,
+      fallbackSrc: bind.fallbackSrc ?? null,
+      maxLen: bind.maxLen != null ? toInt(bind.maxLen, null) : null,
+    };
+  };
 
   try {
     const tpl = await EditorTemplate.findByPk(id);
     if (!tpl) return res.status(404).json({ message: "Template no encontrado" });
 
-    const patch = {};
-    if (req.body.name != null) patch.name = String(req.body.name);
-    if (req.body.app != null) patch.app = req.body.app ? String(req.body.app) : null;
-    if (req.body.format != null) patch.format = req.body.format ? String(req.body.format) : null;
-    if (req.body.canvasWidth != null) patch.canvasWidth = toInt(req.body.canvasWidth, tpl.canvasWidth);
-    if (req.body.canvasHeight != null) patch.canvasHeight = toInt(req.body.canvasHeight, tpl.canvasHeight);
-    if (req.body.backgroundSrc != null) patch.backgroundSrc = req.body.backgroundSrc ? String(req.body.backgroundSrc) : null;
-    if (req.body.isActive != null) patch.isActive = toBool(req.body.isActive, tpl.isActive);
-    if (req.body.isDefault != null) patch.isDefault = toBool(req.body.isDefault, tpl.isDefault);
-    if (updatedBy) patch.updatedBy = updatedBy;
+    const t = await sequelize.transaction();
+    try {
+      // =========================
+      // A) Si llega doc -> reescribir TODO
+      // =========================
+      if (doc && isPlainObject(doc)) {
+        const groupsIn = Array.isArray(doc.groups) ? doc.groups : [];
+        const layersIn = Array.isArray(doc.layers) ? doc.layers : [];
 
-    await tpl.update(patch);
+        const patchTpl = {
+          name: doc?.meta?.name ?? tpl.name,
+          app: doc.app ?? tpl.app ?? null,
+          format: doc.format ?? tpl.format ?? null,
+          canvasWidth: toInt(doc?.canvas?.width, tpl.canvasWidth || 1920),
+          canvasHeight: toInt(doc?.canvas?.height, tpl.canvasHeight || 1080),
+          backgroundSrc: doc.backgroundSrc ? toRelativeImgPath(doc.backgroundSrc) : null,
+          updatedBy: updatedBy || null,
+        };
 
-    if (patch.isDefault === true && tpl.app && tpl.format) {
-      await EditorTemplate.update(
-        { isDefault: false },
-        {
-          where: { id: { [Op.ne]: tpl.id }, app: tpl.app, format: tpl.format },
+        await tpl.update(patchTpl, { transaction: t });
+
+        // borrar dependencias (layers -> props/bind)
+        const oldLayers = await EditorTemplateLayer.findAll({
+          where: { templateId: tpl.id },
+          attributes: ["id"],
+          transaction: t,
+        });
+
+        const oldLayerIds = oldLayers.map((x) => x.id);
+
+        if (oldLayerIds.length) {
+          await EditorLayerProp.destroy({ where: { layerId: oldLayerIds }, transaction: t });
+          await EditorLayerBind.destroy({ where: { layerId: oldLayerIds }, transaction: t });
         }
-      );
-    }
 
-    res.json({ message: "Template actualizado", template: tpl });
+        await EditorTemplateLayer.destroy({ where: { templateId: tpl.id }, transaction: t });
+        await EditorTemplateGroup.destroy({ where: { templateId: tpl.id }, transaction: t });
+
+        // insertar groups
+        const groupKeyToId = new Map();
+        for (const g of groupsIn) {
+          const key = g?.id || g?.key;
+          if (!key) continue;
+
+          const row = await EditorTemplateGroup.create(
+            {
+              templateId: tpl.id,
+              key: String(key),
+              x: toInt(g.x, 0),
+              y: toInt(g.y, 0),
+              locked: toBool(g.locked, false),
+              visible: toBool(g.visible, true),
+            },
+            { transaction: t }
+          );
+
+          groupKeyToId.set(String(key), row.id);
+        }
+
+        // insertar layers + props + bind
+        for (const l of layersIn) {
+          const layerKey = l?.id || l?.key;
+          if (!layerKey) continue;
+
+          const groupKey = l?.groupId || l?.groupKey || null;
+          const groupId = groupKey ? groupKeyToId.get(String(groupKey)) || null : null;
+
+          const layerRow = await EditorTemplateLayer.create(
+            {
+              templateId: tpl.id,
+              groupId,
+              key: String(layerKey),
+              type: String(l.type),
+              x: toInt(l.x, 0),
+              y: toInt(l.y, 0),
+              w: toInt(l.w, 100),
+              h: toInt(l.h, 100),
+              zIndex: toInt(l.zIndex, 1),
+              name: l.name ?? null,
+              visible: toBool(l.visible, true),
+              locked: toBool(l.locked, false),
+            },
+            { transaction: t }
+          );
+
+          // props (si es image y viene src absoluto -> relativo)
+          if (isPlainObject(l.props)) {
+            const entries = Object.entries(l.props).map(([k, v]) => {
+              if (k === "src") return [k, toRelativeImgPath(v)];
+              return [k, v];
+            });
+
+            for (const [propKey, rawValue] of entries) {
+              const { valueType, valueText, valueJson } = splitPropValue(rawValue);
+              await EditorLayerProp.create(
+                {
+                  layerId: layerRow.id,
+                  propKey: String(propKey),
+                  valueType,
+                  valueText,
+                  valueJson,
+                },
+                { transaction: t }
+              );
+            }
+          }
+
+          const bindPayload = pickBindFields(l.bind);
+          if (bindPayload) {
+            await EditorLayerBind.create(
+              { layerId: layerRow.id, ...bindPayload },
+              { transaction: t }
+            );
+          }
+        }
+
+        await t.commit();
+        return res.json({ message: "Template guardado (doc completo)", templateId: tpl.id });
+      }
+
+      // =========================
+      // B) Si NO llega doc -> patch normal (tu lógica anterior)
+      // =========================
+      const patch = {};
+      if (req.body.name != null) patch.name = String(req.body.name);
+      if (req.body.app != null) patch.app = req.body.app ? String(req.body.app) : null;
+      if (req.body.format != null) patch.format = req.body.format ? String(req.body.format) : null;
+
+      if (req.body.canvasWidth != null) patch.canvasWidth = toInt(req.body.canvasWidth, tpl.canvasWidth);
+      if (req.body.canvasHeight != null) patch.canvasHeight = toInt(req.body.canvasHeight, tpl.canvasHeight);
+
+      if (req.body.backgroundSrc != null)
+        patch.backgroundSrc = req.body.backgroundSrc ? toRelativeImgPath(req.body.backgroundSrc) : null;
+
+      if (req.body.isActive != null) patch.isActive = toBool(req.body.isActive, tpl.isActive);
+      if (req.body.isDefault != null) patch.isDefault = toBool(req.body.isDefault, tpl.isDefault);
+
+      if (updatedBy) patch.updatedBy = updatedBy;
+
+      await tpl.update(patch, { transaction: t });
+
+      await t.commit();
+      return res.json({ message: "Template actualizado", template: tpl });
+    } catch (e) {
+      await t.rollback();
+      throw e;
+    }
   } catch (error) {
     console.error("updateTemplate error:", error);
-    res.status(500).json({ message: "Error actualizando template" });
+    return res.status(500).json({ message: "Error actualizando template" });
   }
 };
+
+
+// ✅ helper: arma doc en formato editor desde el template Sequelize con includes
+const buildResolvedDocFromTemplateRow = (templateRow) => {
+  const groups = (templateRow.groups || []).map((g) => ({
+    id: g.key,
+    x: g.x,
+    y: g.y,
+    locked: g.locked,
+    visible: g.visible,
+  }));
+
+  const layers = (templateRow.layers || [])
+    .map((l) => ({
+      id: l.key,
+      groupId: l.group?.key || null,
+      type: l.type,
+      x: l.x,
+      y: l.y,
+      w: l.w,
+      h: l.h,
+      zIndex: l.zIndex,
+      name: l.name,
+      visible: l.visible,
+      locked: l.locked,
+      props: propsRowsToObject(l.props || []),
+      bind: l.bind
+        ? {
+            textFrom: l.bind.textFrom,
+            srcFrom: l.bind.srcFrom,
+            srcPrefix: l.bind.srcPrefix,
+            fallbackSrc: l.bind.fallbackSrc,
+            maxLen: l.bind.maxLen,
+          }
+        : undefined,
+    }))
+    .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+
+  return {
+    canvas: { width: templateRow.canvasWidth, height: templateRow.canvasHeight },
+    backgroundSrc: templateRow.backgroundSrc,
+    groups,
+    layers,
+  };
+};
+
+// ✅ GET /editor/templates/:id/resolved
+export const getTemplateResolvedById = async (req, res) => {
+  try {
+    const id = toInt(req.params.id, 0);
+
+    const row = await EditorTemplate.findByPk(id, {
+      include: [
+        { model: EditorTemplateGroup, as: "groups" },
+        {
+          model: EditorTemplateLayer,
+          as: "layers",
+          include: [
+            { model: EditorLayerProp, as: "props" },
+            { model: EditorLayerBind, as: "bind" },
+            { model: EditorTemplateGroup, as: "group" },
+          ],
+        },
+      ],
+    });
+
+    if (!row) return res.status(404).json({ message: "Template no encontrado" });
+    if (row.isActive === false) return res.status(404).json({ message: "Template inactivo" });
+
+    const resolved = buildResolvedDocFromTemplateRow(row);
+
+    return res.json({
+      templateId: row.id,
+      template: {
+        id: row.id,
+        name: row.name,
+        app: row.app,
+        format: row.format,
+        isDefault: row.isDefault,
+        isActive: row.isActive,
+      },
+      resolved,
+    });
+  } catch (error) {
+    console.error("getTemplateResolvedById error:", error);
+    return res.status(500).json({ message: "Error resolviendo template" });
+  }
+};
+
+// ✅ GET /editor/templates/default?app=EdDeli&format=16:9
+export const getDefaultTemplateResolved = async (req, res) => {
+  try {
+    const app = req.query?.app ? String(req.query.app) : null;
+    const format = req.query?.format ? String(req.query.format) : null;
+
+    const whereDefault = { isActive: true, isDefault: true };
+    if (app) whereDefault.app = app;
+    if (format) whereDefault.format = format;
+
+    // 1) intenta default activo
+    let row = await EditorTemplate.findOne({
+      where: whereDefault,
+      order: [["updatedAt", "DESC"]],
+      include: [
+        { model: EditorTemplateGroup, as: "groups" },
+        {
+          model: EditorTemplateLayer,
+          as: "layers",
+          include: [
+            { model: EditorLayerProp, as: "props" },
+            { model: EditorLayerBind, as: "bind" },
+            { model: EditorTemplateGroup, as: "group" },
+          ],
+        },
+      ],
+    });
+
+    // 2) fallback: primero activo (por app/format si vienen)
+    if (!row) {
+      const whereAny = { isActive: true };
+      if (app) whereAny.app = app;
+      if (format) whereAny.format = format;
+
+      row = await EditorTemplate.findOne({
+        where: whereAny,
+        order: [["id", "DESC"]],
+        include: [
+          { model: EditorTemplateGroup, as: "groups" },
+          {
+            model: EditorTemplateLayer,
+            as: "layers",
+            include: [
+              { model: EditorLayerProp, as: "props" },
+              { model: EditorLayerBind, as: "bind" },
+              { model: EditorTemplateGroup, as: "group" },
+            ],
+          },
+        ],
+      });
+    }
+
+    if (!row) return res.status(404).json({ message: "No hay templates activos" });
+
+    const resolved = buildResolvedDocFromTemplateRow(row);
+
+    return res.json({
+      templateId: row.id,
+      template: {
+        id: row.id,
+        name: row.name,
+        app: row.app,
+        format: row.format,
+        isDefault: row.isDefault,
+        isActive: row.isActive,
+      },
+      resolved,
+    });
+  } catch (error) {
+    console.error("getDefaultTemplateResolved error:", error);
+    return res.status(500).json({ message: "Error trayendo default" });
+  }
+};
+
+
 
 export const deleteTemplate = async (req, res) => {
   try {
