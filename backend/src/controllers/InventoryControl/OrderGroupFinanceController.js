@@ -373,6 +373,117 @@ const toNum = (v, def = 0) => {
   };
   
 
+export const addItemsToGroup = async (req, res) => {
+  const { groupId } = req.params;
+  const { itemIds } = req.body;
+
+  if (!Array.isArray(itemIds) || itemIds.length === 0) {
+    return res.status(400).json({ message: "itemIds es requerido y debe ser un array no vacío" });
+  }
+
+  try {
+    const token = getHeaderToken(req);
+    await verifyJWT(token);
+
+    const result = await sequelize.transaction(async (t) => {
+      // 1) Validar que el grupo existe y está abierto
+      const group = await ItemGroup.findByPk(groupId, { transaction: t });
+      if (!group) return { status: 404, body: { message: "Grupo no existe" } };
+      if (group.status !== "open") {
+        return { status: 400, body: { message: "Solo se pueden agregar ítems a grupos abiertos" } };
+      }
+
+      // 2) Validar que los ítems pertenecen al mismo cliente que el grupo
+      const items = await OrderItem.findAll({
+        where: { id: { [Op.in]: itemIds } },
+        include: [{ model: Order, as: "ERP_order", attributes: ["id", "customerId"] }],
+        transaction: t,
+      });
+
+      if (items.length !== itemIds.length) {
+        return { status: 400, body: { message: "Algunos ítems no existen" } };
+      }
+
+      // Verificar que todos pertenecen al mismo cliente del grupo
+      const invalidItems = items.filter((it) => it.ERP_order?.customerId !== group.customerId);
+      if (invalidItems.length > 0) {
+        return {
+          status: 400,
+          body: {
+            message: "Algunos ítems pertenecen a otro cliente",
+            itemsInvalidos: invalidItems.map((it) => ({ orderItemId: it.id, customerId: it.ERP_order?.customerId })),
+          },
+        };
+      }
+
+      // 3) Evitar ítems que ya están en otro grupo (o en este mismo grupo)
+      const already = await ItemGroupItem.findAll({
+        where: { orderItemId: { [Op.in]: itemIds } },
+        transaction: t,
+      });
+
+      if (already.length > 0) {
+        const alreadyInThisGroup = already.filter((x) => x.groupId === Number(groupId));
+        const alreadyInOtherGroup = already.filter((x) => x.groupId !== Number(groupId));
+
+        if (alreadyInOtherGroup.length > 0) {
+          return {
+            status: 400,
+            body: {
+              message: "Algunos ítems ya están en otro grupo",
+              itemsEnOtroGrupo: alreadyInOtherGroup.map((x) => ({ orderItemId: x.orderItemId, groupId: x.groupId })),
+            },
+          };
+        }
+
+        // Si ya están en este grupo, los filtramos para no duplicar
+        const alreadyInThisGroupIds = new Set(alreadyInThisGroup.map((x) => x.orderItemId));
+        const newItemIds = itemIds.filter((id) => !alreadyInThisGroupIds.has(id));
+
+        if (newItemIds.length === 0) {
+          return { status: 200, body: { mensaje: "Todos los ítems ya estaban en este grupo", itemsAgregados: [] } };
+        }
+
+        // Crear solo los nuevos
+        await ItemGroupItem.bulkCreate(
+          newItemIds.map((id) => ({ groupId: group.id, orderItemId: id })),
+          { transaction: t }
+        );
+
+        return {
+          status: 200,
+          body: {
+            mensaje: "Ítems agregados al grupo",
+            grupo: { id: group.id, customerId: group.customerId, concept: group.concept },
+            itemsAgregados: newItemIds,
+            itemsYaEnGrupo: Array.from(alreadyInThisGroupIds),
+          },
+        };
+      }
+
+      // 4) Todos son nuevos, crear todos
+      await ItemGroupItem.bulkCreate(
+        itemIds.map((id) => ({ groupId: group.id, orderItemId: id })),
+        { transaction: t }
+      );
+
+      return {
+        status: 200,
+        body: {
+          mensaje: "Ítems agregados al grupo",
+          grupo: { id: group.id, customerId: group.customerId, concept: group.concept },
+          itemsAgregados: itemIds,
+        },
+      };
+    });
+
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error("addItemsToGroup:", error);
+    return res.status(500).json({ message: "Error agregando ítems al grupo", error: String(error?.message || error) });
+  }
+};
+
 export const createItemGroup = async (req, res) => {
   const { customerId, itemIds, concept } = req.body;
 

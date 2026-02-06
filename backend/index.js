@@ -42,9 +42,9 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:4173",
   "http://localhost:8888",
-  "http://192.168.1.101:8888",
-  "http://192.168.1.101:5173",
-  "http://192.168.1.101:5174",
+  "http://192.168.1.100:8888",
+  "http://192.168.1.100:5173",
+  "http://192.168.1.100:5174",
   "http://192.168.110.93:8888",
   "http://192.168.110.93:5173",
   "http://192.168.110.93:5174",
@@ -110,8 +110,8 @@ initNotificationSocket(io);
 export async function main() {
   try {
     await sequelize.authenticate();
-    // await sequelize.sync({ force: true });
-    // await insertData();
+/*      await sequelize.sync({ force: true });
+     await insertData(); */
 
     console.log("✅ Conexión realizada con éxito.");
 

@@ -31,6 +31,7 @@ import {
 
     // ✅ NUEVO: Grupos por ITEMS
     createItemGroup,
+    addItemsToGroup,
     updateItemGroup,
     deleteItemGroup,
     moveItemBetweenGroups,
@@ -68,6 +69,13 @@ router.get("/workbench/all", isAuthenticated, getFinanceWorkbenchAll);
  * body: { customerId, itemIds: number[], concept? }
  */
 router.post("/workbench/item-groups", isAuthenticated, createItemGroup);
+
+/**
+ * Agregar ítems a un grupo existente
+ * POST /workbench/item-groups/:groupId/add-items
+ * body: { itemIds: number[] }
+ */
+router.post("/workbench/item-groups/:groupId/add-items", isAuthenticated, addItemsToGroup);
 
 /**
  * Editar grupo (concept/status)

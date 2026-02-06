@@ -10,10 +10,10 @@ export { sequelize };
 
 
 
-// import { Sequelize } from "sequelize";
-
-// export const sequelize = new Sequelize({
-//   dialect: "sqlite",
-//   storage: "database.db",   // ← aquí se crea el archivo .db
-//   logging: false,
-// });
+/* import { Sequelize } from "sequelize"
+export const sequelize = new Sequelize({
+  dialect: "sqlite",
+  storage: "database.db",   // ← aquí se crea el archivo .db
+  logging: false,
+});
+ */
