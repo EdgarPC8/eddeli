@@ -45,9 +45,6 @@ const allowedOrigins = [
   "http://192.168.1.100:8888",
   "http://192.168.1.100:5173",
   "http://192.168.1.100:5174",
-  "http://192.168.110.93:8888",
-  "http://192.168.110.93:5173",
-  "http://192.168.110.93:5174",
   "https://aplicaciones.marianosamaniego.edu.ec",
   "https://www.aplicaciones.marianosamaniego.edu.ec",
 ];
