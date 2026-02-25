@@ -42,10 +42,11 @@ const safeSubfolder = (p = "") => {
 
 // ✅ Puedes mandar la subcarpeta por body o query:
 // - body.subfolder = ""                => guarda en src/img
-// - body.subfolder = "EdDeli"          => guarda en src/img/EdDeli
-// - body.subfolder = "EdDeli/products" => guarda en src/img/EdDeli/products
+// - body.subfolder = "EdDeli/stores"   => guarda en src/img/EdDeli/stores
+// Si no viene subfolder, por defecto "EdDeli/stores" para stores
 const resolveDestination = (req) => {
-  const sub = safeSubfolder(req.body?.subfolder ?? req.query?.subfolder ?? "");
+  const raw = String(req.body?.subfolder ?? req.query?.subfolder ?? "").trim();
+  const sub = raw ? safeSubfolder(raw) : "EdDeli/stores";
   const dest = path.join(IMG_BASE_DIR, sub);
   fs.mkdirSync(dest, { recursive: true });
   return { dest, sub };

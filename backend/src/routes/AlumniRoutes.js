@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { getMatriz,addMatriz,editMatriz,deleteMatriz } from "../controllers/Alumni/MatrizController.js";
+import { getMatriz, getMatrizStats, addMatriz, editMatriz, deleteMatriz } from "../controllers/Alumni/MatrizController.js";
 import { getCareers,addCareer,editCareer,deleteCareer } from "../controllers/Alumni/CareerController.js";
 import { getPeriods,addPeriod,editPeriod ,deletePeriod} from "../controllers/Alumni/PeriodController.js";
 import { getMatriculas,addMatriculasBulk } from "../controllers/Alumni/MatriculaController.js";
@@ -17,7 +17,8 @@ router.get("/createAccounts",createAccountsFromMatriculas);
 router.post("/filterUsers", isAuthenticated,filterUsers);                             
 router.get("/matricula", isAuthenticated,getMatriculas);                             
 router.post("/matricula/bulk", isAuthenticated,addMatriculasBulk);                             
-router.get("/matriz", isAuthenticated,getMatriz);                             
+router.get("/matriz", isAuthenticated, getMatriz);
+router.get("/matriz/stats", getMatrizStats);                             
 router.post("/matriz", isAuthenticated,addMatriz);                             
 router.put("/matriz/:id", isAuthenticated,editMatriz);                             
 router.delete("/matriz/:id", isAuthenticated,deleteMatriz);                             

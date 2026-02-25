@@ -1,3 +1,16 @@
+/**
+ * Slug para URLs/categorías: normaliza acentos, minúsculas, reemplaza no-alfanuméricos por guiones.
+ * Usado por CatalogController y CatalogVitrinaController.
+ */
+export function slugify(s = "") {
+  return String(s)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
 // Función para calcular la fecha de expiración según `lic.time`
 export function calculateExpirationDate(now, time) {
     const expirationDate = new Date(now);

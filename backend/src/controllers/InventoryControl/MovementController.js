@@ -610,7 +610,20 @@ export const getMovementsByProduct = async (req, res) => {
       where: { productId },
       order: [['date', 'DESC']]
     });
-    res.json(movements);
+    
+    // Formatear fechas correctamente antes de enviar
+    const formattedMovements = movements.map(movement => {
+      const movementData = movement.toJSON();
+      if (movementData.date) {
+        const date = new Date(movementData.date);
+        if (!isNaN(date.getTime())) {
+          movementData.date = date.toISOString();
+        }
+      }
+      return movementData;
+    });
+    
+    res.json(formattedMovements);
   } catch (error) {
     res.status(500).json({ message: "Error al obtener movimientos", error });
   }
@@ -624,7 +637,21 @@ export const getAllMovements = async (req, res) => {
       ],
       order: [['date', 'DESC']]
     });
-    res.json(movements);
+    
+    // Formatear fechas correctamente antes de enviar
+    const formattedMovements = movements.map(movement => {
+      const movementData = movement.toJSON();
+      if (movementData.date) {
+        // Asegurar que la fecha esté en formato ISO completo
+        const date = new Date(movementData.date);
+        if (!isNaN(date.getTime())) {
+          movementData.date = date.toISOString();
+        }
+      }
+      return movementData;
+    });
+    
+    res.json(formattedMovements);
   } catch (error) {
     res.status(500).json({ message: "Error al obtener todos los movimientos", error });
   }

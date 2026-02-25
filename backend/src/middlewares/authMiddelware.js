@@ -10,6 +10,7 @@ const isAuthenticated = async (req, res, next) => {
     const token = getHeaderToken(req);
 
     const verify = await verifyJWT(token);
+    req.user = verify;
 
     next();
   } catch (error) {

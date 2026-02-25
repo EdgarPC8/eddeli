@@ -122941,7 +122941,7 @@
       "categoryId": 1,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 9000,
+      "stock": 7800,
       "minStock": 0,
       "price": "0.85",
       "wholesaleRules": null,
@@ -122952,7 +122952,7 @@
       "isActive": 1,
       "primaryImageUrl": null,
       "createdAt": "2025-09-26T19:48:20.000Z",
-      "updatedAt": "2026-02-24T15:41:26.000Z"
+      "updatedAt": "2026-01-16T16:12:58.000Z"
     },
     {
       "id": 44,
@@ -123771,7 +123771,7 @@
     {
       "id": 81,
       "name": "Minitorta Semihúmedo Decorado",
-      "desc": "Textura suave y jugosa, más húmedo que un pastel clásico. \r\nCon relleno de Piña, Mora o Manjar",
+      "desc": "Textura suave y jugosa, más húmedo que un pastel clásico.",
       "type": "final",
       "unitId": 1,
       "categoryId": 5,
@@ -123780,7 +123780,7 @@
       "stock": 0,
       "minStock": 0,
       "price": "4.00",
-      "wholesaleRules": "[]",
+      "wholesaleRules": null,
       "distributorPrice": "2.80",
       "taxRate": "0.00",
       "sku": null,
@@ -123788,11 +123788,11 @@
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-mini-torta-decorado-g4z7l.png",
       "createdAt": "2026-02-23T00:00:00.000Z",
-      "updatedAt": "2026-02-23T17:05:25.000Z"
+      "updatedAt": "2026-02-23T00:00:00.000Z"
     },
     {
       "id": 82,
-      "name": "Minitorta Húmedo Decorado",
+      "name": "Minitorta Húmedo Decorado (Tres Leches)",
       "desc": "Muy jugoso, empapado en leche, textura suave y cremosa estilo tres leches.",
       "type": "final",
       "unitId": 1,
@@ -123802,7 +123802,7 @@
       "stock": 0,
       "minStock": 0,
       "price": "4.50",
-      "wholesaleRules": "[]",
+      "wholesaleRules": null,
       "distributorPrice": "3.15",
       "taxRate": "0.00",
       "sku": null,
@@ -123810,7 +123810,7 @@
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-mini-torta-decorado-g4z7l.png",
       "createdAt": "2026-02-23T00:00:00.000Z",
-      "updatedAt": "2026-02-23T17:03:21.000Z"
+      "updatedAt": "2026-02-23T00:00:00.000Z"
     },
     {
       "id": 83,
@@ -176508,21 +176508,6 @@
       "createdBy": 1,
       "createdAt": "2026-02-23T14:40:09.000Z",
       "updatedAt": "2026-02-23T14:40:09.000Z"
-    },
-    {
-      "id": 3464,
-      "productId": 43,
-      "quantity": 1200,
-      "description": "3 fundas de azucar impalpable a 1.3 cada una en bermeo plaza",
-      "price": 3.9,
-      "type": "entrada",
-      "reason": "ENTRADA_COMPRA",
-      "referenceType": null,
-      "referenceId": null,
-      "date": "2026-02-24T15:41:26.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-02-24T15:41:26.000Z",
-      "updatedAt": "2026-02-24T15:41:26.000Z"
     }
   ],
   "Customer": [
@@ -182011,26 +181996,6 @@
       "financeIncomeId": null,
       "createdAt": "2026-02-23T14:40:03.000Z",
       "updatedAt": "2026-02-23T14:40:09.000Z"
-    },
-    {
-      "id": 543,
-      "customerId": 19,
-      "status": "pendiente",
-      "notes": "",
-      "date": "2026-02-23T15:40:10.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-02-24T15:40:10.000Z",
-      "updatedAt": "2026-02-24T15:40:10.000Z"
-    },
-    {
-      "id": 544,
-      "customerId": 19,
-      "status": "pendiente",
-      "notes": "",
-      "date": "2026-02-25T04:18:13.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-02-25T04:18:13.000Z",
-      "updatedAt": "2026-02-25T04:18:13.000Z"
     }
   ],
   "OrderItem": [
@@ -190275,32 +190240,6 @@
       "replacedQty": 0,
       "deliveredAt": "2026-02-23T14:40:09.000Z",
       "paidAt": null
-    },
-    {
-      "id": 660,
-      "orderId": 543,
-      "productId": 65,
-      "quantity": 39,
-      "price": 0.3,
-      "soldQty": 0,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": null,
-      "paidAt": null
-    },
-    {
-      "id": 661,
-      "orderId": 544,
-      "productId": 44,
-      "quantity": 40,
-      "price": 0.75,
-      "soldQty": 0,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": null,
-      "paidAt": null
     }
   ],
   "Expense": [
@@ -195399,62 +195338,6 @@
       "createdBy": 1,
       "createdAt": "2026-02-21T22:55:40.000Z",
       "updatedAt": "2026-02-21T22:55:40.000Z"
-    },
-    {
-      "id": 369,
-      "date": "2026-02-24",
-      "amount": "3.90",
-      "concept": "Compra de Azúcar impalpable",
-      "category": "Compras",
-      "referenceId": 43,
-      "referenceType": "inventory_entry",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-02-24T15:41:26.000Z",
-      "updatedAt": "2026-02-24T15:41:26.000Z"
-    },
-    {
-      "id": 370,
-      "date": "2026-02-23",
-      "amount": "3.35",
-      "concept": "bisagras y picaporte peqieño para puerta de baño",
-      "category": "Otro",
-      "referenceId": null,
-      "referenceType": null,
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-02-24T15:42:09.000Z",
-      "updatedAt": "2026-02-24T15:42:09.000Z"
-    },
-    {
-      "id": 371,
-      "date": "2026-02-12",
-      "amount": "16.00",
-      "concept": "12 en matcons chile para la puerta, y 4 en otra ferreteria",
-      "category": "Otro",
-      "referenceId": null,
-      "referenceType": null,
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-02-25T16:01:42.000Z",
-      "updatedAt": "2026-02-25T16:01:42.000Z"
-    },
-    {
-      "id": 372,
-      "date": "2026-02-18",
-      "amount": "2.00",
-      "concept": "carrera para ir a dejar gasolina",
-      "category": "Otro",
-      "referenceId": null,
-      "referenceType": null,
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-02-25T16:02:12.000Z",
-      "updatedAt": "2026-02-25T16:02:12.000Z"
     }
   ],
   "Income": [
@@ -203366,7 +203249,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Disponible",
-      "position": 20,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "0.15",
@@ -203375,7 +203258,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-10-21T03:22:59.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-10-21T03:22:59.000Z"
     },
     {
       "id": 2,
@@ -203385,7 +203268,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Disponible",
-      "position": 3,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "1.00",
@@ -203394,7 +203277,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-10-21T03:30:36.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-10-21T03:56:13.000Z"
     },
     {
       "id": 3,
@@ -203404,7 +203287,7 @@
       "subtitle": "Chocolate",
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 1,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "0.25",
@@ -203413,7 +203296,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-10-21T03:33:13.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-10-22T02:28:17.000Z"
     },
     {
       "id": 4,
@@ -203423,7 +203306,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 2,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "0.50",
@@ -203432,7 +203315,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-10-21T03:37:42.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-24T13:49:46.000Z"
     },
     {
       "id": 5,
@@ -203442,7 +203325,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Disponible",
-      "position": 4,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "1.00",
@@ -203451,7 +203334,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-10-21T03:45:28.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-24T13:48:15.000Z"
     },
     {
       "id": 6,
@@ -203461,7 +203344,7 @@
       "subtitle": "Tortila de trigo",
       "imageUrl": null,
       "badge": "Disponible",
-      "position": 6,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "1.00",
@@ -203470,7 +203353,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-10-21T03:47:33.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-10-21T03:47:33.000Z"
     },
     {
       "id": 7,
@@ -203480,7 +203363,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Disponible",
-      "position": 19,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "1.00",
@@ -203489,7 +203372,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-10-21T03:55:15.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-10-21T03:55:15.000Z"
     },
     {
       "id": 8,
@@ -203499,7 +203382,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 16,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "6.00",
@@ -203508,7 +203391,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-10-22T02:00:37.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-10-22T02:27:31.000Z"
     },
     {
       "id": 9,
@@ -203518,7 +203401,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 15,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "3.50",
@@ -203527,7 +203410,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-10-22T02:00:37.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-10-22T02:00:37.000Z"
     },
     {
       "id": 10,
@@ -203537,7 +203420,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 13,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "10.00",
@@ -203546,7 +203429,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-10-22T02:00:37.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-10-22T02:27:40.000Z"
     },
     {
       "id": 11,
@@ -203556,7 +203439,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 10,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "16.00",
@@ -203565,7 +203448,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-10-22T02:00:37.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-10-22T02:27:47.000Z"
     },
     {
       "id": 12,
@@ -203803,7 +203686,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Disponible",
-      "position": 5,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "1.00",
@@ -203812,7 +203695,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-04T02:11:03.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-04T02:11:03.000Z"
     },
     {
       "id": 25,
@@ -203822,7 +203705,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 28,
+      "position": 6,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "3.00",
@@ -203831,7 +203714,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-04T02:11:22.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-04T02:17:45.000Z"
     },
     {
       "id": 26,
@@ -203841,7 +203724,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 32,
+      "position": 10,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "2.50",
@@ -203850,7 +203733,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-04T02:11:37.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-04T02:18:37.000Z"
     },
     {
       "id": 27,
@@ -203860,7 +203743,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 33,
+      "position": 11,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "5.00",
@@ -203869,7 +203752,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-04T02:11:43.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-04T02:18:44.000Z"
     },
     {
       "id": 28,
@@ -203879,7 +203762,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 31,
+      "position": 9,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "1.00",
@@ -203888,7 +203771,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-04T02:11:51.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-04T02:18:25.000Z"
     },
     {
       "id": 29,
@@ -203898,7 +203781,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 27,
+      "position": 5,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "1.25",
@@ -203907,7 +203790,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-04T02:12:00.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-04T02:17:35.000Z"
     },
     {
       "id": 30,
@@ -203917,7 +203800,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 29,
+      "position": 7,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "5.50",
@@ -203926,7 +203809,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-04T02:12:13.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-04T02:17:53.000Z"
     },
     {
       "id": 31,
@@ -203936,7 +203819,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 34,
+      "position": 12,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "7.00",
@@ -203945,7 +203828,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-04T02:12:44.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-04T02:18:51.000Z"
     },
     {
       "id": 32,
@@ -203955,7 +203838,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 23,
+      "position": 1,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "1.50",
@@ -203964,7 +203847,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-04T02:13:00.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-04T02:19:42.000Z"
     },
     {
       "id": 33,
@@ -203974,7 +203857,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 24,
+      "position": 2,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "3.00",
@@ -203983,7 +203866,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-04T02:13:08.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-04T02:15:15.000Z"
     },
     {
       "id": 34,
@@ -203993,7 +203876,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 25,
+      "position": 3,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "6.00",
@@ -204002,7 +203885,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-04T02:13:13.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-04T02:15:20.000Z"
     },
     {
       "id": 35,
@@ -204012,7 +203895,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 26,
+      "position": 4,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "8.00",
@@ -204021,7 +203904,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-04T02:13:19.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-04T02:15:26.000Z"
     },
     {
       "id": 36,
@@ -204031,7 +203914,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 30,
+      "position": 8,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "7.50",
@@ -204040,7 +203923,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-04T02:13:31.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-04T02:18:00.000Z"
     },
     {
       "id": 37,
@@ -204059,7 +203942,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-19T15:56:38.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-19T15:56:38.000Z"
     },
     {
       "id": 38,
@@ -204069,7 +203952,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 9,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "1.00",
@@ -204078,7 +203961,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-24T16:04:03.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-24T16:04:03.000Z"
     },
     {
       "id": 39,
@@ -204088,7 +203971,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 21,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "0.25",
@@ -204097,7 +203980,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-30T21:53:21.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-12-01T16:48:21.000Z"
     },
     {
       "id": 40,
@@ -204107,7 +203990,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 22,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "0.50",
@@ -204116,17 +203999,17 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2025-11-30T22:04:21.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2025-11-30T22:04:21.000Z"
     },
     {
       "id": 41,
       "productId": 82,
       "section": "home",
-      "title": "Minitorta Húmedo Decorado",
+      "title": "Minitorta Húmedo Decorado (Tres Leches)",
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 7,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "4.50",
@@ -204135,7 +204018,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2026-02-23T16:47:11.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2026-02-23T16:47:11.000Z"
     },
     {
       "id": 42,
@@ -204145,7 +204028,7 @@
       "subtitle": null,
       "imageUrl": null,
       "badge": "Bajo Pedido",
-      "position": 8,
+      "position": 0,
       "minOrderQty": null,
       "isActive": 1,
       "priceOverride": "4.00",
@@ -204154,102 +204037,7 @@
       "startsAt": null,
       "endsAt": null,
       "createdAt": "2026-02-23T16:47:11.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
-    },
-    {
-      "id": 43,
-      "productId": 88,
-      "section": "home",
-      "title": "Pastel Grande Húmedo Decorado (Tres Leches)",
-      "subtitle": null,
-      "imageUrl": null,
-      "badge": "Bajo Pedido",
-      "position": 11,
-      "minOrderQty": null,
-      "isActive": 1,
-      "priceOverride": "20.00",
-      "wholesaleOverrideRules": null,
-      "storeId": null,
-      "startsAt": null,
-      "endsAt": null,
-      "createdAt": "2026-02-23T17:11:23.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
-    },
-    {
-      "id": 44,
-      "productId": 87,
-      "section": "home",
-      "title": "Pastel Grande Semihúmedo Decorado",
-      "subtitle": null,
-      "imageUrl": null,
-      "badge": "Bajo pedido",
-      "position": 12,
-      "minOrderQty": null,
-      "isActive": 1,
-      "priceOverride": "15.50",
-      "wholesaleOverrideRules": null,
-      "storeId": null,
-      "startsAt": null,
-      "endsAt": null,
-      "createdAt": "2026-02-23T17:11:23.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
-    },
-    {
-      "id": 45,
-      "productId": 86,
-      "section": "home",
-      "title": "Pastel Mediano Húmedo Decorado (Tres Leches)",
-      "subtitle": null,
-      "imageUrl": null,
-      "badge": "Bajo Pedido",
-      "position": 14,
-      "minOrderQty": null,
-      "isActive": 1,
-      "priceOverride": "15.00",
-      "wholesaleOverrideRules": null,
-      "storeId": null,
-      "startsAt": null,
-      "endsAt": null,
-      "createdAt": "2026-02-23T17:11:24.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
-    },
-    {
-      "id": 46,
-      "productId": 84,
-      "section": "home",
-      "title": "Pastel Pequeño Húmedo Decorado (Tres Leches)",
-      "subtitle": null,
-      "imageUrl": null,
-      "badge": "Bajo Pedido",
-      "position": 17,
-      "minOrderQty": null,
-      "isActive": 1,
-      "priceOverride": "7.00",
-      "wholesaleOverrideRules": null,
-      "storeId": null,
-      "startsAt": null,
-      "endsAt": null,
-      "createdAt": "2026-02-23T17:11:24.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
-    },
-    {
-      "id": 47,
-      "productId": 83,
-      "section": "home",
-      "title": "Pastel Pequeño Semihúmedo Decorado",
-      "subtitle": null,
-      "imageUrl": null,
-      "badge": "Bajo Pedido",
-      "position": 18,
-      "minOrderQty": null,
-      "isActive": 1,
-      "priceOverride": "6.00",
-      "wholesaleOverrideRules": null,
-      "storeId": null,
-      "startsAt": null,
-      "endsAt": null,
-      "createdAt": "2026-02-23T17:11:25.000Z",
-      "updatedAt": "2026-02-23T17:27:51.000Z"
+      "updatedAt": "2026-02-23T16:47:11.000Z"
     }
   ],
   "StoreProduct": [
@@ -204581,7 +204369,7 @@
   ],
   "EditorTemplateGroup": [
     {
-      "id": 29,
+      "id": 5,
       "templateId": 1,
       "key": "group_badge",
       "x": 1450,
@@ -204590,7 +204378,7 @@
       "visible": 1
     },
     {
-      "id": 30,
+      "id": 6,
       "templateId": 1,
       "key": "group_price",
       "x": 250,
@@ -204599,7 +204387,7 @@
       "visible": 1
     },
     {
-      "id": 31,
+      "id": 7,
       "templateId": 1,
       "key": "group_product",
       "x": 0,
@@ -204608,7 +204396,7 @@
       "visible": 1
     },
     {
-      "id": 32,
+      "id": 8,
       "templateId": 1,
       "key": "group_title",
       "x": 80,
@@ -204619,39 +204407,39 @@
   ],
   "EditorTemplateLayer": [
     {
-      "id": 71,
+      "id": 11,
       "templateId": 1,
-      "groupId": 31,
+      "groupId": 7,
       "key": "image_mkyrhl6i_rostt",
       "type": "image",
-      "x": -3,
-      "y": 3,
-      "w": 1919,
-      "h": 1076,
+      "x": 9,
+      "y": 36,
+      "w": 1865,
+      "h": 1001,
       "zIndex": 10,
       "name": "image_background",
       "visible": 1,
-      "locked": 0
+      "locked": 1
     },
     {
-      "id": 72,
+      "id": 12,
       "templateId": 1,
-      "groupId": 31,
+      "groupId": 7,
       "key": "product_image",
       "type": "image",
-      "x": 897,
-      "y": 77,
-      "w": 925,
-      "h": 913,
+      "x": 882,
+      "y": 65,
+      "w": 1000,
+      "h": 958,
       "zIndex": 20,
       "name": "product_image",
       "visible": 1,
       "locked": 0
     },
     {
-      "id": 73,
+      "id": 13,
       "templateId": 1,
-      "groupId": 32,
+      "groupId": 8,
       "key": "title_bg",
       "type": "shape",
       "x": -48,
@@ -204664,54 +204452,54 @@
       "locked": 0
     },
     {
-      "id": 74,
+      "id": 14,
       "templateId": 1,
-      "groupId": 32,
+      "groupId": 8,
       "key": "title_bg_copy",
       "type": "shape",
-      "x": -62,
-      "y": 439,
-      "w": 455,
-      "h": 303,
+      "x": -71,
+      "y": 487,
+      "w": 479,
+      "h": 177,
       "zIndex": 50,
       "name": "title_bg_copy",
-      "visible": 0,
+      "visible": 1,
       "locked": 0
     },
     {
-      "id": 75,
+      "id": 15,
       "templateId": 1,
-      "groupId": 32,
+      "groupId": 8,
       "key": "title_text",
       "type": "text",
       "x": 25,
       "y": -14,
       "w": 698,
-      "h": 298,
+      "h": 244,
       "zIndex": 60,
       "name": "title_text",
       "visible": 1,
       "locked": 0
     },
     {
-      "id": 76,
+      "id": 16,
       "templateId": 1,
-      "groupId": 32,
+      "groupId": 8,
       "key": "weight_text",
       "type": "text",
-      "x": -26,
-      "y": 478,
-      "w": 425,
-      "h": 220,
+      "x": -20,
+      "y": 550,
+      "w": 398,
+      "h": 76,
       "zIndex": 70,
       "name": "weight_text",
       "visible": 1,
       "locked": 0
     },
     {
-      "id": 77,
+      "id": 17,
       "templateId": 1,
-      "groupId": 31,
+      "groupId": 7,
       "key": "image_mkja16xk_026gu",
       "type": "image",
       "x": 1326,
@@ -204724,9 +204512,9 @@
       "locked": 0
     },
     {
-      "id": 78,
+      "id": 18,
       "templateId": 1,
-      "groupId": 32,
+      "groupId": 8,
       "key": "text_mkj9kd64_l6nbl",
       "type": "text",
       "x": 1375,
@@ -204739,9 +204527,9 @@
       "locked": 0
     },
     {
-      "id": 79,
+      "id": 19,
       "templateId": 1,
-      "groupId": 31,
+      "groupId": 7,
       "key": "image_mkjama5t_hi6wg",
       "type": "image",
       "x": 60,
@@ -204754,9 +204542,9 @@
       "locked": 0
     },
     {
-      "id": 80,
+      "id": 20,
       "templateId": 1,
-      "groupId": 29,
+      "groupId": 5,
       "key": "badge_text",
       "type": "text",
       "x": -1313,
@@ -204771,456 +204559,384 @@
   ],
   "EditorLayerProp": [
     {
-      "id": 363,
-      "layerId": 71,
+      "id": 49,
+      "layerId": 11,
       "propKey": "borderRadius",
       "valueText": "20",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 364,
-      "layerId": 71,
+      "id": 50,
+      "layerId": 11,
       "propKey": "fit",
       "valueText": "cover",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 365,
-      "layerId": 71,
+      "id": 51,
+      "layerId": 11,
       "propKey": "src",
       "valueText": "EdDeli/ads/backgrounds/banner/plantilla_16_9.png",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 366,
-      "layerId": 72,
+      "id": 52,
+      "layerId": 12,
       "propKey": "borderRadius",
       "valueText": "30",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 367,
-      "layerId": 72,
+      "id": 53,
+      "layerId": 12,
       "propKey": "fit",
       "valueText": "cover",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 368,
-      "layerId": 72,
+      "id": 54,
+      "layerId": 12,
       "propKey": "src",
       "valueText": "EdDeli/products/conos-0kx4a.png",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 369,
-      "layerId": 73,
+      "id": 55,
+      "layerId": 13,
       "propKey": "borderRadius",
       "valueText": "22",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 370,
-      "layerId": 73,
+      "id": 56,
+      "layerId": 13,
       "propKey": "fill",
       "valueText": "rgba(0,0,0,0.25)",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 371,
-      "layerId": 74,
+      "id": 57,
+      "layerId": 14,
       "propKey": "borderRadius",
       "valueText": "22",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 372,
-      "layerId": 74,
+      "id": 58,
+      "layerId": 14,
       "propKey": "fill",
       "valueText": "rgba(0,0,0,0.25)",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 373,
-      "layerId": 75,
+      "id": 59,
+      "layerId": 15,
       "propKey": "align",
       "valueText": "center",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 374,
-      "layerId": 75,
+      "id": 60,
+      "layerId": 15,
       "propKey": "color",
       "valueText": "#FFF6D1",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 375,
-      "layerId": 75,
+      "id": 61,
+      "layerId": 15,
       "propKey": "fontFamily",
       "valueText": "Poppins, Inter, system-ui, Arial",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 376,
-      "layerId": 75,
+      "id": 62,
+      "layerId": 15,
       "propKey": "fontSize",
       "valueText": "75",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 377,
-      "layerId": 75,
+      "id": 63,
+      "layerId": 15,
       "propKey": "fontWeight",
       "valueText": "900",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 378,
-      "layerId": 75,
+      "id": 64,
+      "layerId": 15,
       "propKey": "letterSpacing",
       "valueText": "1.5",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 379,
-      "layerId": 75,
+      "id": 65,
+      "layerId": 15,
       "propKey": "lineHeight",
       "valueText": "1.1",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 380,
-      "layerId": 75,
+      "id": 66,
+      "layerId": 15,
       "propKey": "shadowBlur",
       "valueText": "18",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 381,
-      "layerId": 75,
+      "id": 67,
+      "layerId": 15,
       "propKey": "shadowColor",
       "valueText": "rgba(0,0,0,0.45)",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 382,
-      "layerId": 75,
+      "id": 68,
+      "layerId": 15,
       "propKey": "shadowOffsetX",
       "valueText": "0",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 383,
-      "layerId": 75,
+      "id": 69,
+      "layerId": 15,
       "propKey": "shadowOffsetY",
       "valueText": "6",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 384,
-      "layerId": 75,
+      "id": 70,
+      "layerId": 15,
       "propKey": "stroke",
       "valueText": "#D4AF37",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 385,
-      "layerId": 75,
+      "id": 71,
+      "layerId": 15,
       "propKey": "strokeWidth",
       "valueText": "6",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 386,
-      "layerId": 75,
+      "id": 72,
+      "layerId": 15,
       "propKey": "text",
       "valueText": "NOMBRE DEL PRODUCTO",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 387,
-      "layerId": 76,
+      "id": 73,
+      "layerId": 16,
       "propKey": "align",
       "valueText": "left",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 388,
-      "layerId": 76,
+      "id": 74,
+      "layerId": 16,
       "propKey": "color",
-      "valueText": "#FFFFFF",
+      "valueText": "rgba(255,255,255,0.85)",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 389,
-      "layerId": 76,
+      "id": 75,
+      "layerId": 16,
       "propKey": "fontFamily",
-      "valueText": "Poppins, system-ui, Arial",
+      "valueText": "Inter, system-ui, Arial",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 390,
-      "layerId": 76,
+      "id": 76,
+      "layerId": 16,
       "propKey": "fontSize",
       "valueText": "28",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 391,
-      "layerId": 76,
+      "id": 77,
+      "layerId": 16,
       "propKey": "fontWeight",
-      "valueText": "700",
+      "valueText": "600",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 392,
-      "layerId": 76,
-      "propKey": "letterSpacing",
-      "valueText": "0",
-      "valueJson": null,
-      "valueType": "number"
-    },
-    {
-      "id": 393,
-      "layerId": 76,
-      "propKey": "lineHeight",
-      "valueText": "1.1",
-      "valueJson": null,
-      "valueType": "number"
-    },
-    {
-      "id": 394,
-      "layerId": 76,
-      "propKey": "shadowBlur",
-      "valueText": "12",
-      "valueJson": null,
-      "valueType": "number"
-    },
-    {
-      "id": 395,
-      "layerId": 76,
-      "propKey": "shadowColor",
-      "valueText": "rgba(0,0,0,0.45)",
-      "valueJson": null,
-      "valueType": "string"
-    },
-    {
-      "id": 396,
-      "layerId": 76,
-      "propKey": "shadowOffsetX",
-      "valueText": "0",
-      "valueJson": null,
-      "valueType": "number"
-    },
-    {
-      "id": 397,
-      "layerId": 76,
-      "propKey": "shadowOffsetY",
-      "valueText": "7",
-      "valueJson": null,
-      "valueType": "number"
-    },
-    {
-      "id": 398,
-      "layerId": 76,
-      "propKey": "stroke",
-      "valueText": "#D4AF37",
-      "valueJson": null,
-      "valueType": "string"
-    },
-    {
-      "id": 399,
-      "layerId": 76,
-      "propKey": "strokeWidth",
-      "valueText": "0",
-      "valueJson": null,
-      "valueType": "number"
-    },
-    {
-      "id": 400,
-      "layerId": 76,
+      "id": 78,
+      "layerId": 16,
       "propKey": "text",
       "valueText": "Esta es la descripción del producto",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 401,
-      "layerId": 76,
-      "propKey": "verticalAlign",
-      "valueText": "center",
-      "valueJson": null,
-      "valueType": "string"
-    },
-    {
-      "id": 402,
-      "layerId": 77,
+      "id": 79,
+      "layerId": 17,
       "propKey": "borderRadius",
       "valueText": "20",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 403,
-      "layerId": 77,
+      "id": 80,
+      "layerId": 17,
       "propKey": "fit",
       "valueText": "cover",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 404,
-      "layerId": 77,
+      "id": 81,
+      "layerId": 17,
       "propKey": "src",
       "valueText": "EdDeli/ads/badges/estrella_badge_dorada.png",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 405,
-      "layerId": 78,
+      "id": 82,
+      "layerId": 18,
       "propKey": "align",
       "valueText": "left",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 406,
-      "layerId": 78,
+      "id": 83,
+      "layerId": 18,
       "propKey": "color",
       "valueText": "#FFFFFF",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 407,
-      "layerId": 78,
+      "id": 84,
+      "layerId": 18,
       "propKey": "fontFamily",
       "valueText": "Inter, system-ui, Arial",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 408,
-      "layerId": 78,
+      "id": 85,
+      "layerId": 18,
       "propKey": "fontSize",
       "valueText": "70",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 409,
-      "layerId": 78,
+      "id": 86,
+      "layerId": 18,
       "propKey": "fontWeight",
       "valueText": "800",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 410,
-      "layerId": 78,
+      "id": 87,
+      "layerId": 18,
       "propKey": "text",
       "valueText": "$26.00",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 411,
-      "layerId": 79,
+      "id": 88,
+      "layerId": 19,
       "propKey": "borderRadius",
       "valueText": "20",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 412,
-      "layerId": 79,
+      "id": 89,
+      "layerId": 19,
       "propKey": "fit",
       "valueText": "cover",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 413,
-      "layerId": 79,
+      "id": 90,
+      "layerId": 19,
       "propKey": "src",
       "valueText": "EdDeli/ads/badges/etiqueta_dorada.png",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 414,
-      "layerId": 80,
+      "id": 91,
+      "layerId": 20,
       "propKey": "align",
       "valueText": "center",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 415,
-      "layerId": 80,
+      "id": 92,
+      "layerId": 20,
       "propKey": "color",
       "valueText": "#FFFFFF",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 416,
-      "layerId": 80,
+      "id": 93,
+      "layerId": 20,
       "propKey": "fontFamily",
       "valueText": "Inter, system-ui, Arial",
       "valueJson": null,
       "valueType": "string"
     },
     {
-      "id": 417,
-      "layerId": 80,
+      "id": 94,
+      "layerId": 20,
       "propKey": "fontSize",
       "valueText": "48",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 418,
-      "layerId": 80,
+      "id": 95,
+      "layerId": 20,
       "propKey": "fontWeight",
       "valueText": "900",
       "valueJson": null,
       "valueType": "number"
     },
     {
-      "id": 419,
-      "layerId": 80,
+      "id": 96,
+      "layerId": 20,
       "propKey": "text",
       "valueText": "OFERTA",
       "valueJson": null,
@@ -205229,8 +204945,8 @@
   ],
   "EditorLayerBind": [
     {
-      "id": 71,
-      "layerId": 71,
+      "id": 11,
+      "layerId": 11,
       "textFrom": null,
       "srcFrom": null,
       "srcPrefix": null,
@@ -205238,8 +204954,8 @@
       "maxLen": null
     },
     {
-      "id": 72,
-      "layerId": 72,
+      "id": 12,
+      "layerId": 12,
       "textFrom": null,
       "srcFrom": "imageUrl",
       "srcPrefix": "",
@@ -205247,8 +204963,8 @@
       "maxLen": null
     },
     {
-      "id": 73,
-      "layerId": 73,
+      "id": 13,
+      "layerId": 13,
       "textFrom": null,
       "srcFrom": null,
       "srcPrefix": null,
@@ -205256,8 +204972,8 @@
       "maxLen": null
     },
     {
-      "id": 74,
-      "layerId": 74,
+      "id": 14,
+      "layerId": 14,
       "textFrom": null,
       "srcFrom": null,
       "srcPrefix": null,
@@ -205265,8 +204981,8 @@
       "maxLen": null
     },
     {
-      "id": 75,
-      "layerId": 75,
+      "id": 15,
+      "layerId": 15,
       "textFrom": "displayName",
       "srcFrom": null,
       "srcPrefix": null,
@@ -205274,8 +204990,8 @@
       "maxLen": 32
     },
     {
-      "id": 76,
-      "layerId": 76,
+      "id": 16,
+      "layerId": 16,
       "textFrom": "product.desc",
       "srcFrom": null,
       "srcPrefix": null,
@@ -205283,8 +204999,8 @@
       "maxLen": null
     },
     {
-      "id": 77,
-      "layerId": 77,
+      "id": 17,
+      "layerId": 17,
       "textFrom": null,
       "srcFrom": null,
       "srcPrefix": null,
@@ -205292,8 +205008,8 @@
       "maxLen": null
     },
     {
-      "id": 78,
-      "layerId": 78,
+      "id": 18,
+      "layerId": 18,
       "textFrom": "displayPrice",
       "srcFrom": null,
       "srcPrefix": null,
@@ -205301,8 +205017,8 @@
       "maxLen": null
     },
     {
-      "id": 79,
-      "layerId": 79,
+      "id": 19,
+      "layerId": 19,
       "textFrom": null,
       "srcFrom": null,
       "srcPrefix": null,
@@ -205310,8 +205026,8 @@
       "maxLen": null
     },
     {
-      "id": 80,
-      "layerId": 80,
+      "id": 20,
+      "layerId": 20,
       "textFrom": "badge",
       "srcFrom": null,
       "srcPrefix": null,

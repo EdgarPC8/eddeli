@@ -239,7 +239,8 @@ export const getAccounts = async (req, res) => {
               "secondLastName",
               "photo",
               "ci",
-              "birthday"
+              "birthday",
+              "gender"
             ]
           }
         ]

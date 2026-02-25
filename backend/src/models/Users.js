@@ -10,6 +10,7 @@ export const Users = sequelize.define('users', {
   },
   ci: {
     type: DataTypes.STRING,
+    unique: true,
   },
   documentType: {
     type: DataTypes.STRING,

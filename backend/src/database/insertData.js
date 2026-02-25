@@ -1,5 +1,8 @@
 import { promises as fs } from 'fs';
-import { resolve } from 'path';
+import { resolve, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
 import { Roles } from '../models/Roles.js';
 import { Users } from '../models/Users.js';
 import { 
@@ -45,14 +48,24 @@ import { Expense,
   Payment
   
 } from '../models/Finance.js';
+import { CvTemplate } from '../models/CvTemplate.js';
+import {
+  EditorTemplate,
+  EditorTemplateGroup,
+  EditorTemplateLayer,
+  EditorLayerProp,
+  EditorLayerBind,
+  EditorDesign,
+  EditorDesignLayerOverride,
+} from '../models/Editor.js';
 
 
 
 
 
-
-export const backupFilePath = resolve('./src/database/backup.json'); // Ruta del archivo de respaldo principal
-export const backups = resolve('./src/backups'); // Ruta para guardar copias de seguridad
+// Rutas relativas al archivo para que siempre sean src/database y src/backups
+export const backupFilePath = resolve(__dirname, 'backup.json');
+export const backups = resolve(__dirname, '..', 'backups');
 
 // ===== Helpers anti "JSON doble stringificado" =====
 
@@ -121,6 +134,8 @@ const SANITIZE_CONFIG = {
 };
 
 
+const BULK_OPT = { returning: false };
+
 export const insertData = async () => {
   try {
     await fs.access(backupFilePath);
@@ -146,57 +161,91 @@ export const insertData = async () => {
       });
     }
 
-    // ===== Inserts =====
-    await Roles.bulkCreate(jsonData.Roles, { returning: true });
-    await Users.bulkCreate(jsonData.Users, { returning: true });
-    await Account.bulkCreate(jsonData.Account, { returning: true });
-    await Careers.bulkCreate(jsonData.Careers, { returning: true });
-    await Periods.bulkCreate(jsonData.Periods, { returning: true });
+    // ===== Inserts en transacción única (más rápido) =====
+    const t = await sequelize.transaction();
+    try {
+      const opt = { ...BULK_OPT, transaction: t };
 
-    await Form.bulkCreate(jsonData.Form, { returning: true });
-    await Question.bulkCreate(jsonData.Question, { returning: true });
-    await Option.bulkCreate(jsonData.Option, { returning: true });
-    await Response.bulkCreate(jsonData.Response, { returning: true });
-    await Answer.bulkCreate(jsonData.Answer, { returning: true });
-    await UserForm.bulkCreate(jsonData.UserForm, { returning: true });
+      await Roles.bulkCreate(jsonData.Roles || [], opt);
+      await Users.bulkCreate(jsonData.Users || [], opt);
+      await Account.bulkCreate(jsonData.Account || [], opt);
+      await Careers.bulkCreate(jsonData.Careers || [], opt);
+      await Periods.bulkCreate(jsonData.Periods || [], opt);
 
-    await Matriz.bulkCreate(jsonData.Matriz, { returning: true });
-    await Matricula.bulkCreate(jsonData.Matricula, { returning: true });
+      await Form.bulkCreate(jsonData.Form || [], opt);
+      await Question.bulkCreate(jsonData.Question || [], opt);
+      await Option.bulkCreate(jsonData.Option || [], opt);
+      await Response.bulkCreate(jsonData.Response || [], opt);
+      await Answer.bulkCreate(jsonData.Answer || [], opt);
+      await UserForm.bulkCreate(jsonData.UserForm || [], opt);
 
-    await AccountRoles.bulkCreate(jsonData.AccountRoles, { returning: true });
-    await Notifications.bulkCreate(jsonData.Notifications, { returning: true });
+      await Matriz.bulkCreate(jsonData.Matriz || [], opt);
+      await Matricula.bulkCreate(jsonData.Matricula || [], opt);
 
-    await QuizQuizzes.bulkCreate(jsonData.QuizQuizzes, { returning: true });
-    await QuizQuestions.bulkCreate(jsonData.QuizQuestions, { returning: true });
-    await QuizOptions.bulkCreate(jsonData.QuizOptions, { returning: true });
-    await QuizAttempts.bulkCreate(jsonData.QuizAttempts, { returning: true });
-    await QuizAnswers.bulkCreate(jsonData.QuizAnswers, { returning: true });
-    await QuizAssignment.bulkCreate(jsonData.QuizAssignment, { returning: true });
+      await AccountRoles.bulkCreate(jsonData.AccountRoles || [], opt);
+      await Notifications.bulkCreate(jsonData.Notifications || [], opt);
 
-    await InventoryCategory.bulkCreate(jsonData.InventoryCategory, { returning: true });
-    await InventoryUnit.bulkCreate(jsonData.InventoryUnit, { returning: true });
+      await QuizQuizzes.bulkCreate(jsonData.QuizQuizzes || [], opt);
+      await QuizQuestions.bulkCreate(jsonData.QuizQuestions || [], opt);
+      await QuizOptions.bulkCreate(jsonData.QuizOptions || [], opt);
+      await QuizAttempts.bulkCreate(jsonData.QuizAttempts || [], opt);
+      await QuizAnswers.bulkCreate(jsonData.QuizAnswers || [], opt);
+      await QuizAssignment.bulkCreate(jsonData.QuizAssignment || [], opt);
 
-    // ✅ ya llega limpio (wholesaleRules sin escapes infinitos)
-    await InventoryProduct.bulkCreate(jsonData.InventoryProduct, { returning: true });
+      await InventoryCategory.bulkCreate(jsonData.InventoryCategory || [], opt);
+      await InventoryUnit.bulkCreate(jsonData.InventoryUnit || [], opt);
+      await InventoryProduct.bulkCreate(jsonData.InventoryProduct || [], opt);
+      await InventoryRecipe.bulkCreate(jsonData.InventoryRecipe || [], opt);
+      await InventoryMovement.bulkCreate(jsonData.InventoryMovement || [], opt);
 
-    await InventoryRecipe.bulkCreate(jsonData.InventoryRecipe, { returning: true });
-    await InventoryMovement.bulkCreate(jsonData.InventoryMovement, { returning: true });
+      await Customer.bulkCreate(jsonData.Customer || [], opt);
+      await Order.bulkCreate(jsonData.Order || [], opt);
+      await OrderItem.bulkCreate(jsonData.OrderItem || [], opt);
 
-    await Customer.bulkCreate(jsonData.Customer, { returning: true });
-    await Order.bulkCreate(jsonData.Order, { returning: true });
-    await OrderItem.bulkCreate(jsonData.OrderItem, { returning: true });
+      await Expense.bulkCreate(jsonData.Expense || [], opt);
+      await Income.bulkCreate(jsonData.Income || [], opt);
 
-    await Expense.bulkCreate(jsonData.Expense, { returning: true });
-    await Income.bulkCreate(jsonData.Income, { returning: true });
+      await Store.bulkCreate(jsonData.Store || [], opt);
+      await HomeProduct.bulkCreate(jsonData.HomeProduct || [], opt);
+      await Catalog.bulkCreate(jsonData.Catalog || [], opt);
+      await StoreProduct.bulkCreate(jsonData.StoreProduct || [], opt);
 
-    await Store.bulkCreate(jsonData.Store, { returning: true });
-    await HomeProduct.bulkCreate(jsonData.HomeProduct, { returning: true });
-    await Catalog.bulkCreate(jsonData.Catalog, { returning: true });
-    await StoreProduct.bulkCreate(jsonData.StoreProduct, { returning: true });
+      await ItemGroup.bulkCreate(jsonData.ItemGroup || [], opt);
+      await ItemGroupItem.bulkCreate(jsonData.ItemGroupItem || [], opt);
+      await Payment.bulkCreate(jsonData.Payment || [], opt);
 
-    await ItemGroup.bulkCreate(jsonData.ItemGroup, { returning: true });
-    await ItemGroupItem.bulkCreate(jsonData.ItemGroupItem, { returning: true });
-    await Payment.bulkCreate(jsonData.Payment, { returning: true });
+      if (Array.isArray(jsonData.CvTemplates) && jsonData.CvTemplates.length > 0) {
+        await CvTemplate.bulkCreate(jsonData.CvTemplates, opt);
+      }
+
+      // Plantillas de publicidad / editor
+      if (Array.isArray(jsonData.EditorTemplate) && jsonData.EditorTemplate.length > 0) {
+        await EditorTemplate.bulkCreate(jsonData.EditorTemplate, opt);
+      }
+      if (Array.isArray(jsonData.EditorTemplateGroup) && jsonData.EditorTemplateGroup.length > 0) {
+        await EditorTemplateGroup.bulkCreate(jsonData.EditorTemplateGroup, opt);
+      }
+      if (Array.isArray(jsonData.EditorTemplateLayer) && jsonData.EditorTemplateLayer.length > 0) {
+        await EditorTemplateLayer.bulkCreate(jsonData.EditorTemplateLayer, opt);
+      }
+      if (Array.isArray(jsonData.EditorLayerProp) && jsonData.EditorLayerProp.length > 0) {
+        await EditorLayerProp.bulkCreate(jsonData.EditorLayerProp, opt);
+      }
+      if (Array.isArray(jsonData.EditorLayerBind) && jsonData.EditorLayerBind.length > 0) {
+        await EditorLayerBind.bulkCreate(jsonData.EditorLayerBind, opt);
+      }
+      if (Array.isArray(jsonData.EditorDesign) && jsonData.EditorDesign.length > 0) {
+        await EditorDesign.bulkCreate(jsonData.EditorDesign, opt);
+      }
+      if (Array.isArray(jsonData.EditorDesignLayerOverride) && jsonData.EditorDesignLayerOverride.length > 0) {
+        await EditorDesignLayerOverride.bulkCreate(jsonData.EditorDesignLayerOverride, opt);
+      }
+
+      await t.commit();
+    } catch (err) {
+      await t.rollback();
+      throw err;
+    }
 
     console.log("Datos insertados correctamente desde el archivo de respaldo.");
   } catch (error) {
@@ -215,59 +264,104 @@ export const insertData = async () => {
 
 export const saveBackup = async () => {
   try {
-    const rolesData = await Roles.findAll({ raw: true });
-    const usersData = await Users.findAll({ raw: true });
-    const accountData = await Account.findAll({ raw: true });
-    const careersData = await Careers.findAll({ raw: true });
-    const periodsData = await Periods.findAll({ raw: true });
+    // Lecturas en paralelo (mucho más rápido)
+    const [
+      rolesData,
+      usersData,
+      accountData,
+      careersData,
+      periodsData,
+      FormData,
+      QuestionData,
+      OptionData,
+      ResponseData,
+      AnswerData,
+      UserFormData,
+      MatrizData,
+      MatriculaData,
+      AccountRolesData,
+      NotificationsData,
+      QuizAnswersData,
+      QuizAttemptsData,
+      QuizOptionsData,
+      QuizQuestionsData,
+      QuizQuizzesData,
+      QuizAssignmentData,
+      InventoryCategoryData,
+      InventoryUnitData,
+      InventoryProductRaw,
+      InventoryRecipeData,
+      InventoryMovementData,
+      CustomerData,
+      OrderData,
+      OrderItemData,
+      ExpenseData,
+      IncomeData,
+      HomeProductData,
+      StoreData,
+      CatalogData,
+      StoreProductData,
+      ItemGroupData,
+      ItemGroupItemData,
+      PaymentData,
+      CvTemplatesData,
+      EditorTemplateData,
+      EditorTemplateGroupData,
+      EditorTemplateLayerData,
+      EditorLayerPropData,
+      EditorLayerBindData,
+      EditorDesignData,
+      EditorDesignLayerOverrideData,
+    ] = await Promise.all([
+      Roles.findAll({ raw: true }),
+      Users.findAll({ raw: true }),
+      Account.findAll({ raw: true }),
+      Careers.findAll({ raw: true }),
+      Periods.findAll({ raw: true }),
+      Form.findAll({ raw: true }),
+      Question.findAll({ raw: true }),
+      Option.findAll({ raw: true }),
+      Response.findAll({ raw: true }),
+      Answer.findAll({ raw: true }),
+      UserForm.findAll({ raw: true }),
+      Matriz.findAll({ raw: true }),
+      Matricula.findAll({ raw: true }),
+      AccountRoles.findAll({ raw: true }),
+      Notifications.findAll({ raw: true }),
+      QuizAnswers.findAll({ raw: true }),
+      QuizAttempts.findAll({ raw: true }),
+      QuizOptions.findAll({ raw: true }),
+      QuizQuestions.findAll({ raw: true }),
+      QuizQuizzes.findAll({ raw: true }),
+      QuizAssignment.findAll({ raw: true }),
+      InventoryCategory.findAll({ raw: true }),
+      InventoryUnit.findAll({ raw: true }),
+      InventoryProduct.findAll({ raw: true }),
+      InventoryRecipe.findAll({ raw: true }),
+      InventoryMovement.findAll({ raw: true }),
+      Customer.findAll({ raw: true }),
+      Order.findAll({ raw: true }),
+      OrderItem.findAll({ raw: true }),
+      Expense.findAll({ raw: true }),
+      Income.findAll({ raw: true }),
+      HomeProduct.findAll({ raw: true }),
+      Store.findAll({ raw: true }),
+      Catalog.findAll({ raw: true }),
+      StoreProduct.findAll({ raw: true }),
+      ItemGroup.findAll({ raw: true }),
+      ItemGroupItem.findAll({ raw: true }),
+      Payment.findAll({ raw: true }),
+      CvTemplate.findAll({ raw: true }),
+      EditorTemplate.findAll({ raw: true }),
+      EditorTemplateGroup.findAll({ raw: true }),
+      EditorTemplateLayer.findAll({ raw: true }),
+      EditorLayerProp.findAll({ raw: true }),
+      EditorLayerBind.findAll({ raw: true }),
+      EditorDesign.findAll({ raw: true }),
+      EditorDesignLayerOverride.findAll({ raw: true }),
+    ]);
 
-    const FormData = await Form.findAll({ raw: true });
-    const QuestionData = await Question.findAll({ raw: true });
-    const OptionData = await Option.findAll({ raw: true });
-    const ResponseData = await Response.findAll({ raw: true });
-    const AnswerData = await Answer.findAll({ raw: true });
-    const UserFormData = await UserForm.findAll({ raw: true });
-
-    const MatrizData = await Matriz.findAll({ raw: true });
-    const MatriculaData = await Matricula.findAll({ raw: true });
-
-    const AccountRolesData = await AccountRoles.findAll({ raw: true });
-    const NotificationsData = await Notifications.findAll({ raw: true });
-
-    const QuizAnswersData = await QuizAnswers.findAll({ raw: true });
-    const QuizAttemptsData = await QuizAttempts.findAll({ raw: true });
-    const QuizOptionsData = await QuizOptions.findAll({ raw: true });
-    const QuizQuestionsData = await QuizQuestions.findAll({ raw: true });
-    const QuizQuizzesData = await QuizQuizzes.findAll({ raw: true });
-    const QuizAssignmentData = await QuizAssignment.findAll({ raw: true });
-
-    const InventoryCategoryData = await InventoryCategory.findAll({ raw: true });
-    const InventoryUnitData = await InventoryUnit.findAll({ raw: true });
-
-    // ✅ IMPORTANTE: raw + sanitize
-    const InventoryProductData = sanitizeRows(
-      await InventoryProduct.findAll({ raw: true }),
-      SANITIZE_CONFIG.InventoryProduct
-    );
-
-    const InventoryRecipeData = await InventoryRecipe.findAll({ raw: true });
-    const InventoryMovementData = await InventoryMovement.findAll({ raw: true });
-
-    const CustomerData = await Customer.findAll({ raw: true });
-    const OrderData = await Order.findAll({ raw: true });
-    const OrderItemData = await OrderItem.findAll({ raw: true });
-
-    const ExpenseData = await Expense.findAll({ raw: true });
-    const IncomeData = await Income.findAll({ raw: true });
-
-    const HomeProductData = await HomeProduct.findAll({ raw: true });
-    const StoreData = await Store.findAll({ raw: true });
-    const CatalogData = await Catalog.findAll({ raw: true });
-    const StoreProductData = await StoreProduct.findAll({ raw: true });
-
-    const ItemGroupData = await ItemGroup.findAll({ raw: true });
-    const ItemGroupItemData = await ItemGroupItem.findAll({ raw: true });
-    const PaymentData = await Payment.findAll({ raw: true });
+    const InventoryProductData = sanitizeRows(InventoryProductRaw, SANITIZE_CONFIG.InventoryProduct);
 
     const backupData = {
       Roles: rolesData,
@@ -308,6 +402,14 @@ export const saveBackup = async () => {
       ItemGroup: ItemGroupData,
       ItemGroupItem: ItemGroupItemData,
       Payment: PaymentData,
+      CvTemplates: CvTemplatesData,
+      EditorTemplate: EditorTemplateData,
+      EditorTemplateGroup: EditorTemplateGroupData,
+      EditorTemplateLayer: EditorTemplateLayerData,
+      EditorLayerProp: EditorLayerPropData,
+      EditorLayerBind: EditorLayerBindData,
+      EditorDesign: EditorDesignData,
+      EditorDesignLayerOverride: EditorDesignLayerOverrideData,
     };
 
     await fs.mkdir(backups, { recursive: true });

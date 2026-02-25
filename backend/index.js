@@ -4,6 +4,10 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import { sequelize } from "./src/database/connection.js";
+import "./src/models/CV.js"; // CV + Professionals y asociaciones con Users
+import "./src/models/UserData.js"; // Datos adicionales del usuario
+import "./src/models/CvTemplate.js"; // Plantillas de CV para manejador
+import "./src/models/PianoSong.js"; // Canciones del módulo Piano
 import { insertData } from "./src/database/insertData.js";
 import { loggerMiddleware } from "./src/middlewares/loggerMiddleware.js";
 
@@ -14,6 +18,7 @@ import AccountsRoutes from "./src/routes/AccountsRoutes.js";
 import QuizRoutes from "./src/routes/QuizRoutes.js";
 import FormsRoutes from "./src/routes/FormsRoutes.js";
 import AlumniRoutes from "./src/routes/AlumniRoutes.js";
+import CvRoutes from "./src/routes/cvRoutes.js";
 import NotificationsRoutes from "./src/routes/NotificationsRoutes.js";
 import InventoryControlRoutes from "./src/routes/InventoryControlRoutes.js";
 import OrderRoutes from "./src/routes/OrderRoutes.js";
@@ -22,6 +27,7 @@ import FinanceRoutes from "./src/routes/FinanceRoutes.js";
 import ImgRoutes from "./src/routes/ImgRoutes.js";
 import FilesRoutes from "./src/routes/FilesRoutes.js";
 import EditorRoutes from "./src/routes/EditorRoutes.js";
+import PianoRoutes from "./src/routes/PianoRoutes.js";
 
 
 import { initNotificationSocket } from "./src/sockets/notificationSocket.js";
@@ -42,9 +48,9 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:4173",
   "http://localhost:8888",
-  "http://192.168.1.100:8888",
-  "http://192.168.1.100:5173",
-  "http://192.168.1.100:5174",
+  "http://192.168.1.101:8888",
+  "http://192.168.1.101:5173",
+  "http://192.168.1.101:5174",
   "https://aplicaciones.marianosamaniego.edu.ec",
   "https://www.aplicaciones.marianosamaniego.edu.ec",
 ];
@@ -89,6 +95,7 @@ app.use(`/${api}/files`, express.static(path.resolve(__dirname, "src/files")));
 // RESTO DE RUTAS
 // ================================
 app.use(`/${api}/editor`, EditorRoutes);
+app.use(`/${api}/piano`, PianoRoutes);
 app.use(`/${api}/users`, UsersRoutes);
 app.use(`/${api}/quiz`, QuizRoutes);
 app.use(`/${api}`, AuthRoutes);
@@ -96,6 +103,7 @@ app.use(`/${api}/comands`, ComandsRoutes);
 app.use(`/${api}`, AccountsRoutes);
 app.use(`/${api}/forms`, FormsRoutes);
 app.use(`/${api}/alumni`, AlumniRoutes);
+app.use(`/${api}/cv`, CvRoutes);
 app.use(`/${api}/notifications`, NotificationsRoutes);
 app.use(`/${api}/inventory`, InventoryControlRoutes);
 app.use(`/${api}/orders`, OrderRoutes);

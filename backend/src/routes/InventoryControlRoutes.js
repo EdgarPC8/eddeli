@@ -68,19 +68,22 @@ import {
   updateStore,
   deleteStore,
 } from "../controllers/InventoryControl/StoresController.js";
-// routes/inventory/catalog.routes.js
+// CatalogController: CRUD admin + template-items (publicidad)
 import {
   getCatalogEntries,
   createCatalogEntry,
   updateCatalogEntry,
   deleteCatalogEntry,
   reorderCatalogEntries,
+  getPopularProducts,
+  getAutoCatalogSeed,
+  getCatalogTemplateItems,
+} from "../controllers/InventoryControl/CatalogController.js";
+// CatalogVitrinaController: vitrina/backery (CatalogPage)
+import {
   getCatalogBySection,
   getCatalogBySections,
-  getPopularProducts,
-getAutoCatalogSeed,
-getCatalogTemplateItems,
-} from "../controllers/InventoryControl/CatalogController.js";
+} from "../controllers/InventoryControl/CatalogVitrinaController.js";
 
 import {
   getProductsByStore,
@@ -104,22 +107,20 @@ router.patch("/stores/:storeId/products/:productId", toggleStoreProduct);
 // router.get("/products/:productId/stores", getStoresByProduct);
 
 
-// Listado general con filtros
+// ----------------------------------
+// 📋 CATÁLOGO (CatalogController + CatalogVitrinaController)
+// ----------------------------------
+// CatalogController: admin CRUD, template-items (publicidad), populares
 router.get("/getPopularProducts", getPopularProducts);
 router.get("/getAutoCatalogSeed", getAutoCatalogSeed);
 router.get("/catalog", getCatalogEntries);
-router.get("/catalog/template-items", getCatalogTemplateItems);
-// Alias por sección (ej: /inventory/catalog/home)
-// CRUD
+router.get("/catalog/template-items", getCatalogTemplateItems); // → ProductSelector (publicidad)
 router.post("/catalog", isAuthenticated, createCatalogEntry);
 router.put("/catalog/:id", isAuthenticated, updateCatalogEntry);
 router.delete("/catalog/:id", isAuthenticated, deleteCatalogEntry);
-
-// Opcional: reordenar por sección
 router.post("/catalog/reorder", isAuthenticated, reorderCatalogEntries);
-
-
-router.get("/catalog/section/:section", getCatalogBySection);
+// CatalogVitrinaController: vitrina /backery (CatalogPage)
+router.get("/catalog/section/:section", getCatalogBySection);   // → CatalogPage
 router.get("/catalog/sections", getCatalogBySections);
 
 

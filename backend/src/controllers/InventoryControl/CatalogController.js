@@ -1,14 +1,27 @@
-// controllers/catalog/CatalogController.js
+/**
+ * =============================================================================
+ * CatalogController.js
+ * =============================================================================
+ * MÓDULO: Admin CRUD + Publicidad (Editor de plantillas)
+ * RUTAS: GET  /inventory/catalog (admin)
+ *        GET  /inventory/catalog/template-items  → PUBLICIDAD (ProductSelector)
+ *        GET  /inventory/getPopularProducts
+ *        GET  /inventory/getAutoCatalogSeed
+ *        POST /inventory/catalog, PUT, DELETE, reorder
+ * CONSUMIDO POR: CatalogManagerPage, AutoCatalogLab, ProductSelector (editor)
+ *
+ * - template-items: formato COMPLETO (desc, price, category, wholesale, etc.) para publicidad
+ * - CRUD: gestión admin del catálogo
+ * =============================================================================
+ */
 import {
   Catalog,
   InventoryProduct,
   InventoryCategory,
   InventoryUnit,
   InventoryMovement,
-
 } from "../../models/Inventory.js";
-
-// controllers/analytics/PopularProductsController.js
+import { slugify } from "../../helpers/functions.js";
 import { Op, fn, col } from "sequelize";
 import { Order, OrderItem } from "../../models/Orders.js";
 /* =========================
@@ -90,7 +103,74 @@ const formatPriceUSD = (value) => {
   return `$${n.toFixed(2)}`;
 };
 
-// GET /inventory/catalog/template-items
+/* =========================
+   Mapeo COMPLETO para PUBLICIDAD (template-items)
+   → ProductSelector.jsx, Editor de plantillas
+   Incluye: desc, title, subtitle, price, categorySlug, wholesaleRules, etc.
+========================= */
+const mapCatalogEntryToCardForPublicidad = (row) => {
+  const product = row.product || {};
+  const basePrice = row.priceOverride ?? product.price ?? null;
+
+  const categoryObj = product.ERP_inventory_category || product["ERP_inventory_category"];
+  const catName = categoryObj?.name || "";
+  const categorySlug = slugify(catName);
+
+  const unit = product.ERP_inventory_unit || product["ERP_inventory_unit"];
+  const unitAbbr = unit?.abbreviation || unit?.name || null;
+
+  let wholesaleRules = product.wholesaleRules;
+  if (typeof wholesaleRules === "string") {
+    try {
+      wholesaleRules = JSON.parse(wholesaleRules || "[]");
+    } catch {
+      wholesaleRules = [];
+    }
+  }
+  if (!Array.isArray(wholesaleRules)) wholesaleRules = [];
+
+  let wholesaleOverrideRules = row.wholesaleOverrideRules;
+  if (typeof wholesaleOverrideRules === "string") {
+    try {
+      wholesaleOverrideRules = JSON.parse(wholesaleOverrideRules || "[]");
+    } catch {
+      wholesaleOverrideRules = [];
+    }
+  }
+  if (!Array.isArray(wholesaleOverrideRules)) wholesaleOverrideRules = [];
+
+  const effectivePrice = n(basePrice, 0);
+  return {
+    id: row.id,
+    badge: row.badge,
+    title: row.title || product.name,
+    subtitle: row.subtitle || null,
+    displayName: product.name,
+    section: row.section,
+    displayPrice: formatPriceUSD(basePrice),
+    minOrderQty: typeof row.minOrderQty === "number" && row.minOrderQty > 0 ? row.minOrderQty : null,
+    imageUrl: row.imageUrl || product.primaryImageUrl,
+    wholesaleOverrideRules: wholesaleOverrideRules.length > 0 ? wholesaleOverrideRules : undefined,
+    product: {
+      id: product.id,
+      name: product.name,
+      desc: product.desc,
+      price: effectivePrice,
+      primaryImageUrl: product.primaryImageUrl,
+      categorySlug: categorySlug || undefined,
+      categoryId: product.categoryId,
+      unitId: product.unitId,
+      unitAbbr: unitAbbr || undefined,
+      standardWeightGrams: n(product.standardWeightGrams, 0),
+      wholesaleRules,
+    },
+  };
+};
+
+/**
+ * GET /inventory/catalog/template-items
+ * → ProductSelector.jsx (editor publicidad) - Items para plantillas
+ */
 export const getCatalogTemplateItems = async (req, res) => {
   try {
     const { onlyActive = "true", onlyValidNow = "true", storeId } = req.query;
@@ -115,6 +195,8 @@ export const getCatalogTemplateItems = async (req, res) => {
             "price",
             "primaryImageUrl",
             "type",
+            "categoryId",
+            "unitId",
             "standardWeightGrams",
             "wholesaleRules",
           ],
@@ -132,7 +214,7 @@ export const getCatalogTemplateItems = async (req, res) => {
       ? rows.filter((r) => isActiveByDates(r, now))
       : rows;
 
-    res.json(list.map(mapCatalogEntryToCard));
+    res.json(list.map(mapCatalogEntryToCardForPublicidad));
   } catch (err) {
     console.error("getCatalogTemplateItems error:", err);
     res.status(500).json({ message: "Error al obtener items para plantillas" });
@@ -140,10 +222,10 @@ export const getCatalogTemplateItems = async (req, res) => {
 };
 
 
-/* =========================
-   GET /inventory/analytics/getPopularProducts
-   Solo products type='final', desde Orders/OrderItems
-========================= */
+/**
+ * GET /inventory/getPopularProducts
+ * → Productos más vendidos (Orders/OrderItems). Usado por analytics y sugerencias
+ */
 export const getPopularProducts = async (req, res) => {
   try {
     const {
@@ -205,10 +287,10 @@ export const getPopularProducts = async (req, res) => {
   }
 };
 
-/* =========================
-   GET /inventory/analytics/getAutoCatalogSeed
-   Paquete: populares + catálogo existente
-========================= */
+/**
+ * GET /inventory/getAutoCatalogSeed
+ * → AutoCatalogLab.jsx - Paquete: productos populares + catálogo existente para sugerencias
+ */
 export const getAutoCatalogSeed = async (req, res) => {
   try {
     const {
@@ -217,6 +299,7 @@ export const getAutoCatalogSeed = async (req, res) => {
       activeOnly = "true",
       orderBy = "sold30",
       orderStatusIn,    // CSV e.g. "pagado,entregado"
+      categoryId,       // filtrar productos por categoría
       // filtros catálogo existente:
       section,
       onlyActive = "true",
@@ -236,10 +319,11 @@ export const getAutoCatalogSeed = async (req, res) => {
 
     const productWhere = { type: "final" };
     if (String(activeOnly) === "true") productWhere.isActive = true;
+    if (categoryId != null && categoryId !== "") productWhere.categoryId = Number(categoryId);
 
     const products = await InventoryProduct.findAll({
       where: productWhere,
-      attributes: ["id", "name", "price", "primaryImageUrl", "type", "isActive"],
+      attributes: ["id", "name", "price", "primaryImageUrl", "type", "isActive", "categoryId"],
     });
 
     const popular = products.map((p) => {
@@ -249,6 +333,7 @@ export const getAutoCatalogSeed = async (req, res) => {
         name: p.name,
         price: n(p.price, 0),
         primaryImageUrl: p.primaryImageUrl || "",
+        categoryId: p.categoryId ?? null,
         stats: {
           sold30: soldWindowByProduct.get(id) || 0,
           soldAll: soldAllByProduct.get(id) || 0,
@@ -258,13 +343,24 @@ export const getAutoCatalogSeed = async (req, res) => {
       };
     });
 
-    popular.sort((a, b) => {
+    // Ordenar: primero los vendidos (por métrica desc), luego los no vendidos al final
+    const sold = popular.filter((p) => {
+      const v = orderBy === "soldAll" ? p.stats.soldAll : p.stats.sold30;
+      return v > 0;
+    });
+    const unsold = popular.filter((p) => {
+      const v = orderBy === "soldAll" ? p.stats.soldAll : p.stats.sold30;
+      return v === 0;
+    });
+    sold.sort((a, b) => {
       const av = orderBy === "soldAll" ? a.stats.soldAll : a.stats.sold30;
       const bv = orderBy === "soldAll" ? b.stats.soldAll : b.stats.sold30;
       return bv - av;
     });
+    unsold.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
 
-    const popularTop = popular.slice(0, maxItems);
+    // Top N vendidos + todos los no vendidos al final (siempre aparecen)
+    const popularTop = [...sold.slice(0, maxItems), ...unsold];
 
     // CATÁLOGO existente -> shape de AutoCatalogLab
     const catWhere = {};
@@ -321,18 +417,6 @@ export const getAutoCatalogSeed = async (req, res) => {
 };
 
 
-/* =========================
-   Helpers
-========================= */
-
-const slugify = (s = "") =>
-  String(s)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
-
 const isActiveByDates = (row, now = new Date()) => {
   const { startsAt, endsAt } = row || {};
   if (startsAt && now < new Date(startsAt)) return false;
@@ -378,36 +462,7 @@ function parseJsonMaybe(v) {
   return v;
 }
 
-/* =========================
-   Mapeo al formato del frontend (vitrina)
-========================= */
-const mapCatalogEntryToCard = (row) => {
-  const product = row.product || {};
-
-  const basePrice =
-    row.displayPrice ??
-    product.price ??
-    null;
-
-  return {
-    id: row.id,
-    badge: row.badge,
-    displayName: product.name,
-    section: row.section,
-    displayPrice: formatPriceUSD(basePrice),
-
-    imageUrl: product.primaryImageUrl,
-    product: {
-      id: product.id,
-      name: product.name,
-      primaryImageUrl: product.primaryImageUrl,
-    },
-  };
-};
-
-
-
-/* Include para endpoints de VITRINA: forzamos attributes (incluye wholesaleRules) */
+/* Include para product en template-items y CRUD */
 const productIncludeForView = [
   {
     model: InventoryUnit,
@@ -422,130 +477,7 @@ const productIncludeForView = [
 ];
 
 /* =========================
-   GET /api/catalog/section/:section
-   (VITRINA) - Si no hay override de catálogo, usa reglas del producto.
-========================= */
-export const getCatalogBySection = async (req, res) => {
-  try {
-    const { section } = req.params;
-    const { storeId = null, onlyActive = "true" } = req.query;
-    const now = new Date();
-
-    const where = { section };
-    if (storeId) where.storeId = Number(storeId);
-    if (String(onlyActive) === "true") where.isActive = true;
-
-    const rows = await Catalog.findAll({
-      where,
-      include: [
-        {
-          model: InventoryProduct,
-          as: "product",
-          required: true,
-          attributes: [
-            "id",
-            "name",
-            "desc",
-            "price",
-            "primaryImageUrl",
-            "type",
-            "categoryId",
-            "unitId",
-            "standardWeightGrams",
-            "wholesaleRules", // 👈 reglas mayoristas del producto
-          ],
-          include: productIncludeForView,
-        },
-      ],
-      order: [
-        ["position", "ASC"],
-        ["createdAt", "DESC"],
-      ],
-      // 👇 Ojo: no ponemos attributes a nivel Catalog,
-      // así que vienen TODOS los campos, incluido minOrderQty
-    });
-
-    const valid = rows.filter((r) => isActiveByDates(r, now));
-
-    // 👇 Aquí es donde hay que asegurarse de que mapCatalogEntryToCard
-    // exponga r.minOrderQty en el JSON
-    const data = valid.map(mapCatalogEntryToCard);
-
-    res.json(data);
-  } catch (err) {
-    console.error("getCatalogBySection error:", err);
-    res.status(500).json({ message: "Error al obtener catálogo por sección" });
-  }
-};
-
-
-/* =========================
-   GET /api/catalog/sections?sections=home,ofertas
-   (VITRINA) - Si no hay override de catálogo, usa reglas del producto.
-========================= */
-export const getCatalogBySections = async (req, res) => {
-  try {
-    const { sections = "", storeId = null, onlyActive = "true" } = req.query;
-    const list = sections
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-
-    if (!list.length) {
-      return res.status(400).json({ message: "Parámetro 'sections' requerido" });
-    }
-
-    const now = new Date();
-    const where = { section: { [Op.in]: list } };
-    if (storeId) where.storeId = Number(storeId);
-    if (String(onlyActive) === "true") where.isActive = true;
-
-    const rows = await Catalog.findAll({
-      where,
-      include: [
-        {
-          model: InventoryProduct,
-          as: "product",
-          required: true,
-          attributes: [
-            "id",
-            "name",
-            "price",
-            "desc",
-            "primaryImageUrl",
-            "type",
-            "categoryId",
-            "unitId",
-            "standardWeightGrams",
-            "wholesaleRules",
-          ],
-          include: productIncludeForView,
-        },
-      ],
-      order: [
-        ["section", "ASC"],
-        ["position", "ASC"],
-        ["createdAt", "DESC"],
-      ],
-    });
-
-    const grouped = {};
-    list.forEach((s) => (grouped[s] = []));
-    rows.forEach((r) => {
-      if (!isActiveByDates(r, now)) return;
-      const entry = mapCatalogEntryToCard(r); // 👈 aquí también
-      (grouped[r.section] ||= []).push(entry);
-    });
-
-    res.json(grouped);
-  } catch (err) {
-    console.error("getCatalogBySections error:", err);
-    res.status(500).json({ message: "Error al obtener múltiples secciones de catálogo" });
-  }
-};
-
-/* =========================
-   Admin CRUD
+   Admin CRUD - CatalogManagerPage
 ========================= */
 
 function buildCatalogWhere(query) {
@@ -576,18 +508,20 @@ function buildCatalogWhere(query) {
   return where;
 }
 
-/* =========================
-   GET /inventory/catalog (ADMIN)
-========================= */
+/**
+ * GET /inventory/catalog
+ * → CatalogManagerPage - Lista entradas del catálogo con filtros (admin)
+ */
 export const getCatalogEntries = async (req, res) => {
   try {
     const { limit = 50, offset = 0, orderBy = "position", orderDir = "ASC", q } =
       req.query;
 
+    const { categoryId } = req.query;
     const where = buildCatalogWhere(req.query);
-    const productWhere = q && q.trim()
-      ? { name: { [Op.iLike]: `%${q.trim()}%` } }
-      : undefined;
+    const productWhere = {};
+    if (q && q.trim()) productWhere.name = { [Op.iLike]: `%${q.trim()}%` };
+    if (categoryId != null && categoryId !== "") productWhere.categoryId = Number(categoryId);
 
     const rows = await Catalog.findAll({
       where,
@@ -595,8 +529,8 @@ export const getCatalogEntries = async (req, res) => {
         {
           model: InventoryProduct,
           as: "product",
-          required: false,
-          where: productWhere,
+          required: Object.keys(productWhere).length > 0,
+          where: Object.keys(productWhere).length ? productWhere : undefined,
           attributes: [
             "id",
             "name",

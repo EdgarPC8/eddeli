@@ -74,14 +74,13 @@ export const createStore = async (req, res) => {
     payload.name = String(payload.name).trim();
     payload.address = String(payload.address).trim();
 
-    // ✅ IMAGEN: guardar la ruta relativa EXACTA que calculó el middleware
-    // - "" => "archivo.png"
-    // - "EdDeli/stores" => "EdDeli/stores/archivo.png"
+    // ✅ IMAGEN: usar la ruta del input (subfolder) + nombre de archivo
+    // Prioridad: subfolder del body (lo que puso el usuario en el form)
     if (req.file?.filename) {
-      tempRelPath =
-        req.uploadInfo?.relPath ||
-        normalize(path.posix.join(req.body.subfolder || "", req.file.filename));
-
+      const subfolder = (req.body.subfolder || "EdDeli/stores").trim().replace(/\/+$/, "");
+      tempRelPath = subfolder
+        ? `${subfolder}/${req.file.filename}`
+        : req.file.filename;
       payload.imageUrl = tempRelPath;
     }
 
@@ -118,13 +117,13 @@ export const updateStore = async (req, res) => {
     let moved = false;
 
     // ===============================
-    // 1️⃣ CASO: se sube imagen nueva
+    // 1️⃣ CASO: se sube imagen nueva (usar subfolder del form)
     // ===============================
     if (req.file?.filename) {
-      const newRel =
-        req.uploadInfo?.relPath ||
-        normalize(path.posix.join(req.body.subfolder || "", req.file.filename));
-
+      const subfolder = (req.body.subfolder || "EdDeli/stores").trim().replace(/\/+$/, "");
+      const newRel = subfolder
+        ? `${subfolder}/${req.file.filename}`
+        : req.file.filename;
       updates.imageUrl = newRel;
 
       // borrar anterior si no está en uso
@@ -201,7 +200,20 @@ export const updateStore = async (req, res) => {
 
 export const getStores = async (req, res) => {
   try {
-    const rows = await Store.findAll({ order: [["position", "ASC"], ["createdAt", "DESC"]] });
+    const { isActive } = req.query;
+
+    const where = {};
+    // Si piden solo activos (ej: home), filtrar
+    if (isActive === "true" || isActive === true) {
+      where.isActive = true;
+    } else if (isActive === "false" || isActive === false) {
+      where.isActive = false;
+    }
+
+    const rows = await Store.findAll({
+      where: Object.keys(where).length ? where : undefined,
+      order: [["position", "ASC"], ["createdAt", "DESC"]],
+    });
     res.json(rows);
   } catch (error) {
     res.status(500).json({ message: "Error al obtener Stores", error });

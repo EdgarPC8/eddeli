@@ -1,6 +1,6 @@
 import { Users } from "../models/Users.js";
 import { Roles } from "../models/Roles.js";
-
+import { UniqueConstraintError } from "sequelize";
 
 // ✅ CREATE (addUser) - ignora "photo" que venga en el body
 export const addUser = async (req, res) => {
@@ -15,6 +15,11 @@ export const addUser = async (req, res) => {
       user: newUser,
     });
   } catch (error) {
+    if (error instanceof UniqueConstraintError || error.name === "SequelizeUniqueConstraintError") {
+      return res.status(400).json({
+        message: "Esa cédula ya existe",
+      });
+    }
     console.error("error al crear el usuario:", error);
     return res.status(500).json({
       message: "Error al crear el usuario",
