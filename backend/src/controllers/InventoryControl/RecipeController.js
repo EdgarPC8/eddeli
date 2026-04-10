@@ -10,9 +10,10 @@ export const getRecipeCosting = async (req, res) => {
     }
 
     // --- Params / Query ---
+    // Porcentajes sin tope fijo en 100: mano de obra o "extras" pueden superar el 100% del subtotal base.
     const toPctInt = (v) => {
       const n = parseInt(v, 10);
-      return Number.isFinite(n) && n >= 0 ? Math.min(n, 100) : 0;
+      return Number.isFinite(n) && n >= 0 ? n : 0;
     };
     const extrasPctInt = toPctInt(req.query.extrasPercent);
     const laborPctInt  = toPctInt(req.query.laborPercent);
@@ -409,6 +410,46 @@ export const getRecipeCosting = async (req, res) => {
       yieldInfo,
       notas: "Extras = % de INSUMOS; Mano de obra = % de (INSUMOS + EXTRAS). Materiales no entran en la base.",
     };
+
+    const debugRequested =
+      String(req.query.debug) === "1" || String(req.query.debug).toLowerCase() === "true";
+    if (debugRequested) {
+      const pruneCostTree = (node, depth = 0, maxDepth = 6) => {
+        if (!node || depth > maxDepth) return null;
+        return {
+          info: node.info,
+          cost: node.cost,
+          directItemsCount: node.directItems?.length ?? 0,
+          childCount: node.children?.length ?? 0,
+          children: (node.children || []).map((c) => pruneCostTree(c, depth + 1, maxDepth)),
+        };
+      };
+      console.log(
+        "[EdDeli getRecipeCosting DEBUG — copiar para análisis]",
+        JSON.stringify(
+          {
+            productFinalId,
+            query: {
+              extrasPercent: extrasPctInt,
+              laborPercent: laborPctInt,
+              producedQty: producedQty || 0,
+            },
+            cabecera: {
+              id: product.id,
+              name: product.name,
+              type: product.type,
+              unitId: product.unitId,
+            },
+            summaryTotales: summary.totales,
+            yieldInfo: summary.yieldInfo,
+            rowsCount: rows.length,
+            treePruned: pruneCostTree(tree),
+          },
+          null,
+          2
+        )
+      );
+    }
 
     return res.json({ tree, rows, summary });
   } catch (error) {

@@ -462,14 +462,47 @@ export const getProductRotationAnalysis = async (req, res) => {
   }
 };
 
-export const getTopProductsDailySales = async (req, res) => {
-  try {
-    const today = new Date();
-    const startDate = startOfDay(subMonths(today, 1)); // mismo día del mes anterior
-    const endDate = endOfDay(today);
+const orderIncludePaidTop = {
+  model: Order,
+  attributes: [],
+  where: { status: 'pagado' },
+};
+const orderIncludeAnyTop = {
+  model: Order,
+  attributes: [],
+  required: true,
+};
 
-    // 1. Obtener los 5 productos más vendidos
-    const topProductsData = await OrderItem.findAll({
+/**
+ * Top 5 + series diarias para un criterio: 'paid' | 'delivered' | 'order'
+ * (order = fecha creación pedido pagado).
+ */
+async function buildTopProductsDailyForMode(dateBy, startDate, endDate) {
+  let topProductsData;
+  if (dateBy === 'paid') {
+    topProductsData = await OrderItem.findAll({
+      attributes: ['productId', [fn('SUM', col('quantity')), 'totalSold']],
+      where: {
+        paidAt: { [Op.between]: [startDate, endDate] },
+      },
+      include: [orderIncludePaidTop],
+      group: ['productId'],
+      order: [[fn('SUM', col('quantity')), 'DESC']],
+      limit: 5,
+    });
+  } else if (dateBy === 'delivered') {
+    topProductsData = await OrderItem.findAll({
+      attributes: ['productId', [fn('SUM', col('quantity')), 'totalSold']],
+      where: {
+        deliveredAt: { [Op.between]: [startDate, endDate] },
+      },
+      include: [orderIncludeAnyTop],
+      group: ['productId'],
+      order: [[fn('SUM', col('quantity')), 'DESC']],
+      limit: 5,
+    });
+  } else {
+    topProductsData = await OrderItem.findAll({
       attributes: ['productId', [fn('SUM', col('quantity')), 'totalSold']],
       include: [
         {
@@ -485,34 +518,81 @@ export const getTopProductsDailySales = async (req, res) => {
       order: [[fn('SUM', col('quantity')), 'DESC']],
       limit: 5,
     });
+  }
 
-    const topProductIds = topProductsData.map(p => p.productId);
+  const topProductIds = topProductsData.map((p) => p.productId);
 
-    // 2. Obtener los nombres de los productos
-    const products = await InventoryProduct.findAll({
-      where: { id: topProductIds },
-    });
+  const products =
+    topProductIds.length > 0
+      ? await InventoryProduct.findAll({
+          where: { id: topProductIds },
+        })
+      : [];
 
-    const productMap = {};
-    for (const product of products) {
-      productMap[product.id] = product.name;
-    }
+  const productMap = {};
+  for (const product of products) {
+    productMap[product.id] = product.name;
+  }
 
-    // 3. Generar dataset por día
-    const dataset = [];
-    const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
+  if (topProductIds.length === 0) {
+    return { products: [], dataset: [], datasetAmount: [] };
+  }
 
-    for (let i = 0; i <= totalDays; i++) {
-      const day = addDays(startDate, i);
-      const dayStart = startOfDay(day);
-      const dayEnd = endOfDay(day);
+  const dataset = [];
+  const datasetAmount = [];
+  const totalDays = Math.ceil((endDate - startDate) / (1000 * 60 * 60 * 24));
 
-      const dataPoint = {
-        date: format(day, 'yyyy-MM-dd'), // ✅ solo fecha
-      };
+  for (let i = 0; i <= totalDays; i++) {
+    const day = addDays(startDate, i);
+    const dayStart = startOfDay(day);
+    const dayEnd = endOfDay(day);
 
-      const items = await OrderItem.findAll({
-        attributes: ['productId', [fn('SUM', col('quantity')), 'sold']],
+    const dataPointQty = {
+      date: format(day, 'yyyy-MM-dd'),
+    };
+    const dataPointAmt = {
+      date: format(day, 'yyyy-MM-dd'),
+    };
+
+    let items;
+    if (dateBy === 'paid') {
+      items = await OrderItem.findAll({
+        attributes: [
+          'productId',
+          [fn('SUM', col('quantity')), 'sold'],
+          [fn('SUM', literal('`quantity` * `price`')), 'revenue'],
+        ],
+        where: {
+          productId: { [Op.in]: topProductIds },
+          paidAt: { [Op.between]: [dayStart, dayEnd] },
+        },
+        include: [orderIncludePaidTop],
+        group: ['productId'],
+      });
+    } else if (dateBy === 'delivered') {
+      items = await OrderItem.findAll({
+        attributes: [
+          'productId',
+          [fn('SUM', col('quantity')), 'sold'],
+          [fn('SUM', literal('`quantity` * `price`')), 'revenue'],
+        ],
+        where: {
+          productId: { [Op.in]: topProductIds },
+          deliveredAt: { [Op.between]: [dayStart, dayEnd] },
+        },
+        include: [orderIncludeAnyTop],
+        group: ['productId'],
+      });
+    } else {
+      items = await OrderItem.findAll({
+        attributes: [
+          'productId',
+          [fn('SUM', col('quantity')), 'sold'],
+          [fn('SUM', literal('`quantity` * `price`')), 'revenue'],
+        ],
+        where: {
+          productId: { [Op.in]: topProductIds },
+        },
         include: [
           {
             model: Order,
@@ -523,43 +603,51 @@ export const getTopProductsDailySales = async (req, res) => {
             },
           },
         ],
-        where: {
-          productId: { [Op.in]: topProductIds },
-        },
         group: ['productId'],
       });
-
-      // Añadir los vendidos ese día
-      for (const productId of topProductIds) {
-        const item = items.find(i => i.productId === productId);
-        const sold = item ? parseFloat(item.get('sold')) : 0;
-        dataPoint[productId] = sold;
-      }
-
-      // Asegurar que todos los productos tengan clave
-      topProductIds.forEach(id => {
-        if (!(id in dataPoint)) {
-          dataPoint[id] = 0;
-        }
-      });
-
-      dataset.push(dataPoint);
     }
 
-    // 4. Armar lista de productos con id y nombre
-    const productList = topProductIds
-      .map(id => {
-        const name = productMap[id];
-        if (!name) return null;
-        return { id, name };
-      })
-      .filter(p => p !== null);
+    for (const productId of topProductIds) {
+      const item = items.find((row) => row.productId === productId);
+      const sold = item ? parseFloat(item.get('sold')) : 0;
+      const revenue = item ? parseFloat(item.get('revenue')) : 0;
+      dataPointQty[productId] = Number.isFinite(sold) ? sold : 0;
+      dataPointAmt[productId] = Number.isFinite(revenue) ? revenue : 0;
+    }
 
-    res.json({
-      products: productList,
-      dataset,
+    topProductIds.forEach((id) => {
+      if (!(id in dataPointQty)) dataPointQty[id] = 0;
+      if (!(id in dataPointAmt)) dataPointAmt[id] = 0;
     });
 
+    dataset.push(dataPointQty);
+    datasetAmount.push(dataPointAmt);
+  }
+
+  const productList = topProductIds
+    .map((id) => {
+      const name = productMap[id];
+      if (!name) return null;
+      return { id, name };
+    })
+    .filter((p) => p !== null);
+
+  return { products: productList, dataset, datasetAmount };
+}
+
+/** Una sola respuesta: pago y entrega (el front cambia vista sin nueva petición). */
+export const getTopProductsDailySales = async (req, res) => {
+  try {
+    const today = new Date();
+    const startDate = startOfDay(subMonths(today, 1));
+    const endDate = endOfDay(today);
+
+    const [paid, delivered] = await Promise.all([
+      buildTopProductsDailyForMode('paid', startDate, endDate),
+      buildTopProductsDailyForMode('delivered', startDate, endDate),
+    ]);
+
+    res.json({ paid, delivered });
   } catch (error) {
     console.error("Error en getTopProductsDailySales:", error);
     res.status(500).json({

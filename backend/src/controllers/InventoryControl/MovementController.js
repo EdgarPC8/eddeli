@@ -6,7 +6,7 @@ import { Expense } from "../../models/Finance.js";
 
 
 
-import { InventoryMovement, InventoryProduct, InventoryRecipe } from '../../models/Inventory.js';
+import { InventoryMovement, InventoryProduct } from '../../models/Inventory.js';
 
 import { Op, fn, col, literal } from "sequelize";
 
@@ -525,18 +525,126 @@ export const registerProductionFinalFromPayload = async (req, res) => {
 };
 
 
+// =============================================================================
+// POST /inventory/movements — registerMovement
+// Cada `type` aplica una regla distinta sobre `InventoryProduct.stock`.
+// Documentado por separado para mantener y extender (p. ej. nuevos motivos).
+// =============================================================================
+
+const MOVEMENT_TYPES = ["entrada", "salida", "ajuste", "produccion"];
+
+/** Motivos de ajuste permitidos en BD (ENUM en Inventory.js). El front puede enviar AJUSTE_INVENTARIO; aquí se normaliza. */
+const AJUSTE_REASONS_DB = new Set(["AJUSTE_ENTRADA", "AJUSTE_SALIDA"]);
+
+/**
+ * ENTRADA: suma cantidad al stock (compras, devoluciones, otras entradas).
+ * @param {import("sequelize").Model} product InventoryProduct
+ * @param {number} qtyDelta cantidad a sumar (>= 0 esperado)
+ */
+async function applyMovementEntrada(product, qtyDelta) {
+  product.stock = parseFloat(product.stock) + qtyDelta;
+  await product.save();
+}
+
+/**
+ * PRODUCCIÓN: mismo efecto contable que entrada — incrementa stock del producto fabricado.
+ * (El desglose de insumos va por otros flujos: registerProductionFinalFromPayload, etc.)
+ */
+async function applyMovementProduccion(product, qtyDelta) {
+  product.stock = parseFloat(product.stock) + qtyDelta;
+  await product.save();
+}
+
+/**
+ * SALIDA: resta cantidad del stock (venta, consumo interno, merma, etc.)
+ */
+async function applyMovementSalida(product, qtyDelta) {
+  product.stock = parseFloat(product.stock) - qtyDelta;
+  await product.save();
+}
+
+/**
+ * AJUSTE: `nuevoStockAbsoluto` reemplaza el stock (inventario físico / conteo).
+ * No es un delta: el front envía el valor final deseado en `quantity`.
+ */
+async function applyMovementAjuste(product, nuevoStockAbsoluto) {
+  product.stock = nuevoStockAbsoluto;
+  await product.save();
+}
+
+/**
+ * El modelo Sequelize solo tiene AJUSTE_ENTRADA y AJUSTE_SALIDA.
+ * El front (MovementForm) manda `AJUSTE_INVENTARIO` para “ajuste de inventario genérico”.
+ * Derivamos el motivo según si el stock sube, baja o iguala (para reportes/logística).
+ */
+function resolveAjusteReasonForDb(reasonIncoming, stockAnterior, stockNuevo) {
+  if (reasonIncoming && AJUSTE_REASONS_DB.has(reasonIncoming)) {
+    return reasonIncoming;
+  }
+  if (stockNuevo > stockAnterior) return "AJUSTE_ENTRADA";
+  if (stockNuevo < stockAnterior) return "AJUSTE_SALIDA";
+  return "AJUSTE_ENTRADA";
+}
+
+/**
+ * Registra gasto en finanzas solo cuando es compra con monto (entrada + ENTRADA_COMPRA).
+ */
+async function registerExpenseCompraSiAplica({ product, reason, priceTotal, accountId }) {
+  if (reason !== "ENTRADA_COMPRA" || priceTotal == null || Number.isNaN(Number(priceTotal))) {
+    return;
+  }
+  await Expense.create({
+    date: new Date(),
+    amount: priceTotal,
+    concept: `Compra de ${product.name}`,
+    category: "Compras",
+    referenceId: product.id,
+    referenceType: "inventory_entry",
+    createdBy: accountId,
+  });
+}
+
+/**
+ * Crea la fila en ERP_inventory_movements (auditoría).
+ * `quantity` en ajuste = stock final absoluto (misma semántica que antes).
+ */
+async function createInventoryMovementRow({
+  productId,
+  type,
+  reason,
+  quantity,
+  description,
+  price,
+  referenceType,
+  referenceId,
+  createdBy,
+}) {
+  return InventoryMovement.create({
+    productId,
+    type,
+    reason,
+    quantity,
+    description,
+    price: price ?? null,
+    referenceType: referenceType ?? null,
+    referenceId: referenceId ?? null,
+    createdBy,
+    date: new Date(),
+  });
+}
+
 // Crear un movimiento y actualizar el stock del producto
 export const registerMovement = async (req, res) => {
   try {
     const {
       productId,
       type,
-      reason,            // <-- NUEVO
+      reason,
       quantity,
       description,
       price,
-      referenceType,     // ya existe en la tabla
-      referenceId
+      referenceType,
+      referenceId,
     } = req.body;
 
     const token = getHeaderToken(req);
@@ -546,54 +654,62 @@ export const registerMovement = async (req, res) => {
       return res.status(400).json({ message: "Faltan campos obligatorios" });
     }
 
-    // Recomendado: exigir reason para evitar salidas ambiguas
-    if (!reason) {
-      return res.status(400).json({ message: "Falta reason (motivo del movimiento)" });
+    if (!MOVEMENT_TYPES.includes(type)) {
+      return res.status(400).json({ message: `type inválido. Use: ${MOVEMENT_TYPES.join(", ")}` });
     }
 
     const product = await InventoryProduct.findByPk(productId);
     if (!product) return res.status(404).json({ message: "Producto no encontrado" });
 
     const qty = parseFloat(quantity);
-
-    // 1) actualizar stock
-    if (type === "entrada" || type === "produccion") {
-      product.stock = parseFloat(product.stock) + qty;
-      await product.save();
-    } else if (type === "salida") {
-      product.stock = parseFloat(product.stock) - qty;
-      await product.save();
-    } else if (type === "ajuste") {
-      // si tu "ajuste" es setear el stock directamente, OK:
-      product.stock = qty;
-      await product.save();
+    if (Number.isNaN(qty)) {
+      return res.status(400).json({ message: "quantity no numérica" });
     }
 
-    // // 2) finanzas (SOLO compras)
-    if (type === "entrada" && reason === "ENTRADA_COMPRA") {
-      await Expense.create({
-        date: new Date(),
-        amount: price, // total gastado (asegúrate que venga total)
-        concept: `Compra de ${product.name}`,
-        category: "Compras",
-        referenceId: product.id,
-        referenceType: "inventory_entry",
-        createdBy: user.accountId
+    const stockAntes = parseFloat(product.stock) || 0;
+
+    // reason obligatorio salvo ajuste (se infiere / normaliza)
+    if (type !== "ajuste" && !reason) {
+      return res.status(400).json({ message: "Falta reason (motivo del movimiento)" });
+    }
+
+    let reasonParaDb = reason;
+
+    // --- 1) Aplicar cambio de stock según tipo ---
+    if (type === "entrada") {
+      await applyMovementEntrada(product, qty);
+    } else if (type === "produccion") {
+      await applyMovementProduccion(product, qty);
+    } else if (type === "salida") {
+      await applyMovementSalida(product, qty);
+    } else if (type === "ajuste") {
+      await applyMovementAjuste(product, qty);
+      reasonParaDb = resolveAjusteReasonForDb(reason || "AJUSTE_INVENTARIO", stockAntes, qty);
+    }
+
+    // --- 2) Finanzas: solo entrada por compra con precio ---
+    if (type === "entrada") {
+      await registerExpenseCompraSiAplica({
+        product,
+        reason: reasonParaDb,
+        priceTotal: price,
+        accountId: user.accountId,
       });
     }
 
-    // 3) registrar movimiento con reason + referencias
-    await InventoryMovement.create({
+    // --- 3) Movimiento en tabla (ajuste sin precio; coherente con front) ---
+    const priceParaDb = type === "ajuste" ? null : price ?? null;
+
+    await createInventoryMovementRow({
       productId,
       type,
-      reason,                 // <-- NUEVO
+      reason: reasonParaDb,
       quantity: qty,
       description,
-      price: price ?? null,
-      referenceType: referenceType ?? null,
-      referenceId: referenceId ?? null,
+      price: priceParaDb,
+      referenceType,
+      referenceId,
       createdBy: user.accountId,
-      date: new Date()
     });
 
     res.status(201).json({ message: "Movimiento registrado exitosamente" });

@@ -1,12 +1,13 @@
 import { createLicenseToken } from "../libs/jwt.js";
 import { License } from "../models/License.js";
 import { Logs } from "../models/Logs.js";
-import { sequelize } from "../database/connection.js";   // ajusta el path según tu estructura
+import { sequelize } from "../database/connection.js";
 import { backupFilePath, insertData, saveBackup } from "../database/insertData.js";
 import { promises as fs } from "fs";
+
 export const saveBackupController = async (req, res) => {
   try {
-    const data = await saveBackup();
+    await saveBackup();
     res.json("ok");
   } catch (error) {
     console.error("Error en saveBackupController:", error);
@@ -27,7 +28,6 @@ export const uploadBackupController = async (req, res) => {
       });
     }
 
-    // El archivo viene en memoria porque vamos a usar memoryStorage
     const content = req.file.buffer.toString("utf8");
 
     let jsonData;
@@ -41,13 +41,9 @@ export const uploadBackupController = async (req, res) => {
       });
     }
 
-    // Si quieres, aquí podrías validar que tenga ciertas claves mínimas:
-    // if (!jsonData.Roles || !jsonData.Users) { ... }
-
-    // Sobrescribir el backup original
     await fs.writeFile(backupFilePath, JSON.stringify(jsonData, null, 2));
 
-    console.log("✅ backup.json reemplazado en:", backupFilePath);
+    console.log("✅ backup.json EdDeli reemplazado en:", backupFilePath);
 
     return res.json({
       ok: true,
@@ -66,19 +62,29 @@ export const uploadBackupController = async (req, res) => {
 
 export const reloadBdController = async (req, res) => {
   try {
-    console.log("🔄 Reiniciando base de datos...");
+    console.log("🔄 Reiniciando base de datos (EdDeli)...");
 
-    // 1) Dropea TODAS las tablas y las vuelve a crear según los modelos
-    await sequelize.sync({ force: true });
-    console.log("📦 Tablas recreadas con sequelize.sync({ force: true })");
+    const dialect = sequelize.getDialect?.() || "mysql";
 
-    // 2) Vuelve a insertar los datos desde backup.json
+    if (dialect === "mysql") {
+      // Sin esto, MySQL falla al DROP (p. ej. `users`) si otra tabla aún referencia la fila vía FK.
+      await sequelize.query("SET FOREIGN_KEY_CHECKS = 0");
+      try {
+        await sequelize.sync({ force: true });
+      } finally {
+        await sequelize.query("SET FOREIGN_KEY_CHECKS = 1");
+      }
+    } else {
+      await sequelize.sync({ force: true });
+    }
+    console.log("📦 Tablas recreadas (modelos cargados vía insertData / rutas)");
+
     await insertData();
-    console.log("✅ Datos insertados desde backup.json");
+    console.log("✅ Datos EdDeli insertados desde backup.json");
 
     return res.json({
       ok: true,
-      message: "Base de datos reiniciada e inicializada desde backup.json",
+      message: "Base de datos reiniciada e inicializada desde backup.json (EdDeli)",
     });
   } catch (error) {
     console.error("❌ Error en reloadBdController:", error);
@@ -90,43 +96,28 @@ export const reloadBdController = async (req, res) => {
   }
 };
 
-
 export const getLogs = async (req, res) => {
-    try {
-
-        const data = await Logs.findAll();
-        res.json(data);
-    } catch (error) {
-        console.error("Error al obtener usuarios:", error);
-        res.status(500).json({ message: "Error en el servidor." });
-    }
+  try {
+    const data = await Logs.findAll();
+    res.json(data);
+  } catch (error) {
+    console.error("Error al obtener logs:", error);
+    res.status(500).json({ message: "Error en el servidor." });
+  }
 };
+
 export const createLicense = async (req, res) => {
   try {
-  
-  //   const data= req.body;
-  const payload={
-    time:"10 minutos"
-  }
-
-  const token = await createLicenseToken({payload})
-
-  const newData = await License.create({
-    token:token,
-    time:"10 minutos",
-    name:"12345"
-  });
-  res.json({ message: `agregado con éxito`,data:newData});
-
+    const payload = { time: "10 minutos" };
+    const token = await createLicenseToken({ payload });
+    const newData = await License.create({
+      token,
+      time: "10 minutos",
+      name: "12345",
+    });
+    res.json({ message: "agregado con éxito", data: newData });
   } catch (error) {
-    // manejo de errores si ocurre algún problema durante la creación del usuario
-    console.error("error al crear el rol:", error);
+    console.error("error al crear licencia:", error);
+    res.status(500).json({ message: "Error al crear licencia" });
   }
 };
-
-
-
-
-
-
-

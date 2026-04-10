@@ -5,36 +5,81 @@ import { verifyJWT, getHeaderToken } from "../../libs/jwt.js";
 
 // controllers/finance.controller.js
 import { Op, fn, literal } from 'sequelize';
-import { Order, OrderItem } from "../../models/Orders.js";
+import { OrderItem } from "../../models/Orders.js";
+import { ItemGroup, ItemGroupItem, Payment } from "../../models/Finance.js";
 
-
-
-
+/**
+ * Ingresos futuros / por cobrar: alineado con cobranzas por grupos.
+ * - Ítems en un grupo abierto: solo el saldo (total líneas − abonos), no el bruto del ítem.
+ * - Ítems sin grupo: suma price*quantity si paidAt es null.
+ * Así los abonos (ya en Income) no duplican el monto en projectedBalance.
+ */
 export const getFinanceSummary = async (req, res) => {
+  const toNum = (v) => {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : 0;
+  };
+
   try {
-    const [totalIncome, totalExpense, futureIncomeRow] = await Promise.all([
+    const [totalIncome, totalExpense, groupLinks, openGroups, completedPayments] = await Promise.all([
       Income.sum('amount'),
       Expense.sum('amount'),
-      // Suma de (price * quantity) de ítems NO pagados
-      OrderItem.findOne({
-        attributes: [[fn('COALESCE', fn('SUM', literal('price * quantity')), 0), 'futureIncome']],
-        where: {
-          paidAt: { [Op.is]: null },       // aún sin pago
-          // opcional: excluye eliminados/soft-delete si existe un flag
-          
-        //    include: [{ 
-        //      model: Order, 
-        //    as: 'ERP_order', 
-        //    attributes: [], 
-        //    required: true, 
-        //    where: { status: { [Op.ne]: 'pending' } } 
-        //  }],
-        },
-        raw: true,
-      }),
+      ItemGroupItem.findAll({ attributes: ['groupId', 'orderItemId'], raw: true }),
+      ItemGroup.findAll({ where: { status: 'open' }, attributes: ['id'], raw: true }),
+      Payment.findAll({ where: { status: 'completed' }, attributes: ['groupId', 'amount'], raw: true }),
     ]);
 
-    const futureIncome = Number(futureIncomeRow?.futureIncome || 0);
+    const groupedItemIds = new Set(groupLinks.map((x) => x.orderItemId));
+    const openGroupIdSet = new Set(openGroups.map((g) => g.id));
+
+    const itemsByOpenGroupId = new Map();
+    for (const link of groupLinks) {
+      if (!openGroupIdSet.has(link.groupId)) continue;
+      if (!itemsByOpenGroupId.has(link.groupId)) itemsByOpenGroupId.set(link.groupId, []);
+      itemsByOpenGroupId.get(link.groupId).push(link.orderItemId);
+    }
+
+    const paidByGroupId = new Map();
+    for (const p of completedPayments) {
+      const gid = p.groupId;
+      paidByGroupId.set(gid, Number(((paidByGroupId.get(gid) || 0) + toNum(p.amount)).toFixed(2)));
+    }
+
+    let groupRemainingTotal = 0;
+    const idsInOpenGroups = [...new Set([...itemsByOpenGroupId.values()].flat())];
+    if (idsInOpenGroups.length > 0) {
+      const groupedItems = await OrderItem.findAll({
+        where: { id: { [Op.in]: idsInOpenGroups } },
+        attributes: ['id', 'price', 'quantity'],
+        raw: true,
+      });
+      const lineTotalByItemId = new Map(
+        groupedItems.map((it) => [
+          it.id,
+          Number((toNum(it.price) * toNum(it.quantity)).toFixed(2)),
+        ])
+      );
+
+      for (const [groupId, itemIds] of itemsByOpenGroupId) {
+        const totalCalc = itemIds.reduce((sum, id) => sum + (lineTotalByItemId.get(id) || 0), 0);
+        const paid = paidByGroupId.get(groupId) || 0;
+        groupRemainingTotal += Math.max(0, Number((totalCalc - paid).toFixed(2)));
+      }
+    }
+
+    const ungroupedWhere = {
+      paidAt: { [Op.is]: null },
+      ...(groupedItemIds.size > 0 ? { id: { [Op.notIn]: [...groupedItemIds] } } : {}),
+    };
+
+    const futureIncomeRow = await OrderItem.findOne({
+      attributes: [[fn('COALESCE', fn('SUM', literal('price * quantity')), 0), 'futureIncome']],
+      where: ungroupedWhere,
+      raw: true,
+    });
+
+    const ungroupedFuture = toNum(futureIncomeRow?.futureIncome);
+    const futureIncome = Number((groupRemainingTotal + ungroupedFuture).toFixed(2));
     const income = Number(totalIncome || 0);
     const expense = Number(totalExpense || 0);
 
@@ -93,7 +138,10 @@ export const getAllIncomes = async (req, res) => {
   try {
     const incomes = await Income.findAll({
       include: [{ model: Account }],
-      order: [["date", "DESC"]],
+      order: [
+        ["date", "DESC"],
+        ["id", "DESC"],
+      ],
     });
     res.json(incomes);
   } catch (error) {
@@ -107,7 +155,10 @@ export const getAllExpenses = async (req, res) => {
   try {
     const expenses = await Expense.findAll({
       include: [{ model: Account }],
-      order: [["date", "DESC"]],
+      order: [
+        ["date", "DESC"],
+        ["id", "DESC"],
+      ],
     });
     res.json(expenses);
   } catch (error) {
