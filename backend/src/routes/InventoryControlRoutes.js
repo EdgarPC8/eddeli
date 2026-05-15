@@ -40,6 +40,9 @@ import {
   registerMovement,
   getMovementsByProduct,
   getAllMovements,
+  updateMovement,
+  deleteMovement,
+  updateMovementsDateBatch,
   registerProductionIntermediateFromPayload,
   registerProductionFinalFromPayload
 } from '../controllers/InventoryControl/MovementController.js';
@@ -163,6 +166,9 @@ router.delete('/products/:id', isAuthenticated, deleteProduct);     // Eliminar 
 // ----------------------------------
 // Registrar un nuevo movimiento de inventario
 router.post('/movements', isAuthenticated, registerMovement);
+router.put('/movements/batch/date', isAuthenticated, updateMovementsDateBatch);
+router.put('/movements/:movementId', isAuthenticated, updateMovement);
+router.delete('/movements/:movementId', isAuthenticated, deleteMovement);
 router.get("/simulate-production", isAuthenticated,simulateProductionController);
 router.get("/simulateFromIntermediate", isAuthenticated,simulateFromIntermediate);
 

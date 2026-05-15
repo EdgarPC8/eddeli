@@ -36,12 +36,12 @@ const PORT = 3001;
 const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:4173",
-  "http://127.0.0.1:5173",
+  "https://127.0.0.1:5173",
   "http://127.0.0.1:4173",
   "http://localhost:8888",
-  "http://192.168.1.102:8888",
-  "http://192.168.1.102:5173",
-  "http://192.168.1.102:5174",
+  "http://192.168.1.100:8888",
+  "http://192.168.1.100:5173",
+  "https://192.168.110.199:5173",
   "https://aplicaciones.marianosamaniego.edu.ec",
   "https://www.aplicaciones.marianosamaniego.edu.ec",
 ];

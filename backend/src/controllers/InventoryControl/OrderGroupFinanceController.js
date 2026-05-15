@@ -21,25 +21,112 @@ const toNum = (v, def = 0) => {
     return dt.toISOString().slice(0, 10);
   };
 
+  const PROGRAMMER_ONLY_MSG = "Solo el rol Programador puede editar o eliminar abonos";
+  const assertProgrammerRole = (user) =>
+    user?.loginRol === "Programador";
+
+  const getGroupFinancials = async (groupId, t, excludePaymentId = null) => {
+    const group = await ItemGroup.findByPk(groupId, { transaction: t });
+    if (!group) return null;
+
+    const links = await ItemGroupItem.findAll({ where: { groupId }, transaction: t });
+    const itemIds = links.map((l) => l.orderItemId);
+
+    let total = 0;
+    const items =
+      itemIds.length > 0
+        ? await OrderItem.findAll({ where: { id: { [Op.in]: itemIds } }, transaction: t })
+        : [];
+
+    for (const it of items) {
+      const billable = Math.max(
+        0,
+        toNum(it.quantity) - toNum(it.damagedQty) - toNum(it.giftQty)
+      );
+      total = Number((total + billable * toNum(it.price)).toFixed(2));
+    }
+
+    const payments = await Payment.findAll({
+      where: { groupId, status: "completed" },
+      transaction: t,
+    });
+
+    let paid = 0;
+    for (const p of payments) {
+      if (excludePaymentId != null && Number(p.id) === Number(excludePaymentId)) continue;
+      paid = Number((paid + toNum(p.amount)).toFixed(2));
+    }
+
+    const remaining = Number(Math.max(0, total - paid).toFixed(2));
+    return { group, items, total, paid, remaining };
+  };
+
+  const syncGroupAfterPayments = async (groupId, t) => {
+    const fin = await getGroupFinancials(groupId, t);
+    if (!fin) return;
+    const { group, items, total, remaining } = fin;
+    const EPS = 0.0001;
+
+    if (remaining <= EPS && total > EPS) {
+      group.status = "closed";
+      await group.save({ transaction: t });
+
+      const lastPayment = await Payment.findOne({
+        where: { groupId, status: "completed" },
+        order: [
+          ["date", "DESC"],
+          ["id", "DESC"],
+        ],
+        transaction: t,
+      });
+      const closeDate = lastPayment?.date ? new Date(lastPayment.date) : new Date();
+
+      for (const it of items) {
+        if (!it.paidAt) {
+          it.paidAt = closeDate;
+          await it.save({ transaction: t });
+        }
+      }
+      return;
+    }
+
+    if (group.status === "closed") {
+      group.status = "open";
+      await group.save({ transaction: t });
+    }
+
+    for (const it of items) {
+      if (it.paidAt) {
+        it.paidAt = null;
+        await it.save({ transaction: t });
+      }
+    }
+  };
+
   export const deleteGroupPayment = async (req, res) => {
     const { paymentId } = req.params;
   
     try {
       const token = getHeaderToken(req);
-      await verifyJWT(token);
+      const user = await verifyJWT(token);
+      if (!assertProgrammerRole(user)) {
+        return res.status(403).json({ message: PROGRAMMER_ONLY_MSG });
+      }
   
       const result = await sequelize.transaction(async (t) => {
         const payment = await Payment.findByPk(paymentId, { transaction: t });
         if (!payment) return { status: 404, body: { message: "Pago no existe" } };
-  
-        // borrar income asociado
+
+        const groupId = payment.groupId;
+
         await Income.destroy({
           where: { referenceType: "group_payment", referenceId: payment.id },
           transaction: t,
         });
-  
+
         await payment.destroy({ transaction: t });
-  
+        await syncGroupAfterPayments(groupId, t);
+
         return { status: 200, body: { mensaje: "Pago eliminado", paymentId: Number(paymentId) } };
       });
   
@@ -56,26 +143,50 @@ const toNum = (v, def = 0) => {
   
     try {
       const token = getHeaderToken(req);
-      await verifyJWT(token);
+      const user = await verifyJWT(token);
+      if (!assertProgrammerRole(user)) {
+        return res.status(403).json({ message: PROGRAMMER_ONLY_MSG });
+      }
   
       const result = await sequelize.transaction(async (t) => {
         const payment = await Payment.findByPk(paymentId, { transaction: t });
         if (!payment) return { status: 404, body: { message: "Pago no existe" } };
-  
-        if (amount != null) payment.amount = Number(Number(amount).toFixed(2));
+
+        const nextAmount =
+          amount != null ? Number(Number(amount).toFixed(2)) : toNum(payment.amount);
+        const nextStatus = status != null ? String(status) : payment.status;
+
+        if (!Number.isFinite(nextAmount) || nextAmount <= 0) {
+          return { status: 400, body: { message: "Monto inválido" } };
+        }
+
+        if (nextStatus === "completed") {
+          const fin = await getGroupFinancials(payment.groupId, t, payment.id);
+          if (!fin) return { status: 404, body: { message: "Grupo no existe" } };
+          const newPaid = Number((fin.paid + nextAmount).toFixed(2));
+          if (newPaid > fin.total + 0.0001) {
+            return {
+              status: 400,
+              body: {
+                message: `El monto excede el total del grupo. Total: ${fin.total}, otros abonos: ${fin.paid}`,
+              },
+            };
+          }
+        }
+
+        if (amount != null) payment.amount = nextAmount;
         if (date != null) payment.date = new Date(date);
         if (note != null) payment.note = String(note);
         if (method != null) payment.method = String(method);
-        if (status != null) payment.status = String(status);
-  
+        if (status != null) payment.status = nextStatus;
+
         await payment.save({ transaction: t });
-  
-        // sincronizar Income
+
         const income = await Income.findOne({
           where: { referenceType: "group_payment", referenceId: payment.id },
           transaction: t,
         });
-  
+
         if (income) {
           await income.update(
             {
@@ -87,10 +198,15 @@ const toNum = (v, def = 0) => {
             { transaction: t }
           );
         }
-  
+
+        await syncGroupAfterPayments(payment.groupId, t);
+
         return {
           status: 200,
-          body: { mensaje: "Pago actualizado", pago: { id: payment.id, amount: payment.amount, status: payment.status } },
+          body: {
+            mensaje: "Pago actualizado",
+            pago: { id: payment.id, amount: payment.amount, status: payment.status },
+          },
         };
       });
   
@@ -686,7 +802,17 @@ export const getFinanceWorkbenchAll = async (req, res) => {
 
       // 4) Pagos/abonos de grupo
       const payments = await Payment.findAll({
-        attributes: ["id", "groupId", "customerId", "date", "amount", "note", "status", "createdAt"],
+        attributes: [
+          "id",
+          "groupId",
+          "customerId",
+          "date",
+          "amount",
+          "note",
+          "method",
+          "status",
+          "createdAt",
+        ],
         order: [["createdAt", "DESC"]],
         transaction: t,
       });
@@ -760,6 +886,7 @@ export const getFinanceWorkbenchAll = async (req, res) => {
         date: isoDateOnly(p.date) || isoDateOnly(p.createdAt),
         amount: Number(toNum(p.amount).toFixed(2)),
         note: p.note ?? "",
+        method: p.method ?? "efectivo",
         status: p.status,
       }));
 

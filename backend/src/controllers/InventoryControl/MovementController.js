@@ -23,6 +23,35 @@ const endOfDay = (d) => {
 };
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
+const PROGRAMMER_ONLY_MSG =
+  "Solo el rol Programador puede editar, eliminar movimientos o usar fecha personalizada";
+
+const PRODUCTION_OP_REF_PREFIX = "produccion_op:";
+
+const assertProgrammerRole = (user) => user?.loginRol === "Programador";
+
+/** ID de operación de producción (PR-… / PF-…) desde referenceType o descripción. */
+export const extractOperationId = (movement) => {
+  const rt = String(movement?.referenceType || "");
+  if (rt.startsWith(PRODUCTION_OP_REF_PREFIX)) {
+    return rt.slice(PRODUCTION_OP_REF_PREFIX.length);
+  }
+  const desc = String(movement?.description || "");
+  const match = desc.match(/OP:([A-Z]+-\d+-\d+)/);
+  return match ? match[1] : null;
+};
+
+const productionReferenceType = (opId) => `${PRODUCTION_OP_REF_PREFIX}${opId}`;
+
+/** Fecha del movimiento: ahora para todos; fecha enviada solo si es Programador. */
+const resolveMovementDate = (dateInput, user) => {
+  if (dateInput != null && dateInput !== "" && assertProgrammerRole(user)) {
+    const d = new Date(dateInput);
+    if (!Number.isNaN(d.getTime())) return d;
+  }
+  return new Date();
+};
+
 // GET /inventory/logistics/daily?date=2025-12-24
 // o  /inventory/logistics/daily?from=2025-12-24&to=2025-12-24
 
@@ -246,6 +275,8 @@ export const registerProductionIntermediateFromPayload = async (req, res) => {
         return p;
       };
 
+      const movementDate = resolveMovementDate(payload.movementDate, user);
+
       const mov = async ({
         productId,
         type,
@@ -264,10 +295,10 @@ export const registerProductionIntermediateFromPayload = async (req, res) => {
             quantity: num(quantity),
             description,
             price: price ?? null,
-            referenceType: referenceType ?? "produccion",
+            referenceType: referenceType ?? productionReferenceType(opId),
             referenceId: referenceId ?? null,
             createdBy: user.accountId,
-            date: new Date(),
+            date: movementDate,
           },
           { transaction: t }
         );
@@ -370,7 +401,7 @@ export const registerProductionIntermediateFromPayload = async (req, res) => {
   }
 };
 export const registerProductionFinalFromPayload = async (req, res) => {
-  const { productId, quantity, simulated } = req.body;
+  const { productId, quantity, simulated, movementDate } = req.body;
 
   const token = getHeaderToken(req);
   let user = null;
@@ -392,6 +423,7 @@ export const registerProductionFinalFromPayload = async (req, res) => {
   if (!finalProduct) return res.status(404).json({ message: "Producto no encontrado" });
 
   const opId = `PF-${Date.now()}-${Math.floor(Math.random() * 1e5)}`;
+  const prodMovementDate = resolveMovementDate(movementDate, user);
 
   try {
     await sequelize.transaction(async (t) => {
@@ -419,10 +451,10 @@ export const registerProductionFinalFromPayload = async (req, res) => {
             quantity: num(quantity),
             description,
             price: price ?? null,
-            referenceType: referenceType ?? "produccion",
+            referenceType: referenceType ?? productionReferenceType(opId),
             referenceId: referenceId ?? null,
             createdBy: user.accountId,
-            date: new Date(),
+            date: prodMovementDate,
           },
           { transaction: t }
         );
@@ -618,6 +650,7 @@ async function createInventoryMovementRow({
   referenceType,
   referenceId,
   createdBy,
+  date,
 }) {
   return InventoryMovement.create({
     productId,
@@ -629,8 +662,36 @@ async function createInventoryMovementRow({
     referenceType: referenceType ?? null,
     referenceId: referenceId ?? null,
     createdBy,
-    date: new Date(),
+    date: date ?? new Date(),
   });
+}
+
+/** Recalcula stock del producto según todos sus movimientos (orden cronológico). */
+async function syncProductStockFromMovements(productId, transaction) {
+  const movements = await InventoryMovement.findAll({
+    where: { productId },
+    order: [
+      ["date", "ASC"],
+      ["id", "ASC"],
+    ],
+    transaction,
+  });
+
+  let stock = 0;
+  for (const m of movements) {
+    const qty = num(m.quantity);
+    if (m.type === "entrada" || m.type === "produccion") stock += qty;
+    else if (m.type === "salida") stock -= qty;
+    else if (m.type === "ajuste") stock = qty;
+  }
+
+  const product = await InventoryProduct.findByPk(productId, {
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+  if (!product) throw new Error("Producto no encontrado");
+  await product.update({ stock }, { transaction });
+  return stock;
 }
 
 // Crear un movimiento y actualizar el stock del producto
@@ -645,10 +706,15 @@ export const registerMovement = async (req, res) => {
       price,
       referenceType,
       referenceId,
+      date: movementDateInput,
     } = req.body;
 
     const token = getHeaderToken(req);
     const user = await verifyJWT(token);
+
+    if (movementDateInput != null && movementDateInput !== "" && !assertProgrammerRole(user)) {
+      return res.status(403).json({ message: PROGRAMMER_ONLY_MSG });
+    }
 
     if (!productId || !type || quantity == null) {
       return res.status(400).json({ message: "Faltan campos obligatorios" });
@@ -710,11 +776,199 @@ export const registerMovement = async (req, res) => {
       referenceType,
       referenceId,
       createdBy: user.accountId,
+      date: resolveMovementDate(movementDateInput, user),
     });
 
     res.status(201).json({ message: "Movimiento registrado exitosamente" });
   } catch (error) {
     res.status(500).json({ message: "Error al registrar movimiento", error });
+  }
+};
+
+/** PUT /inventory/movements/:movementId — solo Programador */
+export const updateMovement = async (req, res) => {
+  try {
+    const { movementId } = req.params;
+    const token = getHeaderToken(req);
+    const user = await verifyJWT(token);
+
+    if (!assertProgrammerRole(user)) {
+      return res.status(403).json({ message: PROGRAMMER_ONLY_MSG });
+    }
+
+    const {
+      type,
+      reason,
+      quantity,
+      description,
+      price,
+      referenceType,
+      referenceId,
+      date: movementDateInput,
+    } = req.body;
+
+    const result = await sequelize.transaction(async (t) => {
+      const movement = await InventoryMovement.findByPk(movementId, { transaction: t });
+      if (!movement) return { status: 404, body: { message: "Movimiento no encontrado" } };
+
+      const productId = movement.productId;
+
+      if (type != null && !MOVEMENT_TYPES.includes(type)) {
+        return { status: 400, body: { message: "type inválido" } };
+      }
+
+      const nextType = type ?? movement.type;
+      const nextQty =
+        quantity != null ? parseFloat(quantity) : parseFloat(movement.quantity);
+      if (Number.isNaN(nextQty)) {
+        return { status: 400, body: { message: "quantity no numérica" } };
+      }
+
+      let nextReason = reason ?? movement.reason;
+      if (nextType === "ajuste") {
+        const product = await InventoryProduct.findByPk(productId, { transaction: t });
+        const stockAntes = parseFloat(product?.stock) || 0;
+        nextReason = resolveAjusteReasonForDb(
+          nextReason || "AJUSTE_INVENTARIO",
+          stockAntes,
+          nextQty
+        );
+      }
+
+      if (movementDateInput != null) {
+        movement.date = resolveMovementDate(movementDateInput, user);
+      }
+      movement.type = nextType;
+      movement.reason = nextReason;
+      movement.quantity = nextQty;
+      if (description != null) movement.description = description;
+      if (nextType === "ajuste") {
+        movement.price = null;
+      } else if (price !== undefined) {
+        movement.price = price == null ? null : Number(price);
+      }
+      if (referenceType !== undefined) movement.referenceType = referenceType;
+      if (referenceId !== undefined) movement.referenceId = referenceId;
+
+      await movement.save({ transaction: t });
+      await syncProductStockFromMovements(productId, t);
+
+      return {
+        status: 200,
+        body: { message: "Movimiento actualizado", movement: movement.toJSON() },
+      };
+    });
+
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error("updateMovement:", error);
+    return res.status(500).json({
+      message: "Error al actualizar movimiento",
+      error: String(error?.message || error),
+    });
+  }
+};
+
+/** PUT /inventory/movements/batch/date — fecha grupal (producción u otros ids) */
+export const updateMovementsDateBatch = async (req, res) => {
+  try {
+    const token = getHeaderToken(req);
+    const user = await verifyJWT(token);
+
+    if (!assertProgrammerRole(user)) {
+      return res.status(403).json({ message: PROGRAMMER_ONLY_MSG });
+    }
+
+    const { movementIds, operationId, date: movementDateInput } = req.body;
+
+    if (!movementDateInput) {
+      return res.status(400).json({ message: "Falta date" });
+    }
+
+    const result = await sequelize.transaction(async (t) => {
+      let targets = [];
+
+      if (Array.isArray(movementIds) && movementIds.length > 0) {
+        targets = await InventoryMovement.findAll({
+          where: { id: { [Op.in]: movementIds.map(Number) } },
+          transaction: t,
+        });
+      } else if (operationId) {
+        const all = await InventoryMovement.findAll({ transaction: t });
+        targets = all.filter((m) => extractOperationId(m) === String(operationId));
+      } else {
+        return { status: 400, body: { message: "Indica movementIds u operationId" } };
+      }
+
+      if (targets.length === 0) {
+        return { status: 404, body: { message: "No hay movimientos para actualizar" } };
+      }
+
+      const newDate = resolveMovementDate(movementDateInput, user);
+      const productIds = new Set();
+
+      for (const movement of targets) {
+        movement.date = newDate;
+        await movement.save({ transaction: t });
+        productIds.add(movement.productId);
+      }
+
+      for (const productId of productIds) {
+        await syncProductStockFromMovements(productId, t);
+      }
+
+      return {
+        status: 200,
+        body: {
+          message: "Fechas actualizadas",
+          updatedCount: targets.length,
+          operationId: operationId || null,
+        },
+      };
+    });
+
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error("updateMovementsDateBatch:", error);
+    return res.status(500).json({
+      message: "Error al actualizar fechas",
+      error: String(error?.message || error),
+    });
+  }
+};
+
+/** DELETE /inventory/movements/:movementId — solo Programador */
+export const deleteMovement = async (req, res) => {
+  try {
+    const { movementId } = req.params;
+    const token = getHeaderToken(req);
+    const user = await verifyJWT(token);
+
+    if (!assertProgrammerRole(user)) {
+      return res.status(403).json({ message: PROGRAMMER_ONLY_MSG });
+    }
+
+    const result = await sequelize.transaction(async (t) => {
+      const movement = await InventoryMovement.findByPk(movementId, { transaction: t });
+      if (!movement) return { status: 404, body: { message: "Movimiento no encontrado" } };
+
+      const productId = movement.productId;
+      await movement.destroy({ transaction: t });
+      await syncProductStockFromMovements(productId, t);
+
+      return {
+        status: 200,
+        body: { message: "Movimiento eliminado", movementId: Number(movementId) },
+      };
+    });
+
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error("deleteMovement:", error);
+    return res.status(500).json({
+      message: "Error al eliminar movimiento",
+      error: String(error?.message || error),
+    });
   }
 };
 
