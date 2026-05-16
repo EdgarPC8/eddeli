@@ -12,6 +12,7 @@ import {
   updateOrderStatus,
   getAllOrders,
   updateOrder,
+  addOrderItem,
   markOrderAsPaid,
   markItemAsDelivered,
   markItemAsPaid,
@@ -121,6 +122,7 @@ router.delete("/workbench/payments/:paymentId", isAuthenticated, deleteGroupPaym
 // ✅ ÓRDENES (LO TUYO NORMAL)
 // =====================================================
 router.post("", isAuthenticated, createOrder);
+router.post("/:orderId/items", isAuthenticated, addOrderItem);
 router.put("/:id", isAuthenticated, updateOrder);
 router.put("/:id/status", isAuthenticated, updateOrderStatus);
 router.get("", isAuthenticated, getAllOrders);

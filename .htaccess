@@ -1,0 +1,14 @@
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /eddeli/
+
+  # No reescribir si es archivo o directorio real
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Enviar todo lo demás a index.html
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+

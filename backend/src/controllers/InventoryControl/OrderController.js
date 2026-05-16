@@ -764,6 +764,62 @@ export const updateOrder = async (req, res) => {
   }
 };
 
+/** POST /orders/:orderId/items — agregar línea a pedido existente (solo Admin / Programador). */
+export const addOrderItem = async (req, res) => {
+  try {
+    const { orderId } = req.params;
+    const { productId, quantity, price } = req.body ?? {};
+
+    const token = getHeaderToken(req);
+    const user = await verifyJWT(token);
+
+    const isPrivileged = ['Administrador', 'Programador'].includes(user?.loginRol);
+    if (!isPrivileged) {
+      return res.status(403).json({
+        message: 'Solo Administrador o Programador pueden agregar productos a un pedido existente',
+      });
+    }
+
+    const order = await Order.findByPk(orderId);
+    if (!order) {
+      return res.status(404).json({ message: 'Pedido no encontrado' });
+    }
+
+    const pid = Number(productId);
+    const qty = Number(quantity);
+    const pr = Number(price);
+    if (!Number.isFinite(pid) || pid <= 0) {
+      return res.status(400).json({ message: 'productId inválido' });
+    }
+    if (!Number.isFinite(qty) || qty <= 0) {
+      return res.status(400).json({ message: 'Cantidad inválida' });
+    }
+    if (!Number.isFinite(pr) || pr < 0) {
+      return res.status(400).json({ message: 'Precio inválido' });
+    }
+
+    const product = await InventoryProduct.findByPk(pid);
+    if (!product) {
+      return res.status(404).json({ message: 'Producto no encontrado' });
+    }
+
+    const item = await OrderItem.create({
+      orderId: order.id,
+      productId: pid,
+      quantity: qty,
+      price: pr,
+    });
+
+    return res.status(201).json({ message: 'Ítem agregado', item });
+  } catch (error) {
+    console.error('addOrderItem:', error);
+    return res.status(500).json({
+      message: 'Error al agregar ítem al pedido',
+      error: String(error?.message || error),
+    });
+  }
+};
+
 
 
 
