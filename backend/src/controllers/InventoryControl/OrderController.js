@@ -872,9 +872,14 @@ export const createOrder = async (req, res) => {
       )
     );
 
-    res.status(201).json({ order, items: createdItems });
+    res.status(201).json({
+      message: "Pedido registrado correctamente",
+      order,
+      items: createdItems,
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Error al crear pedido', error });
+    console.error("createOrder:", error);
+    res.status(500).json({ message: "Error al crear pedido" });
   }
 };
 
@@ -977,7 +982,7 @@ export const updateOrder = async (req, res) => {
     // Opcional: vuelve a cargar asociaciones mínimas si las necesitas en el front
     // await order.reload({ include: [Customer] });
 
-    return res.json({ message: 'Pedido actualizado', order });
+    return res.json({ message: "Pedido actualizado correctamente", order });
   } catch (error) {
     console.error('Error al actualizar pedido:', error);
     return res.status(500).json({ message: 'Error al actualizar pedido', error: String(error?.message || error) });

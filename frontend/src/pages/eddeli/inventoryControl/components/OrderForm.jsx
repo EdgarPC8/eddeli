@@ -1,15 +1,14 @@
 import { Grid, TextField, Box, Button } from "@mui/material";
 import { useForm } from "react-hook-form";
 import { useEffect, useState } from "react";
-import toast from "react-hot-toast";
 import {
   createOrderRequest,
   updateOrderRequest,
   getAllCustomersRequest,
+  deleteOrderItem,
 } from "../../../../api/ordersRequest";
 import { getAllProducts } from "../../../../api/inventoryControlRequest";
 import { useAuth } from "../../../../context/AuthContext";
-import axios from "axios";
 import SearchableSelect from "../../../../components/SearchableSelect";
 
 /* ========= Utils de fecha en LOCAL (sin UTC) ========= */
@@ -77,7 +76,7 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
   const [selectedProduct, setSelectedProduct] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState("");
 
-  const { toast: toastAuth } = useAuth();
+  const { toast } = useAuth();
 
   const selectedProductId = watch("productId");
 
@@ -106,7 +105,7 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
     const price = Number(watch("price"));
 
     if (!productId || !quantity || !price) {
-      toast.error("Seleccione producto, cantidad y precio");
+      toast({ message: "Seleccione producto, cantidad y precio", variant: "warning" });
       return;
     }
 
@@ -117,118 +116,85 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
       { productId, quantity, price, name: product?.name || "" },
     ]);
 
-    // limpiar inputs
     setValue("productId", "");
-    setSelectedProduct(""); // ✅ limpia SearchableSelect
+    setSelectedProduct("");
     setValue("quantity", "");
     setValue("price", "");
   };
 
-  // Quitar item (si estás editando y tienes id real, lo borras en backend)
   const removeItem = async (index, item) => {
+    const prev = items;
     const updated = [...items];
     updated.splice(index, 1);
     setItems(updated);
 
-    // ⚠️ Esto depende de que tengas jwt() en tu proyecto.
-    // Si no existe, comenta esta parte o cambia por tu forma real de auth.
     if (isEditing && item?.id) {
       try {
-        await axios.delete(`/order-items/${item.id}`, {
-          headers: { Authorization: jwt() },
-        });
-      } catch (err) {
-        toast.error("Error al eliminar ítem del pedido");
+        await toast({ promise: deleteOrderItem(item.id) });
+      } catch {
+        setItems(prev);
       }
     }
   };
 
+  const resetForm = () => {
+    reset();
+    setItems([]);
+    setSelectedCustomer("");
+    setSelectedProduct("");
+    setValue("productId", "");
+    setValue("date", localISODate());
+  };
+
   const submitOrder = async (data) => {
     if (items.length === 0) {
-      toast.error("Debe agregar al menos un producto al pedido");
+      toast({ message: "Debe agregar al menos un producto al pedido", variant: "warning" });
       return;
     }
     if (!selectedCustomer) {
-      toast.error("Seleccione un cliente");
+      toast({ message: "Seleccione un cliente", variant: "warning" });
       return;
     }
 
-    // Construye un Date local a partir de la fecha seleccionada + hora actual local
     const localDT = new Date(`${data.date}T${localHMS()}`);
 
     const payload = {
       customerId: selectedCustomer,
       notes: data.notes,
-      dateMs: localDT.getTime(), // ✅ estable
-      date: toLocalISOWithOffset(localDT), // ✅ offset local
+      dateMs: localDT.getTime(),
+      date: toLocalISOWithOffset(localDT),
       items,
     };
 
-    if (isEditing) {
-      toastAuth({
-        promise: updateOrderRequest(datos.id, payload),
-        onSuccess: () => {
-          if (onClose) onClose();
-          if (reload) reload();
-          reset();
-          setItems([]);
-          setSelectedCustomer("");
-          setSelectedProduct("");
-          setValue("productId", "");
-          return {
-            title: "Pedido",
-            description: "Pedido actualizado correctamente",
-          };
-        },
-        onError: (res) => ({
-          title: "Pedido",
-          description:
-            res?.response?.data?.message || "Error al actualizar pedido",
-        }),
-      });
-      return;
+    try {
+      if (isEditing) {
+        await toast({ promise: updateOrderRequest(datos.id, payload) });
+      } else {
+        await toast({ promise: createOrderRequest(payload) });
+      }
+      resetForm();
+      if (reload) reload();
+      if (onClose) onClose();
+    } catch {
+      /* toast ya mostró el error del backend */
     }
-
-    toastAuth({
-      promise: createOrderRequest(payload),
-      successMessage: "Pedido registrado correctamente",
-      onSuccess: () => {
-        if (onClose) onClose();
-        if (reload) reload();
-        reset();
-        setItems([]);
-        setSelectedCustomer("");
-        setSelectedProduct("");
-        setValue("productId", "");
-      },
-      onError: (res) => ({
-        title: "Pedido",
-        description: res?.response?.data?.message || "Error al registrar pedido",
-      }),
-    });
   };
 
   useEffect(() => {
     fetchProducts();
     fetchCustomers();
 
-    // defaults
     setValue("date", localISODate());
 
     if (isEditing && datos) {
-      // cliente
       setSelectedCustomer(datos.customerId || "");
-      // por si quieres también reflejarlo en el form (opcional)
-      // setValue("customerId", datos.customerId || "");
-
       setValue("notes", datos.notes || "");
       setValue("date", normalizeToYYYYMMDD(datos));
 
       const loadedItems = (datos.ERP_order_items || []).map((item) => ({
-        id: item.id, // ✅ para poder borrar en backend si quieres
+        id: item.id,
         productId: item.productId,
         quantity: item.quantity,
-        // usa el campo real que tengas (price/distributorPrice)
         price:
           item.distributorPrice != null
             ? item.distributorPrice
@@ -252,17 +218,12 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
             items={customers}
             value={selectedCustomer}
             onChange={(val) => {
-              // asume que val es ID
               setSelectedCustomer(val);
             }}
           />
         </Grid>
 
         <Grid item xs={6}>
-          {/* IMPORTANTE:
-              - Registramos productId en el form
-              - y el SearchableSelect también setea productId con setValue
-          */}
           <input type="hidden" {...register("productId")} />
 
           <SearchableSelect
@@ -270,9 +231,8 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
             items={products}
             value={selectedProduct}
             onChange={(val) => {
-              // asume que val es ID (number/string)
               setSelectedProduct(val);
-              setValue("productId", val); // ✅ clave para que addItem funcione
+              setValue("productId", val);
             }}
           />
         </Grid>

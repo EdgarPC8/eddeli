@@ -27,6 +27,8 @@ import ComandsRoutes from "./src/routes/ComandsRoutes.js";
 import { initNotificationSocket } from "./src/sockets/notificationSocket.js";
 import { Server } from "socket.io";
 import { createServer } from "http";
+import { corsOriginCallback, isOriginAllowed } from "./src/utils/corsOrigins.js";
+import { errorMiddleware, notFoundMiddleware } from "./src/middlewares/errorMiddleware.js";
 
 // ✅ __dirname en ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -38,22 +40,12 @@ const api = "eddeliapi";
 
 const PORT = 3001;
 
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:4173",
-  "https://127.0.0.1:5173",
-  "http://127.0.0.1:4173",
-  "http://localhost:8888",
-  "http://192.168.1.100:8888",
-  "http://192.168.110.139:5173",
-  "https://192.168.110.199:5173",
-  "https://aplicaciones.marianosamaniego.edu.ec",
-  "https://www.aplicaciones.marianosamaniego.edu.ec",
-];
-
 const io = new Server(httpServer, {
   cors: {
-    origin: allowedOrigins,
+    origin: (origin, callback) => {
+      if (isOriginAllowed(origin)) callback(null, true);
+      else callback(new Error(`Origen no permitido: ${origin}`));
+    },
     methods: ["GET", "POST"],
     credentials: true,
   },
@@ -63,16 +55,14 @@ const io = new Server(httpServer, {
 app.use(express.json());
 app.use(loggerMiddleware);
 
-// CORS
-const corsOptions = {
-  origin: function (origin, callback) {
-    if (allowedOrigins.indexOf(origin) !== -1 || !origin) callback(null, true);
-    else callback(new Error("Acceso no permitido por CORS"));
-  },
-  optionsSuccessStatus: 200,
-  credentials: true,
-};
-app.use(cors(corsOptions));
+// CORS — localhost, LAN 192.168/10.x y dominio institucional (sin IPs fijas)
+app.use(
+  cors({
+    origin: corsOriginCallback,
+    optionsSuccessStatus: 200,
+    credentials: true,
+  }),
+);
 
 app.use(`/${api}/img`, ImgRoutes);
 
@@ -105,6 +95,9 @@ app.use(`/${api}/tasks`, TaskRoutes);
 
 // Socket para notificaciones
 initNotificationSocket(io);
+
+app.use(notFoundMiddleware);
+app.use(errorMiddleware);
 
 export async function main() {
   try {
