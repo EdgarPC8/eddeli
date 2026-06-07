@@ -1,15 +1,16 @@
-# SPA EdDeli bajo /eddeli/ — build en eddeli/dist/
+# SPA EdDeli — despliegue directo en eddeli/ (copiado al build)
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /eddeli/
 
-  # Archivos estáticos del build (dist/)
-  RewriteCond dist/$1 -f [OR]
-  RewriteCond dist/$1 -d
-  RewriteRule ^(.+)$ dist/$1 [L]
+  RewriteRule ^backend/ - [L]
+  RewriteRule ^frontend/ - [L]
 
-  # Rutas React → index.html del build
-  RewriteRule ^ dist/index.html [L]
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  RewriteRule ^ index.html [L]
 </IfModule>
 
 <IfModule mod_mime.c>

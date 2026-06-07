@@ -1,7 +1,10 @@
-# SPA EdDeli — despliegue directo desde eddeli/dist/
+# SPA EdDeli — despliegue directo en eddeli/ (copiado al build)
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /eddeli/
+
+  RewriteRule ^backend/ - [L]
+  RewriteRule ^frontend/ - [L]
 
   RewriteCond %{REQUEST_FILENAME} -f [OR]
   RewriteCond %{REQUEST_FILENAME} -d
