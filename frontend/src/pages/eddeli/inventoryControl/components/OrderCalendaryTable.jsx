@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   Box, Button, Typography, Grid, Paper, Collapse, TextField, IconButton, Tooltip,
   Accordion, AccordionSummary, AccordionDetails, Divider,
-  useTheme
+  useTheme, CircularProgress
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 
@@ -33,9 +33,9 @@ import {
 } from '../../../../api/ordersRequest';
 import { getAllProducts } from '../../../../api/inventoryControlRequest';
 import { useAuth } from '../../../../context/AuthContext';
-import toast from 'react-hot-toast';
 import SimpleDialog from '../../../../components/Dialogs/SimpleDialog';
 import SearchableSelect from '../../../../components/SearchableSelect';
+import { formatOrderItemFromApi } from '../../../../utils/orderListUtils';
 
 
 /* ---------------- Utils ---------------- */
@@ -111,7 +111,16 @@ const buildFullDate = (dateStr, hh, mm, ss) => {
 };
 
 /* ---------------- Component ---------------- */
-export default function OrderCalendarView({ orders, onReload }) {
+export default function OrderCalendarView({
+  orders,
+  loadingOrders = false,
+  onMonthChange,
+  onReload,
+  onPatchItem,
+  onRemoveOrder,
+  onRemoveOrderItem,
+  onEdit,
+}) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
   const [fields, setFields] = useState({});
@@ -141,6 +150,25 @@ export default function OrderCalendarView({ orders, onReload }) {
 
   const { user, toast: toastAuth } = useAuth();
 
+  const applyItemFromResponse = (response, itemId) => {
+    const raw = response?.data?.item;
+    const orderId = raw?.orderId;
+    if (raw && orderId && onPatchItem) {
+      onPatchItem(orderId, itemId, formatOrderItemFromApi(raw));
+      return true;
+    }
+    return false;
+  };
+
+  const runMutation = async (promise, afterSuccess) => {
+    try {
+      const result = await toastAuth({ promise });
+      await afterSuccess?.(result);
+    } catch {
+      /* toast ya mostró el error */
+    }
+  };
+
   const canManageOrders = ['Administrador', 'Programador'].includes(user?.loginRol);
 
   const [customers, setCustomers] = useState([]);
@@ -150,6 +178,10 @@ export default function OrderCalendarView({ orders, onReload }) {
 
   const handlePrevMonth = () => setCurrentDate((prev) => addMonths(prev, -1));
   const handleNextMonth = () => setCurrentDate((prev) => addMonths(prev, 1));
+
+  useEffect(() => {
+    onMonthChange?.(currentDate);
+  }, [currentDate, onMonthChange]);
 
   useEffect(() => {
     if (!canManageOrders) return;
@@ -178,24 +210,14 @@ export default function OrderCalendarView({ orders, onReload }) {
   const weeks = chunkArray(daysToShow, 7);
 
   const handleDeliver = async (itemId) => {
-    toastAuth({
-      promise: markItemAsDeliveredRequest(itemId),
-      onSuccess: () => {
-        setTimeout(() => onReload?.(), 300);
-        return { title: "Producto", description: "Ítem entregado" };
-      },
-      onError: (res) => ({ title: "Producto", description: res.response?.data?.message || "Error" }),
+    await runMutation(markItemAsDeliveredRequest(itemId), async (res) => {
+      if (!applyItemFromResponse(res, itemId)) await onReload?.();
     });
   };
 
   const handlePaid = async (itemId) => {
-    toastAuth({
-      promise: markItemAsPaidRequest(itemId),
-      onSuccess: () => {
-        setTimeout(() => onReload?.(), 300);
-        return { title: "Producto", description: "Ítem pagado" };
-      },
-      onError: (res) => ({ title: "Producto", description: res.response?.data?.message || "Error" }),
+    await runMutation(markItemAsPaidRequest(itemId), async (res) => {
+      if (!applyItemFromResponse(res, itemId)) await onReload?.();
     });
   };
 
@@ -210,37 +232,25 @@ export default function OrderCalendarView({ orders, onReload }) {
   };
 
   // Confirmar eliminaciones
-  const confirmDeleteOrder = () => {
+  const confirmDeleteOrder = async () => {
     if (!orderToDelete) return;
-    toastAuth({
-      promise: deleteOrder(orderToDelete.id),
-      onSuccess: () => {
-        setOpenDeleteOrder(false);
-        setOrderToDelete(null);
-        setTimeout(() => onReload?.(), 300);
-        return { title: 'Orden', description: 'Orden eliminada correctamente' };
-      },
-      onError: (res) => ({
-        title: 'Orden',
-        description: res.response?.data?.message || 'No se pudo eliminar la orden',
-      }),
+    const orderId = orderToDelete.id;
+    await runMutation(deleteOrder(orderId), async () => {
+      setOpenDeleteOrder(false);
+      setOrderToDelete(null);
+      if (onRemoveOrder) onRemoveOrder(orderId);
+      else await onReload?.();
     });
   };
 
-  const confirmDeleteItem = () => {
+  const confirmDeleteItem = async () => {
     if (!itemToDelete) return;
-    toastAuth({
-      promise: deleteOrderItem(itemToDelete.id),
-      onSuccess: () => {
-        setOpenDeleteItem(false);
-        setItemToDelete(null);
-        setTimeout(() => onReload?.(), 300);
-        return { title: 'Ítem', description: 'Ítem eliminado correctamente' };
-      },
-      onError: (res) => ({
-        title: 'Ítem',
-        description: res.response?.data?.message || 'No se pudo eliminar el ítem',
-      }),
+    const { id: itemId, orderId } = itemToDelete;
+    await runMutation(deleteOrderItem(itemId), async () => {
+      setOpenDeleteItem(false);
+      setItemToDelete(null);
+      if (onRemoveOrderItem && orderId) onRemoveOrderItem(orderId, itemId);
+      else await onReload?.();
     });
   };
 
@@ -250,23 +260,15 @@ export default function OrderCalendarView({ orders, onReload }) {
     const quantity = Number(String(d.quantity ?? '').replace(',', '.'));
     const price = Number(String(d.price ?? '').replace(',', '.'));
     if (!productId || !Number.isFinite(quantity) || quantity <= 0 || !Number.isFinite(price) || price < 0) {
-      toast.error('Selecciona producto, cantidad (> 0) y precio válidos.');
+      toastAuth({ message: 'Selecciona producto, cantidad (> 0) y precio válidos.', variant: 'warning' });
       return;
     }
-    await toastAuth({
-      promise: addOrderItemToOrderRequest(orderId, { productId, quantity, price }),
-      onSuccess: () => {
-        setAddLineDraft((prev) => ({
-          ...prev,
-          [orderId]: { productId: '', quantity: '', price: '' },
-        }));
-        setTimeout(() => onReload?.(), 300);
-        return { title: 'Pedido', description: 'Producto agregado' };
-      },
-      onError: (res) => ({
-        title: 'Pedido',
-        description: res?.response?.data?.message || 'No se pudo agregar el producto',
-      }),
+    await runMutation(addOrderItemToOrderRequest(orderId, { productId, quantity, price }), async () => {
+      setAddLineDraft((prev) => ({
+        ...prev,
+        [orderId]: { productId: '', quantity: '', price: '' },
+      }));
+      await onReload?.();
     });
   };
 
@@ -302,7 +304,12 @@ export default function OrderCalendarView({ orders, onReload }) {
     const quantity = Math.max(0, toNumber(f?.quantity, 0));
     const price = Math.max(0, toNumber(f?.price, 0));
 
-    await updateOrderItemRequest(itemId, { paidAt, deliveredAt, quantity, price });
+    await runMutation(
+      updateOrderItemRequest(itemId, { paidAt, deliveredAt, quantity, price }),
+      async (res) => {
+        if (!applyItemFromResponse(res, itemId)) await onReload?.();
+      },
+    );
   };
 
   const toggleOrderEdit = (orderId) => {
@@ -317,16 +324,8 @@ export default function OrderCalendarView({ orders, onReload }) {
       payload.customerId = Number(f.customerId);
     }
 
-    await toastAuth({
-      promise: updateOrderRequest(orderId, payload),
-      onSuccess: () => {
-        setTimeout(() => onReload?.(), 300);
-        return { title: 'Orden', description: 'Orden actualizada' };
-      },
-      onError: (res) => ({
-        title: 'Orden',
-        description: res.response?.data?.message || 'No se pudo actualizar la orden',
-      }),
+    await runMutation(updateOrderRequest(orderId, payload), async () => {
+      await onReload?.();
     });
   };
 
@@ -394,9 +393,12 @@ export default function OrderCalendarView({ orders, onReload }) {
           : ''}? Esta acción no se puede deshacer.
       </SimpleDialog>
 
-      <Typography variant="h5" align="center" gutterBottom>
-        {format(currentDate, 'MMMM yyyy', { locale: es })}
-      </Typography>
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1 }}>
+        <Typography variant="h5" align="center" gutterBottom sx={{ mb: 0 }}>
+          {format(currentDate, 'MMMM yyyy', { locale: es })}
+        </Typography>
+        {loadingOrders ? <CircularProgress size={22} /> : null}
+      </Box>
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
         <Button variant="contained" onClick={handlePrevMonth}>Mes Anterior</Button>
@@ -874,7 +876,6 @@ export default function OrderCalendarView({ orders, onReload }) {
                                         onClick={async () => {
                                           await handleConfirm(itemId);
                                           toggleEdit();
-                                          onReload?.();
                                         }}
                                       >
                                         Confirmar

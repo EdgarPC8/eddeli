@@ -1066,17 +1066,55 @@ export const updateOrderStatus = async (req, res) => {
   }
 };
 
-// Obtener todos los pedidos con sus items y cliente
+// Obtener pedidos con items y cliente. Query opcional: ?from=YYYY-MM-DD&to=YYYY-MM-DD
+function formatOrdersList(orders) {
+  return orders.map((order) => {
+    const formattedItems = order.ERP_order_items.map((item) => ({
+      ...item.toJSON(),
+      paidAt: item.paidAt
+        ? format(new Date(item.paidAt), "dd/MM/yyyy HH:mm:ss", { locale: es })
+        : null,
+      deliveredAt: item.deliveredAt
+        ? format(new Date(item.deliveredAt), "dd/MM/yyyy HH:mm:ss", { locale: es })
+        : null,
+    }));
 
+    return {
+      ...order.toJSON(),
+      date: format(new Date(order.date), "dd/MM/yyyy HH:mm:ss", { locale: es }),
+      createdAt: format(new Date(order.createdAt), "dd/MM/yyyy HH:mm:ss", { locale: es }),
+      updatedAt: format(new Date(order.updatedAt), "dd/MM/yyyy HH:mm:ss", { locale: es }),
+      ERP_order_items: formattedItems,
+    };
+  });
+}
 
+function parseRangeDate(value, endOfDay = false) {
+  if (!value || typeof value !== "string") return null;
+  const d = new Date(`${value.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return null;
+  if (endOfDay) d.setHours(23, 59, 59, 999);
+  return d;
+}
 
 export const getAllOrders = async (req, res) => {
   try {
+    const fromDate = parseRangeDate(req.query.from, false);
+    const toDate = parseRangeDate(req.query.to, true);
+
+    const where = {};
+    if (fromDate || toDate) {
+      where.date = {};
+      if (fromDate) where.date[Op.gte] = fromDate;
+      if (toDate) where.date[Op.lte] = toDate;
+    }
+
     const orders = await Order.findAll({
+      where,
       include: [
         {
           model: Customer,
-          as: "ERP_customer"
+          as: "ERP_customer",
         },
         {
           model: OrderItem,
@@ -1084,33 +1122,18 @@ export const getAllOrders = async (req, res) => {
           include: [
             {
               model: InventoryProduct,
-              as: "ERP_inventory_product"
-            }
-          ]
-        }
+              as: "ERP_inventory_product",
+            },
+          ],
+        },
       ],
-      order: [["createdAt", "DESC"]]
+      order: [["date", "DESC"]],
     });
 
-    const formattedOrders = orders.map(order => {
-      const formattedItems = order.ERP_order_items.map(item => ({
-        ...item.toJSON(),
-        paidAt: item.paidAt ? format(new Date(item.paidAt), 'dd/MM/yyyy HH:mm:ss', { locale: es }) : null,
-        deliveredAt: item.deliveredAt ? format(new Date(item.deliveredAt), 'dd/MM/yyyy HH:mm:ss', { locale: es }) : null,
-      }));
-
-      return {
-        ...order.toJSON(),
-        date: format(new Date(order.date), 'dd/MM/yyyy HH:mm:ss', { locale: es }),
-        createdAt: format(new Date(order.createdAt), 'dd/MM/yyyy HH:mm:ss', { locale: es }),
-        updatedAt: format(new Date(order.updatedAt), 'dd/MM/yyyy HH:mm:ss', { locale: es }),
-        ERP_order_items: formattedItems,
-      };
-    });
-
-    res.json(formattedOrders);
+    res.json(formatOrdersList(orders));
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener pedidos', error });
+    console.error("getAllOrders:", error);
+    res.status(500).json({ message: "Error al obtener pedidos" });
   }
 };
 

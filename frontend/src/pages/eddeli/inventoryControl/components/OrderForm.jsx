@@ -173,8 +173,8 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
         await toast({ promise: createOrderRequest(payload) });
       }
       resetForm();
-      if (reload) reload();
-      if (onClose) onClose();
+      if (reload) await reload();
+      if (onClose) await onClose();
     } catch {
       /* toast ya mostró el error del backend */
     }

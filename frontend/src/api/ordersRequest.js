@@ -1,4 +1,5 @@
 import axios, { jwt } from "./axios.js";
+import { endOfMonth, format, startOfMonth, subMonths } from "date-fns";
 
 /// 🟢 Pedidos
 // Crear un nuevo pedido con items
@@ -27,11 +28,23 @@ export const updateOrderStatusRequest = async (orderId, status) =>
     headers: { Authorization: jwt() },
   });
 
-// Obtener todos los pedidos (con cliente e items)
-export const getAllOrdersRequest = async () =>
-  await axios.get("/orders", {
+// Obtener pedidos (con cliente e items). Opcional: { from, to } como Date
+export const getAllOrdersRequest = async ({ from, to } = {}) => {
+  const params = new URLSearchParams();
+  if (from) params.set("from", format(from, "yyyy-MM-dd"));
+  if (to) params.set("to", format(to, "yyyy-MM-dd"));
+  const qs = params.toString();
+  return axios.get(`/orders${qs ? `?${qs}` : ""}`, {
     headers: { Authorization: jwt() },
   });
+};
+
+/** Rango mes visible + mes anterior. */
+export const getOrdersForMonthRequest = async (visibleMonth) => {
+  const from = startOfMonth(subMonths(visibleMonth, 1));
+  const to = endOfMonth(visibleMonth);
+  return getAllOrdersRequest({ from, to });
+};
   export const updateOrderRequest = async (id, data) =>
   await axios.put(`/orders/${id}`, data, {
     headers: { Authorization: jwt() },
