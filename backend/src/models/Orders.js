@@ -1,6 +1,7 @@
 import { DataTypes, Sequelize } from 'sequelize';
 import { sequelize } from '../database/connection.js';
 import { InventoryProduct } from './Inventory.js';
+import { CashShift } from './CashShift.js';
 
 // Tabla de clientes
 export const Customer = sequelize.define("ERP_customers", {
@@ -22,6 +23,14 @@ export const Order = sequelize.define("ERP_orders", {
     defaultValue: "pendiente"
   },
   notes: { type: DataTypes.TEXT },
+  shiftId: { type: DataTypes.INTEGER, allowNull: true },
+  paymentMethod: { type: DataTypes.STRING(40), allowNull: true },
+  paidAt: { type: DataTypes.DATE, allowNull: true },
+  documentType: {
+    type: DataTypes.STRING(30),
+    allowNull: true,
+    comment: "factura | nota_venta | documento | consumidor_final",
+  },
   date: {
     type: DataTypes.DATE,
     allowNull: false,
@@ -93,3 +102,6 @@ OrderItem.belongsTo(Order, { foreignKey: 'orderId' });
 
 InventoryProduct.hasMany(OrderItem, { foreignKey: 'productId' });
 OrderItem.belongsTo(InventoryProduct, { foreignKey: 'productId' });
+
+CashShift.hasMany(Order, { foreignKey: 'shiftId', as: 'orders' });
+Order.belongsTo(CashShift, { foreignKey: 'shiftId', as: 'shift' });

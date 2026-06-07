@@ -3,6 +3,7 @@ import { verifyJWT, getHeaderToken } from "../../libs/jwt.js";
 import { InventoryMovement, InventoryProduct } from "../../models/Inventory.js";
 import { Customer, Order, OrderItem } from "../../models/Orders.js";
 import { Income } from "../../models/Finance.js";
+import { findOpenShiftForAccount } from "./ShiftController.js";
 import { format } from 'date-fns';
 import { de, es } from 'date-fns/locale';
 
@@ -13,6 +14,225 @@ import { sequelize } from "../../database/connection.js";
 
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+const CAJA_POS_TAG = "[CAJA_POS]";
+
+/** POST /orders/pos/checkout — venta desde caja con turno abierto. */
+export const posCheckout = async (req, res) => {
+  try {
+    const token = getHeaderToken(req);
+    const user = await verifyJWT(token);
+    const { accountId } = user;
+
+    const { customerId, notes, items, paymentMethod, saleType, documentType } = req.body;
+    if (!customerId || !Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "Faltan customerId o items." });
+    }
+
+    const notesText = String(notes || "");
+    if (!notesText.includes(CAJA_POS_TAG)) {
+      return res.status(400).json({ message: "Pedido POS inválido (falta marca de caja)." });
+    }
+
+    const isCredit = saleType === "credito";
+    const docType = ["factura", "nota_venta", "documento", "consumidor_final"].includes(
+      String(documentType || ""),
+    )
+      ? String(documentType)
+      : "consumidor_final";
+    const shift = await findOpenShiftForAccount(accountId);
+    if (!shift) {
+      return res.status(400).json({
+        message: "Abre un turno de caja antes de registrar ventas en el punto de venta.",
+      });
+    }
+
+    const result = await sequelize.transaction(async (t) => {
+      const now = new Date();
+      const order = await Order.create(
+        {
+          customerId: Number(customerId),
+          notes: notesText,
+          date: now,
+          status: isCredit ? "pendiente" : "pagado",
+          shiftId: shift.id,
+          paymentMethod: isCredit ? "credito" : paymentMethod || "efectivo",
+          paidAt: isCredit ? null : now,
+          documentType: docType,
+        },
+        { transaction: t },
+      );
+
+      for (const row of items) {
+        const productId = Number(row.productId);
+        const qty = Number(row.quantity);
+        const price = Number(row.price);
+        if (!Number.isFinite(productId) || !Number.isFinite(qty) || qty <= 0) {
+          throw new Error("Ítem inválido en el carrito.");
+        }
+
+        const product = await InventoryProduct.findByPk(productId, {
+          transaction: t,
+          lock: t.LOCK.UPDATE,
+        });
+        if (!product) throw new Error(`Producto #${productId} no encontrado.`);
+
+        if (!isCredit) {
+          if (num(product.stock) < qty) {
+            throw new Error(`Stock insuficiente para ${product.name}. Disponible: ${product.stock}`);
+          }
+          product.stock = num(product.stock) - qty;
+          await product.save({ transaction: t });
+
+          await InventoryMovement.create(
+            {
+              productId: product.id,
+              quantity: qty,
+              type: "salida",
+              reason: "SALIDA_VENTA",
+              referenceType: "order",
+              referenceId: order.id,
+              date: now,
+              createdBy: accountId,
+              description: `Venta POS · pedido #${order.id}`,
+            },
+            { transaction: t },
+          );
+        }
+
+        const orderItem = await OrderItem.create(
+          {
+            orderId: order.id,
+            productId,
+            quantity: qty,
+            price,
+            soldQty: isCredit ? 0 : qty,
+            deliveredAt: isCredit ? null : now,
+            paidAt: isCredit ? null : now,
+          },
+          { transaction: t },
+        );
+
+        if (!isCredit) {
+          const amount = Number((price * qty).toFixed(2));
+          const concept = `Venta POS ${product.name} x${qty} (Ord #${order.id})`;
+          await Income.create(
+            {
+              date: now,
+              amount,
+              concept,
+              category: "Venta",
+              referenceType: "order_item",
+              referenceId: orderItem.id,
+              createdBy: accountId,
+            },
+            { transaction: t },
+          );
+        }
+      }
+
+      return order;
+    });
+
+    res.status(201).json({ ok: true, orderId: result.id, order: result });
+  } catch (error) {
+    console.error("posCheckout:", error);
+    res.status(400).json({ message: error.message || "Error en checkout POS" });
+  }
+};
+
+const CAJA_POS_TAG_EXPORT = "[CAJA_POS]";
+
+/** GET /orders/pos/sales — ventas de caja para facturación e impresión. */
+export const getPosSales = async (req, res) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 200, 500);
+    const orders = await Order.findAll({
+      where: {
+        [Op.or]: [
+          { notes: { [Op.like]: `%${CAJA_POS_TAG_EXPORT}%` } },
+          { documentType: { [Op.ne]: null } },
+        ],
+      },
+      include: [
+        { model: Customer, as: "ERP_customer" },
+        {
+          model: OrderItem,
+          as: "ERP_order_items",
+          include: [{ model: InventoryProduct, as: "ERP_inventory_product" }],
+        },
+      ],
+      order: [["id", "DESC"]],
+      limit,
+    });
+
+    const data = orders.map((order) => {
+      const items = (order.ERP_order_items || []).map((item) => {
+        const qty = Number(item.soldQty || 0) > 0 ? Number(item.soldQty) : Number(item.quantity || 0);
+        const price = Number(item.price || 0);
+        const product = item.ERP_inventory_product;
+        const taxRate = Number(product?.taxRate || 0);
+        const lineTotal = Number((qty * price).toFixed(2));
+        let subtotal = lineTotal;
+        let iva = 0;
+        if (taxRate > 0) {
+          subtotal = Number((lineTotal / (1 + taxRate / 100)).toFixed(2));
+          iva = Number((lineTotal - subtotal).toFixed(2));
+        }
+        return {
+          id: item.id,
+          productId: item.productId,
+          name: product?.name || `Producto #${item.productId}`,
+          quantity: qty,
+          price,
+          taxRate,
+          subtotal,
+          iva,
+          lineTotal,
+        };
+      });
+      const total = items.reduce((acc, it) => acc + it.lineTotal, 0);
+      const subtotal = items.reduce((acc, it) => acc + it.subtotal, 0);
+      const iva = items.reduce((acc, it) => acc + it.iva, 0);
+      const customer = order.ERP_customer;
+      return {
+        id: order.id,
+        date: order.date,
+        paidAt: order.paidAt,
+        status: order.status,
+        notes: order.notes,
+        paymentMethod: order.paymentMethod,
+        documentType: order.documentType || inferDocumentTypeFromNotes(order.notes),
+        customer: customer
+          ? {
+              id: customer.id,
+              name: customer.name,
+              phone: customer.phone,
+              email: customer.email,
+              address: customer.address,
+            }
+          : null,
+        items,
+        subtotal: Number(subtotal.toFixed(2)),
+        iva: Number(iva.toFixed(2)),
+        total: Number(total.toFixed(2)),
+      };
+    });
+
+    res.json(data);
+  } catch (error) {
+    console.error("getPosSales:", error);
+    res.status(500).json({ message: "Error al obtener ventas de caja" });
+  }
+};
+
+function inferDocumentTypeFromNotes(notes) {
+  const n = String(notes || "").toLowerCase();
+  if (n.includes("consumidor final") || n.includes("mostrador sin datos")) {
+    return "consumidor_final";
+  }
+  return "documento";
+}
 
 // Cantidad COBRABLE (venta real)
 // - Si existe soldQty => usar soldQty

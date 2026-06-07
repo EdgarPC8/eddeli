@@ -1,0 +1,43 @@
+import { DataTypes } from "sequelize";
+import { sequelize } from "../database/connection.js";
+import { Users } from "./Users.js";
+
+/** Turno de caja: apertura con capital inicial y cierre con arqueo. */
+export const CashShift = sequelize.define(
+  "ERP_cash_shifts",
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    accountId: { type: DataTypes.INTEGER, allowNull: false },
+    userId: { type: DataTypes.INTEGER, allowNull: false },
+    status: {
+      type: DataTypes.ENUM("open", "closed"),
+      allowNull: false,
+      defaultValue: "open",
+    },
+    openedAt: { type: DataTypes.DATE, allowNull: false },
+    closedAt: { type: DataTypes.DATE, allowNull: true },
+    openingCashCounts: { type: DataTypes.JSON, allowNull: false },
+    openingCashTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: false, defaultValue: 0 },
+    closingCashCounts: { type: DataTypes.JSON, allowNull: true },
+    closingCashTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
+    expectedCashTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
+    cashDifference: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
+    salesCashTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
+    salesTransferTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
+    salesCardTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
+    salesTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
+    openingNotes: { type: DataTypes.TEXT, allowNull: true },
+    closingNotes: { type: DataTypes.TEXT, allowNull: true },
+  },
+  {
+    timestamps: true,
+    indexes: [
+      { fields: ["accountId", "status"] },
+      { fields: ["userId"] },
+      { fields: ["openedAt"] },
+    ],
+  },
+);
+
+CashShift.belongsTo(Users, { foreignKey: "userId", as: "user" });
+Users.hasMany(CashShift, { foreignKey: "userId", as: "cashShifts" });

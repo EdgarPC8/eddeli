@@ -1,0 +1,168 @@
+import axios, { jwt } from "./axios.js";
+
+/// 🟢 Pedidos
+// Crear un nuevo pedido con items
+export const createOrderRequest = async (data) =>
+  await axios.post("/orders", data, {
+    headers: { Authorization: jwt() },
+  });
+
+/** Venta atómica desde caja (turno abierto, stock, ingreso). */
+export const posCheckoutRequest = async (data) =>
+  await axios.post("/orders/pos/checkout", data, {
+    headers: { Authorization: jwt() },
+  });
+
+/** Ventas POS para facturación e impresión. */
+export const getPosSalesRequest = async (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return axios.get(`/orders/pos/sales${qs ? `?${qs}` : ""}`, {
+    headers: { Authorization: jwt() },
+  });
+};
+
+// Cambiar estado del pedido (entregado, cancelado)
+export const updateOrderStatusRequest = async (orderId, status) =>
+  await axios.put(`/orders/${orderId}/status`, { status }, {
+    headers: { Authorization: jwt() },
+  });
+
+// Obtener todos los pedidos (con cliente e items)
+export const getAllOrdersRequest = async () =>
+  await axios.get("/orders", {
+    headers: { Authorization: jwt() },
+  });
+  export const updateOrderRequest = async (id, data) =>
+  await axios.put(`/orders/${id}`, data, {
+    headers: { Authorization: jwt() },
+  });
+
+/** Agregar una línea (producto) a un pedido ya creado — solo Admin/Programador en backend. */
+export const addOrderItemToOrderRequest = async (orderId, data) =>
+  await axios.post(`/orders/${orderId}/items`, data, {
+    headers: { Authorization: jwt() },
+  });
+// ✅ Marcar ítem como entregado
+export const markItemAsDeliveredRequest = async (itemId) =>
+  await axios.put(`/orders/order-items/${itemId}/mark-delivered`, {}, {
+    headers: { Authorization: jwt() },
+  });
+
+// 💰 Marcar ítem como pagado
+export const markItemAsPaidRequest = async (itemId) =>
+  await axios.put(`/orders/order-items/${itemId}/mark-paid`, {}, {
+    headers: { Authorization: jwt() },
+  });
+  export const updateOrderItemRequest = async (itemId, data) =>
+  await axios.put(`/orders/order-items/${itemId}`, data, {
+    headers: { Authorization: jwt() },
+  });
+
+
+export const getAllCustomersRequest = async () =>
+  await axios.get('/orders/customers', { headers: { Authorization: jwt() } });
+
+export const createCustomerRequest = async (data) =>
+  await axios.post('/orders/customers', data, { headers: { Authorization: jwt() } });
+
+export const updateCustomerRequest = async (id, data) =>
+  await axios.put(`/orders/customers/${id}`, data, { headers: { Authorization: jwt() } });
+
+export const deleteCustomerRequest = async (id) =>
+  await axios.delete(`/orders/customers/${id}`, { headers: { Authorization: jwt() } });
+
+export const deleteOrder = async (id) =>
+  await axios.delete(`/orders/order/${id}`, { headers: { Authorization: jwt() } });
+export const deleteOrderItem = async (id) =>
+  await axios.delete(`/orders/order-items/${id}`, { headers: { Authorization: jwt() } });
+// ===============================
+// 🟣 FINANCE WORKBENCH (COBRANZAS)
+// ===============================
+
+/**
+ * 🔹 Cargar TODO el módulo de cobranzas
+ * Clientes + pedidos + grupos + pagos
+ * GET /orders/workbench/all
+ */
+export const getFinanceWorkbenchAllRequest = async () =>
+  await axios.get("/orders/workbench/all", {
+    headers: { Authorization: jwt() },
+  });
+
+/**
+ * 🔹 Crear grupo por ITEMS
+ * POST /orders/workbench/item-groups
+ * data: { customerId, itemIds: [], concept? }
+ */
+export const createItemGroupRequest = async (data) =>
+  await axios.post("/orders/workbench/item-groups", data, {
+    headers: { Authorization: jwt() },
+  });
+
+/**
+ * 🔹 Agregar ítems a un grupo existente
+ * POST /orders/workbench/item-groups/:groupId/add-items
+ * data: { itemIds: [] }
+ */
+export const addItemsToGroupRequest = async (groupId, data) =>
+  await axios.post(`/orders/workbench/item-groups/${groupId}/add-items`, data, {
+    headers: { Authorization: jwt() },
+  });
+
+/**
+ * 🔹 Editar grupo (concept/status)
+ * PUT /orders/workbench/item-groups/:groupId
+ * data: { concept?, status? }  // "open" | "closed" | "cancelled"
+ */
+export const updateItemGroupRequest = async (groupId, data) =>
+  await axios.put(`/orders/workbench/item-groups/${groupId}`, data, {
+    headers: { Authorization: jwt() },
+  });
+
+/**
+ * 🔹 Eliminar grupo
+ * DELETE /orders/workbench/item-groups/:groupId
+ */
+export const deleteItemGroupRequest = async (groupId) =>
+  await axios.delete(`/orders/workbench/item-groups/${groupId}`, {
+    headers: { Authorization: jwt() },
+  });
+
+/**
+ * 🔹 Mover / quitar / agregar item a grupo
+ * POST /orders/workbench/item-groups/move-item
+ * data: { orderItemId, toGroupId }  // toGroupId = null => quitar del grupo
+ */
+export const moveItemBetweenGroupsRequest = async (data) =>
+  await axios.post("/orders/workbench/item-groups/move-item", data, {
+    headers: { Authorization: jwt() },
+  });
+
+/**
+ * 🔹 Abonar / pagar a un grupo (crea Payment + Income)
+ * POST /orders/workbench/item-groups/:groupId/pay
+ * data: { amount, date?, note?, method? }
+ */
+export const payItemGroupRequest = async (groupId, data) =>
+  await axios.post(`/orders/workbench/item-groups/${groupId}/pay`, data, {
+    headers: { Authorization: jwt() },
+  });
+
+/**
+ * 🔹 Editar un pago (sincroniza el Income asociado)
+ * PUT /orders/workbench/payments/:paymentId
+ * data: { amount?, date?, note?, method?, status? }
+ */
+export const updateGroupPaymentRequest = async (paymentId, data) =>
+  await axios.put(`/orders/workbench/payments/${paymentId}`, data, {
+    headers: { Authorization: jwt() },
+  });
+
+/**
+ * 🔹 Eliminar un pago (borra Payment + Applications + Income asociado)
+ * DELETE /orders/workbench/payments/:paymentId
+ */
+export const deleteGroupPaymentRequest = async (paymentId) =>
+  await axios.delete(`/orders/workbench/payments/${paymentId}`, {
+    headers: { Authorization: jwt() },
+  });

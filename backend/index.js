@@ -13,6 +13,11 @@ import NotificationsRoutes from "./src/routes/NotificationsRoutes.js";
 import InventoryControlRoutes from "./src/routes/InventoryControlRoutes.js";
 import OrderRoutes from "./src/routes/OrderRoutes.js";
 import FinanceRoutes from "./src/routes/FinanceRoutes.js";
+import ShiftRoutes from "./src/routes/ShiftRoutes.js";
+import TaskRoutes from "./src/routes/TaskRoutes.js";
+import { CashShift } from "./src/models/CashShift.js";
+import { Order } from "./src/models/Orders.js";
+import { TaskPlan, TaskItem } from "./src/models/Tasks.js";
 
 import ImgRoutes from "./src/routes/ImgRoutes.js";
 import FilesRoutes from "./src/routes/FilesRoutes.js";
@@ -40,7 +45,7 @@ const allowedOrigins = [
   "http://127.0.0.1:4173",
   "http://localhost:8888",
   "http://192.168.1.100:8888",
-  "http://192.168.1.100:5173",
+  "http://192.168.110.139:5173",
   "https://192.168.110.199:5173",
   "https://aplicaciones.marianosamaniego.edu.ec",
   "https://www.aplicaciones.marianosamaniego.edu.ec",
@@ -95,6 +100,8 @@ app.use(`/${api}/notifications`, NotificationsRoutes);
 app.use(`/${api}/inventory`, InventoryControlRoutes);
 app.use(`/${api}/orders`, OrderRoutes);
 app.use(`/${api}/finance`, FinanceRoutes);
+app.use(`/${api}/shifts`, ShiftRoutes);
+app.use(`/${api}/tasks`, TaskRoutes);
 
 // Socket para notificaciones
 initNotificationSocket(io);
@@ -102,6 +109,10 @@ initNotificationSocket(io);
 export async function main() {
   try {
     await sequelize.authenticate();
+    await CashShift.sync({ alter: true });
+    await Order.sync({ alter: true });
+    await TaskPlan.sync({ alter: true });
+    await TaskItem.sync({ alter: true });
 /*      await sequelize.sync({ force: true });
      await insertData(); */
 

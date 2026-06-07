@@ -9,6 +9,8 @@ import {
 
 import {
   createOrder,
+  posCheckout,
+  getPosSales,
   updateOrderStatus,
   getAllOrders,
   updateOrder,
@@ -121,6 +123,8 @@ router.delete("/workbench/payments/:paymentId", isAuthenticated, deleteGroupPaym
 // =====================================================
 // ✅ ÓRDENES (LO TUYO NORMAL)
 // =====================================================
+router.get("/pos/sales", isAuthenticated, getPosSales);
+router.post("/pos/checkout", isAuthenticated, posCheckout);
 router.post("", isAuthenticated, createOrder);
 router.post("/:orderId/items", isAuthenticated, addOrderItem);
 router.put("/:id", isAuthenticated, updateOrder);

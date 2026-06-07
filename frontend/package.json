@@ -1,0 +1,33 @@
+{
+  "name": "frontend-eddeli",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --clearScreen false",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/icons-material": "^5.15.14",
+    "@mui/material": "^5.18.0",
+    "@mui/x-charts": "^7.29.1",
+    "@mui/x-data-grid": "^7.21.0",
+    "axios": "^1.6.8",
+    "date-fns": "^4.1.0",
+    "notistack": "^3.0.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-easy-crop": "^5.5.1",
+    "react-hook-form": "^7.51.2",
+    "react-hot-toast": "^2.4.1",
+    "react-router-dom": "^6.22.2",
+    "socket.io-client": "^4.8.1"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^5.4.11"
+  }
+}
