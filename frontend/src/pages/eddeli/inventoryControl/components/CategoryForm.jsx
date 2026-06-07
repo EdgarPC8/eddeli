@@ -8,7 +8,6 @@ import {
 } from "@mui/material";
 import { useForm } from "react-hook-form";
 import { useEffect } from "react";
-import toast from "react-hot-toast";
 import { useAuth } from "../../../../context/AuthContext";
 import {
   createCategoryRequest,
@@ -25,35 +24,33 @@ function CategoryForm({ isEditing = false, datos = {}, onClose, reload }) {
 
   // 🔹 Envío del formulario
   const submitForm = async (formData) => {
-    // Convertir el valor del switch a booleano real
     formData.isPublic = Boolean(formData.isPublic);
 
-    if (isEditing) {
-      toastAuth({
-        promise: updateCategoryRequest(datos.id, formData),
-        onSuccess: () => {
-          if (onClose) onClose();
-          if (reload) reload();
+    try {
+      if (isEditing) {
+        await toastAuth({
+          promise: updateCategoryRequest(datos.id, formData),
+          onSuccess: async () => {
+            resetForm();
+            if (reload) await reload();
+            if (onClose) onClose();
+          },
+        });
+        return;
+      }
+
+      await toastAuth({
+        promise: createCategoryRequest(formData),
+        successMessage: "Categoría guardada con éxito",
+        onSuccess: async () => {
           resetForm();
-          return {
-            title: "Categoría",
-            description: "Categoría actualizada correctamente",
-          };
+          if (reload) await reload();
+          if (onClose) onClose();
         },
       });
-      return;
+    } catch {
+      /* toast mostró error */
     }
-
-    toastAuth({
-      promise: createCategoryRequest(formData),
-      successMessage: "Categoría guardada con éxito",
-      onSuccess: (data) => {
-        if (onClose) onClose();
-        if (reload) reload();
-        resetForm();
-        console.log(data);
-      },
-    });
   };
 
   // 🔹 Cargar datos al editar

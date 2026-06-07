@@ -6,8 +6,9 @@ import {
   } from "@mui/material";
   import { useEffect, useState } from "react";
   import { Edit, Delete, Straighten } from "@mui/icons-material";
-  import toast from "react-hot-toast";
   import UnitForm from "./components/UnitForm.jsx";
+import { useAuth } from "../../../context/AuthContext.jsx";
+import { runMutationReload } from "../../../utils/mutationToast.js";
 
 import DataTable from "../../../components/Tables/DataTable";
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
@@ -16,6 +17,7 @@ import { getUnits,deleteUnitRequest } from "../../../api/inventoryControlRequest
 
 
   function UnitPage() {
+    const { toast } = useAuth();
     const [data, setData] = useState([]);
     const [open, setOpen] = useState(false);
     const [dataToDelete, setDataToDelete] = useState({});
@@ -33,20 +35,11 @@ import { getUnits,deleteUnitRequest } from "../../../api/inventoryControlRequest
     const handleDialogUser = () => setOpenDialog(!openDialog);
   
     const deleteData = async () => {
-      toast.promise(
-        deleteUnitRequest(dataToDelete.id),
-        {
-          loading: "Eliminando...",
-          success: "Unidad eliminada con éxito",
-          error: "Ocurrió un error",
-        },
-        {
-          position: "top-right",
-          style: { fontFamily: "roboto" },
-        }
-      );
-      setData(data.filter((item) => item.id !== dataToDelete.id));
-      handleDialog();
+      await runMutationReload(toast, {
+        promise: deleteUnitRequest(dataToDelete.id),
+        reload: fecthData,
+        onClose: handleDialog,
+      });
     };
   
     const columns = [

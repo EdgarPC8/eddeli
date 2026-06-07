@@ -6,17 +6,19 @@ import {
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import { Edit, Delete, Category } from "@mui/icons-material";
-import toast from "react-hot-toast";
 import CategoryForm from "./components/CategoryForm";
 import {
   getCategories,
   deleteCategoryRequest,
 } from "../../../api/inventoryControlRequest.js";
+import { useAuth } from "../../../context/AuthContext.jsx";
+import { runMutationReload } from "../../../utils/mutationToast.js";
 
 import DataTable from "../../../components/Tables/DataTable";
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
 
 function CategoryPage() {
+  const { toast } = useAuth();
   const [data, setData] = useState([]);
   const [open, setOpen] = useState(false);
   const [dataToDelete, setDataToDelete] = useState({});
@@ -34,20 +36,11 @@ function CategoryPage() {
   const handleDialogUser = () => setOpenDialog(!openDialog);
 
   const deleteData = async () => {
-    toast.promise(
-      deleteCategoryRequest(dataToDelete.id),
-      {
-        loading: "Eliminando...",
-        success: "Categoría eliminada con éxito",
-        error: "Ocurrió un error",
-      },
-      {
-        position: "top-right",
-        style: { fontFamily: "roboto" },
-      }
-    );
-    setData(data.filter((item) => item.id !== dataToDelete.id));
-    handleDialog();
+    await runMutationReload(toast, {
+      promise: deleteCategoryRequest(dataToDelete.id),
+      reload: fecthData,
+      onClose: handleDialog,
+    });
   };
 
   const columns = [

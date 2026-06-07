@@ -13,11 +13,12 @@ import {
 } from "@mui/material";
 import { useCallback, useEffect, useState } from "react";
 import { Edit, Delete, RestaurantMenu } from "@mui/icons-material";
-import toast from "react-hot-toast";
 
 import TablePro from "../../../components/Tables/TablePro";
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
 import RecipeForm from "./components/RecipeForm";
+import { useAuth } from "../../../context/AuthContext.jsx";
+import { runMutationReload } from "../../../utils/mutationToast.js";
 import {
   getAllProducts,
   getRecipeByProduct,
@@ -29,6 +30,7 @@ import SearchableSelect from "../../../components/SearchableSelect";
 
 
 function RecipePage() {
+  const { toast } = useAuth();
   const [products, setProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState("");
   const [recipe, setRecipe] = useState([]);
@@ -58,7 +60,7 @@ function RecipePage() {
   /** JSON en consola del navegador + petición con debug=1 para log en terminal del backend */
   const logRecipeAnalysis = useCallback(async () => {
     if (!selectedProduct) {
-      toast.error("Selecciona un producto primero");
+      toast({ message: "Selecciona un producto primero", variant: "warning" });
       return;
     }
 
@@ -114,7 +116,7 @@ function RecipePage() {
 
     try {
       await getRecipeCosting(selectedProduct, { ...params, debug: 1 });
-      toast.success("Listo: revisa consola del navegador (F12) y la terminal del backend");
+      toast({ message: "Listo: revisa consola del navegador (F12) y la terminal del backend", variant: "success" });
     } catch {
       toast("Log en consola del navegador listo; el backend no respondió al debug", {
         icon: "⚠️",
@@ -145,25 +147,22 @@ function RecipePage() {
       setCostTreeData(data);
       setCostSummary(data.summary || null);
     } catch (e) {
-      toast.error("Error al calcular el costeo");
+      toast({ message: "Error al calcular el costeo", variant: "error" });
     } finally {
       setLoadingCost(false);
     }
   };
 
   const deleteData = async () => {
-    toast.promise(
-      deleteRecipeRequest(dataToDelete.id),
-      {
-        loading: "Eliminando...",
-        success: "Insumo eliminado con éxito",
-        error: "Ocurrió un error",
+    await runMutationReload(toast, {
+      promise: deleteRecipeRequest(dataToDelete.id),
+      reload: async () => {
+        const { data } = await getRecipeByProduct(selectedProduct);
+        setRecipe(data || []);
+        fetchCostingData(selectedProduct);
       },
-      { position: "top-right", style: { fontFamily: "roboto" } }
-    );
-    setRecipe((prev) => prev.filter((item) => item.id !== dataToDelete.id));
-    handleDialog();
-    fetchCostingData(selectedProduct);
+      onClose: handleDialog,
+    });
   };
 
   // columnas receta (izquierda)

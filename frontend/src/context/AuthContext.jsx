@@ -70,7 +70,10 @@ export function AuthProvider({ children }) {
       setIsAuthenticated(false);
       setIsLoading(false);
       setErrors({
-        message: getApiErrorMessage(error, "Error de conexión"),
+        message: getApiErrorMessage(
+          error,
+          "No se pudo conectar con el servidor. Verifique su conexión e intente de nuevo."
+        ),
         status: "error",
       });
       return { error: true };
@@ -110,8 +113,18 @@ export function AuthProvider({ children }) {
    * Toast unificado.
    * - `message`: texto directo (validaciones locales).
    * - `promise`: mutación; éxito/error leen `response.data.message` del backend.
+   * - `onSuccess` / `onError`: callbacks tras mutación (recargar tablas, cerrar modal).
+   * - `successMessage` / `errorMessage`: fallback si el backend no envía message.
    */
-  const toast = async ({ message, variant = "info", promise } = {}) => {
+  const toast = async ({
+    message,
+    variant = "info",
+    promise,
+    onSuccess,
+    onError,
+    successMessage,
+    errorMessage,
+  } = {}) => {
     if (message && !promise) {
       enqueueSnackbar(message, { variant, autoHideDuration: 3000 });
       return;
@@ -120,15 +133,21 @@ export function AuthProvider({ children }) {
 
     try {
       const result = await promise;
-      const text = getApiSuccessMessage(result);
+      const text = getApiSuccessMessage(result, successMessage);
       if (text) {
         enqueueSnackbar(text, { variant: "success", autoHideDuration: 3000 });
       }
+      if (onSuccess) {
+        await onSuccess(result);
+      }
       return result;
     } catch (error) {
-      const text = getApiErrorMessage(error);
+      const text = getApiErrorMessage(error, errorMessage);
       if (text) {
         enqueueSnackbar(text, { variant: "error", autoHideDuration: 4000 });
+      }
+      if (onError) {
+        await onError(error);
       }
       throw error;
     }

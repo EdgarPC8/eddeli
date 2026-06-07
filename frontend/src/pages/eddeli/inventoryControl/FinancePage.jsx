@@ -10,7 +10,6 @@ import {
 } from "@mui/material";
 import { useEffect, useState } from "react";
 import { Add, MonetizationOn, MoneyOff } from "@mui/icons-material";
-import toast from "react-hot-toast";
 import DataTable from "../../../components/Tables/DataTable";
 import TablePro from "../../../components/Tables/TablePro";
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
@@ -22,7 +21,11 @@ import {
   deleteIncomeRequest,
   deleteExpenseRequest,
 } from "../../../api/financeRequest";
+import { useAuth } from "../../../context/AuthContext.jsx";
+import { runMutationReload } from "../../../utils/mutationToast.js";
+
 function FinancePage() {
+  const { toast } = useAuth();
   const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0, balance: 0 });
   const [incomes, setIncomes] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -180,13 +183,11 @@ console.groupEnd();
 
   const deleteData = async () => {
     const fn = formType === "income" ? deleteIncomeRequest : deleteExpenseRequest;
-    toast.promise(fn(dataToDelete.id), {
-      loading: "Eliminando...",
-      success: "Registro eliminado con éxito",
-      error: "Ocurrió un error",
+    await runMutationReload(toast, {
+      promise: fn(dataToDelete.id),
+      reload: fetchData,
+      onClose: handleDialogDelete,
     });
-    fetchData();
-    handleDialogDelete();
   };
 
 // 1) commonColumns: maneja params y stopPropagation

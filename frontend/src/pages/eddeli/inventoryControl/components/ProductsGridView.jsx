@@ -11,6 +11,7 @@ import {
   InputLabel,
   MenuItem,
   Select,
+  TablePagination,
   TextField,
   Typography,
   IconButton,
@@ -328,9 +329,21 @@ function DuplicateDialog({ open, product, onClose, onSuccess }) {
   );
 }
 
-export default function ProductsGridView({ products = [], onEdit, onReload, pathImgBase = pathImg }) {
+export default function ProductsGridView({
+  products = [],
+  search = "",
+  onEdit,
+  onReload,
+  pathImgBase = pathImg,
+}) {
   const [categoryFilter, setCategoryFilter] = useState("");
   const [duplicateProduct, setDuplicateProduct] = useState(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(24);
+
+  useEffect(() => {
+    setPage(0);
+  }, [search, categoryFilter]);
 
   const categories = useMemo(() => {
     const set = new Set();
@@ -344,18 +357,37 @@ export default function ProductsGridView({ products = [], onEdit, onReload, path
   const filteredProducts = useMemo(() => {
     let list = products;
     if (categoryFilter) {
-      list = products.filter(
+      list = list.filter(
         (p) => String(p?.categoryId ?? p?.ERP_inventory_category?.id) === String(categoryFilter)
       );
     }
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter((p) => {
+        const parts = [
+          p.name,
+          p.desc,
+          p.description,
+          p?.ERP_inventory_category?.name,
+          typeLabels[p.type],
+          p.type,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return parts.includes(q);
+      });
+    }
     return [...list].sort((a, b) => stockNum(b) - stockNum(a));
-  }, [products, categoryFilter]);
+  }, [products, categoryFilter, search]);
+
+  const paginatedProducts = useMemo(() => {
+    const start = page * rowsPerPage;
+    return filteredProducts.slice(start, start + rowsPerPage);
+  }, [filteredProducts, page, rowsPerPage]);
 
   return (
-    <Box sx={{ mt: 3 }}>
-      <Typography variant="h6" sx={{ mb: 0.5 }}>
-        Vista en tarjetas
-      </Typography>
+    <Box>
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Ordenadas por stock (mayor a menor). Puede ajustar stock con movimiento de ajuste.
       </Typography>
@@ -364,7 +396,10 @@ export default function ProductsGridView({ products = [], onEdit, onReload, path
         <Select
           value={categoryFilter}
           label="Categoría"
-          onChange={(e) => setCategoryFilter(e.target.value)}
+          onChange={(e) => {
+            setCategoryFilter(e.target.value);
+            setPage(0);
+          }}
         >
           <MenuItem value="">
             <em>Todas</em>
@@ -377,7 +412,7 @@ export default function ProductsGridView({ products = [], onEdit, onReload, path
         </Select>
       </FormControl>
       <Grid container spacing={2}>
-        {filteredProducts.map((p) => (
+        {paginatedProducts.map((p) => (
           <Grid item xs={6} sm={4} md={3} lg={2} key={p.id}>
             <ProductCard
               product={p}
@@ -391,8 +426,28 @@ export default function ProductsGridView({ products = [], onEdit, onReload, path
       </Grid>
       {filteredProducts.length === 0 && (
         <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
-          No hay productos para mostrar
+          {products.length === 0
+            ? "No hay productos para mostrar"
+            : "Ningún producto coincide con la búsqueda o el filtro."}
         </Typography>
+      )}
+      {filteredProducts.length > 0 && (
+        <TablePagination
+          component="div"
+          count={filteredProducts.length}
+          page={page}
+          onPageChange={(_, p) => setPage(p)}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={(e) => {
+            setRowsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+          rowsPerPageOptions={[12, 24, 48]}
+          labelRowsPerPage="Por página"
+          labelDisplayedRows={({ from, to, count }) =>
+            `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
+          }
+        />
       )}
       <DuplicateDialog
         open={!!duplicateProduct}

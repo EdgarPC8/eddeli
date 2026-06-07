@@ -21,10 +21,11 @@ import {
   Alert,
 } from "@mui/material";
 import { Edit, Delete, Inventory } from "@mui/icons-material";
-import toast from "react-hot-toast";
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
 import TablePro from "../../../components/Tables/TablePro";
 import { pathImg } from "../../../api/axios";
+import { useAuth } from "../../../context/AuthContext.jsx";
+import { runMutationReload } from "../../../utils/mutationToast.js";
 
 import {
   getCatalogEntries,
@@ -537,6 +538,7 @@ function CatalogForm({ open, onClose, isEditing, datos, onSubmit, products }) {
    Página principal con TablePro
 ================================= */
 export default function CatalogManager() {
+  const { toast } = useAuth();
   const [rows, setRows] = useState([]);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -597,24 +599,20 @@ export default function CatalogManager() {
 
   const handleDelete = async () => {
     if (!rowToDelete) return;
-    toast.promise(deleteCatalogEntry(rowToDelete.id), {
-      loading: "Eliminando...",
-      success: "Eliminado con éxito",
-      error: "Ocurrió un error",
+    await runMutationReload(toast, {
+      promise: deleteCatalogEntry(rowToDelete.id),
+      reload: fetchRows,
+      onClose: handleDialogDelete,
     });
-    setRows((prev) => prev.filter((r) => r.id !== rowToDelete.id));
-    handleDialogDelete();
   };
 
   const upsertEntry = async (payload, id) => {
     const promise = isEditing ? updateCatalogEntry(id, payload) : createCatalogEntry(payload);
-    await toast.promise(promise, {
-      loading: isEditing ? "Guardando cambios..." : "Creando...",
-      success: isEditing ? "Catálogo actualizado" : "Agregado al catálogo",
-      error: "No se pudo guardar",
+    await runMutationReload(toast, {
+      promise,
+      reload: fetchRows,
+      onClose: handleDialogForm,
     });
-    handleDialogForm();
-    fetchRows();
   };
 
   const productById = (id) => products.find((p) => String(p.id) === String(id));

@@ -9,7 +9,6 @@ import {
 import { useEffect, useState } from "react";
 
 import { Edit, Delete, Storefront } from "@mui/icons-material";
-import toast from "react-hot-toast";
 
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
 import TablePro from "../../../components/Tables/TablePro";
@@ -21,8 +20,11 @@ import {
 } from "../../../api/inventoryControlRequest";
 
 import { pathImg } from "../../../api/axios";
+import { useAuth } from "../../../context/AuthContext.jsx";
+import { runMutationReload } from "../../../utils/mutationToast.js";
 
 function StoresPage() {
+  const { toast } = useAuth();
   const [data, setData] = useState([]);
   const [openDelete, setOpenDelete] = useState(false);
   const [toDelete, setToDelete] = useState(null);
@@ -46,19 +48,11 @@ function StoresPage() {
 
   const confirmDelete = async () => {
     if (!toDelete?.id) return;
-
-    toast.promise(
-      deleteStoreRequest(toDelete.id),
-      {
-        loading: "Eliminando...",
-        success: "Punto de venta eliminado con éxito",
-        error: "Ocurrió un error",
-      },
-      { position: "top-right", style: { fontFamily: "roboto" } }
-    );
-
-    setData((prev) => prev.filter((x) => x.id !== toDelete.id));
-    handleDeleteDialog();
+    await runMutationReload(toast, {
+      promise: deleteStoreRequest(toDelete.id),
+      reload: fetchData,
+      onClose: handleDeleteDialog,
+    });
   };
 
   const columns = [

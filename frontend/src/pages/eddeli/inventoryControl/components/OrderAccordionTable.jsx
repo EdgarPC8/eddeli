@@ -21,7 +21,6 @@ import EditIcon from '@mui/icons-material/Edit';
 import MonetizationOnIcon from '@mui/icons-material/MonetizationOn';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useState } from 'react';
-import toast from 'react-hot-toast';
 import { 
   markItemAsPaidRequest,
   markItemAsDeliveredRequest,
@@ -30,6 +29,7 @@ import {
 
 import {  formatDate } from '../../../../helpers/functions';
 import { useAuth } from "../../../../context/AuthContext";
+import { withMutationToast } from "../../../../utils/mutationToast";
 
 function OrderRow({ order, onReload, onEdit }) {
   const [open, setOpen] = useState(false);
@@ -41,43 +41,28 @@ function OrderRow({ order, onReload, onEdit }) {
   );
 
   const handleDeliver = async (itemId) => {
-    toastAuth({
+    await withMutationToast(toastAuth, {
       promise: markItemAsDeliveredRequest(itemId),
-      onSuccess: () => {
-        setTimeout(() => onReload(), 300);
-        return {
-          title: "Producto",
-          description: "Ítem entregado",
-        };
-      },
-      onError: (res) => {
-        return {
-          title: "Producto",
-          description: res.response.data.message,
-        };
-      },
+      onSuccess: () => onReload?.(),
     });
   };
 
   const handlePaid = async (itemId) => {
-    toast.promise(markItemAsPaidRequest(itemId), {
-      loading: 'Registrando pago...',
-      success: 'Ítem pagado',
-      error: 'Error al pagar ítem',
+    await withMutationToast(toastAuth, {
+      promise: markItemAsPaidRequest(itemId),
+      onSuccess: () => onReload?.(),
     });
-    setTimeout(() => onReload(), 300);
   };
 
   const handleUpdateItem = async (itemId, data) => {
     if (isNaN(data.quantity) || isNaN(data.price)) {
-      return toast.error("Cantidad o precio inválido");
+      toastAuth({ message: "Cantidad o precio inválido", variant: "warning" });
+      return;
     }
-    toast.promise(updateOrderItemRequest(itemId, data), {
-      loading: "Actualizando ítem...",
-      success: "Ítem actualizado",
-      error: "Error al actualizar ítem",
+    await withMutationToast(toastAuth, {
+      promise: updateOrderItemRequest(itemId, data),
+      onSuccess: () => onReload?.(),
     });
-    onReload();
   };
 
   const totalItems = order.ERP_order_items.length;

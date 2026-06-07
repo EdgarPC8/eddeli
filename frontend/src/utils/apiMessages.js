@@ -20,15 +20,56 @@ export function getApiMessageFromData(data, headers) {
   return null;
 }
 
+const AXIOS_GENERIC_STATUS_RE = /^request failed with status code \d+$/i;
+
+/** Mensaje legible para el usuario según tipo de fallo HTTP/red. */
+export function getFriendlyHttpErrorMessage(error, fallback = null) {
+  const status = error?.response?.status;
+
+  if (!error?.response) {
+    const code = error?.code;
+    const msg = String(error?.message || "").toLowerCase();
+    if (code === "ERR_NETWORK" || msg.includes("network error")) {
+      return (
+        fallback ||
+        "No se pudo conectar con el servidor. Compruebe su conexión a internet o que el servicio esté activo."
+      );
+    }
+    if (code === "ECONNABORTED" || msg.includes("timeout")) {
+      return fallback || "El servidor tardó demasiado en responder. Intente de nuevo.";
+    }
+    return fallback || "No se pudo conectar con el servidor.";
+  }
+
+  if (status >= 500) {
+    return "Error en el servidor. Intente más tarde o contacte al administrador.";
+  }
+  if (status === 401 || status === 403) {
+    return "Usuario o contraseña incorrectos.";
+  }
+  if (status === 404) {
+    return "Servicio no encontrado. Verifique la configuración del sistema.";
+  }
+  if (status === 503 || status === 502 || status === 504) {
+    return "El servidor no está disponible en este momento. Intente más tarde.";
+  }
+
+  return fallback;
+}
+
 /** Mensaje de error HTTP (axios). */
 export function getApiErrorMessage(error, fallback = null) {
   const data = error?.response?.data;
   const fromBody = getApiMessageFromData(data);
   if (fromBody) return fromBody;
-  if (typeof error?.message === "string" && error.message.trim()) {
-    return error.message.trim();
+
+  const rawMsg =
+    typeof error?.message === "string" ? error.message.trim() : "";
+  if (rawMsg && !AXIOS_GENERIC_STATUS_RE.test(rawMsg)) {
+    return rawMsg;
   }
-  return fallback;
+
+  return getFriendlyHttpErrorMessage(error, fallback) || "Ocurrió un error. Intente de nuevo.";
 }
 
 /** Mensaje de éxito desde axios response (o primer ítem de Promise.all). */

@@ -63,17 +63,20 @@ const FinanceForm = ({ type = "income", data = null, onClose, onSaved }) => {
 
     const call = isEditing ? requestFn(data.id, payload) : requestFn(payload);
 
-    toast({
-      promise: call,
-      loadingMessage: isEditing ? "Actualizando..." : "Guardando...",
-      successMessage: isEditing ? "Actualizado correctamente" : "Registrado correctamente",
-      errorMessage: "Hubo un error",
-      onSuccess: () => {
-        onSaved?.();
-        onClose?.();
-        reset();
-      },
-    });
+    try {
+      await toast({
+        promise: call,
+        successMessage: isEditing ? "Actualizado correctamente" : "Registrado correctamente",
+        errorMessage: "Hubo un error",
+        onSuccess: async () => {
+          if (onSaved) await onSaved();
+          if (onClose) onClose();
+          reset();
+        },
+      });
+    } catch {
+      /* toast mostró error */
+    }
   };
 
   return (
