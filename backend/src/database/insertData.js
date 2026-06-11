@@ -37,9 +37,67 @@ import {
   EditorDesign,
   EditorDesignLayerOverride,
 } from "../models/Editor.js";
+import { CashShift } from "../models/CashShift.js";
+import { CashShiftMovement } from "../models/CashShiftMovement.js";
+import { TaskPlan, TaskItem } from "../models/Tasks.js";
+import { License } from "../models/License.js";
+import { Logs } from "../models/Logs.js";
+import { UserData } from "../models/UserData.js";
 
 export const backupFilePath = resolve(__dirname, "backup.json");
 export const backups = resolve(__dirname, "..", "backups");
+
+/**
+ * Tablas EdDeli incluidas en backup.json (guardar / recargar BD).
+ * Excluidas a propósito (módulos SoftEd compartidos): quiz_*, form_*, alumni_*, cv_*.
+ */
+export const BACKUP_TABLE_ENTRIES = [
+  { key: "Roles", model: Roles },
+  { key: "Users", model: Users },
+  { key: "Account", model: Account },
+  { key: "AccountRoles", model: AccountRoles },
+  { key: "UserData", model: UserData },
+  { key: "Notifications", model: Notifications },
+  { key: "InventoryCategory", model: InventoryCategory },
+  { key: "InventoryUnit", model: InventoryUnit },
+  { key: "InventoryProduct", model: InventoryProduct, sanitize: "InventoryProduct" },
+  { key: "InventoryRecipe", model: InventoryRecipe },
+  { key: "InventoryMovement", model: InventoryMovement },
+  { key: "CashShift", model: CashShift, sanitize: "CashShift" },
+  { key: "CashShiftMovement", model: CashShiftMovement },
+  { key: "Customer", model: Customer },
+  { key: "Order", model: Order },
+  { key: "OrderItem", model: OrderItem },
+  { key: "TaskPlan", model: TaskPlan },
+  { key: "TaskItem", model: TaskItem },
+  { key: "Expense", model: Expense },
+  { key: "Income", model: Income },
+  { key: "Store", model: Store },
+  { key: "HomeProduct", model: HomeProduct },
+  { key: "Catalog", model: Catalog },
+  { key: "StoreProduct", model: StoreProduct },
+  { key: "ItemGroup", model: ItemGroup },
+  { key: "ItemGroupItem", model: ItemGroupItem },
+  { key: "Payment", model: Payment },
+  { key: "EditorTemplate", model: EditorTemplate },
+  { key: "EditorTemplateGroup", model: EditorTemplateGroup },
+  { key: "EditorTemplateLayer", model: EditorTemplateLayer },
+  { key: "EditorLayerProp", model: EditorLayerProp },
+  { key: "EditorLayerBind", model: EditorLayerBind },
+  { key: "EditorDesign", model: EditorDesign },
+  { key: "EditorDesignLayerOverride", model: EditorDesignLayerOverride },
+  { key: "License", model: License },
+  { key: "Logs", model: Logs },
+];
+
+export function summarizeBackupData(data) {
+  const counts = {};
+  for (const { key } of BACKUP_TABLE_ENTRIES) {
+    const rows = data?.[key];
+    counts[key] = Array.isArray(rows) ? rows.length : 0;
+  }
+  return counts;
+}
 
 const unwrapJsonString = (value, maxDepth = 12) => {
   let v = value;
@@ -85,11 +143,48 @@ const sanitizeRows = (rows, config = {}) => {
 
 const SANITIZE_CONFIG = {
   InventoryProduct: {
-    jsonStringFields: ["wholesaleRules"],
+    jsonStringFields: ["wholesaleRules", "packageTiers"],
+  },
+  CashShift: {
+    jsonStringFields: ["openingCashCounts", "closingCashCounts"],
   },
 };
 
 const BULK_OPT = { returning: false };
+
+/** Evita FK rotas al restaurar backups viejos sin turnos de caja. */
+export function prepareBackupForRestore(jsonData) {
+  const data = { ...jsonData };
+
+  data.InventoryProduct = sanitizeRows(
+    data.InventoryProduct,
+    SANITIZE_CONFIG.InventoryProduct,
+  );
+  data.CashShift = sanitizeRows(data.CashShift, SANITIZE_CONFIG.CashShift);
+
+  const shifts = Array.isArray(data.CashShift) ? data.CashShift : [];
+  const validShiftIds = new Set(shifts.map((s) => s?.id).filter((id) => id != null));
+
+  if (Array.isArray(data.Order)) {
+    data.Order = data.Order.map((order) => {
+      if (!order || order.shiftId == null) return order;
+      if (!validShiftIds.has(order.shiftId)) {
+        return { ...order, shiftId: null };
+      }
+      return order;
+    });
+  }
+
+  if (Array.isArray(data.CashShiftMovement)) {
+    data.CashShiftMovement = data.CashShiftMovement.map((row) => {
+      if (!row || row.shiftId == null) return row;
+      if (!validShiftIds.has(row.shiftId)) return null;
+      return row;
+    }).filter(Boolean);
+  }
+
+  return data;
+}
 
 /** Respaldo / restore solo tablas EdDeli (inventario, pedidos, finanzas, editor, notificaciones, cuentas). Quiz, forms, alumni, CV → softed/backend. */
 export const insertData = async () => {
@@ -98,68 +193,15 @@ export const insertData = async () => {
     console.log("El archivo de respaldo ya existe.");
 
     const data = await fs.readFile(backupFilePath, "utf8");
-    const jsonData = JSON.parse(data);
-
-    jsonData.InventoryProduct = sanitizeRows(
-      jsonData.InventoryProduct,
-      SANITIZE_CONFIG.InventoryProduct
-    );
+    const jsonData = prepareBackupForRestore(JSON.parse(data));
 
     const t = await sequelize.transaction();
     try {
       const opt = { ...BULK_OPT, transaction: t };
 
-      await Roles.bulkCreate(jsonData.Roles || [], opt);
-      await Users.bulkCreate(jsonData.Users || [], opt);
-      await Account.bulkCreate(jsonData.Account || [], opt);
-      await AccountRoles.bulkCreate(jsonData.AccountRoles || [], opt);
-      await Notifications.bulkCreate(jsonData.Notifications || [], opt);
-
-      await InventoryCategory.bulkCreate(jsonData.InventoryCategory || [], opt);
-      await InventoryUnit.bulkCreate(jsonData.InventoryUnit || [], opt);
-      await InventoryProduct.bulkCreate(jsonData.InventoryProduct || [], opt);
-      await InventoryRecipe.bulkCreate(jsonData.InventoryRecipe || [], opt);
-      await InventoryMovement.bulkCreate(jsonData.InventoryMovement || [], opt);
-
-      await Customer.bulkCreate(jsonData.Customer || [], opt);
-      await Order.bulkCreate(jsonData.Order || [], opt);
-      await OrderItem.bulkCreate(jsonData.OrderItem || [], opt);
-
-      await Expense.bulkCreate(jsonData.Expense || [], opt);
-      await Income.bulkCreate(jsonData.Income || [], opt);
-
-      await Store.bulkCreate(jsonData.Store || [], opt);
-      await HomeProduct.bulkCreate(jsonData.HomeProduct || [], opt);
-      await Catalog.bulkCreate(jsonData.Catalog || [], opt);
-      await StoreProduct.bulkCreate(jsonData.StoreProduct || [], opt);
-
-      await ItemGroup.bulkCreate(jsonData.ItemGroup || [], opt);
-      await ItemGroupItem.bulkCreate(jsonData.ItemGroupItem || [], opt);
-      await Payment.bulkCreate(jsonData.Payment || [], opt);
-
-      if (Array.isArray(jsonData.EditorTemplate) && jsonData.EditorTemplate.length > 0) {
-        await EditorTemplate.bulkCreate(jsonData.EditorTemplate, opt);
-      }
-      if (Array.isArray(jsonData.EditorTemplateGroup) && jsonData.EditorTemplateGroup.length > 0) {
-        await EditorTemplateGroup.bulkCreate(jsonData.EditorTemplateGroup, opt);
-      }
-      if (Array.isArray(jsonData.EditorTemplateLayer) && jsonData.EditorTemplateLayer.length > 0) {
-        await EditorTemplateLayer.bulkCreate(jsonData.EditorTemplateLayer, opt);
-      }
-      if (Array.isArray(jsonData.EditorLayerProp) && jsonData.EditorLayerProp.length > 0) {
-        await EditorLayerProp.bulkCreate(jsonData.EditorLayerProp, opt);
-      }
-      if (Array.isArray(jsonData.EditorLayerBind) && jsonData.EditorLayerBind.length > 0) {
-        await EditorLayerBind.bulkCreate(jsonData.EditorLayerBind, opt);
-      }
-      if (Array.isArray(jsonData.EditorDesign) && jsonData.EditorDesign.length > 0) {
-        await EditorDesign.bulkCreate(jsonData.EditorDesign, opt);
-      }
-      if (
-        Array.isArray(jsonData.EditorDesignLayerOverride) &&
-        jsonData.EditorDesignLayerOverride.length > 0
-      ) {
-        await EditorDesignLayerOverride.bulkCreate(jsonData.EditorDesignLayerOverride, opt);
+      for (const entry of BACKUP_TABLE_ENTRIES) {
+        const rows = jsonData[entry.key];
+        await entry.model.bulkCreate(Array.isArray(rows) ? rows : [], opt);
       }
 
       await t.commit();
@@ -169,6 +211,7 @@ export const insertData = async () => {
     }
 
     console.log("Datos insertados correctamente desde el archivo de respaldo (EdDeli).");
+    return { ok: true };
   } catch (error) {
     if (error.code === "ENOENT") {
       await fs.writeFile(
@@ -176,109 +219,29 @@ export const insertData = async () => {
         JSON.stringify({ Roles: [], Users: [], Account: [] }, null, 2)
       );
       console.log("Archivo de respaldo creado: backup.json");
-    } else {
-      console.error("Error al insertar datos:", error);
+      return { ok: true, createdEmptyBackup: true };
     }
+    console.error("Error al insertar datos:", error);
+    throw error;
   }
 };
 
 export const saveBackup = async () => {
   try {
-    const [
-      rolesData,
-      usersData,
-      accountData,
-      accountRolesData,
-      notificationsData,
-      inventoryCategoryData,
-      inventoryUnitData,
-      inventoryProductRaw,
-      inventoryRecipeData,
-      inventoryMovementData,
-      customerData,
-      orderData,
-      orderItemData,
-      expenseData,
-      incomeData,
-      homeProductData,
-      storeData,
-      catalogData,
-      storeProductData,
-      itemGroupData,
-      itemGroupItemData,
-      paymentData,
-      editorTemplateData,
-      editorTemplateGroupData,
-      editorTemplateLayerData,
-      editorLayerPropData,
-      editorLayerBindData,
-      editorDesignData,
-      editorDesignLayerOverrideData,
-    ] = await Promise.all([
-      Roles.findAll({ raw: true }),
-      Users.findAll({ raw: true }),
-      Account.findAll({ raw: true }),
-      AccountRoles.findAll({ raw: true }),
-      Notifications.findAll({ raw: true }),
-      InventoryCategory.findAll({ raw: true }),
-      InventoryUnit.findAll({ raw: true }),
-      InventoryProduct.findAll({ raw: true }),
-      InventoryRecipe.findAll({ raw: true }),
-      InventoryMovement.findAll({ raw: true }),
-      Customer.findAll({ raw: true }),
-      Order.findAll({ raw: true }),
-      OrderItem.findAll({ raw: true }),
-      Expense.findAll({ raw: true }),
-      Income.findAll({ raw: true }),
-      HomeProduct.findAll({ raw: true }),
-      Store.findAll({ raw: true }),
-      Catalog.findAll({ raw: true }),
-      StoreProduct.findAll({ raw: true }),
-      ItemGroup.findAll({ raw: true }),
-      ItemGroupItem.findAll({ raw: true }),
-      Payment.findAll({ raw: true }),
-      EditorTemplate.findAll({ raw: true }),
-      EditorTemplateGroup.findAll({ raw: true }),
-      EditorTemplateLayer.findAll({ raw: true }),
-      EditorLayerProp.findAll({ raw: true }),
-      EditorLayerBind.findAll({ raw: true }),
-      EditorDesign.findAll({ raw: true }),
-      EditorDesignLayerOverride.findAll({ raw: true }),
-    ]);
+    const fetched = await Promise.all(
+      BACKUP_TABLE_ENTRIES.map((entry) => entry.model.findAll({ raw: true })),
+    );
 
-    const InventoryProductData = sanitizeRows(inventoryProductRaw, SANITIZE_CONFIG.InventoryProduct);
+    const backupData = {};
+    BACKUP_TABLE_ENTRIES.forEach((entry, index) => {
+      let rows = fetched[index];
+      if (entry.sanitize && SANITIZE_CONFIG[entry.sanitize]) {
+        rows = sanitizeRows(rows, SANITIZE_CONFIG[entry.sanitize]);
+      }
+      backupData[entry.key] = rows;
+    });
 
-    const backupData = {
-      Roles: rolesData,
-      Users: usersData,
-      Account: accountData,
-      AccountRoles: accountRolesData,
-      Notifications: notificationsData,
-      InventoryCategory: inventoryCategoryData,
-      InventoryUnit: inventoryUnitData,
-      InventoryProduct: InventoryProductData,
-      InventoryRecipe: inventoryRecipeData,
-      InventoryMovement: inventoryMovementData,
-      Customer: customerData,
-      Order: orderData,
-      OrderItem: orderItemData,
-      Expense: expenseData,
-      Income: incomeData,
-      Store: storeData,
-      HomeProduct: homeProductData,
-      Catalog: catalogData,
-      StoreProduct: storeProductData,
-      ItemGroup: itemGroupData,
-      ItemGroupItem: itemGroupItemData,
-      Payment: paymentData,
-      EditorTemplate: editorTemplateData,
-      EditorTemplateGroup: editorTemplateGroupData,
-      EditorTemplateLayer: editorTemplateLayerData,
-      EditorLayerProp: editorLayerPropData,
-      EditorLayerBind: editorLayerBindData,
-      EditorDesign: editorDesignData,
-      EditorDesignLayerOverride: editorDesignLayerOverrideData,
-    };
+    const counts = summarizeBackupData(backupData);
 
     await fs.mkdir(backups, { recursive: true });
 
@@ -293,7 +256,8 @@ export const saveBackup = async () => {
     await fs.writeFile(backupFilePath, JSON.stringify(backupData, null, 2));
 
     console.log("Backup EdDeli guardado en:", backupPath);
-    return backupPath;
+    console.log("Filas por tabla:", counts);
+    return { backupPath, counts };
   } catch (error) {
     console.error("Error al guardar el backup:", error);
     throw error;
@@ -303,7 +267,7 @@ export const saveBackup = async () => {
 /** Descarga JSON de respaldo EdDeli (GET /eddeliapi/comands/downloadBackup). */
 export const downloadBackup = async (req, res) => {
   try {
-    const backupPath = await saveBackup();
+    const { backupPath } = await saveBackup();
     res.download(backupPath, (err) => {
       if (err) {
         console.error("Error al enviar el archivo:", err);

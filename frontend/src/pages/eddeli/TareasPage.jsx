@@ -199,7 +199,7 @@ export default function TareasPage() {
         <Typography variant="h5" fontWeight={700} gutterBottom>
           Tareas
         </Typography>
-        <Paper sx={{ p: 2, borderRadius: 2, mb: 2, display: "flex", justifyContent: "space-between" }}>
+        <Paper sx={{ p: 1, borderRadius: 2, mb: 1, display: "flex", justifyContent: "space-between" }}>
           <Typography variant="body2" color="text.secondary">
             Crea planes y publica tareas para empleados.
           </Typography>

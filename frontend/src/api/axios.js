@@ -8,7 +8,7 @@ import { io } from "socket.io-client";
 const API_ENV = import.meta.env.DEV ? "local" : "production";
 const API_PATH = "eddeliapi";
 const API_PORT = 3001;
-const SERVER_HOST = "192.168.110.139";
+const SERVER_HOST = "192.168.110.199";
 const PRODUCTION_ORIGIN = "https://aplicaciones.marianosamaniego.edu.ec";
 
 function resolveApiBase() {

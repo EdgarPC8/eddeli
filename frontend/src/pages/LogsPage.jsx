@@ -99,7 +99,6 @@ export default function LogsPage() {
         indexHeader="#"
         rowsPerPageOptions={[10, 25, 50]}
         defaultRowsPerPage={10}
-        tableMaxHeight={520}
       />
 
       <SimpleDialog

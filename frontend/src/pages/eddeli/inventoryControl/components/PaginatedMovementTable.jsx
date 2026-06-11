@@ -27,7 +27,7 @@ export default function PaginatedMovementTable({
   defaultRowsPerPage = 10,
   rowsPerPageOptions = [5, 10, 25, 50],
   showIndex = true,
-  tableMaxHeight = 360,
+  tableMaxHeight = "calc(100vh - 220px)",
 }) {
   const [searchText, setSearchText] = useState("");
   const [page, setPage] = useState(0);

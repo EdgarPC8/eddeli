@@ -282,7 +282,6 @@ function RecipePage() {
             columns={columns}
             defaultRowsPerPage={10}
             title="Receta (insumos)"
-            tableMaxHeight={320}
             showIndex={true}
           />
         </Grid>

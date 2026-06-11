@@ -1282,7 +1282,6 @@ function StoresPage() {
         loading={loading}
         defaultRowsPerPage={10}
         title="Listado de puntos de venta"
-        tableMaxHeight={420}
       />
 
       {/* Form create/edit */}

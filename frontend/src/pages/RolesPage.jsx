@@ -176,7 +176,6 @@ import UserForm from "../components/Forms/UserForm.jsx";
               showSearch
               showPagination
               defaultRowsPerPage={5}
-              tableMaxHeight={400}
               showIndex
               indexHeader="#"
             />

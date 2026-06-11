@@ -205,7 +205,6 @@ export default function ProductionManagerPage() {
             showPagination
             defaultRowsPerPage={10}
             rowsPerPageOptions={[5, 10, 25, 50]}
-            tableMaxHeight={420}
           />
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
             El valor del campo es el stock absoluto; al guardar se registra un movimiento de ajuste.

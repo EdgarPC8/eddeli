@@ -470,12 +470,29 @@ export default function CollectionsWorkbench() {
     }
   };
 
+  const buildSuggestedPayNote = (amount, groupId) => {
+    const rem = groupRemaining(groupId);
+    const grp = customerGroups.find((g) => g.id === groupId);
+    const cliente = customer?.name || "Cliente";
+    const grupo = grp?.concept || `Grupo #${groupId}`;
+    const amt = Number(amount);
+    if (Number.isFinite(amt) && amt > 0 && Math.abs(amt - rem) < 0.0001) {
+      return `Liquidación total: ${cliente} canceló por completo el grupo «${grupo}» (abono $${amt.toFixed(2)}, saldo $0.00)`;
+    }
+    if (Number.isFinite(amt) && amt > 0) {
+      const pendiente = Number(Math.max(0, rem - amt).toFixed(2));
+      return `Abono parcial: ${cliente} | grupo «${grupo}» | $${amt.toFixed(2)} | pendiente $${pendiente.toFixed(2)}`;
+    }
+    return "Abono";
+  };
+
   const openPay = () => {
     if (!selectedGroupId) return;
     setUiMsg(null);
-    setPayAmount("");
+    const rem = groupRemaining(selectedGroupId);
+    setPayAmount(rem > 0 ? String(rem) : "");
     setPayDate(todayISO());
-    setPayNote("Abono");
+    setPayNote(buildSuggestedPayNote(rem, selectedGroupId));
     setPayMethod("efectivo");
     setPayOpen(true);
   };
@@ -506,8 +523,8 @@ export default function CollectionsWorkbench() {
       setUiMsg({
         type: "success",
         text: closed
-          ? "Grupo pagado ✅ Se marcaron los ítems como pagados."
-          : "Abono registrado ✅",
+          ? `Grupo liquidado ✅ ${res?.data?.pago?.note || "El cliente saldó todo el saldo pendiente."}`
+          : `Abono registrado ✅ ${res?.data?.pago?.note || ""}`.trim(),
       });
     } catch (err) {
       console.error("confirmPay:", err);
@@ -1560,6 +1577,16 @@ export default function CollectionsWorkbench() {
         confirmPay={confirmPay}
         selectedGroupId={selectedGroupId}
         groupRemaining={groupRemaining}
+        onPayAmountChange={(value) => {
+          setPayAmount(value);
+          if (!selectedGroupId) return;
+          const amt = Number(value);
+          if (!Number.isFinite(amt) || amt <= 0) return;
+          setPayNote((prev) => {
+            const prevGeneric = !prev || prev === "Abono" || prev.startsWith("Abono parcial:") || prev.startsWith("Liquidación total:");
+            return prevGeneric ? buildSuggestedPayNote(amt, selectedGroupId) : prev;
+          });
+        }}
         moveOpen={moveOpen}
         setMoveOpen={setMoveOpen}
         moveItem={moveItem}

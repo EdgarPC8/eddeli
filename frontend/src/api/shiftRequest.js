@@ -15,3 +15,9 @@ export const openShift = (payload) => axios.post("/shifts/open", payload, auth()
 
 export const closeShift = (id, payload) =>
   axios.post(`/shifts/${id}/close`, payload, auth());
+
+export const getShiftMovements = (shiftId) =>
+  axios.get(`/shifts/${shiftId}/movements`, auth());
+
+export const createShiftMovement = (shiftId, payload) =>
+  axios.post(`/shifts/${shiftId}/movements`, payload, auth());

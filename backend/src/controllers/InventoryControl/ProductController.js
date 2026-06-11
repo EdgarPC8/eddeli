@@ -13,6 +13,7 @@ import {
   // ProductPlacement,
 } from "../../models/Inventory.js";
 import fileDirName from "../../libs/file-dirname.js";
+import { normalizePackageTiersStrict } from "../../utils/productPricingUtils.js";
 
 
 // controllers/ProductController.js (solo createProduct)
@@ -104,6 +105,10 @@ export const updateProduct = async (req, res) => {
       moved = true;
     }
 
+    if ("packageTiers" in updates) {
+      updates.packageTiers = normalizePackageTiersStrict(updates.packageTiers);
+    }
+
     // ===============================
     // 3️⃣ Actualiza BD
     // ===============================
@@ -117,6 +122,9 @@ export const updateProduct = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+    if (error?.message && /(wholesaleRules|packageTiers)/.test(error.message)) {
+      return res.status(400).json({ message: error.message });
+    }
     return res
       .status(500)
       .json({ message: "Error al actualizar producto", error });
@@ -204,6 +212,10 @@ export const createProduct = async (req, res) => {
       delete payload.wholesaleRulesText;
     }
 
+    if ("packageTiers" in payload) {
+      payload.packageTiers = normalizePackageTiersStrict(payload.packageTiers);
+    }
+
     // ✅ NO guardar subfolder en la tabla (si te llega por form)
     delete payload.subfolder;
 
@@ -214,7 +226,7 @@ export const createProduct = async (req, res) => {
     // ✅ rollback: si subió imagen y falló el create, borra el archivo subido
     if (tempRelPath) safeUnlink(imagePath(tempRelPath));
 
-    if (error?.message && /wholesaleRules/.test(error.message)) {
+    if (error?.message && /(wholesaleRules|packageTiers)/.test(error.message)) {
       return res.status(400).json({ message: error.message });
     }
 

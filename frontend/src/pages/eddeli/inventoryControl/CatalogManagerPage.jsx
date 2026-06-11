@@ -805,7 +805,6 @@ export default function CatalogManager() {
         columns={columns}
         defaultRowsPerPage={10}
         title="CATÁLOGO"
-        tableMaxHeight={380}
         showIndex={true}
       />
       <AutoCatalogLab onSyncAfterSave={fetchRows} />

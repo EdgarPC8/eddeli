@@ -1,4 +1,5 @@
 import { Users } from "../models/Users.js";
+import { Account } from "../models/Account.js";
 import { Roles } from "../models/Roles.js";
 import { UniqueConstraintError } from "sequelize";
 
@@ -48,21 +49,42 @@ export const updateUserData = async (req, res) => {
 
 export const getUsers = async (req, res) => {
   try {
-    console.log("Consulta a la base de datos iniciada");
-    const users = await Users.findAll();
+    const users = await Users.findAll({
+      include: [
+        {
+          model: Account,
+          attributes: ["id", "username", "userId"],
+          include: [{ model: Roles, attributes: ["id", "name"], through: { attributes: [] } }],
+        },
+      ],
+      order: [["id", "ASC"]],
+    });
 
-    // Verifica si los usuarios existen
-    if (!users || users.length === 0) {
-      return res.status(404).json({ message: "No se encontraron usuarios." });
-    }
+    const payload = users.map((user) => {
+      const row = user.toJSON();
+      const accounts = row.Accounts || row.accounts || [];
+      const primary = accounts[0] || null;
+      return {
+        ...row,
+        Accounts: undefined,
+        accounts: undefined,
+        account: primary
+          ? {
+              id: primary.id,
+              username: primary.username,
+              userId: primary.userId,
+              roles: primary.roles || primary.Roles || [],
+            }
+          : null,
+      };
+    });
 
-    // console.log("Consulta completada:", users);
-    res.json(users);
+    res.json(payload);
   } catch (error) {
     console.error("Error al obtener usuarios:", error);
     res.status(500).json({ message: "Error en el servidor." });
   }
-  };
+};
 
   
   export const getOneUser = async (req, res) => {

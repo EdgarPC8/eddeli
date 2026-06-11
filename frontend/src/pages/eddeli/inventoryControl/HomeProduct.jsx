@@ -804,7 +804,6 @@ import {
           loading={loading}
           defaultRowsPerPage={10}
           title="Listado de destacados"
-          tableMaxHeight={420}
         />
   
         {/* Diálogo de formulario (crear/editar) */}

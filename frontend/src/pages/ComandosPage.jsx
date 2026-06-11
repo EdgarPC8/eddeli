@@ -1,4 +1,4 @@
-/** Comandos admin: backup y recarga BD; mensajes desde tiendaapi. Solo Programador. */
+/** Comandos admin: backup y recarga BD. Solo Programador. */
 import { useEffect, useRef, useState } from "react";
 import {
   Card,
@@ -21,30 +21,81 @@ import { reloadBD, saveBackup, downloadBackup, uploadBackup } from "../api/coman
 import { useAuth } from "../context/AuthContext.jsx";
 import { Navigate } from "react-router-dom";
 import SimpleDialog from "../components/Dialogs/SimpleDialog.jsx";
-import { getApiSuccessMessage } from "../utils/apiMessages.js";
+import { getApiErrorMessage, getApiSuccessMessage } from "../utils/apiMessages.js";
 
-const RELOAD_STEPS = [
-  { until: 25, label: "Preparando recarga de la base de datos…" },
-  { until: 50, label: "Eliminando tablas existentes…" },
-  { until: 80, label: "Importando backup.json…" },
-  { until: 95, label: "Insertando catálogo, clientes y pedidos…" },
-];
+const OPERATION_CONFIG = {
+  upload: {
+    title: "Subiendo backup.json",
+    steps: [
+      { until: 30, label: "Leyendo archivo seleccionado…" },
+      { until: 65, label: "Enviando al servidor…" },
+      { until: 90, label: "Validando JSON en el servidor…" },
+    ],
+    successMessage: "Archivo backup.json subido correctamente.",
+    errorMessage: "No se pudo subir el archivo. Verifique que sea un JSON válido.",
+  },
+  download: {
+    title: "Descargando backup.json",
+    steps: [
+      { until: 35, label: "Generando respaldo desde la base de datos…" },
+      { until: 70, label: "Preparando archivo para descarga…" },
+      { until: 92, label: "Finalizando descarga…" },
+    ],
+    successMessage: "Descarga de backup.json completada correctamente.",
+    errorMessage: "No se pudo descargar el backup. Intente de nuevo.",
+  },
+  save: {
+    title: "Guardando copia en servidor",
+    steps: [
+      { until: 40, label: "Leyendo datos de la base de datos…" },
+      { until: 75, label: "Escribiendo backup.json…" },
+      { until: 92, label: "Guardando copia con fecha en /backups…" },
+    ],
+    successMessage: "Copia de seguridad guardada en el servidor.",
+    errorMessage: "No se pudo guardar la copia en el servidor.",
+  },
+  reload: {
+    title: "Recargando base de datos",
+    steps: [
+      { until: 25, label: "Preparando recarga de la base de datos…" },
+      { until: 50, label: "Eliminando tablas existentes…" },
+      { until: 80, label: "Importando backup.json…" },
+      { until: 95, label: "Insertando catálogo, clientes y pedidos…" },
+    ],
+    successMessage: "Base de datos recargada correctamente.",
+    errorMessage:
+      "No se pudo recargar la base de datos. Verifique que backup.json exista y que el servidor esté activo.",
+  },
+};
 
-function reloadStepLabel(progress) {
-  const step = RELOAD_STEPS.find((s) => progress < s.until);
+const INITIAL_PROGRESS_DIALOG = {
+  open: false,
+  title: "",
+  progress: 0,
+  message: "",
+  loading: false,
+};
+
+function stepLabel(steps, progress) {
+  const step = steps.find((s) => progress < s.until);
   return step?.label || "Finalizando…";
+}
+
+function formatBackupTablesSummary(tables) {
+  if (!tables || typeof tables !== "object") return "";
+  const shift = tables.CashShift ?? 0;
+  const movements = tables.CashShiftMovement ?? 0;
+  const orders = tables.Order ?? 0;
+  return ` Turnos: ${shift}, mov. caja: ${movements}, pedidos: ${orders}.`;
 }
 
 export default function ComandosPage() {
   const theme = useTheme();
   const { user, toast } = useAuth();
   const progressTimer = useRef(null);
-  const [reloadDialog, setReloadDialog] = useState({
-    open: false,
-    progress: 0,
-    message: RELOAD_STEPS[0].label,
-    loading: false,
-  });
+  const activeStepsRef = useRef([]);
+  const [confirmReloadOpen, setConfirmReloadOpen] = useState(false);
+  const [progressDialog, setProgressDialog] = useState(INITIAL_PROGRESS_DIALOG);
 
   useEffect(
     () => () => {
@@ -53,17 +104,6 @@ export default function ComandosPage() {
     []
   );
 
-  const startProgressAnimation = () => {
-    if (progressTimer.current) clearInterval(progressTimer.current);
-    progressTimer.current = setInterval(() => {
-      setReloadDialog((prev) => {
-        if (!prev.loading || prev.progress >= 92) return prev;
-        const next = Math.min(prev.progress + 4, 92);
-        return { ...prev, progress: next, message: reloadStepLabel(next) };
-      });
-    }, 350);
-  };
-
   const stopProgressAnimation = () => {
     if (progressTimer.current) {
       clearInterval(progressTimer.current);
@@ -71,47 +111,83 @@ export default function ComandosPage() {
     }
   };
 
-  const handleReloadBD = async () => {
-    if (
-      !window.confirm(
-        "¿Recargar la base de datos desde backup.json? Se borrarán todos los datos actuales."
-      )
-    ) {
-      return;
-    }
+  const startProgressAnimation = (steps) => {
+    activeStepsRef.current = steps;
+    if (progressTimer.current) clearInterval(progressTimer.current);
+    progressTimer.current = setInterval(() => {
+      setProgressDialog((prev) => {
+        if (!prev.loading || prev.progress >= 92) return prev;
+        const next = Math.min(prev.progress + 4, 92);
+        return {
+          ...prev,
+          progress: next,
+          message: stepLabel(activeStepsRef.current, next),
+        };
+      });
+    }, 350);
+  };
 
-    setReloadDialog({
+  const runWithProgress = async (operationKey, task) => {
+    const config = OPERATION_CONFIG[operationKey];
+    const firstMessage = config.steps[0]?.label || "Procesando…";
+
+    setProgressDialog({
       open: true,
+      title: config.title,
       progress: 8,
-      message: RELOAD_STEPS[0].label,
+      message: firstMessage,
       loading: true,
     });
-    startProgressAnimation();
+    startProgressAnimation(config.steps);
 
     try {
-      const res = await reloadBD();
+      const res = await task();
       stopProgressAnimation();
-      setReloadDialog({
+      setProgressDialog({
         open: true,
+        title: config.title,
         progress: 100,
-        message: "Base de datos recargada correctamente.",
+        message: config.successMessage,
         loading: false,
       });
+      const baseMessage = getApiSuccessMessage(res, config.successMessage);
+      const tablesSummary =
+        operationKey === "save" ? formatBackupTablesSummary(res?.data?.tables) : "";
       toast({
-        message: getApiSuccessMessage(res, "Base de datos recargada correctamente."),
+        message: `${baseMessage}${tablesSummary}`,
         variant: "success",
       });
       setTimeout(() => {
-        setReloadDialog({ open: false, progress: 0, message: "", loading: false });
+        setProgressDialog(INITIAL_PROGRESS_DIALOG);
       }, 900);
     } catch (error) {
       stopProgressAnimation();
-      setReloadDialog({ open: false, progress: 0, message: "", loading: false });
+      setProgressDialog(INITIAL_PROGRESS_DIALOG);
       toast({
-        message: error?.response?.data?.message || "Error al recargar la base de datos.",
+        message: getApiErrorMessage(error, config.errorMessage),
         variant: "error",
       });
     }
+  };
+
+  const executeReloadBD = () => runWithProgress("reload", reloadBD);
+
+  const executeDownloadBackup = () => runWithProgress("download", downloadBackup);
+
+  const executeSaveBackup = () => runWithProgress("save", saveBackup);
+
+  const executeUploadBackup = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json";
+    input.onchange = (event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
+      const fd = new FormData();
+      fd.append("backup", file);
+      void runWithProgress("upload", () => uploadBackup(fd));
+    };
+    input.click();
   };
 
   const COMMANDS = [
@@ -120,46 +196,36 @@ export default function ComandosPage() {
       name: "Subir backup.json",
       info: "Reemplaza backup.json en el servidor (luego usa Recargar BD)",
       icon: UploadFileIcon,
-      run: () => {
-        const input = document.createElement("input");
-        input.type = "file";
-        input.accept = "application/json";
-        input.onchange = (event) => {
-          const file = event.target.files?.[0];
-          if (!file) return;
-          const fd = new FormData();
-          fd.append("backup", file);
-          toast({ promise: uploadBackup(fd) });
-        };
-        input.click();
-      },
+      run: executeUploadBackup,
     },
     {
       key: "download",
       name: "Descargar backup.json",
       info: "Descarga el estado actual de la base en JSON",
       icon: BackupIcon,
-      run: () => toast({ promise: downloadBackup() }),
+      run: executeDownloadBackup,
     },
     {
       key: "reload",
       name: "Recargar BD",
       info: "Borra y vuelve a crear tablas desde backup.json",
       icon: RefreshIcon,
-      run: handleReloadBD,
+      run: () => setConfirmReloadOpen(true),
     },
     {
       key: "save",
       name: "Guardar copia en servidor",
       info: "Guarda backup.json y copia con fecha en /backups",
       icon: SaveIcon,
-      run: () => toast({ promise: saveBackup() }),
+      run: executeSaveBackup,
     },
   ];
 
   if (user?.loginRol !== "Programador") {
     return <Navigate to="/" replace />;
   }
+
+  const isBusy = progressDialog.loading;
 
   return (
     <Box>
@@ -168,32 +234,43 @@ export default function ComandosPage() {
       </Typography>
       <Alert severity="warning" sx={{ mb: 2 }}>
         Recargar BD elimina todos los datos actuales y los restaura desde <strong>backup.json</strong>.
-        Úsalo con precaución.
+        El backup incluye inventario, pedidos, finanzas, turnos de caja y movimientos. Úsalo con precaución.
       </Alert>
 
       <SimpleDialog
-        open={reloadDialog.open}
+        open={confirmReloadOpen}
+        onClose={() => setConfirmReloadOpen(false)}
+        title="¿Recargar la base de datos?"
+        message="Se borrarán todos los datos actuales y se restaurarán desde backup.json. Esta acción no se puede deshacer."
+        onClickAccept={() => {
+          setConfirmReloadOpen(false);
+          void executeReloadBD();
+        }}
+      />
+
+      <SimpleDialog
+        open={progressDialog.open}
         onClose={() => {
-          if (!reloadDialog.loading) {
-            setReloadDialog({ open: false, progress: 0, message: "", loading: false });
+          if (!progressDialog.loading) {
+            setProgressDialog(INITIAL_PROGRESS_DIALOG);
           }
         }}
-        title="Recargando base de datos"
+        title={progressDialog.title}
         maxWidth="sm"
         fullWidth
-        hideClose={reloadDialog.loading}
-        disableClose={reloadDialog.loading}
+        hideClose={progressDialog.loading}
+        disableClose={progressDialog.loading}
       >
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          {reloadDialog.message}
+          {progressDialog.message}
         </Typography>
         <LinearProgress
           variant="determinate"
-          value={reloadDialog.progress}
+          value={progressDialog.progress}
           sx={{ height: 10, borderRadius: 5 }}
         />
         <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1, textAlign: "right" }}>
-          {reloadDialog.progress}%
+          {progressDialog.progress}%
         </Typography>
       </SimpleDialog>
 
@@ -222,7 +299,7 @@ export default function ComandosPage() {
                 </CardContent>
                 <CardActions>
                   <Tooltip title={cmd.info}>
-                    <Button fullWidth variant="contained" onClick={() => cmd.run()} disabled={reloadDialog.loading}>
+                    <Button fullWidth variant="contained" onClick={() => cmd.run()} disabled={isBusy}>
                       Ejecutar
                     </Button>
                   </Tooltip>

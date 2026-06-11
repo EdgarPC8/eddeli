@@ -10,7 +10,12 @@ import {
   InputAdornment,
   ToggleButton,
   ToggleButtonGroup,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import ViewModuleIcon from "@mui/icons-material/ViewModule";
 import TableRowsIcon from "@mui/icons-material/TableRows";
 import SearchIcon from "@mui/icons-material/Search";
@@ -45,7 +50,12 @@ function ProductsPage() {
   };
 
   const handleDialog = () => setOpen(!open);
-  const handleDialogUser = () => setOpenDialog(!openDialog);
+
+  const closeProductDialog = () => {
+    setOpenDialog(false);
+    setIsEditing(false);
+    setDatos({});
+  };
 
   const deleteData = async () => {
     toast.promise(
@@ -65,7 +75,7 @@ function ProductsPage() {
     setDatos(product);
     setIsEditing(true);
     settitleUserDialog("Editar Producto");
-    handleDialogUser();
+    setOpenDialog(true);
   };
 
   const columns = [
@@ -176,18 +186,87 @@ function ProductsPage() {
         ¿Está seguro de eliminar el producto?
       </SimpleDialog>
 
-      <SimpleDialog
+      <Dialog
         open={openDialog}
-        onClose={handleDialogUser}
-        tittle={titleUserDialog}
+        onClose={closeProductDialog}
+        fullWidth
+        maxWidth="md"
+        scroll="paper"
+        PaperProps={{ sx: { maxHeight: "92vh", display: "flex", flexDirection: "column" } }}
       >
-        <ProductForm
-          onClose={handleDialogUser}
-          isEditing={isEditing}
-          datos={datos}
-          reload={fecthData}
-        />
-      </SimpleDialog>
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            px: 2,
+            pt: 1.5,
+            pb: 0.5,
+            flexShrink: 0,
+          }}
+        >
+          <DialogTitle sx={{ p: 0, flex: 1, fontWeight: 700 }}>
+            {titleUserDialog}
+          </DialogTitle>
+          <IconButton aria-label="Cerrar" onClick={closeProductDialog} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Box>
+
+        <DialogContent
+          dividers
+          sx={{
+            px: 2,
+            py: 1.5,
+            flex: 1,
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <Box
+            sx={{
+              overflowY: "auto",
+              flex: 1,
+              pr: 0.5,
+              maxHeight: { xs: "calc(92vh - 140px)", sm: "calc(92vh - 130px)" },
+            }}
+          >
+            <ProductForm
+              key={isEditing ? datos?.id ?? "edit" : "new"}
+              onClose={closeProductDialog}
+              isEditing={isEditing}
+              datos={datos}
+              reload={fecthData}
+            />
+          </Box>
+        </DialogContent>
+
+        <DialogActions
+          sx={{
+            px: 2,
+            py: 1.5,
+            gap: 1,
+            flexShrink: 0,
+            borderTop: 1,
+            borderColor: "divider",
+            bgcolor: "background.paper",
+          }}
+        >
+          <Button type="button" onClick={closeProductDialog} color="inherit">
+            Cancelar
+          </Button>
+          <Box sx={{ flex: 1 }} />
+          <Button
+            type="submit"
+            form="eddeli-product-form"
+            variant="contained"
+            sx={{ minWidth: 160 }}
+          >
+            {isEditing ? "Actualizar producto" : "Guardar producto"}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Paper
         sx={{
@@ -208,7 +287,7 @@ function ProductsPage() {
             setIsEditing(false);
             setDatos({});
             settitleUserDialog("Agregar Producto");
-            handleDialogUser();
+            setOpenDialog(true);
           }}
         >
           Crear Producto
@@ -274,7 +353,6 @@ function ProductsPage() {
           columns={columns}
           defaultRowsPerPage={10}
           title="PRODUCTOS"
-          tableMaxHeight={380}
           showIndex={true}
         />
       )}

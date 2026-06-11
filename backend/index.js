@@ -15,9 +15,7 @@ import OrderRoutes from "./src/routes/OrderRoutes.js";
 import FinanceRoutes from "./src/routes/FinanceRoutes.js";
 import ShiftRoutes from "./src/routes/ShiftRoutes.js";
 import TaskRoutes from "./src/routes/TaskRoutes.js";
-import { CashShift } from "./src/models/CashShift.js";
-import { Order } from "./src/models/Orders.js";
-import { TaskPlan, TaskItem } from "./src/models/Tasks.js";
+import { syncDatabaseSchema } from "./src/database/syncModels.js";
 
 import ImgRoutes from "./src/routes/ImgRoutes.js";
 import FilesRoutes from "./src/routes/FilesRoutes.js";
@@ -102,14 +100,12 @@ app.use(errorMiddleware);
 export async function main() {
   try {
     await sequelize.authenticate();
-    await CashShift.sync({ alter: true });
-    await Order.sync({ alter: true });
-    await TaskPlan.sync({ alter: true });
-    await TaskItem.sync({ alter: true });
-/*      await sequelize.sync({ force: true });
-     await insertData(); */
-
-    console.log("✅ Conexión realizada con éxito.");
+    const syncResult = await syncDatabaseSchema();
+    if (syncResult.skipped) {
+      console.log("✅ Conexión realizada (sin ALTER; usa npm run db:sync si cambiaste modelos).");
+    } else {
+      console.log("✅ Conexión realizada y esquema sincronizado (DB_SYNC_ALTER activo).");
+    }
 
     httpServer.listen(PORT, () => {
       console.log(`🟢 Backend + Socket.IO escuchando en puerto ${PORT}`);

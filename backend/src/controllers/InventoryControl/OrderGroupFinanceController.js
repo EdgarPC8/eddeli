@@ -21,6 +21,46 @@ const toNum = (v, def = 0) => {
     return dt.toISOString().slice(0, 10);
   };
 
+  const truncateNote = (text, max = 255) => {
+    const s = String(text || "").trim();
+    if (s.length <= max) return s;
+    return `${s.slice(0, max - 1)}…`;
+  };
+
+  const isGenericPaymentNote = (note, groupId) => {
+    const n = String(note || "").trim().toLowerCase();
+    if (!n || n === "abono") return true;
+    if (n === `abono grupo #${groupId}`.toLowerCase()) return true;
+    return false;
+  };
+
+  /** Nota/concepto descriptivo para abonos y liquidaciones de cobranza. */
+  const buildGroupPaymentNote = ({
+    customerName,
+    groupConcept,
+    groupId,
+    amount,
+    remainingAfter,
+    isFullSettlement,
+    userNote,
+  }) => {
+    const amt = Number(Number(amount || 0).toFixed(2));
+    const saldo = Number(Number(remainingAfter || 0).toFixed(2));
+    const cliente = String(customerName || "Cliente").trim();
+    const grupo = String(groupConcept || `Grupo #${groupId}`).trim();
+    const extra = !isGenericPaymentNote(userNote, groupId) ? String(userNote).trim() : "";
+
+    let base;
+    if (isFullSettlement) {
+      base = `Liquidación total: ${cliente} canceló por completo el grupo «${grupo}» (abono $${amt.toFixed(2)}, saldo $0.00)`;
+    } else {
+      base = `Abono parcial: ${cliente} | grupo «${grupo}» | $${amt.toFixed(2)} | pendiente $${saldo.toFixed(2)}`;
+    }
+
+    if (!extra) return truncateNote(base);
+    return truncateNote(`${base}. ${extra}`);
+  };
+
   const PROGRAMMER_ONLY_MSG = "Solo el rol Programador puede editar o eliminar abonos";
   const assertProgrammerRole = (user) =>
     user?.loginRol === "Programador";
@@ -367,7 +407,25 @@ const toNum = (v, def = 0) => {
         }
   
         const paymentDate = date ? new Date(date) : new Date();
-  
+        const newPaid = roundMoney(alreadyPaid + payAmount);
+        const newRemaining = roundMoney(Math.max(0, total - newPaid));
+        const isFullSettlement = newRemaining <= EPS;
+
+        const customer = await Customer.findByPk(group.customerId, {
+          attributes: ["id", "name"],
+          transaction: t,
+        });
+
+        const paymentNote = buildGroupPaymentNote({
+          customerName: customer?.name,
+          groupConcept: group.concept,
+          groupId: group.id,
+          amount: payAmount,
+          remainingAfter: newRemaining,
+          isFullSettlement,
+          userNote: note,
+        });
+
         // 2) Crear Payment
         const payment = await Payment.create(
           {
@@ -376,7 +434,7 @@ const toNum = (v, def = 0) => {
             date: paymentDate,
             amount: roundMoney(payAmount),
             method: method || "efectivo",
-            note: note || `Abono grupo #${group.id}`,
+            note: paymentNote,
             status: "completed",
             createdBy: user.accountId,
           },
@@ -388,19 +446,16 @@ const toNum = (v, def = 0) => {
           {
             date: paymentDate,
             amount: roundMoney(payAmount),
-            concept: payment.note || `Abono grupo #${group.id}`,
+            concept: paymentNote,
             category: "Venta",
             status: "paid",
             referenceType: "group_payment",
             referenceId: payment.id,
             createdBy: user.accountId,
-            counterpartyName: null,
+            counterpartyName: customer?.name || null,
           },
           { transaction: t }
         );
-  
-        const newPaid = roundMoney(alreadyPaid + payAmount);
-        const newRemaining = roundMoney(Math.max(0, total - newPaid));
 
         console.log("[payItemGroup] abono registrado OK", {
           groupId: group.id,
@@ -431,9 +486,16 @@ const toNum = (v, def = 0) => {
         return {
           status: 200,
           body: {
-            mensaje: "Abono registrado",
+            mensaje: closed
+              ? "Liquidación total registrada: el cliente saldó el grupo por completo"
+              : "Abono parcial registrado",
             grupo: { id: group.id, status: group.status },
-            pago: { paymentId: payment.id, incomeId: income.id, amount: roundMoney(payAmount) },
+            pago: {
+              paymentId: payment.id,
+              incomeId: income.id,
+              amount: roundMoney(payAmount),
+              note: paymentNote,
+            },
             resumen: { total, abonadoAntes: alreadyPaid, abonadoAcumulado: newPaid, saldo: newRemaining, cerrado: closed },
             closed,
           },

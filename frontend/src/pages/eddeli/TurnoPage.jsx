@@ -1,12 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  Autocomplete,
   Box,
   Button,
   Chip,
   CircularProgress,
+  FormControl,
   Grid,
   InputAdornment,
+  InputLabel,
+  MenuItem,
   Paper,
+  Select,
   Stack,
   Table,
   TableBody,
@@ -15,18 +20,24 @@ import {
   TableHead,
   TableRow,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 import LockIcon from "@mui/icons-material/Lock";
 import HistoryIcon from "@mui/icons-material/History";
+import AddIcon from "@mui/icons-material/Add";
+import SwapVertIcon from "@mui/icons-material/SwapVert";
 import { useAuth } from "../../context/AuthContext.jsx";
 import {
   closeShift,
+  createShiftMovement,
   getActiveShift,
   getShifts,
   openShift,
 } from "../../api/shiftRequest.js";
+import { getAllProducts } from "../../api/inventoryControlRequest.js";
 import {
   CASH_BILLS,
   CASH_COINS,
@@ -37,6 +48,27 @@ import {
 } from "../../utils/turnoCashUtils.js";
 
 const to2 = (n) => Number(Number(n || 0).toFixed(2));
+
+const MOVEMENT_CATEGORY_LABELS = {
+  gasto_operativo: "Gasto operativo",
+  compra_mercancia: "Compra mercancía",
+  retiro: "Retiro / depósito",
+  entrada: "Entrada de efectivo",
+  otro: "Otro",
+};
+
+const OUT_CATEGORIES = ["gasto_operativo", "compra_mercancia", "retiro", "otro"];
+const IN_CATEGORIES = ["entrada", "otro"];
+
+const emptyMovementForm = () => ({
+  direction: "out",
+  category: "gasto_operativo",
+  amount: "",
+  concept: "",
+  notes: "",
+  product: null,
+  quantity: "",
+});
 
 const compactFieldSx = {
   m: 0,
@@ -163,6 +195,10 @@ export default function TurnoPage() {
   const [closeCounts, setCloseCounts] = useState(emptyCashCounts);
   const [openNotes, setOpenNotes] = useState("");
   const [closeNotes, setCloseNotes] = useState("");
+  const [movementForm, setMovementForm] = useState(emptyMovementForm);
+  const [movementSaving, setMovementSaving] = useState(false);
+  const [products, setProducts] = useState([]);
+  const [productsLoading, setProductsLoading] = useState(false);
 
   const openTotal = useMemo(() => computeCashTotal(openCounts), [openCounts]);
   const closeTotal = useMemo(() => computeCashTotal(closeCounts), [closeCounts]);
@@ -189,6 +225,78 @@ export default function TurnoPage() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (movementForm.category !== "compra_mercancia" || products.length > 0) return;
+    setProductsLoading(true);
+    getAllProducts()
+      .then((res) => setProducts(Array.isArray(res.data) ? res.data : []))
+      .catch(() => setProducts([]))
+      .finally(() => setProductsLoading(false));
+  }, [movementForm.category, products.length]);
+
+  const movementCategories =
+    movementForm.direction === "out" ? OUT_CATEGORIES : IN_CATEGORIES;
+
+  const handleMovementDirection = (_, value) => {
+    if (!value) return;
+    const defaultCategory = value === "out" ? "gasto_operativo" : "entrada";
+    setMovementForm((p) => ({
+      ...p,
+      direction: value,
+      category: defaultCategory,
+      product: null,
+      quantity: "",
+    }));
+  };
+
+  const handleAddMovement = async () => {
+    if (!activeShift?.id) return;
+    const amt = Number(movementForm.amount);
+    if (!amt || amt <= 0) {
+      void toast?.({ message: "Ingresa un monto válido.", variant: "warning" });
+      return;
+    }
+    if (!String(movementForm.concept || "").trim()) {
+      void toast?.({ message: "Indica un concepto.", variant: "warning" });
+      return;
+    }
+    if (movementForm.category === "compra_mercancia") {
+      const hasProduct = Boolean(movementForm.product);
+      const hasQty = movementForm.quantity !== "" && Number(movementForm.quantity) > 0;
+      if (hasProduct !== hasQty) {
+        void toast?.({
+          message: "Para compra de mercancía indica producto y cantidad, o deja ambos vacíos.",
+          variant: "warning",
+        });
+        return;
+      }
+    }
+
+    try {
+      setMovementSaving(true);
+      await createShiftMovement(activeShift.id, {
+        direction: movementForm.direction,
+        category: movementForm.category,
+        amount: amt,
+        concept: movementForm.concept.trim(),
+        notes: movementForm.notes?.trim() || undefined,
+        productId: movementForm.product?.id,
+        quantity:
+          movementForm.quantity !== "" ? Number(movementForm.quantity) : undefined,
+      });
+      void toast?.({ message: "Movimiento registrado.", variant: "success" });
+      setMovementForm(emptyMovementForm());
+      await load();
+    } catch (e) {
+      void toast?.({
+        message: e?.response?.data?.message || "No se pudo registrar el movimiento.",
+        variant: "error",
+      });
+    } finally {
+      setMovementSaving(false);
+    }
+  };
 
   const handleOpenShift = async () => {
     if (openTotal <= 0) {
@@ -254,6 +362,10 @@ export default function TurnoPage() {
   }
 
   const sales = activeShift?.sales;
+  const cashMovements = activeShift?.cashMovements;
+  const cashOut = Number(cashMovements?.cashOut ?? 0);
+  const cashIn = Number(cashMovements?.cashIn ?? 0);
+  const movementItems = Array.isArray(cashMovements?.items) ? cashMovements.items : [];
   const expectedCash = Number(activeShift?.expectedCashTotal ?? 0);
   const diffPreview = to2(closeTotal - expectedCash);
 
@@ -317,6 +429,180 @@ export default function TurnoPage() {
           </Stack>
         </Paper>
       ) : (
+        <>
+        <Paper variant="panel" sx={panelSx}>
+          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.75 }}>
+            <SwapVertIcon sx={{ fontSize: 18 }} color="action" />
+            <Typography variant="subtitle2" fontWeight={700}>
+              Movimientos de caja
+            </Typography>
+          </Stack>
+
+          <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mb: 1 }}>
+            <ToggleButtonGroup
+              exclusive
+              size="small"
+              value={movementForm.direction}
+              onChange={handleMovementDirection}
+              disabled={movementSaving}
+              sx={{ flexShrink: 0 }}
+            >
+              <ToggleButton value="out" sx={{ px: 1.5, fontSize: "0.75rem" }}>
+                Salida
+              </ToggleButton>
+              <ToggleButton value="in" sx={{ px: 1.5, fontSize: "0.75rem" }}>
+                Entrada
+              </ToggleButton>
+            </ToggleButtonGroup>
+
+            <FormControl size="small" sx={{ minWidth: 160, ...compactFieldSx }}>
+              <InputLabel>Categoría</InputLabel>
+              <Select
+                label="Categoría"
+                value={movementForm.category}
+                onChange={(e) =>
+                  setMovementForm((p) => ({
+                    ...p,
+                    category: e.target.value,
+                    product: null,
+                    quantity: "",
+                  }))
+                }
+                disabled={movementSaving}
+              >
+                {movementCategories.map((cat) => (
+                  <MenuItem key={cat} value={cat}>
+                    {MOVEMENT_CATEGORY_LABELS[cat]}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <TextField
+              size="small"
+              margin="dense"
+              label="Monto"
+              type="number"
+              value={movementForm.amount}
+              onChange={(e) => setMovementForm((p) => ({ ...p, amount: e.target.value }))}
+              disabled={movementSaving}
+              inputProps={{ min: 0, step: 0.01 }}
+              sx={{ ...compactFieldSx, width: 110 }}
+            />
+
+            <TextField
+              size="small"
+              margin="dense"
+              label="Concepto"
+              value={movementForm.concept}
+              onChange={(e) => setMovementForm((p) => ({ ...p, concept: e.target.value }))}
+              disabled={movementSaving}
+              sx={{ ...compactFieldSx, flex: 1, minWidth: 120 }}
+            />
+
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<AddIcon />}
+              disabled={movementSaving}
+              onClick={() => void handleAddMovement()}
+              sx={{ flexShrink: 0, alignSelf: { xs: "stretch", md: "center" } }}
+            >
+              {movementSaving ? "Guardando…" : "Registrar"}
+            </Button>
+          </Stack>
+
+          {movementForm.category === "compra_mercancia" && (
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mb: 1 }}>
+              <Autocomplete
+                size="small"
+                options={products}
+                loading={productsLoading}
+                getOptionLabel={(opt) => opt?.name || ""}
+                value={movementForm.product}
+                onChange={(_, val) => setMovementForm((p) => ({ ...p, product: val }))}
+                disabled={movementSaving}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    margin="dense"
+                    label="Producto (opc.)"
+                    placeholder="Si compraste mercancía para inventario"
+                    sx={compactFieldSx}
+                  />
+                )}
+                sx={{ flex: 1, minWidth: 180 }}
+              />
+              <TextField
+                size="small"
+                margin="dense"
+                label="Cantidad"
+                type="number"
+                value={movementForm.quantity}
+                onChange={(e) => setMovementForm((p) => ({ ...p, quantity: e.target.value }))}
+                disabled={movementSaving}
+                inputProps={{ min: 0, step: 0.01 }}
+                sx={{ ...compactFieldSx, width: 110 }}
+              />
+              <TextField
+                size="small"
+                margin="dense"
+                label="Notas (opc.)"
+                value={movementForm.notes}
+                onChange={(e) => setMovementForm((p) => ({ ...p, notes: e.target.value }))}
+                disabled={movementSaving}
+                sx={{ ...compactFieldSx, flex: 1, minWidth: 120 }}
+              />
+            </Stack>
+          )}
+
+          {movementItems.length > 0 && (
+            <TableContainer sx={{ maxHeight: 140, mb: 1 }}>
+              <Table
+                size="small"
+                stickyHeader
+                sx={{ "& .MuiTableCell-root": { py: 0.35, px: 1, fontSize: "0.72rem" } }}
+              >
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Hora</TableCell>
+                    <TableCell>Tipo</TableCell>
+                    <TableCell>Concepto</TableCell>
+                    <TableCell align="right">Monto</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {movementItems.map((m) => (
+                    <TableRow key={m.id} hover>
+                      <TableCell>{formatShiftDate(m.createdAt)}</TableCell>
+                      <TableCell>
+                        {m.direction === "out" ? "Salida" : "Entrada"}
+                        {" · "}
+                        {MOVEMENT_CATEGORY_LABELS[m.category] || m.category}
+                      </TableCell>
+                      <TableCell>{m.concept}</TableCell>
+                      <TableCell
+                        align="right"
+                        sx={{
+                          fontWeight: 700,
+                          color: m.direction === "out" ? "error.main" : "success.main",
+                        }}
+                      >
+                        {m.direction === "out" ? "−" : "+"}
+                        {formatMoney(m.amount)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+
+          <Typography variant="caption" color="text.secondary">
+            Registra aquí papel, comida, compras en efectivo, retiros o entradas de cambio para que el arqueo cuadre.
+          </Typography>
+        </Paper>
+
         <Paper variant="panel" sx={panelSx}>
           <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
             Cierre de caja
@@ -325,13 +611,15 @@ export default function TurnoPage() {
           <Stack direction="row" spacing={0.5} sx={{ mb: 0.25 }} wrap="nowrap">
             <StatChip label="Apertura" value={formatMoney(activeShift.openingCashTotal)} />
             <StatChip label="Efec. ventas" value={formatMoney(sales?.salesCash)} />
+            <StatChip label="Salidas" value={formatMoney(cashOut)} />
+            <StatChip label="Entradas" value={formatMoney(cashIn)} />
             <StatChip label="Esperado" value={formatMoney(expectedCash)} highlight />
             <StatChip label="Transfer." value={formatMoney(sales?.salesTransfer)} />
             <StatChip label="Tarjeta" value={formatMoney(sales?.salesCard)} />
             <StatChip label="Pedidos" value={String(activeShift.orderCount ?? 0)} />
           </Stack>
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
-            Transfer. y tarjeta se registran en Caja al cobrar; aquí solo se resumen. El arqueo es solo efectivo físico.
+            Esperado = apertura + ventas en efectivo − salidas + entradas. Transfer. y tarjeta solo se resumen.
           </Typography>
 
           <CashArqueoBlock
@@ -375,6 +663,7 @@ export default function TurnoPage() {
             </Button>
           </Stack>
         </Paper>
+        </>
       )}
 
       <Paper variant="panel" sx={{ p: 1, borderRadius: 1.5 }}>

@@ -188,7 +188,6 @@ function StoresPage() {
         columns={columns}
         defaultRowsPerPage={10}
         title="PUNTOS DE VENTA"
-        tableMaxHeight={380}
         showIndex={true}
       />
     </Container>

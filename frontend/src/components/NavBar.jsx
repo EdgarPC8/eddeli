@@ -21,8 +21,6 @@ import {
   Divider,
   Tooltip,
   CircularProgress,
-  styled,
-  useTheme,
   Badge,
   Popover,
   Accordion,
@@ -30,6 +28,7 @@ import {
   AccordionDetails,
   ListItem,
 } from "@mui/material";
+import { useTheme } from "@mui/material/styles";
 import MenuIcon from "@mui/icons-material/Menu";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
@@ -169,14 +168,6 @@ function menuGroupsForRole(loginRol) {
   })).filter((group) => group.items.length > 0);
 }
 
-const DrawerHeader = styled("div")(({ theme }) => ({
-  display: "flex",
-  alignItems: "center",
-  padding: theme.spacing(0, 1),
-  ...theme.mixins.toolbar,
-  justifyContent: "flex-end",
-}));
-
 export default function NavBar() {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -259,7 +250,15 @@ export default function NavBar() {
 
   const drawerContent = (
     <>
-      <DrawerHeader>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          px: 1,
+          ...theme.mixins.toolbar,
+          justifyContent: "flex-end",
+        }}
+      >
         <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1, px: 1 }}>
           <Box
             component="img"
@@ -281,7 +280,7 @@ export default function NavBar() {
         >
           <ChevronLeftIcon />
         </IconButton>
-      </DrawerHeader>
+      </Box>
       <Divider />
       <List sx={{ px: 1, py: 1 }}>
         {menuItems.map((item) => renderMenuItem(item))}

@@ -207,7 +207,7 @@ export default function AccountForm({ isEditing = false, datos = null, onClose, 
                 showSearch
                 showPagination
                 defaultRowsPerPage={5}
-                tableMaxHeight={240}
+                tableMaxHeight="calc(50vh - 80px)"
               />
             )}
           </Grid>

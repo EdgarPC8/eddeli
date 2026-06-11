@@ -21,19 +21,24 @@ export const InventoryMovement = sequelize.define('ERP_inventory_movements', {
   // NUEVO: motivo específico
   reason: {
     type: DataTypes.ENUM(
-      "ENTRADA_PRODUCCION",     // entra por producción propia
-      "ENTRADA_COMPRA",         // entra por compra a proveedor
-  
-      "SALIDA_VENTA",           // sale por venta / entrega de pedido
-      "SALIDA_YAPA",            // sale por yapa / regalo
-      "SALIDA_DANIADO",         // sale por producto dañado
-      "SALIDA_CADUCADO",        // sale por producto caducado
-      "SALIDA_CONSUMO_INTERNO", // sale por consumo interno
-  
-      "AJUSTE_ENTRADA",         // ajuste positivo (sobrante)
-      "AJUSTE_SALIDA"           // ajuste negativo (faltante)
+      "ENTRADA_PRODUCCION",
+      "ENTRADA_COMPRA",
+      "ENTRADA_DEVOLUCION",
+      "ENTRADA_OTRA",
+      "SALIDA_VENTA",
+      "SALIDA_YAPA",
+      "SALIDA_DANIADO",
+      "SALIDA_CADUCADO",
+      "SALIDA_CONSUMO_INTERNO",
+      "SALIDA_CONSUMO",
+      "SALIDA_MERMA",
+      "SALIDA_OTRA",
+      "SALIDA_REEMPLAZO",
+      "AJUSTE_ENTRADA",
+      "AJUSTE_SALIDA",
+      "PRODUCCION_FINAL",
     ),
-    allowNull: true
+    allowNull: true,
   },
   referenceType: { type: DataTypes.STRING, allowNull: true }, // "order", "purchase", "production", etc.
   referenceId: { type: DataTypes.INTEGER, allowNull: true },
@@ -122,6 +127,8 @@ export const InventoryProduct = sequelize.define('ERP_inventory_products', {
   // 💰 Precios
   price: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
   wholesaleRules: { type: DataTypes.JSON, allowNull: true },
+  /** Tramos opcionales: [{ qty, totalPrice }] — ej. 2 pans = $0.25 */
+  packageTiers: { type: DataTypes.JSON, allowNull: true },
   distributorPrice: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
   taxRate: { type: DataTypes.DECIMAL(5,2), defaultValue: 0 }, // % IVA
   // 📦 Identificadores

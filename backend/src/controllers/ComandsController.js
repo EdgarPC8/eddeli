@@ -2,13 +2,19 @@ import { createLicenseToken } from "../libs/jwt.js";
 import { License } from "../models/License.js";
 import { Logs } from "../models/Logs.js";
 import { sequelize } from "../database/connection.js";
+import "../database/registerEdDeliModels.js";
 import { backupFilePath, insertData, saveBackup } from "../database/insertData.js";
 import { promises as fs } from "fs";
 
 export const saveBackupController = async (req, res) => {
   try {
-    await saveBackup();
-    res.json("ok");
+    const { backupPath, counts } = await saveBackup();
+    res.json({
+      ok: true,
+      message: "Copia de seguridad guardada correctamente.",
+      path: backupPath,
+      tables: counts,
+    });
   } catch (error) {
     console.error("Error en saveBackupController:", error);
     return res.status(500).json({
@@ -64,10 +70,18 @@ export const reloadBdController = async (req, res) => {
   try {
     console.log("🔄 Reiniciando base de datos (EdDeli)...");
 
+    let safetyBackupPath = null;
+    try {
+      const safety = await saveBackup();
+      safetyBackupPath = safety.backupPath;
+      console.log("💾 Copia de seguridad previa guardada en:", safetyBackupPath);
+    } catch (backupErr) {
+      console.warn("⚠️ No se pudo guardar copia previa; se continúa con backup.json:", backupErr.message);
+    }
+
     const dialect = sequelize.getDialect?.() || "mysql";
 
     if (dialect === "mysql") {
-      // Sin esto, MySQL falla al DROP (p. ej. `users`) si otra tabla aún referencia la fila vía FK.
       await sequelize.query("SET FOREIGN_KEY_CHECKS = 0");
       try {
         await sequelize.sync({ force: true });
@@ -77,7 +91,7 @@ export const reloadBdController = async (req, res) => {
     } else {
       await sequelize.sync({ force: true });
     }
-    console.log("📦 Tablas recreadas (modelos cargados vía insertData / rutas)");
+    console.log("📦 Tablas recreadas");
 
     await insertData();
     console.log("✅ Datos EdDeli insertados desde backup.json");
@@ -85,12 +99,14 @@ export const reloadBdController = async (req, res) => {
     return res.json({
       ok: true,
       message: "Base de datos reiniciada e inicializada desde backup.json (EdDeli)",
+      safetyBackup: safetyBackupPath,
     });
   } catch (error) {
     console.error("❌ Error en reloadBdController:", error);
     return res.status(500).json({
       ok: false,
-      message: "Error al reiniciar la base de datos",
+      message:
+        "Error al reiniciar la base de datos. Si quedó vacía, restaura desde src/database/backups/ o backup.json.",
       error: error.message,
     });
   }

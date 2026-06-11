@@ -13,7 +13,12 @@ import {
   DialogContent,
   DialogActions,
   Slider,
+  IconButton,
+  Tooltip,
 } from "@mui/material";
+import ImageIcon from "@mui/icons-material/Image";
+import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import Cropper from "react-easy-crop";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../../../../context/AuthContext";
@@ -193,6 +198,28 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
     }
   });
 
+  const [packageTiers, setPackageTiers] = useState(() => {
+    try {
+      if (Array.isArray(datos?.packageTiers)) return datos.packageTiers;
+      if (typeof datos?.packageTiers === "string") {
+        const parsed = JSON.parse(datos.packageTiers);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+      return [];
+    } catch {
+      return [];
+    }
+  });
+
+  const addPackageTier = () =>
+    setPackageTiers((prev) => [...prev, { qty: 1, totalPrice: 0 }]);
+  const removePackageTier = (idx) =>
+    setPackageTiers((prev) => prev.filter((_, i) => i !== idx));
+  const updatePackageTier = (idx, key, val) =>
+    setPackageTiers((prev) =>
+      prev.map((t, i) => (i === idx ? { ...t, [key]: val } : t))
+    );
+
   const addTier = () =>
     setWholesaleRules((prev) => [...prev, { minQty: 12, discountPercent: 5 }]);
   const removeTier = (idx) =>
@@ -209,6 +236,7 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
   const [cropOpen, setCropOpen] = useState(false);
   const [lastMeta, setLastMeta] = useState(null);
   const fileRef = useRef(null);
+  const cameraRef = useRef(null);
 
   // ✅ Input manual: el usuario puede escribir "EdDeli", "EdDeli/products", "EdDeli/products/donas"
   // El submit lo normaliza para mandar "subfolder" correcto al middleware.
@@ -223,15 +251,14 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
   const ASPECTS = { "1:1": 1, "4:3": 4 / 3, "16:9": 16 / 9, free: undefined };
   const [aspectKey, setAspectKey] = useState("1:1");
 
-  const chooseFile = () => fileRef.current?.click();
-
-  const onFileChange = (e) => {
+  const handlePickImage = (e) => {
     const f = e.target.files?.[0];
+    e.target.value = "";
     if (!f) return;
+    if (imageSrc) URL.revokeObjectURL(imageSrc);
     const url = URL.createObjectURL(f);
     setImageSrc(url);
     setCropOpen(true);
-    e.target.value = "";
   };
 
   const onCropConfirm = async (blob, meta) => {
@@ -259,6 +286,8 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
     setPreviewUrl(null);
     setSelectedFile(null);
     setLastMeta(null);
+    if (fileRef.current) fileRef.current.value = "";
+    if (cameraRef.current) cameraRef.current.value = "";
   };
 
   useEffect(() => {
@@ -301,6 +330,23 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
     } catch (err) {
       console.warn("Error parsing wholesaleRules:", err);
       setWholesaleRules([]);
+    }
+
+    try {
+      if (Array.isArray(datos.packageTiers)) {
+        setPackageTiers(datos.packageTiers);
+      } else if (
+        typeof datos.packageTiers === "string" &&
+        datos.packageTiers.trim() !== ""
+      ) {
+        const parsed = JSON.parse(datos.packageTiers);
+        setPackageTiers(Array.isArray(parsed) ? parsed : []);
+      } else {
+        setPackageTiers([]);
+      }
+    } catch (err) {
+      console.warn("Error parsing packageTiers:", err);
+      setPackageTiers([]);
     }
 
     // ✅ sugerir la carpeta a partir de la ruta guardada
@@ -359,6 +405,7 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
       fd.append("standardWeightGrams", String(data.standardWeightGrams));
   
     fd.append("wholesaleRules", JSON.stringify(wholesaleRules || []));
+    fd.append("packageTiers", JSON.stringify(packageTiers || []));
   
     // ✅ nombre base si subes imagen nueva
     fd.append("customFileName", data.name?.trim() || "producto");
@@ -416,16 +463,101 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
   
 
   return (
-    <Box component="form" sx={{ mt: 1 }} onSubmit={handleSubmit(submitForm)}>
+    <Box
+      component="form"
+      id="eddeli-product-form"
+      sx={{ mt: 0 }}
+      onSubmit={handleSubmit(submitForm)}
+    >
       <Grid container spacing={2}>
         {/* Campos principales */}
         <Grid item xs={12}>
-          <TextField
-            label="Nombre"
-            fullWidth
-            variant="standard"
-            {...register("name", { required: true })}
-          />
+          <Stack direction="row" spacing={1} alignItems="flex-start">
+            <TextField
+              label="Nombre"
+              fullWidth
+              variant="standard"
+              sx={{ flex: 1 }}
+              {...register("name", { required: true })}
+            />
+            <Stack direction="row" spacing={0.25} sx={{ pt: 0.25, flexShrink: 0 }}>
+              <Tooltip title="Elegir imagen de la galería y recortar">
+                <IconButton
+                  component="label"
+                  size="small"
+                  color={selectedFile || currentImage ? "primary" : "default"}
+                  aria-label="Elegir imagen"
+                >
+                  <ImageIcon />
+                  <input
+                    ref={fileRef}
+                    hidden
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePickImage}
+                  />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Tomar foto con la cámara del dispositivo">
+                <IconButton
+                  component="label"
+                  size="small"
+                  color={selectedFile || currentImage ? "primary" : "default"}
+                  aria-label="Tomar foto"
+                >
+                  <PhotoCameraIcon />
+                  <input
+                    ref={cameraRef}
+                    hidden
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    onChange={handlePickImage}
+                  />
+                </IconButton>
+              </Tooltip>
+              {(selectedFile || currentImage) && (
+                <Tooltip title="Quitar imagen seleccionada">
+                  <IconButton
+                    size="small"
+                    color="error"
+                    aria-label="Quitar imagen"
+                    onClick={clearPreview}
+                  >
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              )}
+            </Stack>
+          </Stack>
+          {currentImage ? (
+            <Box sx={{ mt: 1.5, display: "flex", alignItems: "center", gap: 1.5 }}>
+              <Box
+                component="img"
+                src={currentImage}
+                alt="Vista previa"
+                sx={{
+                  width: 72,
+                  height: 72,
+                  objectFit: "cover",
+                  borderRadius: 1.5,
+                  border: 1,
+                  borderColor: "divider",
+                }}
+              />
+              <Box>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  {selectedFile ? "Nueva imagen (se sube al guardar)" : "Imagen actual del producto"}
+                </Typography>
+                {lastMeta ? (
+                  <Typography variant="caption" color="text.secondary" display="block">
+                    {lastMeta.width}×{lastMeta.height}px ·{" "}
+                    {((lastMeta.sizeBytes || 0) / (1024 * 1024)).toFixed(2)} MB
+                  </Typography>
+                ) : null}
+              </Box>
+            </Box>
+          ) : null}
         </Grid>
 
         <Grid item xs={12}>
@@ -554,6 +686,61 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
           />
         </Grid>
 
+        {/* Precios por tramo / paquete (opcional) */}
+        <Grid item xs={12}>
+          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
+            <Typography variant="subtitle2">Precios por tramo (paquetes)</Typography>
+            <Button variant="outlined" size="small" onClick={addPackageTier}>
+              Añadir tramo
+            </Button>
+          </Stack>
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+            Opcional. Solo para productos como pan: 1=$0.15, 2=$0.25, 4=$0.50… Caja combina
+            tramos automáticamente. Si configuras tramos, tienen prioridad sobre mayoreo.
+          </Typography>
+        </Grid>
+
+        {packageTiers.map((tier, idx) => (
+          <Grid key={`pkg-${idx}`} item xs={12} sm={6} md={4}>
+            <Stack
+              spacing={1}
+              sx={{
+                border: "1px solid",
+                borderColor: "divider",
+                p: 1.5,
+                borderRadius: 1,
+              }}
+            >
+              <TextField
+                label="Cantidad"
+                type="number"
+                size="small"
+                value={tier.qty}
+                onChange={(e) =>
+                  updatePackageTier(idx, "qty", Math.max(1, Number(e.target.value || 1)))
+                }
+              />
+              <TextField
+                label="Total a cobrar ($)"
+                type="number"
+                size="small"
+                value={tier.totalPrice}
+                onChange={(e) =>
+                  updatePackageTier(
+                    idx,
+                    "totalPrice",
+                    Math.max(0, Number(e.target.value || 0))
+                  )
+                }
+                inputProps={{ step: "0.01", min: 0 }}
+              />
+              <Button color="error" size="small" onClick={() => removePackageTier(idx)}>
+                Quitar
+              </Button>
+            </Stack>
+          </Grid>
+        ))}
+
         {/* Reglas Mayoristas */}
         <Grid item xs={12}>
           <Stack direction="row" alignItems="center" spacing={1}>
@@ -612,98 +799,33 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
           </Grid>
         ))}
 
-        {/* Imagen */}
+        {/* Imagen — carpeta destino y proporción de recorte */}
         <Grid item xs={12}>
           <Stack spacing={1}>
-            {/* ✅ Input manual: ruta completa desde EdDeli */}
             <TextField
-              label='Carpeta destino (ej: "EdDeli" o "EdDeli/products")'
+              label='Carpeta destino (ej: "EdDeli/products")'
               size="small"
               fullWidth
               variant="standard"
               value={imageSubfolder}
               onChange={(e) => setImageSubfolder(e.target.value)}
-              placeholder='Ej: EdDeli | EdDeli/products | EdDeli/products/donas'
-              helperText='El backend guardará siempre la ruta en BD como: EdDeli/<subcarpeta>/<archivo>. No pongas ".." ni caracteres raros.'
+              placeholder="EdDeli/products"
+              helperText="Ruta donde se guardará la imagen en el servidor."
             />
-
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              spacing={2}
-              alignItems="center"
+            <TextField
+              label="Relación de aspecto al recortar"
+              value={aspectKey}
+              onChange={(e) => setAspectKey(e.target.value)}
+              select
+              size="small"
+              sx={{ maxWidth: 220 }}
             >
-              <Button variant="outlined" onClick={chooseFile}>
-                {currentImage ? "Cambiar imagen…" : "Elegir imagen…"}
-              </Button>
-
-              <TextField
-                label="Relación de aspecto"
-                value={aspectKey}
-                onChange={(e) => setAspectKey(e.target.value)}
-                select
-                size="small"
-                sx={{ width: 220 }}
-              >
-                <MenuItem value="free">Libre</MenuItem>
-                <MenuItem value="1:1">1:1</MenuItem>
-                <MenuItem value="4:3">4:3</MenuItem>
-                <MenuItem value="16:9">16:9</MenuItem>
-              </TextField>
-            </Stack>
-
-            <input
-              type="file"
-              accept="image/*"
-              hidden
-              ref={fileRef}
-              onChange={onFileChange}
-            />
-
-            {currentImage && (
-              <Box
-                sx={{
-                  mt: 1,
-                  border: "1px dashed",
-                  borderColor: "divider",
-                  p: 1,
-                  borderRadius: 1,
-                  display: "flex",
-                  gap: 2,
-                  flexWrap: "wrap",
-                }}
-              >
-                <img
-                  src={currentImage}
-                  alt="preview"
-                  style={{
-                    width: 120,
-                    height: 120,
-                    objectFit: "cover",
-                    borderRadius: 8,
-                  }}
-                />
-                <Box>
-                  <Typography variant="body2" color="text.secondary">
-                    {selectedFile ? "Vista previa (recortada)" : "Imagen actual"}
-                  </Typography>
-                  {lastMeta && (
-                    <Typography variant="caption" color="text.secondary">
-                      {lastMeta.width}×{lastMeta.height}px ·{" "}
-                      {((lastMeta.sizeBytes || 0) / (1024 * 1024)).toFixed(2)}{" "}
-                      MB · {lastMeta.mime}
-                    </Typography>
-                  )}
-                </Box>
-              </Box>
-            )}
+              <MenuItem value="free">Libre</MenuItem>
+              <MenuItem value="1:1">1:1</MenuItem>
+              <MenuItem value="4:3">4:3</MenuItem>
+              <MenuItem value="16:9">16:9</MenuItem>
+            </TextField>
           </Stack>
-        </Grid>
-
-        {/* Botón Guardar */}
-        <Grid item xs={12} sm={4}>
-          <Button variant="contained" fullWidth type="submit">
-            {!isEditing ? "Guardar" : "Editar"}
-          </Button>
         </Grid>
       </Grid>
 

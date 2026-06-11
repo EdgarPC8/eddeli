@@ -311,7 +311,6 @@ const commonColumns = [
             columns={commonColumns}
             defaultRowsPerPage={5}
             title="Ingresos"
-            tableMaxHeight={200}
           />
         </Grid>
         <Grid item xs={12} md={6}>
@@ -336,7 +335,6 @@ const commonColumns = [
             columns={commonColumns}
             defaultRowsPerPage={5}
             title="Gastos"
-            tableMaxHeight={200}
           />
         </Grid>
       </Grid>

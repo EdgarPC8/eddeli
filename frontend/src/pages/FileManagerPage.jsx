@@ -332,7 +332,6 @@ import UploadFileForm from "../components/Forms/UploadFileForm";
           columns={columns}
           defaultRowsPerPage={10}
           title="ARCHIVOS"
-          tableMaxHeight={420}
           showIndex={true}
         />
   

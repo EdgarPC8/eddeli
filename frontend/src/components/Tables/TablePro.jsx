@@ -27,7 +27,7 @@ const TablePro = ({
   defaultRowsPerPage = 5,
   showIndex = false,
   indexHeader = "#",
-  tableMaxHeight = 150,
+  tableMaxHeight = "calc(100vh - 220px)",
 }) => {
   const [searchText, setSearchText] = useState("");
   const [page, setPage] = useState(0);
@@ -99,16 +99,17 @@ const TablePro = ({
     : filteredRows;
 
   return (
-    <Paper sx={{ width: "100%", p: 2 }}>
-      <Box sx={{ p: 1 }}>
+    <Paper sx={{ width: "100%", p: 1, overflow: "hidden" }}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
         {title && (
-          <Typography variant="h6" gutterBottom>
+          <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
             {title}
           </Typography>
         )}
         {showSearch && (
           <TextField
             fullWidth
+            size="small"
             variant="outlined"
             placeholder="Buscar..."
             value={searchText}

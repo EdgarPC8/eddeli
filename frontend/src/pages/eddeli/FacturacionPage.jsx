@@ -64,7 +64,7 @@ export default function FacturacionPage() {
       <Typography variant="h5" fontWeight={700} gutterBottom>
         Facturación — ventas de caja
       </Typography>
-      <Paper sx={{ p: 2, mb: 2, borderRadius: 2 }}>
+      <Paper sx={{ p: 1, mb: 1, borderRadius: 2 }}>
         <Typography variant="body2" color="text.secondary">
           Registro de ventas del punto de venta: factura, nota de venta, comprobante o consumidor final.
           Pulsa el icono de impresora para ver la vista previa y elegir formato A4 o ticket 80 mm.

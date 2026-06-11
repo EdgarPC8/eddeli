@@ -573,35 +573,35 @@ const AJUSTE_REASONS_DB = new Set(["AJUSTE_ENTRADA", "AJUSTE_SALIDA"]);
  * @param {import("sequelize").Model} product InventoryProduct
  * @param {number} qtyDelta cantidad a sumar (>= 0 esperado)
  */
-async function applyMovementEntrada(product, qtyDelta) {
+async function applyMovementEntrada(product, qtyDelta, transaction) {
   product.stock = parseFloat(product.stock) + qtyDelta;
-  await product.save();
+  await product.save({ transaction });
 }
 
 /**
  * PRODUCCIÓN: mismo efecto contable que entrada — incrementa stock del producto fabricado.
  * (El desglose de insumos va por otros flujos: registerProductionFinalFromPayload, etc.)
  */
-async function applyMovementProduccion(product, qtyDelta) {
+async function applyMovementProduccion(product, qtyDelta, transaction) {
   product.stock = parseFloat(product.stock) + qtyDelta;
-  await product.save();
+  await product.save({ transaction });
 }
 
 /**
  * SALIDA: resta cantidad del stock (venta, consumo interno, merma, etc.)
  */
-async function applyMovementSalida(product, qtyDelta) {
+async function applyMovementSalida(product, qtyDelta, transaction) {
   product.stock = parseFloat(product.stock) - qtyDelta;
-  await product.save();
+  await product.save({ transaction });
 }
 
 /**
  * AJUSTE: `nuevoStockAbsoluto` reemplaza el stock (inventario físico / conteo).
  * No es un delta: el front envía el valor final deseado en `quantity`.
  */
-async function applyMovementAjuste(product, nuevoStockAbsoluto) {
+async function applyMovementAjuste(product, nuevoStockAbsoluto, transaction) {
   product.stock = nuevoStockAbsoluto;
-  await product.save();
+  await product.save({ transaction });
 }
 
 /**
@@ -621,49 +621,73 @@ function resolveAjusteReasonForDb(reasonIncoming, stockAnterior, stockNuevo) {
 /**
  * Registra gasto en finanzas solo cuando es compra con monto (entrada + ENTRADA_COMPRA).
  */
-async function registerExpenseCompraSiAplica({ product, reason, priceTotal, accountId }) {
+async function registerExpenseCompraSiAplica({ product, reason, priceTotal, accountId, transaction }) {
   if (reason !== "ENTRADA_COMPRA" || priceTotal == null || Number.isNaN(Number(priceTotal))) {
     return;
   }
-  await Expense.create({
-    date: new Date(),
-    amount: priceTotal,
-    concept: `Compra de ${product.name}`,
-    category: "Compras",
-    referenceId: product.id,
-    referenceType: "inventory_entry",
-    createdBy: accountId,
-  });
+  await Expense.create(
+    {
+      date: new Date(),
+      amount: priceTotal,
+      concept: `Compra de ${product.name}`,
+      category: "Compras",
+      referenceId: product.id,
+      referenceType: "inventory_entry",
+      createdBy: accountId,
+    },
+    { transaction },
+  );
 }
 
 /**
  * Crea la fila en ERP_inventory_movements (auditoría).
  * `quantity` en ajuste = stock final absoluto (misma semántica que antes).
  */
-async function createInventoryMovementRow({
-  productId,
-  type,
-  reason,
-  quantity,
-  description,
-  price,
-  referenceType,
-  referenceId,
-  createdBy,
-  date,
-}) {
-  return InventoryMovement.create({
+async function createInventoryMovementRow(
+  {
     productId,
     type,
     reason,
     quantity,
     description,
-    price: price ?? null,
-    referenceType: referenceType ?? null,
-    referenceId: referenceId ?? null,
+    price,
+    referenceType,
+    referenceId,
     createdBy,
-    date: date ?? new Date(),
-  });
+    date,
+  },
+  transaction,
+) {
+  return InventoryMovement.create(
+    {
+      productId,
+      type,
+      reason,
+      quantity,
+      description,
+      price: price ?? null,
+      referenceType: referenceType ?? null,
+      referenceId: referenceId ?? null,
+      createdBy,
+      date: date ?? new Date(),
+    },
+    { transaction },
+  );
+}
+
+/** Alias usados en el front que deben mapear a valores válidos del ENUM. */
+const REASON_ALIASES = {
+  SALIDA_CONSUMO: "SALIDA_CONSUMO_INTERNO",
+  SALIDA_MERMA: "SALIDA_DANIADO",
+  PRODUCCION_FINAL: "ENTRADA_PRODUCCION",
+  ENTRADA_DEVOLUCION: "ENTRADA_COMPRA",
+};
+
+function normalizeMovementReason(type, reason, stockAntes, stockNuevo) {
+  if (type === "ajuste") {
+    return resolveAjusteReasonForDb(reason || "AJUSTE_INVENTARIO", stockAntes, stockNuevo);
+  }
+  return REASON_ALIASES[reason] || reason;
 }
 
 /** Recalcula stock del producto según todos sus movimientos (orden cronológico). */
@@ -724,64 +748,77 @@ export const registerMovement = async (req, res) => {
       return res.status(400).json({ message: `type inválido. Use: ${MOVEMENT_TYPES.join(", ")}` });
     }
 
-    const product = await InventoryProduct.findByPk(productId);
-    if (!product) return res.status(404).json({ message: "Producto no encontrado" });
-
     const qty = parseFloat(quantity);
     if (Number.isNaN(qty)) {
       return res.status(400).json({ message: "quantity no numérica" });
     }
-
-    const stockAntes = parseFloat(product.stock) || 0;
 
     // reason obligatorio salvo ajuste (se infiere / normaliza)
     if (type !== "ajuste" && !reason) {
       return res.status(400).json({ message: "Falta reason (motivo del movimiento)" });
     }
 
-    let reasonParaDb = reason;
-
-    // --- 1) Aplicar cambio de stock según tipo ---
-    if (type === "entrada") {
-      await applyMovementEntrada(product, qty);
-    } else if (type === "produccion") {
-      await applyMovementProduccion(product, qty);
-    } else if (type === "salida") {
-      await applyMovementSalida(product, qty);
-    } else if (type === "ajuste") {
-      await applyMovementAjuste(product, qty);
-      reasonParaDb = resolveAjusteReasonForDb(reason || "AJUSTE_INVENTARIO", stockAntes, qty);
-    }
-
-    // --- 2) Finanzas: solo entrada por compra con precio ---
-    if (type === "entrada") {
-      await registerExpenseCompraSiAplica({
-        product,
-        reason: reasonParaDb,
-        priceTotal: price,
-        accountId: user.accountId,
+    await sequelize.transaction(async (t) => {
+      const product = await InventoryProduct.findByPk(productId, {
+        transaction: t,
+        lock: t.LOCK.UPDATE,
       });
-    }
+      if (!product) {
+        const err = new Error("Producto no encontrado");
+        err.statusCode = 404;
+        throw err;
+      }
 
-    // --- 3) Movimiento en tabla (ajuste sin precio; coherente con front) ---
-    const priceParaDb = type === "ajuste" ? null : price ?? null;
+      const stockAntes = parseFloat(product.stock) || 0;
+      const reasonParaDb = normalizeMovementReason(type, reason, stockAntes, qty);
 
-    await createInventoryMovementRow({
-      productId,
-      type,
-      reason: reasonParaDb,
-      quantity: qty,
-      description,
-      price: priceParaDb,
-      referenceType,
-      referenceId,
-      createdBy: user.accountId,
-      date: resolveMovementDate(movementDateInput, user),
+      if (type === "entrada") {
+        await applyMovementEntrada(product, qty, t);
+      } else if (type === "produccion") {
+        await applyMovementProduccion(product, qty, t);
+      } else if (type === "salida") {
+        await applyMovementSalida(product, qty, t);
+      } else if (type === "ajuste") {
+        await applyMovementAjuste(product, qty, t);
+      }
+
+      if (type === "entrada") {
+        await registerExpenseCompraSiAplica({
+          product,
+          reason: reasonParaDb,
+          priceTotal: price,
+          accountId: user.accountId,
+          transaction: t,
+        });
+      }
+
+      const priceParaDb = type === "ajuste" ? null : price ?? null;
+
+      await createInventoryMovementRow(
+        {
+          productId,
+          type,
+          reason: reasonParaDb,
+          quantity: qty,
+          description,
+          price: priceParaDb,
+          referenceType,
+          referenceId,
+          createdBy: user.accountId,
+          date: resolveMovementDate(movementDateInput, user),
+        },
+        t,
+      );
     });
 
     res.status(201).json({ message: "Movimiento registrado exitosamente" });
   } catch (error) {
-    res.status(500).json({ message: "Error al registrar movimiento", error });
+    const status = error?.statusCode || 500;
+    const message =
+      status === 500
+        ? error?.message || "Error al registrar movimiento"
+        : error?.message || "Error al registrar movimiento";
+    res.status(status).json({ message, error: String(error?.message || error) });
   }
 };
 

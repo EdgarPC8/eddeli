@@ -34,6 +34,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import PrintIcon from "@mui/icons-material/Print";
+import AppsIcon from "@mui/icons-material/Apps";
 import PrintFormatDialog from "../../components/saleReceipt/PrintFormatDialog.jsx";
 import {
   getAllProducts,
@@ -42,13 +43,14 @@ import {
 import { getAllCustomersRequest, posCheckoutRequest } from "../../api/ordersRequest.js";
 import { getActiveShift } from "../../api/shiftRequest.js";
 import CajaCustomerFormDialog from "./CajaCustomerFormDialog.jsx";
+import CajaQuickProductsDialog from "./CajaQuickProductsDialog.jsx";
 import SearchableSelect from "../../components/SearchableSelect.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { buildCajaOrderNotes } from "../../utils/eddeliPosOrderUtils.js";
 import { buildCustomerDisplayName, formatCustomerDocument } from "./cajaCustomerUtils.js";
 import { formatMoney } from "../../utils/turnoCashUtils.js";
 import { useBarcodeScanner } from "../../hooks/useBarcodeScanner.js";
-import { resolveEddeliUnitPrice } from "../../utils/productLookup.js";
+import { resolveEddeliLinePricing } from "../../utils/productLookup.js";
 import {
   buildReceiptFromCheckout,
   resolveStoredDocumentType,
@@ -132,7 +134,10 @@ const buildStockIssues = (cart, productList) => {
 const lineBreakdown = (row) => {
   const qty = Number(row.quantity || 0);
   const unitPrice = Number(row.price || 0);
-  const total = to2(qty * unitPrice);
+  const total =
+    row.lineTotal != null && row.pricingMode === "package"
+      ? to2(Number(row.lineTotal))
+      : to2(qty * unitPrice);
   const taxType = String(row.taxType || "gravado");
   const taxRate = Number(row.taxRate || 0);
   if (taxType !== "gravado" || taxRate <= 0) {
@@ -173,6 +178,7 @@ export default function CajaPage() {
   const [printOpen, setPrintOpen] = useState(false);
   const [printReceipt, setPrintReceipt] = useState(null);
   const [lastSaleReceipt, setLastSaleReceipt] = useState(null);
+  const [quickProductsOpen, setQuickProductsOpen] = useState(false);
 
   const loadData = async () => {
     const [productsRes, customersRes, shiftRes] = await Promise.allSettled([
@@ -228,16 +234,20 @@ export default function CajaPage() {
     return map;
   }, [products]);
 
-  const addToCart = (product) => {
+  const addToCart = (product, qtyToAdd = 1) => {
+    const addQty = Math.max(1, Math.floor(Number(qtyToAdd) || 1));
     setCart((prev) => {
       const id = Number(product.id);
       const exists = prev.find((row) => Number(row.productId) === id);
-      const quantity = exists ? Number(exists.quantity) + 1 : 1;
+      const quantity = exists ? Number(exists.quantity) + addQty : addQty;
+      const pricing = resolveEddeliLinePricing(product, quantity);
       const line = {
         productId: id,
         name: product.name,
         quantity,
-        price: resolveEddeliUnitPrice(product, quantity),
+        price: pricing.unitPrice,
+        lineTotal: pricing.lineTotal,
+        pricingMode: pricing.mode,
         stock: Number(product.stock || 0),
         barcode: product.barcode || "",
         taxType: product.taxType || "gravado",
@@ -258,7 +268,8 @@ export default function CajaPage() {
     setSelectedProductId("");
   };
 
-  const scannerUiBlocked = saving || stockDialogOpen || quickDownOpen || addCustomerOpen;
+  const scannerUiBlocked =
+    saving || stockDialogOpen || quickDownOpen || addCustomerOpen || quickProductsOpen;
 
   const handleBarcodeCode = useCallback(
     (code) => {
@@ -291,8 +302,15 @@ export default function CajaPage() {
         if (key === "quantity") {
           const product = products.find((p) => Number(p.id) === Number(productId));
           if (product) {
-            next.price = resolveEddeliUnitPrice(product, next.quantity);
+            const pricing = resolveEddeliLinePricing(product, next.quantity);
+            next.price = pricing.unitPrice;
+            next.lineTotal = pricing.lineTotal;
+            next.pricingMode = pricing.mode;
           }
+        }
+        if (key === "price") {
+          next.lineTotal = null;
+          next.pricingMode = "manual";
         }
         return next;
       })
@@ -390,7 +408,10 @@ export default function CajaPage() {
       items: cartSnapshot.map((row) => ({
         productId: Number(row.productId),
         quantity: Number(row.quantity),
-        price: Number(row.price || 0),
+        price:
+          row.pricingMode === "package" && row.lineTotal != null
+            ? Number(row.lineTotal) / Number(row.quantity || 1)
+            : Number(row.price || 0),
       })),
     });
     if (!data?.orderId && !data?.ok) {
@@ -436,6 +457,7 @@ export default function CajaPage() {
     }
     try {
       setSaving(true);
+      const stockPatches = new Map();
       for (const issue of stockIssues) {
         const raw = String(stockAdjustQty[issue.productId] ?? "").trim().replace(",", ".");
         const adj = Number(raw);
@@ -446,7 +468,20 @@ export default function CajaPage() {
           quantity: adj,
           description: adjustmentNote || "Entrada desde caja (ajuste de stock)",
           price: null,
+          referenceType: "caja_stock_adjust",
         });
+        stockPatches.set(
+          Number(issue.productId),
+          Number(issue.systemStock) + adj,
+        );
+      }
+      if (stockPatches.size > 0) {
+        setProducts((prev) =>
+          prev.map((p) => {
+            const nextStock = stockPatches.get(Number(p.id));
+            return nextStock == null ? p : { ...p, stock: nextStock };
+          }),
+        );
       }
       const { products: fresh } = await loadData();
       const still = buildStockIssues(cart, fresh);
@@ -704,6 +739,9 @@ export default function CajaPage() {
                 renderOption={renderCajaProductOption}
                 onEnterWithInput={handleBarcodeCode}
               />
+              <Button variant="outlined" startIcon={<AppsIcon />} onClick={() => setQuickProductsOpen(true)}>
+                Accesos rápidos
+              </Button>
               <Button variant="contained" onClick={addSelectedProduct}>
                 Agregar
               </Button>
@@ -1151,6 +1189,13 @@ export default function CajaPage() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <CajaQuickProductsDialog
+        open={quickProductsOpen}
+        onClose={() => setQuickProductsOpen(false)}
+        products={products}
+        onAdd={(product, qty) => addToCart(product, qty)}
+      />
 
       <CajaCustomerFormDialog
         open={addCustomerOpen}

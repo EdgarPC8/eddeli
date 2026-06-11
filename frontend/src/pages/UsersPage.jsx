@@ -49,7 +49,7 @@ export default function UsersPage() {
 
   return (
     <Box>
-      <Paper variant="panel" sx={{ p: 2, mb: 2 }}>
+      <Paper variant="panel" sx={{ p: 1, mb: 1 }}>
         <Button
           variant="contained"
           onClick={() => {
@@ -84,12 +84,21 @@ export default function UsersPage() {
             render: (r) => <p>{r.ci}</p>,
           },
 
-          { id: "email", label: "Correo", render: (r) => r.email || "—" },
-          { id: "Nombre", label: "Nombre", render: (r) => r.firstName || "—" },
+          {
+            id: "Nombre",
+            label: "Nombre",
+            render: (r) =>
+              [r.firstName, r.secondName, r.firstLastName, r.secondLastName].filter(Boolean).join(" ") || "—",
+          },
           {
             id: "username",
             label: "Usuario",
-            render: (r) => r.account.username || "—",
+            render: (r) => r.account?.username || "—",
+          },
+          {
+            id: "roles",
+            label: "Roles",
+            render: (r) => (r.account?.roles || []).map((role) => role.name).join(", ") || "—",
           },
 
           {
@@ -103,13 +112,12 @@ export default function UsersPage() {
                   setIsEditing(true);
                   setUserId(r.id);
                   setForm({
-                    email: r.email,
                     firstName: r.firstName,
                     firstLastName: r.firstLastName,
-                    username: r.account.username,
+                    username: r.account?.username || "",
                     ci: r.ci,
                     password: "",
-                    roles: r.account.roles?.map((r) => r.id),
+                    roles: r.account?.roles?.map((role) => role.id) || [],
                   });
                 }}
               >

@@ -26,6 +26,8 @@ export const CashShift = sequelize.define(
     salesTransferTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
     salesCardTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
     salesTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
+    cashOutTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
+    cashInTotal: { type: DataTypes.DECIMAL(12, 2), allowNull: true },
     openingNotes: { type: DataTypes.TEXT, allowNull: true },
     closingNotes: { type: DataTypes.TEXT, allowNull: true },
   },

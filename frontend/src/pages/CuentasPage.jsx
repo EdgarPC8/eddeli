@@ -150,7 +150,6 @@ export default function CuentasPage() {
         showPagination
         showIndex
         defaultRowsPerPage={10}
-        tableMaxHeight={480}
       />
 
       <SimpleDialog

@@ -40,6 +40,7 @@ export default function CollectionsDialogs({
   setPayOpen,
   payAmount,
   setPayAmount,
+  onPayAmountChange,
   payDate,
   setPayDate,
   payNote,
@@ -146,7 +147,14 @@ export default function CollectionsDialogs({
             <TextField
               label="Monto"
               value={payAmount}
-              onChange={(e) => setPayAmount(e.target.value)}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (typeof onPayAmountChange === "function") {
+                  onPayAmountChange(value);
+                } else {
+                  setPayAmount(value);
+                }
+              }}
               type="number"
               inputProps={{ step: "0.01", min: 0 }}
               helperText={
@@ -167,10 +175,12 @@ export default function CollectionsDialogs({
               placeholder="efectivo / transferencia / etc."
             />
             <TextField
-              label="Nota"
+              label="Nota / descripción"
               value={payNote}
               onChange={(e) => setPayNote(e.target.value)}
-              placeholder="Ej: Abono en efectivo"
+              placeholder="Se completa automáticamente al liquidar el saldo"
+              multiline
+              minRows={2}
             />
           </Stack>
         </DialogContent>
