@@ -4,6 +4,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 import { sequelize } from "./src/database/connection.js";
+import "./src/database/registerEdDeliModels.js";
+import { recreateDatabaseFromBackup } from "./src/database/insertData.js";
 import { loggerMiddleware } from "./src/middlewares/loggerMiddleware.js";
 
 import UsersRoutes from "./src/routes/UsersRoutes.js";
@@ -70,14 +72,6 @@ app.use(`/${api}/files`, FilesRoutes);
 // Sirve los archivos guardados en src/files
 app.use(`/${api}/files`, express.static(path.resolve(__dirname, "src/files")));
 
-
-// ⚠️ Ya NO necesitas estas dos si todo estará bajo /img:
-// app.use(`/${api}/photos`, express.static(`src/img/photos`));
-// app.use(`/${api}/inventory/imgEdDeli`, express.static(`src/img/EdDeli`));
-
-// ================================
-// Rutas EdDeli (inventario, pedidos, finanzas, editor, archivos, auth/cuentas, comandos/backup)
-// Quiz, piano, forms, CV, etc. → softed/backend (softedapi); comandos también existen allí para su backup.json
 // ================================
 app.use(`/${api}/comands`, ComandsRoutes);
 app.use(`/${api}/editor`, EditorRoutes);
@@ -100,6 +94,14 @@ app.use(errorMiddleware);
 export async function main() {
   try {
     await sequelize.authenticate();
+
+    // ═══════════════════════════════════════════════════════════════════
+    // ⚠️  SOLO DESARROLLO — Reset total (borra tablas y carga backup.json)
+    // Descomenta las 2 líneas siguientes. Cada reinicio de nodemon repetirá el reset.
+    // Alternativa sin tocar código: npm run db:reset
+    // ═══════════════════════════════════════════════════════════════════
+    // await recreateDatabaseFromBackup();
+
     const syncResult = await syncDatabaseSchema();
     if (syncResult.skipped) {
       console.log("✅ Conexión realizada (sin ALTER; usa npm run db:sync si cambiaste modelos).");

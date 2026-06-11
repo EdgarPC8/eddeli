@@ -31,8 +31,9 @@ const OPERATION_CONFIG = {
       { until: 65, label: "Enviando al servidor…" },
       { until: 90, label: "Validando JSON en el servidor…" },
     ],
-    successMessage: "Archivo backup.json subido correctamente.",
-    errorMessage: "No se pudo subir el archivo. Verifique que sea un JSON válido.",
+    successMessage: "Backup validado y guardado en el servidor. Ejecuta «Recargar BD» para aplicarlo.",
+    errorMessage:
+      "No se pudo subir el archivo. Debe ser un backup EdDeli válido (objeto con Roles, Users, Account, etc.).",
   },
   download: {
     title: "Descargando backup.json",
@@ -152,7 +153,9 @@ export default function ComandosPage() {
       });
       const baseMessage = getApiSuccessMessage(res, config.successMessage);
       const tablesSummary =
-        operationKey === "save" ? formatBackupTablesSummary(res?.data?.tables) : "";
+        operationKey === "save" || operationKey === "upload" || operationKey === "reload"
+          ? formatBackupTablesSummary(res?.data?.tables)
+          : "";
       toast({
         message: `${baseMessage}${tablesSummary}`,
         variant: "success",
@@ -194,7 +197,7 @@ export default function ComandosPage() {
     {
       key: "upload",
       name: "Subir backup.json",
-      info: "Reemplaza backup.json en el servidor (luego usa Recargar BD)",
+      info: "Valida el JSON, lo guarda en backup.json y luego debes usar Recargar BD",
       icon: UploadFileIcon,
       run: executeUploadBackup,
     },

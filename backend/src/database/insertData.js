@@ -99,6 +99,86 @@ export function summarizeBackupData(data) {
   return counts;
 }
 
+/** Asegura que existan todas las claves del backup (arrays vacíos si faltan). */
+export function ensureBackupShape(data) {
+  const out = data && typeof data === "object" && !Array.isArray(data) ? { ...data } : {};
+  for (const { key } of BACKUP_TABLE_ENTRIES) {
+    if (!Array.isArray(out[key])) out[key] = [];
+  }
+  return out;
+}
+
+const VALID_MOVEMENT_REASONS = new Set([
+  "ENTRADA_PRODUCCION",
+  "ENTRADA_COMPRA",
+  "ENTRADA_DEVOLUCION",
+  "ENTRADA_OTRA",
+  "SALIDA_VENTA",
+  "SALIDA_YAPA",
+  "SALIDA_DANIADO",
+  "SALIDA_CADUCADO",
+  "SALIDA_CONSUMO_INTERNO",
+  "SALIDA_CONSUMO",
+  "SALIDA_MERMA",
+  "SALIDA_OTRA",
+  "SALIDA_REEMPLAZO",
+  "AJUSTE_ENTRADA",
+  "AJUSTE_SALIDA",
+  "PRODUCCION_FINAL",
+]);
+
+const MOVEMENT_REASON_ALIASES = {
+  SALIDA_CONSUMO: "SALIDA_CONSUMO_INTERNO",
+  SALIDA_MERMA: "SALIDA_DANIADO",
+  PRODUCCION_FINAL: "ENTRADA_PRODUCCION",
+  ENTRADA_DEVOLUCION: "ENTRADA_COMPRA",
+};
+
+/**
+ * Parsea texto JSON de backup (archivo subido o backup.json).
+ * Valida forma, normaliza claves y campos problemáticos.
+ */
+export function parseBackupJsonContent(content) {
+  const stripped = String(content ?? "").replace(/^\uFEFF/, "").trim();
+  if (!stripped) {
+    throw new Error("El archivo está vacío");
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(stripped);
+  } catch (err) {
+    throw new Error(`JSON inválido: ${err.message}`);
+  }
+
+  if (parsed && typeof parsed === "object" && parsed.backup && typeof parsed.backup === "object") {
+    parsed = parsed.backup;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error(
+      "El JSON debe ser un objeto con tablas EdDeli (Roles, Users, Account, InventoryProduct, Order, …)",
+    );
+  }
+
+  const shaped = ensureBackupShape(parsed);
+  const hasRows = BACKUP_TABLE_ENTRIES.some(
+    ({ key }) => Array.isArray(shaped[key]) && shaped[key].length > 0,
+  );
+  if (!hasRows) {
+    throw new Error("El backup no contiene datos en ninguna tabla reconocida");
+  }
+
+  return prepareBackupForRestore(shaped);
+}
+
+/** Escribe backup.json normalizado en disco. */
+export async function writeBackupToDisk(jsonData) {
+  const normalized = prepareBackupForRestore(ensureBackupShape(jsonData));
+  await fs.writeFile(backupFilePath, JSON.stringify(normalized, null, 2), "utf8");
+  return { path: backupFilePath, tables: summarizeBackupData(normalized) };
+}
+
 const unwrapJsonString = (value, maxDepth = 12) => {
   let v = value;
   for (let i = 0; i < maxDepth; i++) {
@@ -183,20 +263,59 @@ export function prepareBackupForRestore(jsonData) {
     }).filter(Boolean);
   }
 
+  if (Array.isArray(data.InventoryMovement)) {
+    data.InventoryMovement = data.InventoryMovement.map((row) => {
+      if (!row || row.reason == null) return row;
+      let reason = row.reason;
+      if (!VALID_MOVEMENT_REASONS.has(reason)) {
+        reason = MOVEMENT_REASON_ALIASES[reason] || null;
+      }
+      if (reason && !VALID_MOVEMENT_REASONS.has(reason)) reason = null;
+      return reason === row.reason ? row : { ...row, reason };
+    });
+  }
+
   return data;
+}
+
+async function setForeignKeyChecks(enabled, transaction) {
+  const dialect = sequelize.getDialect?.() || "mysql";
+  if (dialect !== "mysql") return;
+  const value = enabled ? 1 : 0;
+  await sequelize.query(`SET FOREIGN_KEY_CHECKS = ${value}`, { transaction });
+}
+
+/** Borra tablas, las recrea e importa backup.json (Comandos / scripts). */
+export async function recreateDatabaseFromBackup() {
+  await fs.access(backupFilePath);
+
+  const dialect = sequelize.getDialect?.() || "mysql";
+  if (dialect === "mysql") {
+    await sequelize.query("SET FOREIGN_KEY_CHECKS = 0");
+    try {
+      await sequelize.sync({ force: true });
+    } finally {
+      await sequelize.query("SET FOREIGN_KEY_CHECKS = 1");
+    }
+  } else {
+    await sequelize.sync({ force: true });
+  }
+
+  return insertData();
 }
 
 /** Respaldo / restore solo tablas EdDeli (inventario, pedidos, finanzas, editor, notificaciones, cuentas). Quiz, forms, alumni, CV → softed/backend. */
 export const insertData = async () => {
   try {
     await fs.access(backupFilePath);
-    console.log("El archivo de respaldo ya existe.");
 
-    const data = await fs.readFile(backupFilePath, "utf8");
-    const jsonData = prepareBackupForRestore(JSON.parse(data));
+    const raw = await fs.readFile(backupFilePath, "utf8");
+    const jsonData = parseBackupJsonContent(raw);
+    const counts = summarizeBackupData(jsonData);
 
     const t = await sequelize.transaction();
     try {
+      await setForeignKeyChecks(false, t);
       const opt = { ...BULK_OPT, transaction: t };
 
       for (const entry of BACKUP_TABLE_ENTRIES) {
@@ -204,22 +323,21 @@ export const insertData = async () => {
         await entry.model.bulkCreate(Array.isArray(rows) ? rows : [], opt);
       }
 
+      await setForeignKeyChecks(true, t);
       await t.commit();
     } catch (err) {
       await t.rollback();
       throw err;
     }
 
-    console.log("Datos insertados correctamente desde el archivo de respaldo (EdDeli).");
-    return { ok: true };
+    console.log("Datos insertados correctamente desde backup.json. Filas:", counts);
+    return { ok: true, tables: counts };
   } catch (error) {
     if (error.code === "ENOENT") {
-      await fs.writeFile(
-        backupFilePath,
-        JSON.stringify({ Roles: [], Users: [], Account: [] }, null, 2)
-      );
-      console.log("Archivo de respaldo creado: backup.json");
-      return { ok: true, createdEmptyBackup: true };
+      const empty = ensureBackupShape({});
+      await fs.writeFile(backupFilePath, JSON.stringify(empty, null, 2), "utf8");
+      console.log("Archivo de respaldo creado: backup.json (vacío)");
+      return { ok: true, createdEmptyBackup: true, tables: summarizeBackupData(empty) };
     }
     console.error("Error al insertar datos:", error);
     throw error;
@@ -241,7 +359,8 @@ export const saveBackup = async () => {
       backupData[entry.key] = rows;
     });
 
-    const counts = summarizeBackupData(backupData);
+    const normalized = prepareBackupForRestore(ensureBackupShape(backupData));
+    const counts = summarizeBackupData(normalized);
 
     await fs.mkdir(backups, { recursive: true });
 
@@ -252,8 +371,8 @@ export const saveBackup = async () => {
     const backupFileName = `backup-${timestamp}.json`;
     const backupPath = resolve(backups, backupFileName);
 
-    await fs.writeFile(backupPath, JSON.stringify(backupData, null, 2));
-    await fs.writeFile(backupFilePath, JSON.stringify(backupData, null, 2));
+    await fs.writeFile(backupPath, JSON.stringify(normalized, null, 2), "utf8");
+    await fs.writeFile(backupFilePath, JSON.stringify(normalized, null, 2), "utf8");
 
     console.log("Backup EdDeli guardado en:", backupPath);
     console.log("Filas por tabla:", counts);

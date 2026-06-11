@@ -1,10 +1,13 @@
 import { createLicenseToken } from "../libs/jwt.js";
 import { License } from "../models/License.js";
 import { Logs } from "../models/Logs.js";
-import { sequelize } from "../database/connection.js";
 import "../database/registerEdDeliModels.js";
-import { backupFilePath, insertData, saveBackup } from "../database/insertData.js";
-import { promises as fs } from "fs";
+import {
+  parseBackupJsonContent,
+  recreateDatabaseFromBackup,
+  saveBackup,
+  writeBackupToDisk,
+} from "../database/insertData.js";
 
 export const saveBackupController = async (req, res) => {
   try {
@@ -36,25 +39,27 @@ export const uploadBackupController = async (req, res) => {
 
     const content = req.file.buffer.toString("utf8");
 
-    let jsonData;
+    let normalized;
     try {
-      jsonData = JSON.parse(content);
+      normalized = parseBackupJsonContent(content);
     } catch (err) {
       return res.status(400).json({
         ok: false,
-        message: "El archivo no es un JSON válido",
+        message: err.message || "El archivo no es un backup EdDeli válido",
         error: err.message,
       });
     }
 
-    await fs.writeFile(backupFilePath, JSON.stringify(jsonData, null, 2));
+    const { path: savedPath, tables } = await writeBackupToDisk(normalized);
 
-    console.log("✅ backup.json EdDeli reemplazado en:", backupFilePath);
+    console.log("✅ backup.json EdDeli reemplazado en:", savedPath, tables);
 
     return res.json({
       ok: true,
-      message: "Backup original reemplazado correctamente",
-      path: backupFilePath,
+      message:
+        "Backup validado y guardado. Usa «Recargar BD» para aplicarlo a la base de datos.",
+      path: savedPath,
+      tables,
     });
   } catch (error) {
     console.error("❌ Error al subir y reemplazar backup:", error);
@@ -79,34 +84,21 @@ export const reloadBdController = async (req, res) => {
       console.warn("⚠️ No se pudo guardar copia previa; se continúa con backup.json:", backupErr.message);
     }
 
-    const dialect = sequelize.getDialect?.() || "mysql";
-
-    if (dialect === "mysql") {
-      await sequelize.query("SET FOREIGN_KEY_CHECKS = 0");
-      try {
-        await sequelize.sync({ force: true });
-      } finally {
-        await sequelize.query("SET FOREIGN_KEY_CHECKS = 1");
-      }
-    } else {
-      await sequelize.sync({ force: true });
-    }
-    console.log("📦 Tablas recreadas");
-
-    await insertData();
-    console.log("✅ Datos EdDeli insertados desde backup.json");
+    const insertResult = await recreateDatabaseFromBackup();
+    console.log("✅ Datos EdDeli insertados desde backup.json", insertResult.tables);
 
     return res.json({
       ok: true,
       message: "Base de datos reiniciada e inicializada desde backup.json (EdDeli)",
       safetyBackup: safetyBackupPath,
+      tables: insertResult.tables,
     });
   } catch (error) {
     console.error("❌ Error en reloadBdController:", error);
     return res.status(500).json({
       ok: false,
       message:
-        "Error al reiniciar la base de datos. Si quedó vacía, restaura desde src/database/backups/ o backup.json.",
+        "Error al reiniciar la base de datos. Si quedó vacía, restaura desde src/backups/ o src/database/backup.json.",
       error: error.message,
     });
   }
