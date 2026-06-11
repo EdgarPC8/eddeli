@@ -344,7 +344,12 @@ export const insertData = async () => {
   }
 };
 
-export const saveBackup = async () => {
+/**
+ * @param {{ updateMainBackup?: boolean }} options
+ * - updateMainBackup true (default): también escribe src/database/backup.json
+ * - updateMainBackup false: solo copia con fecha en src/backups/ (p. ej. antes de recargar BD)
+ */
+export const saveBackup = async ({ updateMainBackup = true } = {}) => {
   try {
     const fetched = await Promise.all(
       BACKUP_TABLE_ENTRIES.map((entry) => entry.model.findAll({ raw: true })),
@@ -371,12 +376,18 @@ export const saveBackup = async () => {
     const backupFileName = `backup-${timestamp}.json`;
     const backupPath = resolve(backups, backupFileName);
 
-    await fs.writeFile(backupPath, JSON.stringify(normalized, null, 2), "utf8");
-    await fs.writeFile(backupFilePath, JSON.stringify(normalized, null, 2), "utf8");
+    const payload = JSON.stringify(normalized, null, 2);
+    await fs.writeFile(backupPath, payload, "utf8");
+    if (updateMainBackup) {
+      await fs.writeFile(backupFilePath, payload, "utf8");
+    }
 
     console.log("Backup EdDeli guardado en:", backupPath);
+    if (updateMainBackup) {
+      console.log("backup.json principal actualizado:", backupFilePath);
+    }
     console.log("Filas por tabla:", counts);
-    return { backupPath, counts };
+    return { backupPath, counts, mainBackupUpdated: updateMainBackup };
   } catch (error) {
     console.error("Error al guardar el backup:", error);
     throw error;

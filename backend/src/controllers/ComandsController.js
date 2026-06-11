@@ -75,11 +75,13 @@ export const reloadBdController = async (req, res) => {
   try {
     console.log("🔄 Reiniciando base de datos (EdDeli)...");
 
+    // Copia de seguridad del estado ACTUAL en src/backups/ — NO tocar backup.json
+    // (el usuario pudo haber subido un JSON distinto que debe usarse en la recarga).
     let safetyBackupPath = null;
     try {
-      const safety = await saveBackup();
+      const safety = await saveBackup({ updateMainBackup: false });
       safetyBackupPath = safety.backupPath;
-      console.log("💾 Copia de seguridad previa guardada en:", safetyBackupPath);
+      console.log("💾 Copia de seguridad previa (sin pisar backup.json):", safetyBackupPath);
     } catch (backupErr) {
       console.warn("⚠️ No se pudo guardar copia previa; se continúa con backup.json:", backupErr.message);
     }
