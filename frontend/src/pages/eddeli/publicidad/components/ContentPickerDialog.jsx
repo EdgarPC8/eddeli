@@ -27,7 +27,11 @@ import UploadIcon from "@mui/icons-material/Upload";
 import BakeryDiningIcon from "@mui/icons-material/BakeryDining";
 import ImageIcon from "@mui/icons-material/Image";
 import VideocamIcon from "@mui/icons-material/Videocam";
-import { fetchMediaCatalog, uploadPublicidadImage } from "../../../../api/publicidadRequest.js";
+import {
+  fetchMediaCatalog,
+  uploadPublicidadImage,
+  uploadPublicidadVideo,
+} from "../../../../api/publicidadRequest.js";
 import { useAuth } from "../../../../context/AuthContext.jsx";
 import { CONTENT_TYPES } from "../constants.js";
 
@@ -36,6 +40,7 @@ const TAB_KEYS = ["products", "images", "videos"];
 export default function ContentPickerDialog({ open, onClose, onSelect, existingIds = [] }) {
   const { toast } = useAuth();
   const fileRef = useRef(null);
+  const videoFileRef = useRef(null);
   const [tab, setTab] = useState(0);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -98,6 +103,25 @@ export default function ContentPickerDialog({ open, onClose, onSelect, existingI
     }
   };
 
+  const handleVideoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    setUploading(true);
+    try {
+      const result = await toast({
+        promise: uploadPublicidadVideo(file),
+        successMessage: "Video subido correctamente",
+        errorMessage: "Error al subir el video",
+      });
+      await loadCatalog();
+      onSelect?.(result?.data ?? result);
+      onClose?.();
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const iconFor = (type) => {
     if (type === CONTENT_TYPES.VIDEO) return <VideocamIcon />;
     if (type === CONTENT_TYPES.PRODUCT) return <BakeryDiningIcon />;
@@ -145,6 +169,30 @@ export default function ContentPickerDialog({ open, onClose, onSelect, existingI
             <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleUpload} />
             <Typography variant="caption" color="text.secondary" sx={{ alignSelf: "center" }}>
               Se guarda en EdDeli/publicidad
+            </Typography>
+          </Stack>
+        )}
+
+        {tab === 2 && (
+          <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={uploading ? <CircularProgress size={16} /> : <UploadIcon />}
+              disabled={uploading}
+              onClick={() => videoFileRef.current?.click()}
+            >
+              Subir video
+            </Button>
+            <input
+              ref={videoFileRef}
+              type="file"
+              accept="video/*,.mp4,.webm,.mov,.m4v"
+              hidden
+              onChange={handleVideoUpload}
+            />
+            <Typography variant="caption" color="text.secondary" sx={{ alignSelf: "center" }}>
+              MP4, WebM, MOV… → EdDeli/videos
             </Typography>
           </Stack>
         )}

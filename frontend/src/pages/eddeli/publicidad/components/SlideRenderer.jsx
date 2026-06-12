@@ -10,7 +10,14 @@ import ImageBannerLayout from "./layouts/ImageBannerLayout.jsx";
 import VideoLayout from "./layouts/VideoLayout.jsx";
 import TextMessageLayout from "./layouts/TextMessageLayout.jsx";
 
-export default function SlideRenderer({ slide, phase = "in", compact = false, zIndex = 1 }) {
+export default function SlideRenderer({
+  slide,
+  phase = "in",
+  compact = false,
+  zIndex = 1,
+  playing = true,
+  onMediaEnded,
+}) {
   if (!slide) {
     return (
       <Box sx={{ ...getTransitionSx("fade", phase), color: "#fff", opacity: 0.7, width: "100%", height: "100%" }}>
@@ -23,7 +30,7 @@ export default function SlideRenderer({ slide, phase = "in", compact = false, zI
   if (slide.contentType === CONTENT_TYPES.MENU) {
     content = <MenuBoardLayout slide={slide} compact={compact} />;
   } else if (slide.contentType === CONTENT_TYPES.VIDEO) {
-    content = <VideoLayout slide={slide} />;
+    content = <VideoLayout slide={slide} playing={playing} onEnded={onMediaEnded} />;
   } else if (slide.contentType === CONTENT_TYPES.PRODUCT) {
     content = <ProductHeroLayout slide={slide} compact={compact} />;
   } else if (slide.contentType === CONTENT_TYPES.IMAGE) {

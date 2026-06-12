@@ -161,6 +161,19 @@ export const TITLE_FONT_STYLE_LABELS = {
   [TITLE_FONT_STYLES.ROUNDED_3D]: "Redondeada 3D",
 };
 
+/** Modo de música de fondo por campaña. */
+export const MUSIC_MODES = {
+  NONE: "none",
+  SINGLE_LOOP: "single_loop",
+  PLAYLIST_LOOP: "playlist_loop",
+};
+
+export const MUSIC_MODE_LABELS = {
+  [MUSIC_MODES.NONE]: "Sin música",
+  [MUSIC_MODES.SINGLE_LOOP]: "Una pista en bucle",
+  [MUSIC_MODES.PLAYLIST_LOOP]: "Lista de pistas en bucle",
+};
+
 /** Duración por defecto de cada pieza (segundos). */
 export const DEFAULT_SLIDE_DURATION_SEC = 8;
 

@@ -19,10 +19,19 @@ import ReplayIcon from "@mui/icons-material/Replay";
 import { usePlaybackEngine } from "../hooks/usePlaybackEngine.js";
 import SlideStage from "./SlideStage.jsx";
 import SignagePreviewFrame from "./SignagePreviewFrame.jsx";
+import CampaignMusicPlayer from "./CampaignMusicPlayer.jsx";
+import { MUSIC_MODES } from "../constants.js";
 
-export default function PlaybackPreview({ playlist = [], loop = true, title = "Vista previa" }) {
+export default function PlaybackPreview({
+  playlist = [],
+  loop = true,
+  title = "Vista previa",
+  musicMode = MUSIC_MODES.NONE,
+  musicTracks = [],
+}) {
   const engine = usePlaybackEngine(playlist, { loop, autoPlay: playlist.length > 0 });
-  const { current, leaving, index, total, playing, progress, toggle, next, prev, reset } = engine;
+  const { current, leaving, index, total, playing, progress, toggle, next, prev, reset, notifyMediaEnded } =
+    engine;
 
   return (
     <Paper variant="outlined" sx={{ overflow: "hidden" }}>
@@ -43,7 +52,17 @@ export default function PlaybackPreview({ playlist = [], loop = true, title = "V
         }}
       >
         <SignagePreviewFrame>
-          <SlideStage current={current} leaving={leaving} />
+          <SlideStage
+            current={current}
+            leaving={leaving}
+            playing={playing}
+            onMediaEnded={notifyMediaEnded}
+          />
+          <CampaignMusicPlayer
+            musicMode={musicMode}
+            musicTracks={musicTracks}
+            playing={playing}
+          />
         </SignagePreviewFrame>
       </Box>
 

@@ -15,6 +15,7 @@ import {
   PublicidadDevice,
 } from "../models/Publicidad.js";
 import { InventoryProduct, InventoryCategory } from "../models/Inventory.js";
+import { buildMediaCatalog } from "../services/mediaCatalogService.js";
 
 const { __dirname } = fileDirName(import.meta);
 const IMG_BASE = path.resolve(__dirname, "../img");
@@ -43,6 +44,7 @@ function normalizeTitleFontStyle(value) {
 
 const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"]);
 const VIDEO_EXT = new Set([".mp4", ".webm", ".mov", ".m4v"]);
+const MUSIC_MODES = new Set(["none", "single_loop", "playlist_loop"]);
 
 const PLAYLIST_INCLUDE = {
   model: PublicidadPlaylistItem,
@@ -110,10 +112,34 @@ function normalizeMenuItems(raw = []) {
   }));
 }
 
+function normalizeMusicMode(value) {
+  const mode = String(value || "none").trim().toLowerCase();
+  return MUSIC_MODES.has(mode) ? mode : "none";
+}
+
+function normalizeMusicTracks(raw = []) {
+  const list = parseMenuItemsRaw(raw);
+  return list
+    .map((item, index) => ({
+      id: item.id || `track_${index}_${Date.now().toString(36)}`,
+      title: String(item.title || "Pista").slice(0, 200),
+      mediaPath: item.mediaPath ? String(item.mediaPath).replace(/^\/+/, "") : null,
+      durationSeconds:
+        item.durationSeconds != null && Number.isFinite(Number(item.durationSeconds))
+          ? Math.max(1, Math.round(Number(item.durationSeconds)))
+          : null,
+      order: index,
+    }))
+    .filter((t) => t.mediaPath);
+}
+
 function normalizePlaylist(raw = []) {
   const list = Array.isArray(raw) ? raw : [];
   return list.map((item, index) => {
     const contentType = item.contentType || "image";
+    const isVideo = contentType === "video";
+    const maxDur = isVideo ? 600 : 120;
+    const defaultDur = isVideo ? 60 : DEFAULT_DURATION_SEC;
     const base = {
       id: item.id || item.slideKey || slideUid(),
       contentType,
@@ -123,8 +149,8 @@ function normalizePlaylist(raw = []) {
       mediaPath: item.mediaPath ? String(item.mediaPath).replace(/^\/+/, "") : null,
       price: item.price != null ? Number(item.price) : null,
       durationSeconds: Math.min(
-        120,
-        Math.max(3, Number(item.durationSeconds) || DEFAULT_DURATION_SEC),
+        maxDur,
+        Math.max(3, Number(item.durationSeconds) || defaultDur),
       ),
       transitionIn: TEMPLATE_TRANSITION_IN,
       transitionOut: TEMPLATE_TRANSITION_OUT,
@@ -164,6 +190,8 @@ function playlistFromCampaignRow(c) {
 
 function campaignToJson(row) {
   const c = row.toJSON ? row.toJSON() : row;
+  const musicTracks = normalizeMusicTracks(c.musicTracks);
+  const musicMode = normalizeMusicMode(c.musicMode);
   return {
     id: String(c.id),
     name: c.name,
@@ -171,6 +199,8 @@ function campaignToJson(row) {
     status: c.status,
     screenIds: Array.isArray(c.screenIds) ? c.screenIds : [],
     loop: c.loop !== false,
+    musicMode: musicMode === "none" || !musicTracks.length ? "none" : musicMode,
+    musicTracks,
     playlist: playlistFromCampaignRow(c),
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
@@ -325,6 +355,8 @@ export const getCampaignPlayback = async (req, res) => {
       id: json.id,
       name: json.name,
       loop: json.loop,
+      musicMode: json.musicMode,
+      musicTracks: json.musicTracks,
       playlist: json.playlist,
       message: "Playlist para reproducción",
     });
@@ -337,11 +369,15 @@ export const getCampaignPlayback = async (req, res) => {
 export const createCampaign = async (req, res) => {
   const t = await sequelize.transaction();
   try {
-    const { name, description, status, screenIds, loop, playlist } = req.body || {};
+    const { name, description, status, screenIds, loop, playlist, musicMode, musicTracks } =
+      req.body || {};
     if (!String(name || "").trim()) {
       await t.rollback();
       return res.status(400).json({ message: "El nombre es obligatorio" });
     }
+
+    const normalizedTracks = normalizeMusicTracks(musicTracks);
+    const normalizedMusicMode = normalizeMusicMode(musicMode);
 
     const row = await PublicidadCampaign.create(
       {
@@ -350,6 +386,11 @@ export const createCampaign = async (req, res) => {
         status: status || "draft",
         screenIds: Array.isArray(screenIds) ? screenIds : [],
         loop: loop !== false,
+        musicMode:
+          normalizedMusicMode === "none" || !normalizedTracks.length
+            ? "none"
+            : normalizedMusicMode,
+        musicTracks: normalizedTracks,
         createdByAccountId: req.user?.accountId ?? null,
       },
       { transaction: t },
@@ -383,13 +424,27 @@ export const updateCampaign = async (req, res) => {
       return res.status(404).json({ message: "Campaña no encontrada" });
     }
 
-    const { name, description, status, screenIds, loop, playlist } = req.body || {};
+    const { name, description, status, screenIds, loop, playlist, musicMode, musicTracks } =
+      req.body || {};
     const patch = {};
     if (name != null) patch.name = String(name).trim();
     if (description != null) patch.description = String(description);
     if (status != null) patch.status = status;
     if (screenIds != null) patch.screenIds = Array.isArray(screenIds) ? screenIds : [];
     if (loop != null) patch.loop = !!loop;
+    if (musicMode != null || musicTracks != null) {
+      const normalizedTracks = normalizeMusicTracks(
+        musicTracks != null ? musicTracks : row.musicTracks,
+      );
+      const normalizedMusicMode = normalizeMusicMode(
+        musicMode != null ? musicMode : row.musicMode,
+      );
+      patch.musicTracks = normalizedTracks;
+      patch.musicMode =
+        normalizedMusicMode === "none" || !normalizedTracks.length
+          ? "none"
+          : normalizedMusicMode;
+    }
 
     if (Object.keys(patch).length) await row.update(patch, { transaction: t });
     if (playlist != null) await replacePlaylistItems(row.id, playlist, t);
@@ -549,6 +604,8 @@ export const getDevicePlayback = async (req, res) => {
       campaignId: json.id,
       name: json.name,
       loop: json.loop,
+      musicMode: json.musicMode,
+      musicTracks: json.musicTracks,
       playlist: json.playlist,
       source: resolved.source,
       message: "Playlist para reproducción",
@@ -674,48 +731,14 @@ export const getMediaCatalog = async (_req, res) => {
         price: p.price != null ? Number(p.price) : null,
       }));
 
-    const imageFolders = ["EdDeli/publicidad", "EdDeli/ads", "EdDeli/banners"];
-    const imageFiles = [];
-    for (const folder of imageFolders) {
-      imageFiles.push(...(await walkFiles(IMG_BASE, folder, 5, IMAGE_EXT)));
-    }
-    const seenImages = new Set();
-    const imageItems = imageFiles
-      .filter((f) => {
-        if (seenImages.has(f.relPath)) return false;
-        seenImages.add(f.relPath);
-        return true;
-      })
-      .map((f) => ({
-        id: f.relPath,
-        type: "image",
-        title: f.name,
-        subtitle: f.relPath,
-        mediaPath: f.relPath,
-      }));
+    const media = await buildMediaCatalog({});
 
-    const videoFolders = ["videos", "EdDeli/videos", "publicidad"];
-    const videoFiles = [];
-    for (const folder of videoFolders) {
-      videoFiles.push(...(await walkFiles(FILES_BASE, folder, 4, VIDEO_EXT)));
-    }
-    const seenVideos = new Set();
-    const videoItems = videoFiles
-      .filter((f) => {
-        if (seenVideos.has(f.relPath)) return false;
-        seenVideos.add(f.relPath);
-        return true;
-      })
-      .map((f) => ({
-        id: f.relPath,
-        type: "video",
-        title: f.name,
-        subtitle: f.relPath,
-        mediaPath: f.relPath,
-        durationHint: 30,
-      }));
-
-    res.json({ products: productItems, images: imageItems, videos: videoItems });
+    res.json({
+      products: productItems,
+      images: media.images.map((f) => ({ ...f, type: "image" })),
+      videos: media.videos.map((f) => ({ ...f, type: "video" })),
+      audios: media.audios.map((f) => ({ ...f, type: "audio" })),
+    });
   } catch (error) {
     console.error("getMediaCatalog:", error);
     res.status(500).json({ message: "Error al cargar catálogo de medios", error: error.message });

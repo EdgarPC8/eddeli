@@ -7,9 +7,11 @@ import {
   PublicidadPlaylistItem,
   PublicidadDevice,
 } from "../models/Publicidad.js";
+import { MediaAsset } from "../models/MediaAsset.js";
 
 export async function ensurePublicidadSchema() {
-  await PublicidadCampaign.sync();
+  await MediaAsset.sync();
+  await PublicidadCampaign.sync({ alter: true });
   await PublicidadPlaylistItem.sync({ alter: true });
   await PublicidadDevice.sync({ alter: true });
 }

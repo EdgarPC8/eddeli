@@ -1,10 +1,20 @@
 import { buildImageUrl, pathFiles } from "../../../../api/axios.js";
 import { CONTENT_TYPES } from "../constants.js";
 
+export function resolveFileMediaUrl(mediaPath) {
+  if (!mediaPath) return null;
+  return `${pathFiles}${String(mediaPath).replace(/^\/+/, "")}`;
+}
+
+export function resolveAudioUrl(track) {
+  if (!track?.mediaPath) return null;
+  return resolveFileMediaUrl(track.mediaPath);
+}
+
 export function resolveMediaUrl(slide) {
   if (!slide?.mediaPath) return null;
   if (slide.contentType === CONTENT_TYPES.VIDEO) {
-    return `${pathFiles}${String(slide.mediaPath).replace(/^\/+/, "")}`;
+    return resolveFileMediaUrl(slide.mediaPath);
   }
   return buildImageUrl(slide.mediaPath);
 }

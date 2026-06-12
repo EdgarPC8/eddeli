@@ -24,6 +24,7 @@ import FinanceRoutes from "./src/routes/FinanceRoutes.js";
 import ShiftRoutes from "./src/routes/ShiftRoutes.js";
 import TaskRoutes from "./src/routes/TaskRoutes.js";
 import PublicidadRoutes from "./src/routes/PublicidadRoutes.js";
+import MediaRoutes from "./src/routes/MediaRoutes.js";
 import { syncDatabaseSchema } from "./src/database/syncModels.js";
 import { ensurePublicidadSchema } from "./src/database/ensurePublicidadSchema.js";
 
@@ -94,6 +95,7 @@ app.use(`/${api}/finance`, FinanceRoutes);
 app.use(`/${api}/shifts`, ShiftRoutes);
 app.use(`/${api}/tasks`, TaskRoutes);
 app.use(`/${api}/publicidad`, PublicidadRoutes);
+app.use(`/${api}/media`, MediaRoutes);
 
 // Socket para notificaciones y signage publicidad
 initNotificationSocket(io);

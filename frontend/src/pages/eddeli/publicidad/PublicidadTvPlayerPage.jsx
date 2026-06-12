@@ -13,6 +13,7 @@ import {
 } from "./hooks/usePublicidadPlaybackSync.js";
 import SlideStage from "./components/SlideStage.jsx";
 import SignageOfflineScreen from "./components/SignageOfflineScreen.jsx";
+import CampaignMusicPlayer from "./components/CampaignMusicPlayer.jsx";
 import SignageConnectionBadge from "./components/SignageConnectionBadge.jsx";
 
 export default function PublicidadTvPlayerPage() {
@@ -53,6 +54,8 @@ export default function PublicidadTvPlayerPage() {
       id: payload.campaignId || payload.id,
       name: payload.name,
       loop: payload.loop !== false,
+      musicMode: payload.musicMode || "none",
+      musicTracks: payload.musicTracks || [],
       playlist: payload.playlist,
     });
     setBackendDown(false);
@@ -62,7 +65,7 @@ export default function PublicidadTvPlayerPage() {
   const playlist = backendDown ? [] : campaign?.playlist || [];
   const loop = campaign?.loop !== false;
   const engine = usePlaybackEngine(playlist, { loop, autoPlay: playlist.length > 0 && !backendDown });
-  const { current, leaving } = engine;
+  const { current, leaving, playing, notifyMediaEnded } = engine;
   const engineRef = useRef(engine);
   engineRef.current = engine;
 
@@ -121,7 +124,19 @@ export default function PublicidadTvPlayerPage() {
       ) : showOffline ? (
         <SignageOfflineScreen />
       ) : (
-        <SlideStage current={current} leaving={leaving} />
+        <>
+          <SlideStage
+            current={current}
+            leaving={leaving}
+            playing={playing}
+            onMediaEnded={notifyMediaEnded}
+          />
+          <CampaignMusicPlayer
+            musicMode={campaign?.musicMode}
+            musicTracks={campaign?.musicTracks}
+            playing={playing}
+          />
+        </>
       )}
     </Box>
   );

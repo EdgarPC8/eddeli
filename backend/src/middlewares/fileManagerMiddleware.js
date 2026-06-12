@@ -61,6 +61,12 @@ const DEFAULT_ALLOWED_EXT = new Set([
   ".webm",
   ".mov",
   ".m4v",
+  ".mp3",
+  ".wav",
+  ".ogg",
+  ".m4a",
+  ".aac",
+  ".flac",
 ]);
 
 const DEFAULT_MAX_MB = 25;

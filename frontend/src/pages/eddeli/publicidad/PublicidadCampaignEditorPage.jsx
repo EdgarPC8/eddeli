@@ -34,6 +34,8 @@ import {
 import { CAMPAIGN_STATUS, CAMPAIGN_STATUS_LABELS } from "./constants.js";
 import PlaylistBuilder from "./components/PlaylistBuilder.jsx";
 import PlaybackPreview from "./components/PlaybackPreview.jsx";
+import CampaignMusicPanel from "./components/CampaignMusicPanel.jsx";
+import { MUSIC_MODES } from "./constants.js";
 
 const emptyForm = {
   name: "",
@@ -41,6 +43,8 @@ const emptyForm = {
   status: CAMPAIGN_STATUS.DRAFT,
   loop: true,
   playlist: [],
+  musicMode: MUSIC_MODES.NONE,
+  musicTracks: [],
 };
 
 export default function PublicidadCampaignEditorPage() {
@@ -75,6 +79,8 @@ export default function PublicidadCampaignEditorPage() {
       status: c.status || CAMPAIGN_STATUS.DRAFT,
       loop: c.loop !== false,
       playlist: c.playlist || [],
+      musicMode: c.musicMode || MUSIC_MODES.NONE,
+      musicTracks: c.musicTracks || [],
     });
     loadAssignedDevices(c.id);
   };
@@ -110,6 +116,8 @@ export default function PublicidadCampaignEditorPage() {
     loop: form.loop,
     screenIds: [],
     playlist: form.playlist,
+    musicMode: form.musicMode,
+    musicTracks: form.musicTracks,
   });
 
   const handleSave = async () => {
@@ -252,15 +260,23 @@ export default function PublicidadCampaignEditorPage() {
             </Stack>
           </Paper>
 
-          <Paper variant="outlined" sx={{ p: 2 }}>
+          <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
             <PlaylistBuilder playlist={form.playlist} onChange={(playlist) => patch({ playlist })} />
           </Paper>
+
+          <CampaignMusicPanel
+            musicMode={form.musicMode}
+            musicTracks={form.musicTracks}
+            onChange={(music) => patch(music)}
+          />
         </Grid>
 
         <Grid item xs={12} lg={5}>
           <PlaybackPreview
             playlist={form.playlist}
             loop={form.loop}
+            musicMode={form.musicMode}
+            musicTracks={form.musicTracks}
             title="Vista previa"
           />
           <Paper variant="outlined" sx={{ p: 2, mt: 2 }}>

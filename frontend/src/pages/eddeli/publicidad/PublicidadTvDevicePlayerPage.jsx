@@ -13,30 +13,7 @@ import {
 } from "./hooks/usePublicidadPlaybackSync.js";
 import SlideStage from "./components/SlideStage.jsx";
 import SignageOfflineScreen from "./components/SignageOfflineScreen.jsx";
-
-function DevicePendingScreen({ message }) {
-  return (
-    <Box
-      sx={{
-        width: "100%",
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        bgcolor: "#1A1A1A",
-        color: "#fff",
-        px: 4,
-        textAlign: "center",
-      }}
-    >
-      <Box sx={{ fontSize: 48, mb: 2 }}>📺</Box>
-      <Box sx={{ fontSize: 16, maxWidth: 420, lineHeight: 1.5, color: "rgba(255,255,255,0.75)" }}>
-        {message || "Esperando aprobación del administrador…"}
-      </Box>
-    </Box>
-  );
-}
+import CampaignMusicPlayer from "./components/CampaignMusicPlayer.jsx";
 
 export default function PublicidadTvDevicePlayerPage() {
   const { deviceId: rawDeviceId } = useParams();
@@ -45,7 +22,6 @@ export default function PublicidadTvDevicePlayerPage() {
   const [campaign, setCampaign] = useState(null);
   const [loading, setLoading] = useState(Boolean(deviceId));
   const [gate, setGate] = useState(null);
-  const [gateMessage, setGateMessage] = useState("");
 
   const fetchPlayback = useCallback(async () => {
     if (!deviceId) return;
@@ -53,7 +29,6 @@ export default function PublicidadTvDevicePlayerPage() {
       const res = await getDevicePlayback(deviceId);
       setCampaign(res.data);
       setGate(null);
-      setGateMessage("");
     } catch (err) {
       setCampaign(null);
       const status = err?.response?.status;
@@ -63,8 +38,7 @@ export default function PublicidadTvDevicePlayerPage() {
         (status === 403 ? "pending" : status === 404 ? "no_campaign" : "offline");
 
       if (code === "pending") {
-        setGate("pending");
-        setGateMessage(data.message || "Esperando aprobación…");
+        setGate("offline");
       } else if (
         code === "denied" ||
         code === "no_campaign" ||
@@ -72,10 +46,8 @@ export default function PublicidadTvDevicePlayerPage() {
         code === "campaign_not_found"
       ) {
         setGate("offline");
-        setGateMessage("");
       } else {
         setGate("offline");
-        setGateMessage("");
       }
     } finally {
       setLoading(false);
@@ -98,7 +70,7 @@ export default function PublicidadTvDevicePlayerPage() {
     loop,
     autoPlay: playlist.length > 0 && !showOffline,
   });
-  const { current, leaving } = engine;
+  const { current, leaving, playing, notifyMediaEnded } = engine;
   const engineRef = useRef(engine);
   engineRef.current = engine;
 
@@ -112,11 +84,12 @@ export default function PublicidadTvDevicePlayerPage() {
       campaignId: payload.campaignId || payload.id,
       name: payload.name,
       loop: payload.loop !== false,
+      musicMode: payload.musicMode || "none",
+      musicTracks: payload.musicTracks || [],
       playlist: payload.playlist,
       source: payload.source || "socket",
     });
     setGate(null);
-    setGateMessage("");
     setLoading(false);
   }, [deviceId, fetchPlayback]);
 
@@ -147,12 +120,22 @@ export default function PublicidadTvDevicePlayerPage() {
     >
       {loading ? (
         <Box sx={{ width: "100%", height: "100%", bgcolor: "#000" }} />
-      ) : gate === "pending" ? (
-        <DevicePendingScreen message={gateMessage} />
       ) : showOffline ? (
         <SignageOfflineScreen />
       ) : (
-        <SlideStage current={current} leaving={leaving} />
+        <>
+          <SlideStage
+            current={current}
+            leaving={leaving}
+            playing={playing}
+            onMediaEnded={notifyMediaEnded}
+          />
+          <CampaignMusicPlayer
+            musicMode={campaign?.musicMode}
+            musicTracks={campaign?.musicTracks}
+            playing={playing}
+          />
+        </>
       )}
 
       {import.meta.env.DEV ? (

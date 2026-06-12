@@ -17,6 +17,28 @@ export const PublicidadCampaign = sequelize.define(
     },
     screenIds: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
     loop: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+    /** none | single_loop | playlist_loop — música de fondo mientras la campaña está activa */
+    musicMode: { type: DataTypes.STRING(32), allowNull: false, defaultValue: "none" },
+    /** Lista de pistas: [{ id, title, mediaPath, durationSeconds, order }] */
+    musicTracks: {
+      type: DataTypes.JSON,
+      allowNull: false,
+      defaultValue: [],
+      get() {
+        const raw = this.getDataValue("musicTracks");
+        if (!raw) return [];
+        if (Array.isArray(raw)) return raw;
+        if (typeof raw === "string") {
+          try {
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : [];
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      },
+    },
     createdByAccountId: { type: DataTypes.INTEGER, allowNull: true },
   },
   { timestamps: true },

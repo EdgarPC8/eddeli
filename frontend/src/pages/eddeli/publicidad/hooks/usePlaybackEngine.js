@@ -2,7 +2,7 @@
  * Motor de reproducción de playlist (timer, índice, crossfade, bucle).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { SLIDE_CROSSFADE_MS } from "../constants.js";
+import { CONTENT_TYPES, SLIDE_CROSSFADE_MS } from "../constants.js";
 
 export function usePlaybackEngine(playlist = [], { loop = true, autoPlay = false } = {}) {
   const sorted = useMemo(
@@ -98,6 +98,13 @@ export function usePlaybackEngine(playlist = [], { loop = true, autoPlay = false
     startCrossfade(nextIdx);
   }, [clearSlideTimers, startCrossfade]);
 
+  const notifyMediaEnded = useCallback(() => {
+    if (!playing) return;
+    const slide = sortedRef.current[indexRef.current];
+    if (slide?.contentType !== CONTENT_TYPES.VIDEO) return;
+    advanceSlide();
+  }, [playing, advanceSlide]);
+
   const goTo = useCallback(
     (nextIndex) => {
       const t = sortedRef.current.length;
@@ -144,6 +151,7 @@ export function usePlaybackEngine(playlist = [], { loop = true, autoPlay = false
   useEffect(() => {
     clearSlideTimers();
     if (!playing || !current || leaving || !total) return undefined;
+    if (current.contentType === CONTENT_TYPES.VIDEO) return undefined;
 
     slideTimerRef.current = setTimeout(() => {
       advanceSlide();
@@ -175,5 +183,6 @@ export function usePlaybackEngine(playlist = [], { loop = true, autoPlay = false
     prev,
     reset,
     goTo,
+    notifyMediaEnded,
   };
 }

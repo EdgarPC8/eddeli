@@ -35,6 +35,8 @@ function playlistPayload(campaignJson) {
     name: campaignJson.name,
     loop: campaignJson.loop !== false,
     playlist: campaignJson.playlist || [],
+    musicMode: campaignJson.musicMode || "none",
+    musicTracks: campaignJson.musicTracks || [],
     updatedAt: Date.now(),
   };
 }

@@ -23,6 +23,7 @@ import { getCampaignById } from "../../../api/publicidadRequest.js";
 import { usePlaybackEngine } from "./hooks/usePlaybackEngine.js";
 import { usePublicidadPlaybackSync } from "./hooks/usePublicidadPlaybackSync.js";
 import SlideStage from "./components/SlideStage.jsx";
+import CampaignMusicPlayer from "./components/CampaignMusicPlayer.jsx";
 import SignagePreviewFrame from "./components/SignagePreviewFrame.jsx";
 import SignageOfflineScreen from "./components/SignageOfflineScreen.jsx";
 
@@ -58,6 +59,8 @@ export default function PublicidadPlayerPage() {
         id: payload.campaignId || payload.id || campaignId,
         name: payload.name ?? prev?.name,
         loop: payload.loop !== false,
+        musicMode: payload.musicMode || "none",
+        musicTracks: payload.musicTracks || [],
         playlist: payload.playlist,
       }));
       setBackendDown(false);
@@ -89,7 +92,8 @@ export default function PublicidadPlayerPage() {
   const loop = campaign?.loop !== false;
 
   const engine = usePlaybackEngine(playlist, { loop, autoPlay: playlist.length > 0 && !backendDown });
-  const { current, leaving, index, total, playing, progress, toggle, next, prev } = engine;
+  const { current, leaving, index, total, playing, progress, toggle, next, prev, notifyMediaEnded } =
+    engine;
 
   const enterFullscreen = () => {
     const el = document.documentElement;
@@ -199,7 +203,17 @@ export default function PublicidadPlayerPage() {
             </Box>
           ) : (
             <SignagePreviewFrame>
-              <SlideStage current={current} leaving={leaving} />
+              <SlideStage
+                current={current}
+                leaving={leaving}
+                playing={playing}
+                onMediaEnded={notifyMediaEnded}
+              />
+              <CampaignMusicPlayer
+                musicMode={campaign?.musicMode}
+                musicTracks={campaign?.musicTracks}
+                playing={playing}
+              />
             </SignagePreviewFrame>
           )}
         </Box>
