@@ -239,6 +239,31 @@ const SANITIZE_CONFIG = {
 };
 
 const BULK_OPT = { returning: false };
+const BULK_CHUNK_SIZE = 400;
+
+async function bulkCreateRows(model, rows, opt) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (list.length === 0) return;
+  for (let i = 0; i < list.length; i += BULK_CHUNK_SIZE) {
+    await model.bulkCreate(list.slice(i, i + BULK_CHUNK_SIZE), opt);
+  }
+}
+
+/** Resumen del backup.json en disco (para diagnóstico antes de reset). */
+export async function readBackupFileSummary() {
+  await ensureBackupFileExists();
+  const st = await fs.stat(backupFilePath);
+  const raw = await fs.readFile(backupFilePath, "utf8");
+  const counts = summarizeBackupData(parseBackupJsonContent(raw));
+  const totalRows = Object.values(counts).reduce((a, n) => a + n, 0);
+  return {
+    path: backupFilePath,
+    sizeBytes: st.size,
+    sizeMB: Number((st.size / 1024 / 1024).toFixed(2)),
+    counts,
+    totalRows,
+  };
+}
 
 /** Evita FK rotas al restaurar backups viejos sin turnos de caja. */
 export function prepareBackupForRestore(jsonData) {
@@ -350,7 +375,12 @@ export const insertData = async () => {
 
       for (const entry of BACKUP_TABLE_ENTRIES) {
         const rows = jsonData[entry.key];
-        await entry.model.bulkCreate(Array.isArray(rows) ? rows : [], opt);
+        try {
+          await bulkCreateRows(entry.model, rows, opt);
+        } catch (err) {
+          const detail = err?.parent?.sqlMessage || err?.message || String(err);
+          throw new Error(`Error al importar tabla ${entry.key}: ${detail}`);
+        }
       }
 
       await setForeignKeyChecks(true, t);
