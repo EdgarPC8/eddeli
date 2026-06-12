@@ -9,7 +9,8 @@
     "dev": "nodemon index.js",
     "start": "node index.js",
     "db:sync": "DB_SYNC_ALTER=1 node scripts/sync-schema.js",
-    "db:reset": "node scripts/reset-database.js"
+    "db:reset": "node scripts/reset-database.js",
+    "db:init-backup": "node scripts/init-backup.js"
   },
   "keywords": [],
   "author": "",

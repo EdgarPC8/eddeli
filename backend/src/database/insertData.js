@@ -50,6 +50,7 @@ import { Logs } from "../models/Logs.js";
 import { UserData } from "../models/UserData.js";
 
 export const backupFilePath = resolve(__dirname, "backup.json");
+export const backupExamplePath = resolve(__dirname, "backup.json.example");
 export const backupSafetyPath = resolve(__dirname, "backup.json.bak");
 
 /**
@@ -293,9 +294,42 @@ async function setForeignKeyChecks(enabled, transaction) {
   await sequelize.query(`SET FOREIGN_KEY_CHECKS = ${value}`, { transaction });
 }
 
+/**
+ * Crea backup.json si no existe (p. ej. tras git clone; el JSON real no va al repo).
+ * Usa backup.json.example del repositorio o un esqueleto mínimo con roles.
+ */
+export async function ensureBackupFileExists() {
+  try {
+    await fs.access(backupFilePath);
+    return { created: false, path: backupFilePath };
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+
+  let payload;
+  try {
+    const exampleRaw = await fs.readFile(backupExamplePath, "utf8");
+    payload = JSON.stringify(parseBackupJsonContent(exampleRaw), null, 2);
+    console.log("backup.json no existía: copiado desde backup.json.example");
+  } catch {
+    const empty = ensureBackupShape({});
+    empty.Roles = [
+      { id: 1, name: "Programador" },
+      { id: 2, name: "Administrador" },
+      { id: 3, name: "Profesional" },
+      { id: 4, name: "Estudiante" },
+    ];
+    payload = JSON.stringify(empty, null, 2);
+    console.log("backup.json no existía: creado con estructura mínima (solo Roles)");
+  }
+
+  await fs.writeFile(backupFilePath, payload, "utf8");
+  return { created: true, path: backupFilePath };
+}
+
 /** Borra tablas, las recrea e importa backup.json (Comandos / scripts). */
 export async function recreateDatabaseFromBackup() {
-  await fs.access(backupFilePath);
+  await ensureBackupFileExists();
 
   const dialect = sequelize.getDialect?.() || "mysql";
   if (dialect === "mysql") {
@@ -315,7 +349,7 @@ export async function recreateDatabaseFromBackup() {
 /** Respaldo / restore solo tablas EdDeli (inventario, pedidos, finanzas, editor, notificaciones, cuentas). Quiz, forms, alumni, CV → softed/backend. */
 export const insertData = async () => {
   try {
-    await fs.access(backupFilePath);
+    await ensureBackupFileExists();
 
     const raw = await fs.readFile(backupFilePath, "utf8");
     const jsonData = parseBackupJsonContent(raw);

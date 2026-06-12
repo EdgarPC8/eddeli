@@ -2,6 +2,18 @@
 
 Guía para traer la base `softed` del servidor institucional a tu PC (EdDeli / desarrollo).
 
+## Tras `git clone` (servidor o PC)
+
+`backup.json` **no va al repositorio** (datos locales). En el servidor:
+
+```bash
+cd backend
+npm run db:init-backup    # crea backup.json desde backup.json.example
+npm run db:reset          # crea tablas e importa ese JSON
+```
+
+Para datos reales: en la app **Comandos → Subir backup.json** (desde tu PC) o copia tu `src/database/backup.json` al servidor con `scp`.
+
 ## Red y acceso
 
 | Dónde | Cómo |
