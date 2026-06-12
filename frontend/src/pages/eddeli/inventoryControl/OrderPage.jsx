@@ -15,6 +15,7 @@ import {
   removeOrderFromList,
   removeOrderItemFromList,
 } from "../../../utils/orderListUtils";
+import { isCajaPosOrder } from "../../../utils/eddeliPosOrderUtils.js";
 
 function OrderPage() {
   const [orders, setOrders] = useState([]);
@@ -35,7 +36,8 @@ function OrderPage() {
     try {
       const { data } = await getOrdersForMonthRequest(visibleMonth);
       loadedMonthsRef.current.add(key);
-      setOrders((prev) => mergeOrdersById(prev, Array.isArray(data) ? data : []));
+      const manualOrders = (Array.isArray(data) ? data : []).filter((o) => !isCajaPosOrder(o));
+      setOrders((prev) => mergeOrdersById(prev, manualOrders));
     } catch (e) {
       console.error("OrderPage: cargar pedidos", e);
     } finally {

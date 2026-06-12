@@ -917,7 +917,8 @@ export const deleteTemplate = async (req, res) => {
 
 export const createDesign = async (req, res) => {
   try {
-    const createdBy = toInt(req.user?.id || req.body?.createdBy, 0);
+    // Payload JWT: accountId (AuthController), no req.user.id
+    const createdBy = toInt(req.user?.accountId || req.body?.createdBy, 0);
     const templateId = toInt(req.body?.templateId, 0);
 
     if (!createdBy) return res.status(400).json({ message: "createdBy requerido" });
@@ -948,7 +949,7 @@ export const createDesign = async (req, res) => {
 export const updateDesign = async (req, res) => {
   try {
     const id = toInt(req.params.id, 0);
-    const updatedBy = toInt(req.user?.id || req.body?.updatedBy, 0);
+    const updatedBy = toInt(req.user?.accountId || req.body?.updatedBy, 0);
 
     const row = await EditorDesign.findByPk(id);
     if (!row) return res.status(404).json({ message: "Design no encontrado" });

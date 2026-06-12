@@ -474,6 +474,10 @@ export const updateOrderItem = async (req, res) => {
 };
 
 
+/**
+ * @deprecated Mantenimiento one-off: copia order.date → item.deliveredAt para un cliente fijo.
+ * Solo accesible en desarrollo vía GET /orders/cmd (Programador). No usar en producción.
+ */
 export const command = async (req, res) => {
   const customerId = 19;
 
@@ -1102,7 +1106,9 @@ export const getAllOrders = async (req, res) => {
     const fromDate = parseRangeDate(req.query.from, false);
     const toDate = parseRangeDate(req.query.to, true);
 
-    const where = {};
+    const where = {
+      notes: { [Op.notLike]: `%${CAJA_POS_TAG}%` },
+    };
     if (fromDate || toDate) {
       where.date = {};
       if (fromDate) where.date[Op.gte] = fromDate;

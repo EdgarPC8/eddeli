@@ -2,7 +2,7 @@
  * =============================================================================
  * CatalogController.js
  * =============================================================================
- * MÓDULO: Admin CRUD + Publicidad (Editor de plantillas)
+ * MÓDULO: Admin CRUD + Diseño Promocional (editor de plantillas)
  * RUTAS: GET  /inventory/catalog (admin)
  *        GET  /inventory/catalog/template-items  → PUBLICIDAD (ProductSelector)
  *        GET  /inventory/getPopularProducts
@@ -10,7 +10,7 @@
  *        POST /inventory/catalog, PUT, DELETE, reorder
  * CONSUMIDO POR: CatalogManagerPage, AutoCatalogLab, ProductSelector (editor)
  *
- * - template-items: formato COMPLETO (desc, price, category, wholesale, etc.) para publicidad
+ * - template-items: formato COMPLETO (desc, price, category, wholesale, etc.) para diseño promocional
  * - CRUD: gestión admin del catálogo
  * =============================================================================
  */
@@ -169,7 +169,7 @@ const mapCatalogEntryToCardForPublicidad = (row) => {
 
 /**
  * GET /inventory/catalog/template-items
- * → ProductSelector.jsx (editor publicidad) - Items para plantillas
+ * → ProductSelector.jsx (diseño promocional) - Items para plantillas
  */
 export const getCatalogTemplateItems = async (req, res) => {
   try {

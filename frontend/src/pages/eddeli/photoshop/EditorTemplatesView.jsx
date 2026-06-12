@@ -1,4 +1,6 @@
-// EditorTemplatesView.jsx
+/**
+ * Diseño Promocional — listado y gestión de plantillas del editor.
+ */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
@@ -477,10 +479,10 @@ export default function EditorTemplatesView({
       <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
         <Box>
           <Typography sx={{ fontWeight: 900, color: "#fff" }}>
-            Plantillas disponibles
+            Diseño Promocional — Plantillas
           </Typography>
           <Typography sx={{ color: "rgba(255,255,255,0.65)", fontSize: 12 }}>
-            Abrir, importar JSON, editar y marcar una plantilla como DEFAULT.
+            Abrir, importar JSON, editar y marcar una plantilla como predeterminada.
           </Typography>
         </Box>
 

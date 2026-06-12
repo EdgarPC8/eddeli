@@ -26,6 +26,8 @@ export default defineConfig({
       "@mui/material/styles",
       "@mui/system",
       "@mui/styled-engine",
+      "@mui/x-charts",
+      "@mui/x-data-grid",
     ],
   },
   server: {
@@ -34,6 +36,11 @@ export default defineConfig({
     strictPort: false,
     proxy: {
       "/eddeliapi": {
+        target: "http://127.0.0.1:3001",
+        changeOrigin: true,
+        ws: true,
+      },
+      "/socket.io": {
         target: "http://127.0.0.1:3001",
         changeOrigin: true,
         ws: true,

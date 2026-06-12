@@ -1,3 +1,7 @@
+/**
+ * @deprecated No importado en App.jsx. Pantalla antigua de inicio inventario.
+ * Mantener solo como referencia o eliminar cuando confirmes que no se usa.
+ */
 import React, { useState, useEffect } from "react";
 import {
   Grid, Paper, Typography, Box,

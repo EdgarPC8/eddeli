@@ -71,7 +71,7 @@ import {
   updateStore,
   deleteStore,
 } from "../controllers/InventoryControl/StoresController.js";
-// CatalogController: CRUD admin + template-items (publicidad)
+// CatalogController: CRUD admin + template-items (diseño promocional)
 import {
   getCatalogEntries,
   createCatalogEntry,
@@ -100,11 +100,11 @@ from '../controllers/InventoryControl/StoreProductsController.js';
 const router = express.Router();
 
 
-// productos de una tienda
+// productos de una tienda (lectura pública; mutaciones requieren sesión)
 router.get("/stores/:storeId/products", getProductsByStore);
-router.post("/stores/:storeId/products", addProductsToStore);
-router.delete("/stores/:storeId/products/:productId", removeProductFromStore);
-router.patch("/stores/:storeId/products/:productId", toggleStoreProduct);
+router.post("/stores/:storeId/products", isAuthenticated, addProductsToStore);
+router.delete("/stores/:storeId/products/:productId", isAuthenticated, removeProductFromStore);
+router.patch("/stores/:storeId/products/:productId", isAuthenticated, toggleStoreProduct);
 
 // tiendas que tienen un producto (opcional)
 // router.get("/products/:productId/stores", getStoresByProduct);
@@ -117,7 +117,7 @@ router.patch("/stores/:storeId/products/:productId", toggleStoreProduct);
 router.get("/getPopularProducts", getPopularProducts);
 router.get("/getAutoCatalogSeed", getAutoCatalogSeed);
 router.get("/catalog", getCatalogEntries);
-router.get("/catalog/template-items", getCatalogTemplateItems); // → ProductSelector (publicidad)
+router.get("/catalog/template-items", getCatalogTemplateItems); // → ProductSelector (diseño promocional)
 router.post("/catalog", isAuthenticated, createCatalogEntry);
 router.put("/catalog/:id", isAuthenticated, updateCatalogEntry);
 router.delete("/catalog/:id", isAuthenticated, deleteCatalogEntry);
@@ -128,11 +128,12 @@ router.get("/catalog/sections", getCatalogBySections);
 
 
 
+// Locales: GET público (catálogo / punto de venta); crear/editar/borrar solo autenticado
 router.get("/stores/", getStores);
 router.get("/stores/:id", getStoreById);
-router.post("/stores/", edDeliUploadSingle, createStore);
-router.put("/stores/:id", edDeliUploadSingle, updateStore);
-router.delete("/stores/:id", deleteStore);
+router.post("/stores/", isAuthenticated, edDeliUploadSingle, createStore);
+router.put("/stores/:id", isAuthenticated, edDeliUploadSingle, updateStore);
+router.delete("/stores/:id", isAuthenticated, deleteStore);
 
 // ----------------------------------
 // 🔁 Home Products

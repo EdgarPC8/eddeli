@@ -1,15 +1,29 @@
+/**
+ * Contexto único de tema EdDeli (modo claro/oscuro/neón + ThemeProvider MUI).
+ *
+ * Toda la app debe envolver con <ThemeModeProvider> (ver main.jsx).
+ * No montar otro ThemeProvider de MUI en páginas hijas.
+ */
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { ThemeProvider, CssBaseline } from "@mui/material";
+import { ThemeProvider, CssBaseline } from "./muiRuntime.js";
 import { getTheme } from "./getTheme.js";
 
 const STORAGE_KEY = "eddeli-theme-mode";
 
-const ThemeModeContext = createContext({ mode: "light", setMode: () => {}, toggle: () => {} });
+const ThemeModeContext = createContext({
+  mode: "light",
+  setMode: () => {},
+  toggle: () => {},
+});
 
+/** Modo visual: light | dark | neon */
 export function useThemeMode() {
   return useContext(ThemeModeContext);
 }
 
+/**
+ * Proveedor raíz: persiste modo, construye theme con createTheme (muiRuntime) y envuelve la app.
+ */
 export function ThemeModeProvider({ children }) {
   const [mode, setMode] = useState(() => localStorage.getItem(STORAGE_KEY) || "light");
 

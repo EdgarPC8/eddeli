@@ -22,7 +22,7 @@ export const downloadBackup = async () => {
   const url = window.URL.createObjectURL(new Blob([response.data]));
   const a = document.createElement("a");
   a.href = url;
-  a.download = "backup-tienda.json";
+  a.download = "backup-eddeli.json";
   document.body.appendChild(a);
   a.click();
   a.remove();

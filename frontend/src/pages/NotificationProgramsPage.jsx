@@ -1,8 +1,12 @@
 /**
  * CRUD de notificaciones programadas y envío manual (Admin/Programador).
+ *
+ * BACKEND_ENABLED: poner true cuando existan rutas /notification-programs en el API.
+ * Mientras tanto el ítem del menú está comentado en NavBar.jsx.
  */
 import { useState, useEffect } from "react";
 import {
+  Alert,
   Box,
   Typography,
   Button,
@@ -39,6 +43,9 @@ import {
 import { getRolRequest } from "../api/accountRequest.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { Navigate } from "react-router-dom";
+
+/** Cambiar a true al implementar backend (ver notificationProgramRequest.js). */
+const BACKEND_ENABLED = false;
 
 const ALLOWED = new Set(["Programador", "Administrador"]);
 
@@ -87,6 +94,19 @@ export default function NotificationProgramsPage() {
 
   if (!ALLOWED.has(user?.loginRol)) {
     return <Navigate to="/notifications" replace />;
+  }
+
+  if (!BACKEND_ENABLED) {
+    return (
+      <Box sx={{ p: 3, maxWidth: 640 }}>
+        <Alert severity="info">
+          Notificaciones programadas: el backend aún no expone{" "}
+          <code>/notification-programs</code>. Activa{" "}
+          <code>BACKEND_ENABLED</code> en esta página y descomenta el menú en{" "}
+          <code>NavBar.jsx</code> cuando la API esté lista.
+        </Alert>
+      </Box>
+    );
   }
 
   const handleOpen = (item = null) => {

@@ -27,7 +27,7 @@ import {
 } from "../controllers/InventoryControl/OrderController.js";
 
 
-import { isAuthenticated } from "../middlewares/authMiddelware.js";
+import { isAuthenticated, requireProgrammer } from "../middlewares/authMiddelware.js";
 import { 
     // ✅ WORKBENCH
     getFinanceWorkbenchAll,
@@ -53,9 +53,12 @@ const router = express.Router();
 
 
 // --------------------
-// CMD
+// CMD — script one-off de mantenimiento (cliente hardcodeado en OrderController.command)
+// En producción NO se expone. En dev: solo Programador autenticado.
 // --------------------
-router.get("/cmd", command);
+if (process.env.NODE_ENV !== "production") {
+  router.get("/cmd", isAuthenticated, requireProgrammer, command);
+}
 
 // --------------------
 // WORKBENCH
@@ -131,7 +134,8 @@ router.put("/:id", isAuthenticated, updateOrder);
 router.put("/:id/status", isAuthenticated, updateOrderStatus);
 router.get("", isAuthenticated, getAllOrders);
 
-router.put("/orders/:id/mark-paid", isAuthenticated, markOrderAsPaid);
+// Montado en /orders → ruta correcta /:id/mark-paid (antes /orders/:id duplicaba prefijo)
+router.put("/:id/mark-paid", isAuthenticated, markOrderAsPaid);
 
 // =====================================================
 // ✅ CLIENTES (LO TUYO NORMAL)

@@ -1,4 +1,4 @@
-/** Marca en `tienda_orders.notes` para ventas hechas desde el punto de venta. */
+/** Marca en `ERP_orders.notes` para ventas hechas desde el punto de venta. */
 export const CAJA_POS_TAG = "[CAJA_POS]";
 
 /** Condición de venta en notas del pedido (contado vs crédito). */

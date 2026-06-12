@@ -9,5 +9,11 @@ backend/node_modules/
 .env
 .env.*
 
-# Copias locales de BD
+# Copias locales de BD y dumps subidos
 backend/src/backups/
+backend/src/database/backup.json
+
+# Builds frontend viejos / assets generados (no versionar)
+frontend/dist/
+**/assets/index-*.js
+**/assets/index-*.css

@@ -70,6 +70,8 @@ import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
 import ScheduleIcon from "@mui/icons-material/Schedule";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import ReceiptIcon from "@mui/icons-material/Receipt";
+import TvIcon from "@mui/icons-material/Tv";
+import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 
 import { useAuth } from "../context/AuthContext.jsx";
 import ThemeSwitcher from "./ThemeSwitcher.jsx";
@@ -128,11 +130,30 @@ const MENU_GROUPS = [
     id: "publicidad",
     label: "Publicidad",
     items: [
+      { name: "Campañas", link: "/publicidad", icon: <TvIcon />, roles: ["Programador", "Administrador"] },
+      {
+        name: "Dispositivos TV",
+        link: "/publicidad/dispositivos",
+        icon: <TvIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Reproductor",
+        link: "/publicidad/reproductor",
+        icon: <PlayCircleOutlineIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+    ],
+  },
+  {
+    id: "diseno-promocional",
+    label: "Diseño Promocional",
+    items: [
       { name: "Imágenes", link: "/img", icon: <ImageIcon />, roles: ["Programador"] },
       { name: "Archivos", link: "/file", icon: <InsertDriveFileIcon />, roles: ["Programador"] },
-      { name: "Editor de publicidad", link: "/editorDefault", icon: <EditNoteIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Control publicidad", link: "/publicidad", icon: <VolumeUpIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Plantillas", link: "/templates", icon: <CollectionsBookmarkIcon />, roles: ["Programador", "Administrador"] },
+      { name: "Editor de diseño", link: "/diseno-promocional/editor", icon: <EditNoteIcon />, roles: ["Programador", "Administrador"] },
+      { name: "Vista con productos", link: "/diseno-promocional/vista", icon: <VolumeUpIcon />, roles: ["Programador", "Administrador"] },
+      { name: "Plantillas", link: "/diseno-promocional/plantillas", icon: <CollectionsBookmarkIcon />, roles: ["Programador", "Administrador"] },
     ],
   },
   {
@@ -143,7 +164,8 @@ const MENU_GROUPS = [
       { name: "Cuentas", link: "/cuentas", icon: <ManageAccountsIcon />, roles: ["Programador", "Administrador"] },
       { name: "Roles", link: "/roles", icon: <SettingsApplicationsIcon />, roles: ["Programador", "Administrador"] },
       { name: "Panel de control", link: "/panel_control", icon: <DnsIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Programar notificaciones", link: "/notification-programs", icon: <NotificationsIcon />, roles: ["Programador", "Administrador"] },
+      // Oculto hasta que exista API backend /notification-programs (ver NotificationProgramsPage)
+      // { name: "Programar notificaciones", link: "/notification-programs", icon: <NotificationsIcon />, roles: ["Programador", "Administrador"] },
       { name: "Logs", link: "/logs", icon: <HistoryIcon />, roles: ["Programador"] },
       { name: "Comandos", link: "/comandos", icon: <TerminalIcon />, roles: ["Programador"] },
     ],

@@ -40,12 +40,17 @@ import {
 import { CashShift } from "../models/CashShift.js";
 import { CashShiftMovement } from "../models/CashShiftMovement.js";
 import { TaskPlan, TaskItem } from "../models/Tasks.js";
+import {
+  PublicidadCampaign,
+  PublicidadPlaylistItem,
+  PublicidadDevice,
+} from "../models/Publicidad.js";
 import { License } from "../models/License.js";
 import { Logs } from "../models/Logs.js";
 import { UserData } from "../models/UserData.js";
 
 export const backupFilePath = resolve(__dirname, "backup.json");
-export const backups = resolve(__dirname, "..", "backups");
+export const backupSafetyPath = resolve(__dirname, "backup.json.bak");
 
 /**
  * Tablas EdDeli incluidas en backup.json (guardar / recargar BD).
@@ -70,6 +75,9 @@ export const BACKUP_TABLE_ENTRIES = [
   { key: "OrderItem", model: OrderItem },
   { key: "TaskPlan", model: TaskPlan },
   { key: "TaskItem", model: TaskItem },
+  { key: "PublicidadCampaign", model: PublicidadCampaign },
+  { key: "PublicidadPlaylistItem", model: PublicidadPlaylistItem },
+  { key: "PublicidadDevice", model: PublicidadDevice },
   { key: "Expense", model: Expense },
   { key: "Income", model: Income },
   { key: "Store", model: Store },
@@ -346,8 +354,8 @@ export const insertData = async () => {
 
 /**
  * @param {{ updateMainBackup?: boolean }} options
- * - updateMainBackup true (default): también escribe src/database/backup.json
- * - updateMainBackup false: solo copia con fecha en src/backups/ (p. ej. antes de recargar BD)
+ * - updateMainBackup true (default): escribe src/database/backup.json
+ * - updateMainBackup false: copia de seguridad en backup.json.bak (antes de recargar BD)
  */
 export const saveBackup = async ({ updateMainBackup = true } = {}) => {
   try {
@@ -367,27 +375,13 @@ export const saveBackup = async ({ updateMainBackup = true } = {}) => {
     const normalized = prepareBackupForRestore(ensureBackupShape(backupData));
     const counts = summarizeBackupData(normalized);
 
-    await fs.mkdir(backups, { recursive: true });
-
-    const now = new Date();
-    const pad = (n) => n.toString().padStart(2, "0");
-    const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
-
-    const backupFileName = `backup-${timestamp}.json`;
-    const backupPath = resolve(backups, backupFileName);
-
+    const targetPath = updateMainBackup ? backupFilePath : backupSafetyPath;
     const payload = JSON.stringify(normalized, null, 2);
-    await fs.writeFile(backupPath, payload, "utf8");
-    if (updateMainBackup) {
-      await fs.writeFile(backupFilePath, payload, "utf8");
-    }
+    await fs.writeFile(targetPath, payload, "utf8");
 
-    console.log("Backup EdDeli guardado en:", backupPath);
-    if (updateMainBackup) {
-      console.log("backup.json principal actualizado:", backupFilePath);
-    }
+    console.log("Backup EdDeli guardado en:", targetPath);
     console.log("Filas por tabla:", counts);
-    return { backupPath, counts, mainBackupUpdated: updateMainBackup };
+    return { backupPath: targetPath, counts, mainBackupUpdated: updateMainBackup };
   } catch (error) {
     console.error("Error al guardar el backup:", error);
     throw error;
@@ -397,8 +391,8 @@ export const saveBackup = async ({ updateMainBackup = true } = {}) => {
 /** Descarga JSON de respaldo EdDeli (GET /eddeliapi/comands/downloadBackup). */
 export const downloadBackup = async (req, res) => {
   try {
-    const { backupPath } = await saveBackup();
-    res.download(backupPath, (err) => {
+    await saveBackup();
+    res.download(backupFilePath, "backup-eddeli.json", (err) => {
       if (err) {
         console.error("Error al enviar el archivo:", err);
         res.status(500).send("Error al enviar el archivo.");

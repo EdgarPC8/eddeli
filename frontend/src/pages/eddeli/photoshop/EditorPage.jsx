@@ -1,7 +1,7 @@
 /**
- * EditorPage.jsx
+ * Diseño Promocional — Editor de diseño (capas, texto, imágenes, exportar PNG).
  *
- * Página del editor unificado: /editor y /editor/:id.
+ * Rutas: /diseno-promocional/editor, /editor/:id
  * - Si hay :id en la URL, carga esa plantilla desde el backend (GET .../templates/:id/resolved).
  * - Layout: ProductSelector (opcional, toggle) | CanvasStage + ExportPanel | InspectorPanel + LayersPanel
  * - Con ProductSelector visible: puedes seleccionar productos del catálogo y ver el preview mientras editas.
@@ -164,10 +164,10 @@ function EditorLayout() {
                   <>
                     No se encontró la plantilla con ID: <strong>{id}</strong>
                     <br />
-                    Ve a "Plantillas disponibles" y crea una nueva o selecciona una existente.
+                    Ve a Diseño Promocional → Plantillas y crea una nueva o selecciona una existente.
                   </>
                 ) : (
-                  "Ve a 'Plantillas disponibles' y crea una nueva plantilla desde cero."
+                  "Ve a Diseño Promocional → Plantillas y crea una nueva plantilla desde cero."
                 )}
               </Typography>
             </Box>

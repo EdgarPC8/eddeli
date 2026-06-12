@@ -929,7 +929,7 @@ export default function CajaPage() {
               </TextField>
               {saleType === "credito" ? (
                 <Typography variant="caption" color="text.secondary">
-                  Queda pendiente de cobro; no suma al turno hasta marcarla pagada en Pedidos.
+                  Queda pendiente de cobro; no suma al turno hasta cobrarla en Cobranzas.
                 </Typography>
               ) : null}
               <FormControlLabel

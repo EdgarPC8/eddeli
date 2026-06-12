@@ -1,3 +1,7 @@
+/**
+ * @deprecated Duplicado de StoresManagerPage.jsx (ruta activa: /stores_manager).
+ * No está enlazado en el router. Usar StoresManagerPage o borrar este archivo.
+ */
 import {
   Container,
   IconButton,

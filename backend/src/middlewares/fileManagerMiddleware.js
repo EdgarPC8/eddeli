@@ -57,6 +57,10 @@ const DEFAULT_ALLOWED_EXT = new Set([
   ".jpg",
   ".jpeg",
   ".webp",
+  ".mp4",
+  ".webm",
+  ".mov",
+  ".m4v",
 ]);
 
 const DEFAULT_MAX_MB = 25;

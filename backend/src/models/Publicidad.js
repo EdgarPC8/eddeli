@@ -1,0 +1,107 @@
+/**
+ * Publicidad — campañas y piezas de playlist (persistencia en BD + backup.json).
+ */
+import { DataTypes } from "sequelize";
+import { sequelize } from "../database/connection.js";
+
+export const PublicidadCampaign = sequelize.define(
+  "ERP_publicidad_campaigns",
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    name: { type: DataTypes.STRING(160), allowNull: false },
+    description: { type: DataTypes.TEXT, allowNull: true },
+    status: {
+      type: DataTypes.ENUM("draft", "scheduled", "active", "paused", "ended"),
+      allowNull: false,
+      defaultValue: "draft",
+    },
+    screenIds: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
+    loop: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+    createdByAccountId: { type: DataTypes.INTEGER, allowNull: true },
+  },
+  { timestamps: true },
+);
+
+/** Cada fila = una pieza de la lista de reproducción */
+export const PublicidadPlaylistItem = sequelize.define(
+  "ERP_publicidad_playlist_items",
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    campaignId: { type: DataTypes.INTEGER, allowNull: false },
+    /** ID estable del cliente (slide_xxx) para edición */
+    slideKey: { type: DataTypes.STRING(64), allowNull: true },
+    contentType: {
+      type: DataTypes.ENUM("product", "image", "video", "menu", "text"),
+      allowNull: false,
+    },
+    /** Productos del tablero menú (contentType = menu) */
+    menuItems: {
+      type: DataTypes.JSON,
+      allowNull: true,
+      get() {
+        const raw = this.getDataValue("menuItems");
+        if (!raw) return null;
+        if (Array.isArray(raw)) return raw;
+        if (typeof raw === "string") {
+          try {
+            const parsed = JSON.parse(raw);
+            return Array.isArray(parsed) ? parsed : null;
+          } catch {
+            return null;
+          }
+        }
+        return raw;
+      },
+    },
+    contentId: { type: DataTypes.STRING(120), allowNull: true },
+    title: { type: DataTypes.STRING(200), allowNull: false },
+    subtitle: { type: DataTypes.STRING(300), allowNull: true },
+    mediaPath: { type: DataTypes.STRING(500), allowNull: true },
+    price: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
+    /** Tamaño del título en px (nombre producto / mensaje texto). */
+    titleFontSize: { type: DataTypes.INTEGER, allowNull: true },
+    /** Estilo tipográfico: default, rounded, outline, shadow3d, rounded3d */
+    titleFontStyle: { type: DataTypes.STRING(32), allowNull: true },
+    durationSeconds: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 8 },
+    transitionIn: { type: DataTypes.STRING(32), allowNull: false, defaultValue: "fade" },
+    transitionOut: { type: DataTypes.STRING(32), allowNull: false, defaultValue: "fade" },
+    sortOrder: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+  },
+  { timestamps: true },
+);
+
+PublicidadCampaign.hasMany(PublicidadPlaylistItem, {
+  foreignKey: "campaignId",
+  as: "playlistItems",
+  onDelete: "CASCADE",
+});
+PublicidadPlaylistItem.belongsTo(PublicidadCampaign, {
+  foreignKey: "campaignId",
+  as: "campaign",
+});
+
+/** Dispositivos TV/APK registrados (ID local configurado en cada pantalla). */
+export const PublicidadDevice = sequelize.define(
+  "ERP_publicidad_devices",
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    /** Identificador local del dispositivo (ej. tv-lobby-1). */
+    deviceId: { type: DataTypes.STRING(64), allowNull: false, unique: true },
+    label: { type: DataTypes.STRING(160), allowNull: true },
+    status: {
+      type: DataTypes.ENUM("pending", "approved", "rejected", "disabled"),
+      allowNull: false,
+      defaultValue: "pending",
+    },
+    lastSeenAt: { type: DataTypes.DATE, allowNull: true },
+    notes: { type: DataTypes.TEXT, allowNull: true },
+    /** Campaña que debe reproducir este dispositivo (asignación directa desde el panel). */
+    campaignId: { type: DataTypes.INTEGER, allowNull: true },
+  },
+  { timestamps: true },
+);
+
+PublicidadDevice.belongsTo(PublicidadCampaign, {
+  foreignKey: "campaignId",
+  as: "campaign",
+});

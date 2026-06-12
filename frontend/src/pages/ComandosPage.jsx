@@ -36,13 +36,13 @@ const OPERATION_CONFIG = {
       "No se pudo subir el archivo. Debe ser un backup EdDeli válido (objeto con Roles, Users, Account, etc.).",
   },
   download: {
-    title: "Descargando backup.json",
+    title: "Descargando backup EdDeli",
     steps: [
       { until: 35, label: "Generando respaldo desde la base de datos…" },
       { until: 70, label: "Preparando archivo para descarga…" },
       { until: 92, label: "Finalizando descarga…" },
     ],
-    successMessage: "Descarga de backup.json completada correctamente.",
+    successMessage: "Descarga de backup-eddeli.json completada correctamente.",
     errorMessage: "No se pudo descargar el backup. Intente de nuevo.",
   },
   save: {
@@ -50,7 +50,7 @@ const OPERATION_CONFIG = {
     steps: [
       { until: 40, label: "Leyendo datos de la base de datos…" },
       { until: 75, label: "Escribiendo backup.json…" },
-      { until: 92, label: "Guardando copia con fecha en /backups…" },
+      { until: 92, label: "Guardando backup.json…" },
     ],
     successMessage: "Copia de seguridad guardada en el servidor.",
     errorMessage: "No se pudo guardar la copia en el servidor.",
@@ -203,8 +203,8 @@ export default function ComandosPage() {
     },
     {
       key: "download",
-      name: "Descargar backup.json",
-      info: "Descarga el estado actual de la base en JSON",
+      name: "Descargar backup EdDeli",
+      info: "Descarga el estado actual de la base como backup-eddeli.json",
       icon: BackupIcon,
       run: executeDownloadBackup,
     },
@@ -218,7 +218,7 @@ export default function ComandosPage() {
     {
       key: "save",
       name: "Guardar copia en servidor",
-      info: "Guarda backup.json y copia con fecha en /backups",
+      info: "Exporta la base de datos actual a backup.json",
       icon: SaveIcon,
       run: executeSaveBackup,
     },

@@ -1,6 +1,5 @@
-// src/theme/eddeliTheme.js (EdDeli / panadería — mantener alineado con getTheme.js)
-import { createTheme } from "@mui/material/styles";
-import { alpha } from "@mui/material/styles";
+// Tema EdDeli — createTheme solo vía muiRuntime (evita error createTheme_default en Vite)
+import { createTheme, alpha } from "./muiRuntime.js";
 import { getChartsPalette } from "./chartPalette";
 
 const brand = {

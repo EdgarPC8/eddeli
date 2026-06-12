@@ -1,5 +1,5 @@
 /**
- * Extrae mensajes de respuestas del API (tiendaapi).
+ * Extrae mensajes de respuestas del API (eddeliapi).
  * Prioridad: backend → fallback opcional del llamador.
  */
 

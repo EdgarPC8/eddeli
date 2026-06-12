@@ -1,5 +1,5 @@
 /**
- * Información del sistema (metadatos de la app Tienda).
+ * Información del sistema (metadatos de la app EdDeli).
  */
 import { Box, Typography, Paper, Divider } from "@mui/material";
 import { LOGO_PATH } from "../config.js";

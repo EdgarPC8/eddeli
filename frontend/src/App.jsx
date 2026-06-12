@@ -42,6 +42,12 @@ import ComandosPage from "./pages/ComandosPage.jsx";
 import LogsPage from "./pages/LogsPage.jsx";
 import ImgManagerPage from "./pages/ImgManagerPage.jsx";
 import FileManagerPage from "./pages/FileManagerPage.jsx";
+import PublicidadCampaignsPage from "./pages/eddeli/publicidad/PublicidadCampaignsPage.jsx";
+import PublicidadCampaignEditorPage from "./pages/eddeli/publicidad/PublicidadCampaignEditorPage.jsx";
+import PublicidadPlayerPage from "./pages/eddeli/publicidad/PublicidadPlayerPage.jsx";
+import PublicidadTvPlayerPage from "./pages/eddeli/publicidad/PublicidadTvPlayerPage.jsx";
+import PublicidadTvDevicePlayerPage from "./pages/eddeli/publicidad/PublicidadTvDevicePlayerPage.jsx";
+import PublicidadDevicesPage from "./pages/eddeli/publicidad/PublicidadDevicesPage.jsx";
 
 const AUTH_ROLES = [
   "Estudiante",
@@ -64,6 +70,10 @@ export default function App() {
         <Route element={<PublicOnlyRoute />}>
           <Route path="/login" element={<Login />} />
         </Route>
+
+        {/* Reproductor TV kiosco — sin NavBar ni login (APK Panadería TV / box HDMI) */}
+        <Route path="/tv/device/:deviceId" element={<PublicidadTvDevicePlayerPage />} />
+        <Route path="/tv/:campaignId" element={<PublicidadTvPlayerPage />} />
 
         <Route element={<NavBar />}>
           <Route element={<PublicOnlyRoute />}>
@@ -98,17 +108,28 @@ export default function App() {
           <Route element={<ProtectedRoute requiredRol={["Administrador", "Programador"]} />}>
             <Route path="/facturacion" element={<FacturacionPage />} />
             <Route path="/panel_control" element={<PanelControlPage />} />
+            {/* Ruta reservada; menú oculto hasta API backend (NotificationProgramsPage) */}
             <Route path="/notification-programs" element={<NotificationProgramsPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/cuentas" element={<CuentasPage />} />
             <Route path="/roles" element={<RolesPage />} />
             <Route path="/backery" element={<CatalogoPage />} />
             <Route path="/catalog_manager" element={<CatalogManagerPage />} />
-            <Route path="/publicity_edit" element={<AdTemplateEditor />} />
-            <Route path="/publicidad" element={<ProductTemplateStudio />} />
-            <Route path="/editorDefault" element={<EditorPage />} />
+            {/* —— Módulo Diseño Promocional (editor tipo Photoshop + plantillas) —— */}
+            <Route path="/diseno-promocional/editor" element={<EditorPage />} />
+            <Route path="/diseno-promocional/vista" element={<ProductTemplateStudio />} />
+            <Route path="/diseno-promocional/plantillas" element={<EditorTemplatesView />} />
             <Route path="/editor/:id?" element={<EditorPage />} />
-            <Route path="/templates" element={<EditorTemplatesView />} />
+            <Route path="/publicity_edit" element={<AdTemplateEditor />} />
+            {/* —— Módulo Publicidad (campañas y reproductor para pantallas digitales) —— */}
+            <Route path="/publicidad" element={<PublicidadCampaignsPage />} />
+            <Route path="/publicidad/dispositivos" element={<PublicidadDevicesPage />} />
+            <Route path="/publicidad/campanas/nueva" element={<PublicidadCampaignEditorPage />} />
+            <Route path="/publicidad/campanas/:id" element={<PublicidadCampaignEditorPage />} />
+            <Route path="/publicidad/reproductor/:campaignId?" element={<PublicidadPlayerPage />} />
+            {/* Diseño Promocional — rutas legacy */}
+            <Route path="/editorDefault" element={<Navigate to="/diseno-promocional/editor" replace />} />
+            <Route path="/templates" element={<Navigate to="/diseno-promocional/plantillas" replace />} />
             <Route path="/inventory/products" element={<ProductsPage />} />
             <Route path="/inventory/categories" element={<CategoryPage />} />
             <Route path="/inventory/units" element={<UnitPage />} />

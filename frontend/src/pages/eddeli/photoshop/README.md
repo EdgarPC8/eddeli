@@ -1,6 +1,6 @@
 # Módulo Editor (Photoshop)
 
-Editor visual de **plantillas por capas** para banners y publicidad de productos. Permite crear y editar diseños con texto, imágenes y formas, enlazar datos del catálogo y exportar a PNG/JPG.
+Editor visual de **plantillas por capas** del módulo **Diseño Promocional** (banners y piezas para productos). Permite crear y editar diseños con texto, imágenes y formas, enlazar datos del catálogo y exportar a PNG/JPG.
 
 ---
 
@@ -20,8 +20,8 @@ photoshop/
 ├── README.md                 ← Estás aquí
 ├── EditorProvider.jsx        ← Estado global (context + reducer), carga/guardado, export
 ├── EditorPage.jsx            ← Página principal: /editor y /editor/:id
-├── EditorTemplatesView.jsx   ← Lista de plantillas: /templates
-├── ProductTemplateStudio.jsx ← Vista “studio”: catálogo + preview (/publicidad)
+├── EditorTemplatesView.jsx   ← Lista de plantillas: /diseno-promocional/plantillas
+├── ProductTemplateStudio.jsx ← Vista con catálogo + preview (/diseno-promocional/vista)
 ├── editorReducer.js          ← Acciones del estado (capas, doc, selección)
 ├── editorActions.js          ← Helpers: IDs, capas por defecto, SCALE, path img
 ├── template.js               ← Plantilla local de fallback (sin backend)
@@ -71,8 +71,9 @@ resolveLayer(doc, doc.data, layer) devuelve la capa con texto/imagen ya resuelta
 | Ruta | Archivo | Uso |
 |------|---------|-----|
 | `/editor` y `/editor/:id` | `EditorPage.jsx` | Editar una plantilla. Si hay `id`, se carga desde el backend. Layout: canvas + export a la izquierda; inspector + capas a la derecha. |
-| `/templates` | `EditorTemplatesView.jsx` | Listar plantillas, filtrar, abrir en editor, importar JSON, editar metadatos, eliminar. |
-| `/publicidad` | `ProductTemplateStudio.jsx` | Selector de ítems del catálogo; al elegir uno se actualiza `doc.data` y el canvas muestra el preview con datos reales. Mismo canvas y ExportPanel. |
+| `/diseno-promocional/plantillas` | `EditorTemplatesView.jsx` | Listar plantillas, filtrar, abrir en editor, importar JSON, editar metadatos, eliminar. |
+| `/diseno-promocional/vista` | `ProductTemplateStudio.jsx` | Selector de ítems del catálogo; al elegir uno se actualiza `doc.data` y el canvas muestra el preview con datos reales. |
+| `/diseno-promocional/editor` | `EditorPage.jsx` | Editor de diseño por capas (tipo Photoshop). |
 
 ---
 

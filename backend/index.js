@@ -1,3 +1,9 @@
+/**
+ * Arranque del API EdDeli.
+ * Carga variables de entorno desde backend/.env (JWT_SECRET, DB_*, etc.).
+ * Ver backend/.env.example
+ */
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
 import path from "path";
@@ -17,7 +23,9 @@ import OrderRoutes from "./src/routes/OrderRoutes.js";
 import FinanceRoutes from "./src/routes/FinanceRoutes.js";
 import ShiftRoutes from "./src/routes/ShiftRoutes.js";
 import TaskRoutes from "./src/routes/TaskRoutes.js";
+import PublicidadRoutes from "./src/routes/PublicidadRoutes.js";
 import { syncDatabaseSchema } from "./src/database/syncModels.js";
+import { ensurePublicidadSchema } from "./src/database/ensurePublicidadSchema.js";
 
 import ImgRoutes from "./src/routes/ImgRoutes.js";
 import FilesRoutes from "./src/routes/FilesRoutes.js";
@@ -25,6 +33,7 @@ import EditorRoutes from "./src/routes/EditorRoutes.js";
 import ComandsRoutes from "./src/routes/ComandsRoutes.js";
 
 import { initNotificationSocket } from "./src/sockets/notificationSocket.js";
+import { initPublicidadSocket } from "./src/sockets/publicidadSocket.js";
 import { Server } from "socket.io";
 import { createServer } from "http";
 import { corsOriginCallback, isOriginAllowed } from "./src/utils/corsOrigins.js";
@@ -84,9 +93,11 @@ app.use(`/${api}/orders`, OrderRoutes);
 app.use(`/${api}/finance`, FinanceRoutes);
 app.use(`/${api}/shifts`, ShiftRoutes);
 app.use(`/${api}/tasks`, TaskRoutes);
+app.use(`/${api}/publicidad`, PublicidadRoutes);
 
-// Socket para notificaciones
+// Socket para notificaciones y signage publicidad
 initNotificationSocket(io);
+initPublicidadSocket(io);
 
 app.use(notFoundMiddleware);
 app.use(errorMiddleware);
@@ -101,6 +112,8 @@ export async function main() {
     // Alternativa sin tocar código: npm run db:reset
     // ═══════════════════════════════════════════════════════════════════
     // await recreateDatabaseFromBackup();
+
+    await ensurePublicidadSchema();
 
     const syncResult = await syncDatabaseSchema();
     if (syncResult.skipped) {

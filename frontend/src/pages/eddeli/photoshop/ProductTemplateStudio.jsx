@@ -1,3 +1,6 @@
+/**
+ * Diseño Promocional — vista con catálogo: preview de plantillas con datos reales de productos.
+ */
 import React from "react";
 import { Box } from "@mui/material";
 

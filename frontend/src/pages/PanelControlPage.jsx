@@ -43,7 +43,7 @@ export default function PanelControlPage() {
             Guardar en servidor
           </Button>
           <Button variant="outlined" startIcon={<CloudDownloadIcon />} onClick={handleDownload}>
-            Descargar JSON
+            Descargar backup EdDeli
           </Button>
         </Stack>
       </Paper>

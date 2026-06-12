@@ -2,6 +2,7 @@
  * Sincroniza el esquema de BD con los modelos (ALTER TABLE).
  * Uso: npm run db:sync
  */
+import "dotenv/config";
 import { sequelize } from "../src/database/connection.js";
 import { syncDatabaseSchema } from "../src/database/syncModels.js";
 

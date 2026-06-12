@@ -13,6 +13,7 @@ import "../models/Editor.js";
 import "../models/CashShift.js";
 import "../models/CashShiftMovement.js";
 import "../models/Tasks.js";
+import "../models/Publicidad.js";
 import "../models/License.js";
 import "../models/Logs.js";
 import "../models/UserData.js";
