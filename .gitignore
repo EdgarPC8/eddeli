@@ -1,18 +1,1 @@
-# Dependencias
-node_modules/
-frontend/node_modules/
 backend/node_modules/
-
-# Sistema / IDE
-.DS_Store
-*.log
-.env
-.env.*
-
-# BD local (no versionar; usar backup.json.example en clone)
-backend/src/backups/
-backend/src/database/backup.json
-backend/src/database/backupPrincipal.json
-
-# Build intermedio de Vite (el deploy usa /eddeli/assets/ en la raíz)
-frontend/dist/
