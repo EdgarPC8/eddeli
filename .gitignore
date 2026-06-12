@@ -9,13 +9,11 @@ backend/node_modules/
 .env
 .env.*
 
-# Copias locales de BD y dumps subidos
+# BD local (no versionar; usar backup.json.example en clone)
 backend/src/backups/
 backend/src/database/backup.json
 backend/src/database/backupPrincipal.json
 backend/src/database/backup.json.bak
 
-# Builds frontend viejos / assets generados (no versionar)
+# Build intermedio de Vite (el deploy usa /eddeli/assets/ en la raíz)
 frontend/dist/
-**/assets/index-*.js
-**/assets/index-*.css
