@@ -76,7 +76,7 @@ export const reloadBdController = async (req, res) => {
   try {
     console.log("🔄 Reiniciando base de datos (EdDeli)...");
 
-    // Copia de seguridad del estado ACTUAL en backup.json.bak — NO tocar backup.json
+    // Copia de seguridad del estado ACTUAL en src/backups/ — NO tocar backup.json
     // (el usuario pudo haber subido un JSON distinto que debe usarse en la recarga).
     let safetyBackupPath = null;
     try {
@@ -101,7 +101,7 @@ export const reloadBdController = async (req, res) => {
     return res.status(500).json({
       ok: false,
       message:
-        "Error al reiniciar la base de datos. Si quedó vacía, restaura desde src/database/backup.json o backup.json.bak.",
+        "Error al reiniciar la base de datos. Si quedó vacía, restaura desde src/database/backup.json o src/backups/.",
       error: error.message,
     });
   }

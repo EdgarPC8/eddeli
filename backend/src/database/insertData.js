@@ -50,8 +50,7 @@ import { Logs } from "../models/Logs.js";
 import { UserData } from "../models/UserData.js";
 
 export const backupFilePath = resolve(__dirname, "backup.json");
-export const backupExamplePath = resolve(__dirname, "backup.json.example");
-export const backupSafetyPath = resolve(__dirname, "backup.json.bak");
+export const backups = resolve(__dirname, "..", "backups");
 
 /**
  * Tablas EdDeli incluidas en backup.json (guardar / recargar BD).
@@ -294,10 +293,7 @@ async function setForeignKeyChecks(enabled, transaction) {
   await sequelize.query(`SET FOREIGN_KEY_CHECKS = ${value}`, { transaction });
 }
 
-/**
- * Crea backup.json si no existe (p. ej. tras git clone; el JSON real no va al repo).
- * Usa backup.json.example del repositorio o un esqueleto mínimo con roles.
- */
+/** Crea backup.json vacío si no existe (p. ej. tras git clone). */
 export async function ensureBackupFileExists() {
   try {
     await fs.access(backupFilePath);
@@ -306,24 +302,16 @@ export async function ensureBackupFileExists() {
     if (error.code !== "ENOENT") throw error;
   }
 
-  let payload;
-  try {
-    const exampleRaw = await fs.readFile(backupExamplePath, "utf8");
-    payload = JSON.stringify(parseBackupJsonContent(exampleRaw), null, 2);
-    console.log("backup.json no existía: copiado desde backup.json.example");
-  } catch {
-    const empty = ensureBackupShape({});
-    empty.Roles = [
-      { id: 1, name: "Programador" },
-      { id: 2, name: "Administrador" },
-      { id: 3, name: "Profesional" },
-      { id: 4, name: "Estudiante" },
-    ];
-    payload = JSON.stringify(empty, null, 2);
-    console.log("backup.json no existía: creado con estructura mínima (solo Roles)");
-  }
-
+  const empty = ensureBackupShape({});
+  empty.Roles = [
+    { id: 1, name: "Programador" },
+    { id: 2, name: "Administrador" },
+    { id: 3, name: "Profesional" },
+    { id: 4, name: "Estudiante" },
+  ];
+  const payload = JSON.stringify(empty, null, 2);
   await fs.writeFile(backupFilePath, payload, "utf8");
+  console.log("backup.json no existía: creado en src/database/backup.json");
   return { created: true, path: backupFilePath };
 }
 
@@ -388,8 +376,8 @@ export const insertData = async () => {
 
 /**
  * @param {{ updateMainBackup?: boolean }} options
- * - updateMainBackup true (default): escribe src/database/backup.json
- * - updateMainBackup false: copia de seguridad en backup.json.bak (antes de recargar BD)
+ * - updateMainBackup true (default): copia con fecha en src/backups/ y actualiza src/database/backup.json
+ * - updateMainBackup false: solo copia con fecha en src/backups/ (antes de recargar BD)
  */
 export const saveBackup = async ({ updateMainBackup = true } = {}) => {
   try {
@@ -409,13 +397,27 @@ export const saveBackup = async ({ updateMainBackup = true } = {}) => {
     const normalized = prepareBackupForRestore(ensureBackupShape(backupData));
     const counts = summarizeBackupData(normalized);
 
-    const targetPath = updateMainBackup ? backupFilePath : backupSafetyPath;
-    const payload = JSON.stringify(normalized, null, 2);
-    await fs.writeFile(targetPath, payload, "utf8");
+    await fs.mkdir(backups, { recursive: true });
 
-    console.log("Backup EdDeli guardado en:", targetPath);
+    const now = new Date();
+    const pad = (n) => n.toString().padStart(2, "0");
+    const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
+
+    const backupFileName = `backup-eddeli-${timestamp}.json`;
+    const backupPath = resolve(backups, backupFileName);
+
+    const payload = JSON.stringify(normalized, null, 2);
+    await fs.writeFile(backupPath, payload, "utf8");
+    if (updateMainBackup) {
+      await fs.writeFile(backupFilePath, payload, "utf8");
+    }
+
+    console.log("Backup EdDeli guardado en:", backupPath);
+    if (updateMainBackup) {
+      console.log("backup.json principal actualizado:", backupFilePath);
+    }
     console.log("Filas por tabla:", counts);
-    return { backupPath: targetPath, counts, mainBackupUpdated: updateMainBackup };
+    return { backupPath, counts, mainBackupUpdated: updateMainBackup };
   } catch (error) {
     console.error("Error al guardar el backup:", error);
     throw error;
@@ -425,8 +427,8 @@ export const saveBackup = async ({ updateMainBackup = true } = {}) => {
 /** Descarga JSON de respaldo EdDeli (GET /eddeliapi/comands/downloadBackup). */
 export const downloadBackup = async (req, res) => {
   try {
-    await saveBackup();
-    res.download(backupFilePath, "backup-eddeli.json", (err) => {
+    const { backupPath } = await saveBackup();
+    res.download(backupPath, "backup-eddeli.json", (err) => {
       if (err) {
         console.error("Error al enviar el archivo:", err);
         res.status(500).send("Error al enviar el archivo.");

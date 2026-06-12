@@ -13,7 +13,6 @@ backend/node_modules/
 backend/src/backups/
 backend/src/database/backup.json
 backend/src/database/backupPrincipal.json
-backend/src/database/backup.json.bak
 
 # Build intermedio de Vite (el deploy usa /eddeli/assets/ en la raíz)
 frontend/dist/

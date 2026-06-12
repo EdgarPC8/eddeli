@@ -50,7 +50,7 @@ const OPERATION_CONFIG = {
     steps: [
       { until: 40, label: "Leyendo datos de la base de datos…" },
       { until: 75, label: "Escribiendo backup.json…" },
-      { until: 92, label: "Guardando backup.json…" },
+      { until: 92, label: "Guardando copia con fecha en /backups…" },
     ],
     successMessage: "Copia de seguridad guardada en el servidor.",
     errorMessage: "No se pudo guardar la copia en el servidor.",
@@ -218,7 +218,7 @@ export default function ComandosPage() {
     {
       key: "save",
       name: "Guardar copia en servidor",
-      info: "Exporta la base de datos actual a backup.json",
+      info: "Guarda backup.json y copia con fecha en /backups",
       icon: SaveIcon,
       run: executeSaveBackup,
     },
