@@ -249,20 +249,58 @@ async function bulkCreateRows(model, rows, opt) {
   }
 }
 
-/** Resumen del backup.json en disco (para diagnóstico antes de reset). */
+/** Resumen del backup.json en disco (solo lectura; no crea archivos). */
 export async function readBackupFileSummary() {
-  await ensureBackupFileExists();
+  try {
+    await fs.access(backupFilePath);
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      return {
+        exists: false,
+        path: backupFilePath,
+        sizeBytes: 0,
+        sizeMB: 0,
+        counts: {},
+        totalRows: 0,
+      };
+    }
+    throw error;
+  }
+
   const st = await fs.stat(backupFilePath);
   const raw = await fs.readFile(backupFilePath, "utf8");
   const counts = summarizeBackupData(parseBackupJsonContent(raw));
   const totalRows = Object.values(counts).reduce((a, n) => a + n, 0);
   return {
+    exists: true,
     path: backupFilePath,
     sizeBytes: st.size,
     sizeMB: Number((st.size / 1024 / 1024).toFixed(2)),
     counts,
     totalRows,
   };
+}
+
+/**
+ * Exige backup.json con datos reales antes de reset/importar.
+ * No genera un JSON vacío (evita resetear la BD con solo 4 roles).
+ */
+export async function requireValidBackupFile() {
+  const summary = await readBackupFileSummary();
+  if (!summary.exists) {
+    throw new Error(
+      `No existe backup.json en ${backupFilePath}. ` +
+        "Cópialo desde tu PC (scp) o súbelo en Comandos → Subir backup.json.",
+    );
+  }
+  if ((summary.counts.Users ?? 0) === 0 && (summary.counts.InventoryProduct ?? 0) === 0) {
+    const kb = (summary.sizeBytes / 1024).toFixed(0);
+    throw new Error(
+      `backup.json no tiene usuarios ni productos (${summary.totalRows} filas, ${kb} KB). ` +
+        "Reemplázalo con tu copia real (~3 MB desde tu PC) antes de resetear.",
+    );
+  }
+  return summary;
 }
 
 /** Evita FK rotas al restaurar backups viejos sin turnos de caja. */
@@ -342,7 +380,7 @@ export async function ensureBackupFileExists() {
 
 /** Borra tablas, las recrea e importa backup.json (Comandos / scripts). */
 export async function recreateDatabaseFromBackup() {
-  await ensureBackupFileExists();
+  await requireValidBackupFile();
 
   const dialect = sequelize.getDialect?.() || "mysql";
   if (dialect === "mysql") {
@@ -361,47 +399,36 @@ export async function recreateDatabaseFromBackup() {
 
 /** Respaldo / restore solo tablas EdDeli (inventario, pedidos, finanzas, editor, notificaciones, cuentas). Quiz, forms, alumni, CV → softed/backend. */
 export const insertData = async () => {
+  await requireValidBackupFile();
+
+  const raw = await fs.readFile(backupFilePath, "utf8");
+  const jsonData = parseBackupJsonContent(raw);
+  const counts = summarizeBackupData(jsonData);
+
+  const t = await sequelize.transaction();
   try {
-    await ensureBackupFileExists();
+    await setForeignKeyChecks(false, t);
+    const opt = { ...BULK_OPT, transaction: t };
 
-    const raw = await fs.readFile(backupFilePath, "utf8");
-    const jsonData = parseBackupJsonContent(raw);
-    const counts = summarizeBackupData(jsonData);
-
-    const t = await sequelize.transaction();
-    try {
-      await setForeignKeyChecks(false, t);
-      const opt = { ...BULK_OPT, transaction: t };
-
-      for (const entry of BACKUP_TABLE_ENTRIES) {
-        const rows = jsonData[entry.key];
-        try {
-          await bulkCreateRows(entry.model, rows, opt);
-        } catch (err) {
-          const detail = err?.parent?.sqlMessage || err?.message || String(err);
-          throw new Error(`Error al importar tabla ${entry.key}: ${detail}`);
-        }
+    for (const entry of BACKUP_TABLE_ENTRIES) {
+      const rows = jsonData[entry.key];
+      try {
+        await bulkCreateRows(entry.model, rows, opt);
+      } catch (err) {
+        const detail = err?.parent?.sqlMessage || err?.message || String(err);
+        throw new Error(`Error al importar tabla ${entry.key}: ${detail}`);
       }
-
-      await setForeignKeyChecks(true, t);
-      await t.commit();
-    } catch (err) {
-      await t.rollback();
-      throw err;
     }
 
-    console.log("Datos insertados correctamente desde backup.json. Filas:", counts);
-    return { ok: true, tables: counts };
-  } catch (error) {
-    if (error.code === "ENOENT") {
-      const empty = ensureBackupShape({});
-      await fs.writeFile(backupFilePath, JSON.stringify(empty, null, 2), "utf8");
-      console.log("Archivo de respaldo creado: backup.json (vacío)");
-      return { ok: true, createdEmptyBackup: true, tables: summarizeBackupData(empty) };
-    }
-    console.error("Error al insertar datos:", error);
-    throw error;
+    await setForeignKeyChecks(true, t);
+    await t.commit();
+  } catch (err) {
+    await t.rollback();
+    throw err;
   }
+
+  console.log("Datos insertados correctamente desde backup.json. Filas:", counts);
+  return { ok: true, tables: counts };
 };
 
 /**

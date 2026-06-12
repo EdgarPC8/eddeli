@@ -12,9 +12,16 @@ import {
 export const saveBackupController = async (req, res) => {
   try {
     const { backupPath, counts } = await saveBackup();
+    const users = counts?.Users ?? 0;
+    const products = counts?.InventoryProduct ?? 0;
+    let message = "Copia de seguridad guardada correctamente.";
+    if (users === 0 && products === 0) {
+      message +=
+        " Advertencia: la BD está vacía; el JSON guardado no tendrá usuarios ni productos. Restaura backup.json desde tu PC antes.";
+    }
     res.json({
       ok: true,
-      message: "Copia de seguridad guardada correctamente.",
+      message,
       path: backupPath,
       tables: counts,
     });
