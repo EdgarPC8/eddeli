@@ -97,7 +97,6 @@
     "src/controllers/QuizController.js",
     "src/controllers/UserController.js",
     "src/database/backup.json",
-    "src/database/backupPrincipal.json",
     "src/database/connection.js",
     "src/database/insertData.js",
     "src/helpers/functions.js",

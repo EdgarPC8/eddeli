@@ -12,6 +12,8 @@ backend/node_modules/
 # Copias locales de BD y dumps subidos
 backend/src/backups/
 backend/src/database/backup.json
+backend/src/database/backupPrincipal.json
+backend/src/database/backup.json.bak
 
 # Builds frontend viejos / assets generados (no versionar)
 frontend/dist/
