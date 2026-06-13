@@ -4,6 +4,8 @@ import {
   closeShift,
   createShiftMovement,
   getActiveShift,
+  getDailyShiftReport,
+  getWeeklyShiftReport,
   getShiftById,
   getShiftMovements,
   getShifts,
@@ -13,6 +15,8 @@ import {
 const router = express.Router();
 
 router.get("/active", isAuthenticated, getActiveShift);
+router.get("/reports/weekly", isAuthenticated, getWeeklyShiftReport);
+router.get("/reports/daily", isAuthenticated, getDailyShiftReport);
 router.get("/", isAuthenticated, getShifts);
 router.get("/:id/movements", isAuthenticated, getShiftMovements);
 router.post("/:id/movements", isAuthenticated, createShiftMovement);

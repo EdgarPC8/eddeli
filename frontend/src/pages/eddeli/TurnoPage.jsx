@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link as RouterLink } from "react-router-dom";
 import {
   Autocomplete,
   Box,
@@ -187,6 +188,7 @@ function operatorFromShift(shift, user) {
 
 export default function TurnoPage() {
   const { user, toast } = useAuth();
+  const isAdmin = user?.loginRol === "Administrador" || user?.loginRol === "Programador";
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeShift, setActiveShift] = useState(null);
@@ -373,7 +375,7 @@ export default function TurnoPage() {
 
   return (
     <Box sx={{ px: 0, pt: 0, pb: 1.5, maxWidth: 1280, mx: "auto" }}>
-      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.75 }}>
+      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.75 }} flexWrap="wrap">
         <Typography variant="h6" fontWeight={800}>
           Turno
         </Typography>
@@ -385,7 +387,17 @@ export default function TurnoPage() {
             </Typography>
           </>
         )}
+        {isAdmin && (
+          <Button component={RouterLink} to="/turno/supervision" size="small" variant="outlined" sx={{ ml: "auto" }}>
+            Supervisión por fecha
+          </Button>
+        )}
       </Stack>
+      {!isAdmin && (
+        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+          Abre tu turno, registra salidas de efectivo y cierra caja al terminar tu jornada.
+        </Typography>
+      )}
 
       {!activeShift ? (
         <Paper variant="panel" sx={panelSx}>
@@ -670,7 +682,7 @@ export default function TurnoPage() {
         <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.5 }}>
           <HistoryIcon sx={{ fontSize: 18 }} color="action" />
           <Typography variant="subtitle2" fontWeight={700}>
-            Historial
+            {isAdmin ? "Historial de turnos" : "Mis turnos"}
           </Typography>
         </Stack>
         <TableContainer sx={{ maxHeight: 160 }}>
@@ -678,6 +690,7 @@ export default function TurnoPage() {
             <TableHead>
               <TableRow>
                 <TableCell>Est.</TableCell>
+                {isAdmin && <TableCell>Operador</TableCell>}
                 <TableCell>Apertura</TableCell>
                 <TableCell>Cierre</TableCell>
                 <TableCell align="right">Inic.</TableCell>
@@ -696,6 +709,11 @@ export default function TurnoPage() {
                       sx={{ height: 20, fontSize: "0.65rem", minWidth: 28 }}
                     />
                   </TableCell>
+                  {isAdmin && (
+                    <TableCell>
+                      {operatorFromShift(row, null)}
+                    </TableCell>
+                  )}
                   <TableCell>{formatShiftDate(row.openedAt)}</TableCell>
                   <TableCell>{formatShiftDate(row.closedAt)}</TableCell>
                   <TableCell align="right">{formatMoney(row.openingCashTotal)}</TableCell>
@@ -720,7 +738,7 @@ export default function TurnoPage() {
               ))}
               {history.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6}>
+                  <TableCell colSpan={isAdmin ? 7 : 6}>
                     <Typography variant="caption" color="text.secondary">
                       Sin turnos registrados.
                     </Typography>

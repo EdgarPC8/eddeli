@@ -27,6 +27,7 @@ import ProductTemplateStudio from "./pages/eddeli/photoshop/ProductTemplateStudi
 import EditorTemplatesView from "./pages/eddeli/photoshop/EditorTemplatesView.jsx";
 import CajaPage from "./pages/eddeli/CajaPage.jsx";
 import TurnoPage from "./pages/eddeli/TurnoPage.jsx";
+import TurnoSupervisionPage from "./pages/eddeli/TurnoSupervisionPage.jsx";
 import TareasPage from "./pages/eddeli/TareasPage.jsx";
 import FacturacionPage from "./pages/eddeli/FacturacionPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
@@ -107,6 +108,7 @@ export default function App() {
 
           <Route element={<ProtectedRoute requiredRol={["Administrador", "Programador"]} />}>
             <Route path="/facturacion" element={<FacturacionPage />} />
+            <Route path="/turno/supervision" element={<TurnoSupervisionPage />} />
             <Route path="/panel_control" element={<PanelControlPage />} />
             {/* Ruta reservada; menú oculto hasta API backend (NotificationProgramsPage) */}
             <Route path="/notification-programs" element={<NotificationProgramsPage />} />

@@ -2,7 +2,7 @@ import { Op } from "sequelize";
 import { sequelize } from "../../database/connection.js";
 import { CashShift } from "../../models/CashShift.js";
 import { CashShiftMovement } from "../../models/CashShiftMovement.js";
-import { Order, OrderItem } from "../../models/Orders.js";
+import { Order, OrderItem, Customer } from "../../models/Orders.js";
 import { Users } from "../../models/Users.js";
 import { InventoryProduct, InventoryMovement } from "../../models/Inventory.js";
 import { Expense } from "../../models/Finance.js";
@@ -11,6 +11,7 @@ import { computeCashTotal, normalizeCashCounts } from "../../utils/shiftCashUtil
 const CAJA_POS_TAG = "[CAJA_POS]";
 const to2 = (n) => Number(Number(n || 0).toFixed(2));
 const ADMIN_ROLES = new Set(["Administrador", "Programador"]);
+const USER_LIST_ATTRS = ["id", "firstName", "firstLastName", "ci"];
 
 const OUT_CATEGORIES = new Set(["gasto_operativo", "compra_mercancia", "retiro", "otro"]);
 const IN_CATEGORIES = new Set(["entrada", "otro"]);
@@ -25,7 +26,8 @@ function userLabel(user) {
   if (!user) return "—";
   const parts = [user.firstName, user.firstLastName].filter(Boolean);
   if (parts.length) return parts.join(" ");
-  return user.username || `Usuario #${user.id}`;
+  if (user.ci) return user.ci;
+  return `Usuario #${user.id}`;
 }
 
 const billableQty = (item) => {
@@ -507,6 +509,497 @@ export async function closeShift(req, res) {
         closingCashTotal,
         cashDifference,
       },
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
+
+function parseDayRange(dateStr) {
+  const value = String(dateStr || "").slice(0, 10);
+  const safe = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : new Date().toISOString().slice(0, 10);
+  return {
+    date: safe,
+    dayStart: new Date(`${safe}T00:00:00`),
+    dayEnd: new Date(`${safe}T23:59:59.999`),
+  };
+}
+
+const billableQtyFromItem = (item) => {
+  const sold = Number(item.soldQty || 0);
+  if (sold > 0) return sold;
+  return Number(item.quantity || 0);
+};
+
+function formatPosOrderItems(orderItems = []) {
+  return orderItems.map((item) => {
+    const qty = billableQtyFromItem(item);
+    const price = Number(item.price || 0);
+    const product = item.ERP_inventory_product;
+    const lineTotal = to2(qty * price);
+    return {
+      id: item.id,
+      productId: item.productId,
+      name: product?.name || `Producto #${item.productId}`,
+      quantity: qty,
+      price,
+      lineTotal,
+    };
+  });
+}
+
+function inferDocumentTypeFromNotes(notes) {
+  const n = String(notes || "").toLowerCase();
+  if (n.includes("consumidor final") || n.includes("mostrador sin datos")) {
+    return "consumidor_final";
+  }
+  return "documento";
+}
+
+function shiftOpenedOnDay(shift, dayStart, dayEnd) {
+  const opened = new Date(shift.openedAt);
+  return opened >= dayStart && opened <= dayEnd;
+}
+
+function sumMovementAmounts(movements = []) {
+  return to2(movements.reduce((acc, m) => acc + Number(m.amount || 0), 0));
+}
+
+function buildShiftDayMetrics(shiftId, salesRows, outflowRows, inflowRows) {
+  let salesCashDay = 0;
+  let salesTotalDay = 0;
+  let ordersCountDay = 0;
+
+  for (const sale of salesRows) {
+    if (sale.shiftId !== shiftId) continue;
+    ordersCountDay += 1;
+    salesTotalDay += Number(sale.total || 0);
+    const method = String(sale.paymentMethod || "").toLowerCase();
+    if (method !== "transferencia" && method !== "tarjeta") {
+      salesCashDay += Number(sale.total || 0);
+    }
+  }
+
+  const cashOutDay = sumMovementAmounts(outflowRows.filter((m) => m.shiftId === shiftId));
+  const cashInDay = sumMovementAmounts(inflowRows.filter((m) => m.shiftId === shiftId));
+
+  return {
+    salesCashDay: to2(salesCashDay),
+    salesTotalDay: to2(salesTotalDay),
+    cashOutDay,
+    cashInDay,
+    cashEnteredDay: to2(salesCashDay + cashInDay),
+    ordersCountDay,
+  };
+}
+
+function parseWeekRange(dateStr) {
+  const { date, dayStart } = parseDayRange(dateStr);
+  const d = new Date(dayStart);
+  const dow = d.getDay();
+  const mondayOffset = dow === 0 ? -6 : 1 - dow;
+  const weekStartDate = new Date(d);
+  weekStartDate.setDate(d.getDate() + mondayOffset);
+  weekStartDate.setHours(0, 0, 0, 0);
+  const weekEndDate = new Date(weekStartDate);
+  weekEndDate.setDate(weekStartDate.getDate() + 6);
+  weekEndDate.setHours(23, 59, 59, 999);
+
+  const dayKeys = [];
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(weekStartDate);
+    day.setDate(weekStartDate.getDate() + i);
+    dayKeys.push(formatDateKey(day));
+  }
+
+  return {
+    anchorDate: date,
+    weekStart: formatDateKey(weekStartDate),
+    weekEnd: formatDateKey(weekEndDate),
+    weekStartDate,
+    weekEndDate,
+    dayKeys,
+  };
+}
+
+function formatDateKey(value) {
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return "";
+  const y = dt.getFullYear();
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const day = String(dt.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function computeClosingTotal(opening, sales) {
+  return to2(Number(opening || 0) + Number(sales || 0));
+}
+
+function emptyDaySummary(date) {
+  return {
+    date,
+    openingCashTotal: 0,
+    closingCashTotal: 0,
+    salesTotal: 0,
+    salesCash: 0,
+    salesTransfer: 0,
+    salesCard: 0,
+    cashOutTotal: 0,
+    ordersCount: 0,
+  };
+}
+
+function orderPaidDateKey(order) {
+  return formatDateKey(order.paidAt || order.date);
+}
+
+function computeOrderTotalFromItems(order) {
+  const items = order.ERP_order_items || [];
+  return to2(
+    items.reduce((acc, it) => acc + Number(it.price || 0) * billableQtyFromItem(it), 0),
+  );
+}
+
+function addDaySummaries(target, source) {
+  target.openingCashTotal = to2(target.openingCashTotal + source.openingCashTotal);
+  target.closingCashTotal = to2(target.closingCashTotal + source.closingCashTotal);
+  target.salesTotal = to2(target.salesTotal + source.salesTotal);
+  target.salesCash = to2(target.salesCash + source.salesCash);
+  target.salesTransfer = to2(target.salesTransfer + source.salesTransfer);
+  target.salesCard = to2(target.salesCard + source.salesCard);
+  target.cashOutTotal = to2(target.cashOutTotal + source.cashOutTotal);
+  target.ordersCount += source.ordersCount;
+}
+
+/** GET /shifts/reports/weekly — resumen de 7 días (lunes a domingo). */
+export async function getWeeklyShiftReport(req, res) {
+  try {
+    const { loginRol } = req.user;
+    if (!ADMIN_ROLES.has(loginRol)) {
+      return res.status(403).json({ message: "Solo administradores pueden ver el reporte semanal." });
+    }
+
+    const week = parseWeekRange(req.query.date);
+
+    const [posOrders, shiftsInWeek, outflows] = await Promise.all([
+      Order.findAll({
+        where: {
+          status: "pagado",
+          notes: { [Op.like]: `%${CAJA_POS_TAG}%` },
+          [Op.or]: [
+            { paidAt: { [Op.between]: [week.weekStartDate, week.weekEndDate] } },
+            { paidAt: null, date: { [Op.between]: [week.weekStartDate, week.weekEndDate] } },
+          ],
+        },
+        include: [
+          {
+            model: OrderItem,
+            as: "ERP_order_items",
+            attributes: ["price", "quantity", "soldQty"],
+          },
+        ],
+        attributes: ["id", "paidAt", "date", "paymentMethod"],
+      }),
+      CashShift.findAll({
+        where: {
+          openedAt: { [Op.between]: [week.weekStartDate, week.weekEndDate] },
+        },
+        attributes: ["openedAt", "openingCashTotal"],
+      }),
+      CashShiftMovement.findAll({
+        where: {
+          direction: "out",
+          createdAt: { [Op.between]: [week.weekStartDate, week.weekEndDate] },
+        },
+        attributes: ["amount", "createdAt"],
+      }),
+    ]);
+
+    const byDay = Object.fromEntries(week.dayKeys.map((k) => [k, emptyDaySummary(k)]));
+
+    for (const order of posOrders) {
+      const key = orderPaidDateKey(order);
+      if (!byDay[key]) continue;
+      const total = computeOrderTotalFromItems(order);
+      const row = byDay[key];
+      row.ordersCount += 1;
+      row.salesTotal = to2(row.salesTotal + total);
+      const method = String(order.paymentMethod || "").toLowerCase();
+      if (method === "transferencia") row.salesTransfer = to2(row.salesTransfer + total);
+      else if (method === "tarjeta") row.salesCard = to2(row.salesCard + total);
+      else row.salesCash = to2(row.salesCash + total);
+    }
+
+    for (const shift of shiftsInWeek) {
+      const openKey = formatDateKey(shift.openedAt);
+      if (byDay[openKey]) {
+        byDay[openKey].openingCashTotal = to2(
+          byDay[openKey].openingCashTotal + Number(shift.openingCashTotal || 0),
+        );
+      }
+    }
+
+    for (const movement of outflows) {
+      const key = formatDateKey(movement.createdAt);
+      if (!byDay[key]) continue;
+      byDay[key].cashOutTotal = to2(
+        byDay[key].cashOutTotal + Number(movement.amount || 0),
+      );
+    }
+
+    const days = week.dayKeys.map((key) => {
+      const row = byDay[key];
+      row.closingCashTotal = computeClosingTotal(row.openingCashTotal, row.salesTotal);
+      const dt = new Date(`${key}T12:00:00`);
+      row.weekday = dt.toLocaleDateString("es-EC", { weekday: "long" });
+      row.weekdayShort = dt.toLocaleDateString("es-EC", { weekday: "short" });
+      row.dateLabel = dt.toLocaleDateString("es-EC", { day: "2-digit", month: "short" });
+      return row;
+    });
+
+    const summary = emptyDaySummary("week");
+    for (const day of days) addDaySummaries(summary, day);
+
+    res.json({
+      weekStart: week.weekStart,
+      weekEnd: week.weekEnd,
+      anchorDate: week.anchorDate,
+      days,
+      summary,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
+
+/** GET /shifts/reports/daily — salidas y ventas POS de la fecha elegida (solo admin/programador). */
+export async function getDailyShiftReport(req, res) {
+  try {
+    const { loginRol } = req.user;
+    if (!ADMIN_ROLES.has(loginRol)) {
+      return res.status(403).json({ message: "Solo administradores pueden ver el reporte diario." });
+    }
+
+    const { date: dateStr, dayStart, dayEnd } = parseDayRange(req.query.date);
+
+    const [outflows, inflows, posOrders] = await Promise.all([
+      CashShiftMovement.findAll({
+        where: {
+          direction: "out",
+          createdAt: { [Op.between]: [dayStart, dayEnd] },
+        },
+        include: [
+          {
+            model: Users,
+            as: "user",
+            attributes: USER_LIST_ATTRS,
+          },
+        ],
+        order: [["createdAt", "ASC"]],
+      }),
+      CashShiftMovement.findAll({
+        where: {
+          direction: "in",
+          createdAt: { [Op.between]: [dayStart, dayEnd] },
+        },
+        include: [
+          {
+            model: Users,
+            as: "user",
+            attributes: USER_LIST_ATTRS,
+          },
+        ],
+        order: [["createdAt", "ASC"]],
+      }),
+      Order.findAll({
+        where: {
+          status: "pagado",
+          notes: { [Op.like]: `%${CAJA_POS_TAG}%` },
+          [Op.or]: [
+            { paidAt: { [Op.between]: [dayStart, dayEnd] } },
+            { paidAt: null, date: { [Op.between]: [dayStart, dayEnd] } },
+          ],
+        },
+        include: [
+          { model: Customer, as: "ERP_customer", attributes: ["id", "name"] },
+          {
+            model: OrderItem,
+            as: "ERP_order_items",
+            include: [{ model: InventoryProduct, as: "ERP_inventory_product", attributes: ["id", "name"] }],
+          },
+          {
+            model: CashShift,
+            as: "shift",
+            include: [
+              {
+                model: Users,
+                as: "user",
+                attributes: USER_LIST_ATTRS,
+              },
+            ],
+          },
+        ],
+        order: [["paidAt", "ASC"], ["id", "ASC"]],
+      }),
+    ]);
+
+    const shiftIdsFromActivity = new Set([
+      ...outflows.map((m) => m.shiftId),
+      ...inflows.map((m) => m.shiftId),
+      ...posOrders.map((o) => o.shiftId).filter(Boolean),
+    ]);
+
+    const shiftsActiveOnDay = await CashShift.findAll({
+      where: {
+        openedAt: { [Op.lte]: dayEnd },
+        [Op.or]: [
+          { closedAt: { [Op.gte]: dayStart } },
+          { closedAt: null },
+        ],
+      },
+      include: [
+        {
+          model: Users,
+          as: "user",
+          attributes: USER_LIST_ATTRS,
+        },
+      ],
+      order: [["openedAt", "ASC"]],
+    });
+
+    const shiftById = new Map(shiftsActiveOnDay.map((s) => [s.id, s]));
+    const missingShiftIds = [...shiftIdsFromActivity].filter((id) => !shiftById.has(id));
+    if (missingShiftIds.length) {
+      const extraShifts = await CashShift.findAll({
+        where: { id: { [Op.in]: missingShiftIds } },
+        include: [
+          {
+            model: Users,
+            as: "user",
+            attributes: USER_LIST_ATTRS,
+          },
+        ],
+      });
+      for (const shift of extraShifts) shiftById.set(shift.id, shift);
+    }
+
+    const shifts = [...shiftById.values()].sort(
+      (a, b) => new Date(a.openedAt) - new Date(b.openedAt),
+    );
+
+    let salesCash = 0;
+    let salesTransfer = 0;
+    let salesCard = 0;
+    let salesTotal = 0;
+    let cashOutTotal = 0;
+    let cashInMovementsTotal = 0;
+
+    const sales = posOrders.map((order) => {
+      const items = formatPosOrderItems(order.ERP_order_items || []);
+      const total = to2(items.reduce((acc, it) => acc + it.lineTotal, 0));
+      salesTotal += total;
+      const method = String(order.paymentMethod || "").toLowerCase();
+      if (method === "transferencia") salesTransfer += total;
+      else if (method === "tarjeta") salesCard += total;
+      else salesCash += total;
+
+      const shift = order.shift || shiftById.get(order.shiftId);
+      const customer = order.ERP_customer;
+      const docType = order.documentType || inferDocumentTypeFromNotes(order.notes);
+
+      return {
+        id: order.id,
+        shiftId: order.shiftId,
+        paidAt: order.paidAt || order.date,
+        paymentMethod: order.paymentMethod,
+        documentType: docType,
+        customerName:
+          docType === "consumidor_final"
+            ? "Consumidor final"
+            : customer?.name || "—",
+        operatorName: userLabel(shift?.user),
+        total,
+        items,
+      };
+    });
+
+    for (const movement of outflows) {
+      cashOutTotal += Number(movement.amount || 0);
+    }
+    for (const movement of inflows) {
+      cashInMovementsTotal += Number(movement.amount || 0);
+    }
+
+    const cashEnteredTotal = to2(salesCash + cashInMovementsTotal);
+
+    const openingCashTotal = to2(
+      shifts.reduce((acc, shift) => {
+        if (!shiftOpenedOnDay(shift, dayStart, dayEnd)) return acc;
+        return acc + Number(shift.openingCashTotal || 0);
+      }, 0),
+    );
+    const closingCashTotal = computeClosingTotal(openingCashTotal, salesTotal);
+
+    res.json({
+      date: dateStr,
+      summary: {
+        shiftsCount: shifts.length,
+        ordersCount: sales.length,
+        openingCashTotal,
+        closingCashTotal,
+        salesTotal: to2(salesTotal),
+        salesCash: to2(salesCash),
+        salesTransfer: to2(salesTransfer),
+        salesCard: to2(salesCard),
+        cashOutTotal: to2(cashOutTotal),
+        cashInMovementsTotal: to2(cashInMovementsTotal),
+        cashEnteredTotal,
+        outflowsCount: outflows.length,
+        inflowsCount: inflows.length,
+      },
+      shifts: shifts.map((shift) => {
+        const dayMetrics = buildShiftDayMetrics(shift.id, sales, outflows, inflows);
+        const openedOnDay = shiftOpenedOnDay(shift, dayStart, dayEnd);
+        const openingCashOnDay = openedOnDay ? to2(shift.openingCashTotal) : null;
+        return {
+          id: shift.id,
+          status: shift.status,
+          operatorName: userLabel(shift.user),
+          openedAt: shift.openedAt,
+          closedAt: shift.closedAt,
+          openingCashOnDay,
+          closingCashOnDay: computeClosingTotal(openingCashOnDay, dayMetrics.salesTotalDay),
+          ...dayMetrics,
+          cashDifference: shift.cashDifference != null ? to2(shift.cashDifference) : null,
+        };
+      }),
+      outflows: outflows.map((m) => {
+        const shift = shiftById.get(m.shiftId);
+        return {
+          id: m.id,
+          shiftId: m.shiftId,
+          createdAt: m.createdAt,
+          category: m.category,
+          concept: m.concept,
+          amount: to2(m.amount),
+          notes: m.notes,
+          operatorName: userLabel(m.user || shift?.user),
+        };
+      }),
+      inflows: inflows.map((m) => {
+        const shift = shiftById.get(m.shiftId);
+        return {
+          id: m.id,
+          shiftId: m.shiftId,
+          createdAt: m.createdAt,
+          category: m.category,
+          concept: m.concept,
+          amount: to2(m.amount),
+          notes: m.notes,
+          operatorName: userLabel(m.user || shift?.user),
+        };
+      }),
+      sales,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

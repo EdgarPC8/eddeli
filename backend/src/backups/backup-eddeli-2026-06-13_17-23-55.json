@@ -67,12 +67,12 @@
       "roleId": 2
     },
     {
-      "accountId": 1,
-      "roleId": 4
-    },
-    {
       "accountId": 248,
       "roleId": 2
+    },
+    {
+      "accountId": 1,
+      "roleId": 4
     }
   ],
   "UserData": [],
@@ -1766,7 +1766,7 @@
       "categoryId": 3,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 3,
+      "stock": 7,
       "minStock": 0,
       "price": "0.15",
       "wholesaleRules": null,
@@ -1778,7 +1778,7 @@
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pan-de-dulce-z87ig.png",
       "createdAt": "2025-12-05T16:25:33.000Z",
-      "updatedAt": "2026-06-13T22:14:15.000Z"
+      "updatedAt": "2026-06-13T21:49:42.000Z"
     },
     {
       "id": 72,
@@ -3169,7 +3169,7 @@
       "categoryId": 5,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 3,
+      "stock": 7,
       "minStock": 0,
       "price": "0.50",
       "wholesaleRules": null,
@@ -3181,7 +3181,7 @@
       "isActive": 1,
       "primaryImageUrl": null,
       "createdAt": "2026-06-10T20:17:03.000Z",
-      "updatedAt": "2026-06-13T22:14:15.000Z"
+      "updatedAt": "2026-06-13T00:22:17.000Z"
     },
     {
       "id": 133,
@@ -75112,51 +75112,6 @@
       "createdBy": 1,
       "createdAt": "2026-06-13T21:49:42.000Z",
       "updatedAt": "2026-06-13T21:49:42.000Z"
-    },
-    {
-      "id": 4722,
-      "productId": 132,
-      "quantity": 1,
-      "description": "Venta POS · pedido #766",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 766,
-      "date": "2026-06-13T22:08:16.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-13T22:08:16.000Z",
-      "updatedAt": "2026-06-13T22:08:16.000Z"
-    },
-    {
-      "id": 4723,
-      "productId": 132,
-      "quantity": 3,
-      "description": "Venta POS · pedido #767",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 767,
-      "date": "2026-06-13T22:14:15.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-13T22:14:15.000Z",
-      "updatedAt": "2026-06-13T22:14:15.000Z"
-    },
-    {
-      "id": 4724,
-      "productId": 71,
-      "quantity": 4,
-      "description": "Venta POS · pedido #767",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 767,
-      "date": "2026-06-13T22:14:15.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-13T22:14:15.000Z",
-      "updatedAt": "2026-06-13T22:14:15.000Z"
     }
   ],
   "CashShift": [
@@ -75475,6 +75430,23 @@
       "expenseId": 551,
       "createdAt": "2026-06-12T19:26:29.000Z",
       "updatedAt": "2026-06-12T19:26:29.000Z"
+    },
+    {
+      "id": 11,
+      "shiftId": 6,
+      "accountId": 1,
+      "userId": 1,
+      "direction": "out",
+      "category": "gasto_operativo",
+      "amount": "2.00",
+      "concept": "almuerzo",
+      "notes": null,
+      "productId": null,
+      "quantity": null,
+      "inventoryMovementId": null,
+      "expenseId": 554,
+      "createdAt": "2026-06-13T22:04:01.000Z",
+      "updatedAt": "2026-06-13T22:04:01.000Z"
     }
   ],
   "Customer": [
@@ -86151,34 +86123,6 @@
       "financeIncomeId": null,
       "createdAt": "2026-06-13T21:49:42.000Z",
       "updatedAt": "2026-06-13T21:49:42.000Z"
-    },
-    {
-      "id": 766,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 6,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-13T22:08:16.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-13T22:08:16.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-13T22:08:16.000Z",
-      "updatedAt": "2026-06-13T22:08:16.000Z"
-    },
-    {
-      "id": 767,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 6,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-13T22:14:15.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-13T22:14:15.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-13T22:14:15.000Z",
-      "updatedAt": "2026-06-13T22:14:15.000Z"
     }
   ],
   "OrderItem": [
@@ -98999,45 +98943,6 @@
       "replacedQty": 0,
       "deliveredAt": "2026-06-13T21:49:42.000Z",
       "paidAt": "2026-06-13T21:49:42.000Z"
-    },
-    {
-      "id": 1020,
-      "orderId": 766,
-      "productId": 132,
-      "quantity": 1,
-      "price": 0.5,
-      "soldQty": 1,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-13T22:08:16.000Z",
-      "paidAt": "2026-06-13T22:08:16.000Z"
-    },
-    {
-      "id": 1021,
-      "orderId": 767,
-      "productId": 132,
-      "quantity": 3,
-      "price": 0.5,
-      "soldQty": 3,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-13T22:14:15.000Z",
-      "paidAt": "2026-06-13T22:14:15.000Z"
-    },
-    {
-      "id": 1022,
-      "orderId": 767,
-      "productId": 71,
-      "quantity": 4,
-      "price": 0.125,
-      "soldQty": 4,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-13T22:14:15.000Z",
-      "paidAt": "2026-06-13T22:14:15.000Z"
     }
   ],
   "TaskPlan": [],
@@ -99048,10 +98953,10 @@
       "name": "Panaderia Chile",
       "description": "",
       "status": "active",
-      "screenIds": "[]",
+      "screenIds": "\"[]\"",
       "loop": 1,
       "musicMode": "single_loop",
-      "musicTracks": "[{\"id\":\"track_EdDeli/media/file_1781300805843_1fda61d3.mp3\",\"title\":\"canciones saxofon.mp3\",\"mediaPath\":\"EdDeli/media/file_1781300805843_1fda61d3.mp3\",\"durationSeconds\":180,\"order\":0}]",
+      "musicTracks": "\"[{\\\"id\\\":\\\"track_EdDeli/media/file_1781300805843_1fda61d3.mp3\\\",\\\"title\\\":\\\"canciones saxofon.mp3\\\",\\\"mediaPath\\\":\\\"EdDeli/media/file_1781300805843_1fda61d3.mp3\\\",\\\"durationSeconds\\\":180,\\\"order\\\":0}]\"",
       "createdByAccountId": 1,
       "createdAt": "2026-06-12T18:23:31.000Z",
       "updatedAt": "2026-06-12T21:53:31.000Z"
@@ -99061,10 +98966,10 @@
       "name": "Productos Eddeli",
       "description": "",
       "status": "active",
-      "screenIds": "[]",
+      "screenIds": "\"[]\"",
       "loop": 1,
       "musicMode": "single_loop",
-      "musicTracks": "[{\"id\":\"track_EdDeli/media/file_1781299903362_7381e058.mp3\",\"title\":\"Le festín - Camille  Traducido al Español.mp3\",\"mediaPath\":\"EdDeli/media/file_1781299903362_7381e058.mp3\",\"durationSeconds\":180,\"order\":0}]",
+      "musicTracks": "\"[{\\\"id\\\":\\\"track_EdDeli/media/file_1781299903362_7381e058.mp3\\\",\\\"title\\\":\\\"Le festín - Camille  Traducido al Español.mp3\\\",\\\"mediaPath\\\":\\\"EdDeli/media/file_1781299903362_7381e058.mp3\\\",\\\"durationSeconds\\\":180,\\\"order\\\":0}]\"",
       "createdByAccountId": 1,
       "createdAt": "2026-06-12T21:21:40.000Z",
       "updatedAt": "2026-06-12T21:35:01.000Z"
@@ -106900,6 +106805,20 @@
       "createdBy": 1,
       "createdAt": "2026-06-12T22:11:38.000Z",
       "updatedAt": "2026-06-12T22:11:38.000Z"
+    },
+    {
+      "id": 554,
+      "date": "2026-06-13",
+      "amount": "2.00",
+      "concept": "almuerzo",
+      "category": "Gastos operativos",
+      "referenceId": 11,
+      "referenceType": "cash_shift_movement",
+      "status": "paid",
+      "counterpartyName": null,
+      "createdBy": 1,
+      "createdAt": "2026-06-13T22:04:01.000Z",
+      "updatedAt": "2026-06-13T22:04:01.000Z"
     }
   ],
   "Income": [
@@ -119418,48 +119337,6 @@
       "createdBy": 1,
       "createdAt": "2026-06-13T21:49:42.000Z",
       "updatedAt": "2026-06-13T21:49:42.000Z"
-    },
-    {
-      "id": 914,
-      "date": "2026-06-13",
-      "amount": "0.50",
-      "concept": "Venta POS Porcion de Pastel x1 (Ord #766)",
-      "category": "Venta",
-      "referenceId": 1020,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-13T22:08:16.000Z",
-      "updatedAt": "2026-06-13T22:08:16.000Z"
-    },
-    {
-      "id": 915,
-      "date": "2026-06-13",
-      "amount": "1.50",
-      "concept": "Venta POS Porcion de Pastel x3 (Ord #767)",
-      "category": "Venta",
-      "referenceId": 1021,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-13T22:14:15.000Z",
-      "updatedAt": "2026-06-13T22:14:15.000Z"
-    },
-    {
-      "id": 916,
-      "date": "2026-06-13",
-      "amount": "0.50",
-      "concept": "Venta POS Pan de Dulce x4 (Ord #767)",
-      "category": "Venta",
-      "referenceId": 1022,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-13T22:14:15.000Z",
-      "updatedAt": "2026-06-13T22:14:15.000Z"
     }
   ],
   "Store": [
@@ -126131,19 +126008,19 @@
       "id": 326,
       "httpMethod": "POST",
       "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
+      "endPoint": "/eddeliapi/shifts/6/movements",
       "description": "EL Programador Edgar Torres realizó una acción",
       "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-13T22:08:16.000Z"
+      "date": "2026-06-13T22:04:01.000Z"
     },
     {
       "id": 327,
       "httpMethod": "POST",
       "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
+      "endPoint": "/eddeliapi/comands/upload-backup",
       "description": "EL Programador Edgar Torres realizó una acción",
       "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-13T22:14:15.000Z"
+      "date": "2026-06-13T22:23:49.000Z"
     }
   ]
 }

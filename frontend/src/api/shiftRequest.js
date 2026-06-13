@@ -21,3 +21,13 @@ export const getShiftMovements = (shiftId) =>
 
 export const createShiftMovement = (shiftId, payload) =>
   axios.post(`/shifts/${shiftId}/movements`, payload, auth());
+
+export const getWeeklyShiftReport = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return axios.get(`/shifts/reports/weekly${qs ? `?${qs}` : ""}`, auth());
+};
+
+export const getDailyShiftReport = (params = {}) => {
+  const qs = new URLSearchParams(params).toString();
+  return axios.get(`/shifts/reports/daily${qs ? `?${qs}` : ""}`, auth());
+};

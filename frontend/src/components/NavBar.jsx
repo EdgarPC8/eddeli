@@ -68,6 +68,7 @@ import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
 import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
 import ScheduleIcon from "@mui/icons-material/Schedule";
+import AssessmentIcon from "@mui/icons-material/Assessment";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import ReceiptIcon from "@mui/icons-material/Receipt";
 import TvIcon from "@mui/icons-material/Tv";
@@ -89,6 +90,7 @@ const MENU_ITEMS = [
   { name: "Dashboard", link: "/", icon: <DashboardIcon />, roles: ["Programador", "Administrador"] },
   { name: "Caja", link: "/caja", icon: <PointOfSaleIcon />, roles: ["Programador", "Administrador", "Empleado"] },
   { name: "Turno", link: "/turno", icon: <ScheduleIcon />, roles: ["Programador", "Administrador", "Empleado"] },
+  { name: "Supervisión caja", link: "/turno/supervision", icon: <AssessmentIcon />, roles: ["Programador", "Administrador"] },
   { name: "Tareas", link: "/tareas", icon: <AssignmentTurnedInIcon />, roles: ["Programador", "Administrador", "Empleado"] },
   { name: "Facturación", link: "/facturacion", icon: <ReceiptIcon />, roles: ["Programador", "Administrador"] },
   { name: "Catálogo config", link: "/catalog_manager", icon: <ViewModuleIcon />, roles: ["Programador", "Administrador"] },
