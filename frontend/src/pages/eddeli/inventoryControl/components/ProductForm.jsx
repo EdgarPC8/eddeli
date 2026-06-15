@@ -31,6 +31,32 @@ import {
 import { pathImg } from "../../../../api/axios";
 
 /* ============ Helpers de imagen ============ */
+const ALLOWED_IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+function resolveImageMime(file) {
+  if (file?.type && ALLOWED_IMAGE_MIMES.includes(file.type)) return file.type;
+  const n = String(file?.name || "").toLowerCase();
+  if (n.endsWith(".png")) return "image/png";
+  if (n.endsWith(".webp")) return "image/webp";
+  if (n.endsWith(".gif")) return "image/gif";
+  if (n.endsWith(".jpg") || n.endsWith(".jpeg")) return "image/jpeg";
+  return "image/jpeg";
+}
+
+function mimeToExt(mime) {
+  if (mime === "image/png") return ".png";
+  if (mime === "image/webp") return ".webp";
+  if (mime === "image/gif") return ".gif";
+  return ".jpg";
+}
+
+function formatLabel(mime) {
+  if (mime === "image/png") return "PNG";
+  if (mime === "image/webp") return "WEBP";
+  if (mime === "image/gif") return "GIF";
+  return "JPEG";
+}
+
 async function getCroppedBlob(
   imageSrc,
   cropAreaPixels,
@@ -65,29 +91,35 @@ async function getCroppedBlob(
 }
 
 function blobToFile(blob, originalName = "image", mime = "image/jpeg") {
-  const base = originalName.replace(/\.[^.]+$/, "");
-  const ext =
-    mime === "image/png" ? ".png" : mime === "image/webp" ? ".webp" : ".jpg";
-  return new File([blob], base + ext, { type: mime });
+  const base = String(originalName).replace(/\.[^.]+$/, "") || "image";
+  return new File([blob], base + mimeToExt(mime), { type: mime });
 }
 
 /* ================= CropperDialog ================= */
-function CropperDialog({ open, imageSrc, onClose, onConfirm, aspect }) {
+function CropperDialog({
+  open,
+  imageSrc,
+  onClose,
+  onConfirm,
+  aspect,
+  sourceMime = "image/jpeg",
+  sourceFileName = "image",
+}) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
   const [areaPixels, setAreaPixels] = useState(null);
   const [quality, setQuality] = useState(0.9);
-  const [mime, setMime] = useState("image/jpeg");
+  const [mime, setMime] = useState(sourceMime);
 
   useEffect(() => {
-    if (!open) {
+    if (open) {
       setCrop({ x: 0, y: 0 });
       setZoom(1);
       setAreaPixels(null);
       setQuality(0.9);
-      setMime("image/jpeg");
+      setMime(sourceMime);
     }
-  }, [open]);
+  }, [open, sourceMime]);
 
   const onCropComplete = (_, a) => setAreaPixels(a);
 
@@ -100,6 +132,7 @@ function CropperDialog({ open, imageSrc, onClose, onConfirm, aspect }) {
       mime,
       quality,
       sizeBytes: blob?.size ?? null,
+      sourceFileName,
     });
   };
 
@@ -136,33 +169,26 @@ function CropperDialog({ open, imageSrc, onClose, onConfirm, aspect }) {
           />
         </Box>
 
-        <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-          <TextField
-            label="Formato"
-            size="small"
-            select
-            value={mime}
-            onChange={(e) => setMime(e.target.value)}
-            sx={{ width: 180 }}
-          >
-            <MenuItem value="image/jpeg">JPG</MenuItem>
-            <MenuItem value="image/png">PNG</MenuItem>
-            <MenuItem value="image/webp">WEBP</MenuItem>
-          </TextField>
+        <Stack direction="row" spacing={1} sx={{ mt: 1 }} alignItems="center">
+          <Typography variant="body2" color="text.secondary">
+            Formato original: <strong>{formatLabel(mime)}</strong>
+          </Typography>
 
-          <TextField
-            label="Calidad"
-            size="small"
-            type="number"
-            value={quality}
-            onChange={(e) =>
-              setQuality(
-                Math.min(1, Math.max(0.1, Number(e.target.value || 0.9)))
-              )
-            }
-            inputProps={{ step: 0.05, min: 0.1, max: 1 }}
-            sx={{ width: 160 }}
-          />
+          {(mime === "image/jpeg" || mime === "image/webp") && (
+            <TextField
+              label="Calidad"
+              size="small"
+              type="number"
+              value={quality}
+              onChange={(e) =>
+                setQuality(
+                  Math.min(1, Math.max(0.1, Number(e.target.value || 0.9)))
+                )
+              }
+              inputProps={{ step: 0.05, min: 0.1, max: 1 }}
+              sx={{ width: 160, ml: "auto" }}
+            />
+          )}
         </Stack>
       </DialogContent>
 
@@ -234,6 +260,7 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [imageSrc, setImageSrc] = useState(null);
   const [cropOpen, setCropOpen] = useState(false);
+  const [pendingSourceFile, setPendingSourceFile] = useState(null);
   const [lastMeta, setLastMeta] = useState(null);
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
@@ -255,6 +282,7 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
+    setPendingSourceFile(f);
     if (imageSrc) URL.revokeObjectURL(imageSrc);
     const url = URL.createObjectURL(f);
     setImageSrc(url);
@@ -262,7 +290,9 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
   };
 
   const onCropConfirm = async (blob, meta) => {
-    const file = blobToFile(blob, "image", meta?.mime || "image/jpeg");
+    const mime = meta?.mime || resolveImageMime(pendingSourceFile);
+    const name = meta?.sourceFileName || pendingSourceFile?.name || "image";
+    const file = blobToFile(blob, name, mime);
     setSelectedFile(file);
 
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -270,6 +300,7 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
 
     setLastMeta(meta || null);
     setCropOpen(false);
+    setPendingSourceFile(null);
 
     if (imageSrc) URL.revokeObjectURL(imageSrc);
     setImageSrc(null);
@@ -277,6 +308,7 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
 
   const onCropCancel = () => {
     setCropOpen(false);
+    setPendingSourceFile(null);
     if (imageSrc) URL.revokeObjectURL(imageSrc);
     setImageSrc(null);
   };
@@ -833,6 +865,8 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
         open={cropOpen}
         imageSrc={imageSrc}
         aspect={ASPECTS[aspectKey]}
+        sourceMime={resolveImageMime(pendingSourceFile)}
+        sourceFileName={pendingSourceFile?.name || "image"}
         onClose={onCropCancel}
         onConfirm={onCropConfirm}
       />

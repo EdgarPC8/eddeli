@@ -35,6 +35,32 @@ import {
      Helpers de imagen / crop
   =========================== */
   
+  const ALLOWED_IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+
+  function resolveImageMime(file) {
+    if (file?.type && ALLOWED_IMAGE_MIMES.includes(file.type)) return file.type;
+    const n = String(file?.name || "").toLowerCase();
+    if (n.endsWith(".png")) return "image/png";
+    if (n.endsWith(".webp")) return "image/webp";
+    if (n.endsWith(".gif")) return "image/gif";
+    if (n.endsWith(".jpg") || n.endsWith(".jpeg")) return "image/jpeg";
+    return "image/jpeg";
+  }
+
+  function mimeToExt(mime) {
+    if (mime === "image/png") return ".png";
+    if (mime === "image/webp") return ".webp";
+    if (mime === "image/gif") return ".gif";
+    return ".jpg";
+  }
+
+  function formatLabel(mime) {
+    if (mime === "image/png") return "PNG";
+    if (mime === "image/webp") return "WEBP";
+    if (mime === "image/gif") return "GIF";
+    return "JPEG";
+  }
+
   // Canvas a partir del área de recorte del cropper, luego escala a tamaño final
   async function getCroppedBlob(imageSrc, cropAreaPixels, {
     targetW = 800,
@@ -68,9 +94,8 @@ import {
   }
   
   function blobToFile(blob, originalName = "image", mime = "image/jpeg") {
-    const base = originalName.replace(/\.[^.]+$/, "");
-    const ext = mime === "image/png" ? ".png" : mime === "image/webp" ? ".webp" : ".jpg";
-    return new File([blob], base + ext, { type: mime });
+    const base = String(originalName).replace(/\.[^.]+$/, "") || "image";
+    return new File([blob], base + mimeToExt(mime), { type: mime });
   }
   
   /* ===========================
@@ -81,8 +106,9 @@ import {
     imageSrc,
     onClose,
     onConfirm,
-    aspect,      // puede venir undefined para libre
-    // Los targetW/H ya no son obligatorios: si no se pasan, usa resolución máxima del recorte
+    aspect,
+    sourceMime = "image/jpeg",
+    sourceFileName = "image",
   }) {
     const [crop, setCrop] = useState({ x: 0, y: 0 });
     const [zoom, setZoom] = useState(1);
@@ -100,12 +126,12 @@ import {
     const [customW, setCustomW] = useState("");
     const [customH, setCustomH] = useState("");
     const [quality, setQuality] = useState(0.9);
-    const [mime, setMime] = useState("image/jpeg");
+    const [mime, setMime] = useState(sourceMime);
     const [estimateMB, setEstimateMB] = useState(null);
     const [estimateWH, setEstimateWH] = useState(null);
-  
+
     useEffect(() => {
-      if (!open) {
+      if (open) {
         setCrop({ x: 0, y: 0 });
         setZoom(1);
         setAreaPixels(null);
@@ -113,11 +139,11 @@ import {
         setCustomW("");
         setCustomH("");
         setQuality(0.9);
-        setMime("image/jpeg");
+        setMime(sourceMime);
         setEstimateMB(null);
         setEstimateWH(null);
       }
-    }, [open]);
+    }, [open, sourceMime]);
   
     const onCropComplete = (_, croppedAreaPixels) => setAreaPixels(croppedAreaPixels);
   
@@ -183,6 +209,7 @@ import {
         mime,
         quality,
         sizeBytes: blob?.size ?? null,
+        sourceFileName,
       });
     };
   
@@ -264,18 +291,10 @@ import {
   
           <Box sx={{ display: "grid", gap: 1 }}>
             <Typography variant="subtitle2">Formato y calidad</Typography>
-            <TextField
-              label="Formato"
-              value={mime}
-              onChange={(e) => setMime(e.target.value)}
-              select
-              fullWidth
-            >
-              <MenuItem value="image/jpeg">JPEG (recomendado)</MenuItem>
-              <MenuItem value="image/webp">WEBP</MenuItem>
-              <MenuItem value="image/png">PNG (sin pérdidas, peso alto)</MenuItem>
-            </TextField>
-  
+            <Typography variant="body2" color="text.secondary">
+              Formato original: <strong>{formatLabel(mime)}</strong>
+            </Typography>
+
             {(mime === "image/jpeg" || mime === "image/webp") && (
               <Box>
                 <Typography variant="caption" sx={{ opacity: 0.7 }}>
@@ -324,6 +343,7 @@ import {
   
     const [cropOpen, setCropOpen] = useState(false);
     const [imageSrc, setImageSrc] = useState(null);
+    const [pendingSourceFile, setPendingSourceFile] = useState(null);
     const [aspectKey, setAspectKey] = useState("1:1"); // default
   
     const ASPECTS = {
@@ -339,6 +359,7 @@ import {
     const handleFileChange = (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
+      setPendingSourceFile(file);
       const url = URL.createObjectURL(file);
       setImageSrc(url);
       setCropOpen(true);
@@ -349,12 +370,15 @@ import {
     const [lastMeta, setLastMeta] = useState(null);
   
     const handleCropConfirm = async (blob, meta) => {
-      const file = blobToFile(blob, "image", meta?.mime || "image/jpeg");
+      const mime = meta?.mime || resolveImageMime(pendingSourceFile);
+      const name = meta?.sourceFileName || pendingSourceFile?.name || "image";
+      const file = blobToFile(blob, name, mime);
       setSelectedFile(file);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(URL.createObjectURL(file));
       set("imageFile", file);
       setCropOpen(false);
+      setPendingSourceFile(null);
       setLastMeta(meta || null);
   
       if (imageSrc) URL.revokeObjectURL(imageSrc);
@@ -363,6 +387,7 @@ import {
   
     const handleCropCancel = () => {
       setCropOpen(false);
+      setPendingSourceFile(null);
       if (imageSrc) URL.revokeObjectURL(imageSrc);
       setImageSrc(null);
     };
@@ -547,9 +572,11 @@ import {
         <CropperDialog
           open={cropOpen}
           imageSrc={imageSrc}
-          aspect={ASPECTS[aspectKey]}     // undefined => libre
+          aspect={ASPECTS[aspectKey]}
+          sourceMime={resolveImageMime(pendingSourceFile)}
+          sourceFileName={pendingSourceFile?.name || "image"}
           onClose={handleCropCancel}
-          onConfirm={handleCropConfirm}   // recibe (blob, meta)
+          onConfirm={handleCropConfirm}
         />
       </DialogContent>
     );
