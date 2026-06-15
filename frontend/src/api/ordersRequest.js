@@ -71,6 +71,12 @@ export const markItemAsPaidRequest = async (itemId) =>
     headers: { Authorization: jwt() },
   });
 
+/** Solo Programador — dashboard estados de pedido (fechas + stock, solo Logs). */
+export const programmerDashboardOrderItemCorrectionRequest = async (itemId, data) =>
+  await axios.patch(`/orders/order-items/${itemId}/programmer-dashboard`, data, {
+    headers: { Authorization: jwt() },
+  });
+
 
 export const getAllCustomersRequest = async () =>
   await axios.get('/orders/customers', { headers: { Authorization: jwt() } });

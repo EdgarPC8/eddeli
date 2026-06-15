@@ -19,6 +19,7 @@ import {
   markItemAsDelivered,
   markItemAsPaid,
   updateOrderItem,
+  programmerDashboardOrderItemCorrection,
   deleteOrderItem,
   deleteOrder,
   command,
@@ -152,6 +153,13 @@ router.delete("/customers/:id", isAuthenticated, deleteCustomer);
 // =====================================================
 router.put("/order-items/:itemId/mark-delivered", isAuthenticated, markItemAsDelivered);
 router.put("/order-items/:itemId/mark-paid", isAuthenticated, markItemAsPaid);
+
+router.patch(
+  "/order-items/:itemId/programmer-dashboard",
+  isAuthenticated,
+  requireProgrammer,
+  programmerDashboardOrderItemCorrection,
+);
 
 router.put("/order-items/:itemId", isAuthenticated, updateOrderItem);
 router.delete("/order-items/:id", isAuthenticated, deleteOrderItem);

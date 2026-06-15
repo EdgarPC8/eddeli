@@ -49,7 +49,7 @@ export default function OrderStatusDetailDialog({ open, onClose, initialTab = "u
       <DialogTitle sx={{ pr: 6, pb: 1 }}>
         Estados de pedido
         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.25 }}>
-          Tabla paginada por ítem. Usa los filtros de color para cambiar de estado.
+          Tabla paginada por ítem. Solo Programador puede editar entrega, pago (con fecha) y stock; se registra en Logs.
         </Typography>
         <IconButton
           aria-label="cerrar"

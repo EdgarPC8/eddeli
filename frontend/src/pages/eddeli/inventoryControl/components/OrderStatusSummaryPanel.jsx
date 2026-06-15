@@ -96,7 +96,7 @@ export default function OrderStatusSummaryPanel({ overView = [] }) {
               Resumen de estados de pedido
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Clic en una tarjeta para ver el detalle de esos pedidos.
+              Clic en una tarjeta para ver el detalle. Solo Programador puede corregir entrega, pago y stock.
             </Typography>
           </Box>
           <Button

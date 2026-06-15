@@ -20,6 +20,7 @@ import {
   ToggleButton,
   ToggleButtonGroup,
   TablePagination,
+  Button,
   alpha,
   useTheme,
 } from "@mui/material";
@@ -30,8 +31,7 @@ import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import CancelIcon from "@mui/icons-material/Cancel";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import SearchIcon from "@mui/icons-material/Search";
-import { updateOrderItemRequest } from "../../../../api/ordersRequest.js";
-import { patchProductStockRequest } from "../../../../api/inventoryControlRequest.js";
+import { programmerDashboardOrderItemCorrectionRequest } from "../../../../api/ordersRequest.js";
 import { useAuth } from "../../../../context/AuthContext.jsx";
 import { money } from "../collections/helpers.js";
 import {
@@ -162,20 +162,6 @@ export default function OrderStatusWorkbenchContent({
       const origDelivered = parseDisplayDateToInput(item.deliveredAt);
       const origPaid = parseDisplayDateToInput(item.paidAt);
 
-      const stockChanged =
-        Number(draft.stock) !== Number(item.productStock ?? 0) ||
-        Number(draft.minStock) !== Number(item.productMinStock ?? 0);
-
-      if (stockChanged && productId != null) {
-        await toast({
-          promise: patchProductStockRequest(productId, {
-            stock: Number(draft.stock),
-            minStock: Number(draft.minStock),
-          }),
-          successMessage: "Stock actualizado",
-        });
-      }
-
       const payload = {};
       if (draft.deliveredAt !== origDelivered) {
         payload.deliveredAt = draft.deliveredAt ? inputToApiDate(draft.deliveredAt) : null;
@@ -184,12 +170,25 @@ export default function OrderStatusWorkbenchContent({
         payload.paidAt = draft.paidAt ? inputToApiDate(draft.paidAt) : null;
       }
 
-      if (Object.keys(payload).length > 0) {
-        await toast({
-          promise: updateOrderItemRequest(item.id, payload),
-          successMessage: "Ítem actualizado",
-        });
+      const stockChanged =
+        Number(draft.stock) !== Number(item.productStock ?? 0) ||
+        Number(draft.minStock) !== Number(item.productMinStock ?? 0);
+
+      if (stockChanged && productId != null) {
+        payload.productId = productId;
+        payload.stock = Number(draft.stock);
+        payload.minStock = Number(draft.minStock);
       }
+
+      if (!Object.keys(payload).length) {
+        cancelEdit();
+        return;
+      }
+
+      await toast({
+        promise: programmerDashboardOrderItemCorrectionRequest(item.id, payload),
+        successMessage: "Cambio registrado en Logs",
+      });
 
       cancelEdit();
       if (onReload) await onReload();
@@ -198,6 +197,13 @@ export default function OrderStatusWorkbenchContent({
     } finally {
       setSaving(false);
     }
+  };
+
+  const setNow = (field) => {
+    const pad = (n) => String(n).padStart(2, "0");
+    const d = new Date();
+    const local = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    setDraft((prev) => ({ ...prev, [field]: local }));
   };
 
   const colSpan = isProgrammer ? 11 : 10;
@@ -369,15 +375,25 @@ export default function OrderStatusWorkbenchContent({
                       <TableCell align="right">{money(item.price)}</TableCell>
                       <TableCell>
                         {isEditing ? (
-                          <TextField
-                            type="datetime-local"
-                            size="small"
-                            value={draft.deliveredAt}
-                            onChange={(e) =>
-                              setDraft((d) => ({ ...d, deliveredAt: e.target.value }))
-                            }
-                            InputLabelProps={{ shrink: true }}
-                          />
+                          <Stack spacing={0.5} sx={{ minWidth: 200 }}>
+                            <TextField
+                              type="datetime-local"
+                              size="small"
+                              value={draft.deliveredAt}
+                              onChange={(e) =>
+                                setDraft((d) => ({ ...d, deliveredAt: e.target.value }))
+                              }
+                              InputLabelProps={{ shrink: true }}
+                            />
+                            <Button
+                              size="small"
+                              variant="text"
+                              onClick={() => setNow("deliveredAt")}
+                              sx={{ alignSelf: "flex-start", textTransform: "none", py: 0 }}
+                            >
+                              Ahora
+                            </Button>
+                          </Stack>
                         ) : (
                           <StatusChip
                             ok={!!item.deliveredAt}
@@ -391,15 +407,25 @@ export default function OrderStatusWorkbenchContent({
                       </TableCell>
                       <TableCell>
                         {isEditing ? (
-                          <TextField
-                            type="datetime-local"
-                            size="small"
-                            value={draft.paidAt}
-                            onChange={(e) =>
-                              setDraft((d) => ({ ...d, paidAt: e.target.value }))
-                            }
-                            InputLabelProps={{ shrink: true }}
-                          />
+                          <Stack spacing={0.5} sx={{ minWidth: 200 }}>
+                            <TextField
+                              type="datetime-local"
+                              size="small"
+                              value={draft.paidAt}
+                              onChange={(e) =>
+                                setDraft((d) => ({ ...d, paidAt: e.target.value }))
+                              }
+                              InputLabelProps={{ shrink: true }}
+                            />
+                            <Button
+                              size="small"
+                              variant="text"
+                              onClick={() => setNow("paidAt")}
+                              sx={{ alignSelf: "flex-start", textTransform: "none", py: 0 }}
+                            >
+                              Ahora
+                            </Button>
+                          </Stack>
                         ) : (
                           <StatusChip
                             ok={!!item.paidAt}
@@ -548,7 +574,8 @@ export default function OrderStatusWorkbenchContent({
 
       {isProgrammer && (
         <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2 }}>
-          Los cambios de stock no generan movimientos de inventario; quedan registrados en Logs.
+          Solo Programador: puedes marcar entrega/pago con la fecha que elijas y ajustar stock.
+          No se crean movimientos de inventario ni ingresos; todo queda registrado en Logs.
         </Typography>
       )}
     </Box>

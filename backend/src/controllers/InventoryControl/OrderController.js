@@ -9,6 +9,7 @@ import { de, es } from 'date-fns/locale';
 
 import { Op } from "sequelize";
 import { sequelize } from "../../database/connection.js";
+import { logger } from "../../log/LogActivity.js";
 
 
 
@@ -1067,6 +1068,167 @@ export const updateOrderStatus = async (req, res) => {
     res.json({ message: 'Estado actualizado', order });
   } catch (error) {
     res.status(500).json({ message: 'Error al actualizar estado del pedido', error });
+  }
+};
+
+/**
+ * PATCH /orders/order-items/:itemId/programmer-dashboard
+ * Solo Programador: entrega/pago con fecha elegida y stock directo.
+ * Sin movimientos de inventario ni ingresos automáticos; queda en Logs.
+ */
+export const programmerDashboardOrderItemCorrection = async (req, res) => {
+  const { itemId } = req.params;
+  const { deliveredAt, paidAt, stock, minStock, productId } = req.body ?? {};
+
+  const parseDateField = (v) => {
+    if (v === undefined) return undefined;
+    if (v === null || v === "") return null;
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? "__INVALID__" : d;
+  };
+
+  try {
+    const item = await OrderItem.findByPk(itemId);
+    if (!item) return res.status(404).json({ message: "Ítem no encontrado" });
+
+    const itemPayload = {};
+    const logParts = [];
+
+    const delParsed = parseDateField(deliveredAt);
+    if (delParsed === "__INVALID__") {
+      return res.status(400).json({ message: "Fecha de entrega inválida" });
+    }
+    if (delParsed !== undefined) {
+      itemPayload.deliveredAt = delParsed;
+      const prev = item.deliveredAt ? new Date(item.deliveredAt).toISOString() : "—";
+      const next = delParsed ? delParsed.toISOString() : "—";
+      logParts.push(`entrega ${prev} → ${next}`);
+    }
+
+    const paidParsed = parseDateField(paidAt);
+    if (paidParsed === "__INVALID__") {
+      return res.status(400).json({ message: "Fecha de pago inválida" });
+    }
+    if (paidParsed !== undefined) {
+      itemPayload.paidAt = paidParsed;
+      const prev = item.paidAt ? new Date(item.paidAt).toISOString() : "—";
+      const next = paidParsed ? paidParsed.toISOString() : "—";
+      logParts.push(`pago ${prev} → ${next}`);
+    }
+
+    let productRow = null;
+    const pid = productId != null ? Number(productId) : null;
+    const stockTouched = stock !== undefined && stock !== null && stock !== "";
+    const minTouched = minStock !== undefined && minStock !== null && minStock !== "";
+
+    if ((stockTouched || minTouched) && pid) {
+      productRow = await InventoryProduct.findByPk(pid);
+      if (!productRow) return res.status(404).json({ message: "Producto no encontrado" });
+    }
+
+    const productUpdates = {};
+    if (productRow && stockTouched) {
+      const n = Number(stock);
+      if (!Number.isFinite(n) || n < 0) {
+        return res.status(400).json({ message: "Stock inválido" });
+      }
+      productUpdates.stock = n;
+    }
+    if (productRow && minTouched) {
+      const n = Number(minStock);
+      if (!Number.isFinite(n) || n < 0) {
+        return res.status(400).json({ message: "Stock mínimo inválido" });
+      }
+      productUpdates.minStock = n;
+    }
+
+    if (
+      !Object.keys(itemPayload).length &&
+      !Object.keys(productUpdates).length
+    ) {
+      return res.status(400).json({ message: "No hay cambios para registrar" });
+    }
+
+    await sequelize.transaction(async (t) => {
+      if (Object.keys(itemPayload).length) {
+        await OrderItem.update(itemPayload, {
+          where: { id: item.id },
+          transaction: t,
+        });
+
+        const allItems = await OrderItem.findAll({
+          where: { orderId: item.orderId },
+          attributes: ["paidAt"],
+          transaction: t,
+        });
+        const allPaid =
+          allItems.length > 0 && allItems.every((i) => !!i.paidAt);
+        const order = await Order.findByPk(item.orderId, { transaction: t });
+        if (order) {
+          order.status = allPaid ? "pagado" : "pendiente";
+          await order.save({ transaction: t });
+        }
+      }
+
+      if (productRow && Object.keys(productUpdates).length) {
+        const prevStock = Number(productRow.stock ?? 0);
+        const prevMin = Number(productRow.minStock ?? 0);
+        await productRow.update(productUpdates, { transaction: t });
+        await productRow.reload({ transaction: t });
+        logParts.push(
+          `stock "${productRow.name}" ${prevStock} → ${Number(productRow.stock ?? 0)}, min ${prevMin} → ${Number(productRow.minStock ?? 0)}`,
+        );
+      }
+    });
+
+    const updatedItem = await OrderItem.findByPk(item.id, {
+      include: [
+        {
+          model: InventoryProduct,
+          as: "ERP_inventory_product",
+          attributes: ["id", "name", "stock", "minStock"],
+        },
+      ],
+    });
+
+    logger({
+      httpMethod: "PATCH",
+      endPoint: `/orders/order-items/${itemId}/programmer-dashboard`,
+      action: "Corrección dashboard estados de pedido",
+      description: `Pedido #${item.orderId}, ítem #${itemId}. ${logParts.join("; ")}. Sin movimientos de inventario ni ingresos automáticos.`,
+      system: req.headers["user-agent"] || "dashboard",
+    });
+
+    const formatted = updatedItem
+      ? {
+          ...updatedItem.toJSON(),
+          paidAt: updatedItem.paidAt
+            ? format(new Date(updatedItem.paidAt), "dd/MM/yyyy HH:mm:ss", { locale: es })
+            : null,
+          deliveredAt: updatedItem.deliveredAt
+            ? format(new Date(updatedItem.deliveredAt), "dd/MM/yyyy HH:mm:ss", {
+                locale: es,
+              })
+            : null,
+          productStock: Number(
+            updatedItem.ERP_inventory_product?.stock ?? productRow?.stock ?? 0,
+          ),
+          productMinStock: Number(
+            updatedItem.ERP_inventory_product?.minStock ?? productRow?.minStock ?? 0,
+          ),
+        }
+      : null;
+
+    return res.json({
+      message: "Cambios registrados (solo Logs, sin movimientos ni ingresos)",
+      item: formatted,
+    });
+  } catch (error) {
+    console.error("programmerDashboardOrderItemCorrection:", error);
+    return res.status(500).json({
+      message: "Error al registrar corrección",
+      error: error.message,
+    });
   }
 };
 
