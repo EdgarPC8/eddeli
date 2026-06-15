@@ -9,10 +9,11 @@ import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon   from "@mui/icons-material/KeyboardArrowUp";
 import PaidIcon from "@mui/icons-material/AttachMoney";
 import PendingIcon from "@mui/icons-material/HourglassEmpty";
-import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCustomerSalesSummary } from "../../../../api/financeRequest";
+import { getFinanceWorkbenchAllRequest } from "../../../../api/ordersRequest";
+import { buildCustomerDebtMetrics } from "../finance/pendingCollections.js";
 
 /* ---------------------- Utils ---------------------- */
 // -> Devuelve número o def (0). NO trata 0 como falsy. Soporta "7,50".
@@ -41,12 +42,21 @@ const numOrNull = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
-// -> Toma totalAmountDeuda si existe, si no revenuePending; 0 si nada vino.
+// -> Saldo real por cobrar (Cobranzas) o fallback del API.
 const getDebt = (row) => {
+  const d0 = numOrNull(row?.debe);
+  if (d0 !== null) return d0;
   const d1 = numOrNull(row?.totalAmountDeuda);
   if (d1 !== null) return d1;
   const d2 = numOrNull(row?.revenuePending);
   return d2 ?? 0;
+};
+
+const billableQty = (it) => {
+  const qty = toNum(it?.quantity ?? it?.qty);
+  const damaged = toNum(it?.damagedQty);
+  const gift = toNum(it?.giftQty);
+  return Math.max(0, qty - damaged - gift);
 };
 
 const money = (n) =>
@@ -71,14 +81,15 @@ function normalizeRows(rawList) {
       lineItems += items.length;
 
       for (const it of items) {
-        const qty = toNum(it.quantity);
+        const qty = billableQty(it);
         const price = toNum(it.price);
         const amt = qty * price;
+        const rawQty = toNum(it.quantity);
         const isPaid = Boolean(it.paidAt);
         const isDelivered = Boolean(it.deliveredAt);
 
-        unitsFromItems += qty;
-        if (isDelivered) unitsDelivered += qty;
+        unitsFromItems += rawQty;
+        if (isDelivered) unitsDelivered += rawQty;
 
         const prodId = it?.ERP_inventory_product?.id ?? it.productId ?? "unknown";
         const prodName = it?.ERP_inventory_product?.name ?? `Producto #${prodId}`;
@@ -87,7 +98,7 @@ function normalizeRows(rawList) {
           productMap.get(prodId) ??
           { productId: prodId, name: prodName, totalQuantity: 0, totalAmount: 0, pendingQuantity: 0, pendingAmount: 0 };
 
-        prev.totalQuantity += qty;
+        prev.totalQuantity += rawQty;
         prev.totalAmount += amt;
 
         if (!isPaid) {
@@ -129,6 +140,8 @@ function CustomerRow({ row }) {
     : "—";
 
   const debt = getDebt(row);
+  const abonado = toNum(row?.abonado);
+  const cobrableBruto = numOrNull(row?.cobrableBruto) ?? debt + abonado;
 
   return (
     <>
@@ -149,23 +162,33 @@ function CustomerRow({ row }) {
         </TableCell>
 
         <TableCell align="right">{toNum(row?.ordersCount)}</TableCell>
-        <TableCell align="right">{toNum(row?.lineItems)}</TableCell>
-
-        <TableCell align="right">
-          <Stack direction="row" spacing={1} justifyContent="flex-end" alignItems="center">
-            <span>{toNum(row?.units).toLocaleString()}</span>
-            <Tooltip title="Unidades entregadas">
-              <Chip icon={<LocalShippingIcon />} size="small" label={`${toNum(row?.unitsDelivered)}`} />
-            </Tooltip>
-          </Stack>
-        </TableCell>
 
         <TableCell align="right">
           <Chip icon={<PaidIcon />} color="success" size="small" label={money(row?.revenueTotal)} />
         </TableCell>
 
         <TableCell align="right">
-          <Chip icon={<PendingIcon />} color="warning" size="small" label={money(debt)} />
+          <Tooltip title="Monto cobrable antes de abonos parciales en grupos">
+            <Chip size="small" variant="outlined" label={money(cobrableBruto)} />
+          </Tooltip>
+        </TableCell>
+
+        <TableCell align="right">
+          <Tooltip title="Abonos registrados en grupos abiertos (Cobranzas)">
+            <Chip
+              icon={<PaidIcon />}
+              color={abonado > 0 ? "info" : "default"}
+              size="small"
+              variant={abonado > 0 ? "filled" : "outlined"}
+              label={money(abonado)}
+            />
+          </Tooltip>
+        </TableCell>
+
+        <TableCell align="right">
+          <Tooltip title="Saldo pendiente = cobrable − abonado (misma lógica que Cobranzas)">
+            <Chip icon={<PendingIcon />} color={debt > 0 ? "warning" : "default"} size="small" label={money(debt)} />
+          </Tooltip>
         </TableCell>
 
         <TableCell>{lastOrderLabel}</TableCell>
@@ -174,7 +197,14 @@ function CustomerRow({ row }) {
       <TableRow>
         <TableCell colSpan={8} sx={{ p: 0 }}>
           <Collapse in={open} timeout="auto" unmountOnExit>
-            <Box sx={{ p: 2, bgcolor: "#111", borderTop: "1px solid #333" }}>
+            <Box sx={{ p: 2, bgcolor: "action.hover", borderTop: 1, borderColor: "divider" }}>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1.5 }}>
+                <Chip size="small" label={`Sin grupo: ${money(row?.ungroupedPending)}`} variant="outlined" />
+                <Chip size="small" label={`En grupos: ${money(row?.groupsPending)}`} variant="outlined" />
+                <Chip size="small" label={`Abonado: ${money(abonado)}`} color="info" variant="outlined" />
+                <Chip size="small" label={`Debe: ${money(debt)}`} color="warning" />
+              </Stack>
+
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
                 Productos pedidos por este cliente
               </Typography>
@@ -221,7 +251,7 @@ function CustomerRow({ row }) {
 }
 
 /* --------------- Tabla principal --------------- */
-export default function CustomersAccordionTable() {
+export default function CustomersAccordionTable({ workbench: workbenchProp = null }) {
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
@@ -239,33 +269,39 @@ export default function CustomersAccordionTable() {
       try {
         setLoading(true);
         setErr(null);
-        const { data } = await getCustomerSalesSummary();
+        const [salesRes, workbenchRes] = await Promise.all([
+          getCustomerSalesSummary(),
+          workbenchProp
+            ? Promise.resolve({ data: workbenchProp })
+            : getFinanceWorkbenchAllRequest(),
+        ]);
 
-          const raw =
+        const data = salesRes.data;
+        const raw =
           Array.isArray(data?.data) ? data.data :
           Array.isArray(data)       ? data :
           [];
-          const normalized = normalizeRows(raw);
-        
-        /* ================= DEBUG TABLA ================= */
-        // const debugTable = normalized.map((r) => ({
-        //   Cliente: r?.customer?.name ?? `Cliente #${r?.customerId ?? "—"}`,
-        //   Total: toNum(r?.revenueTotal),
-        //   Deuda: getDebt(r),
-        //   Pedidos: toNum(r?.ordersCount),
-        //   Lineas: toNum(r?.lineItems),
-        //   Unidades: toNum(r?.units),
-        //   Entregadas: toNum(r?.unitsDelivered),
-        //   UltimoPedido: r?.lastOrderAt
-        //     ? format(new Date(r.lastOrderAt), "dd/MM/yyyy HH:mm", { locale: es })
-        //     : "—",
-        // }));
-        
-        // console.groupCollapsed(`📊 DEBUG CLIENTES (${debugTable.length})`);
-        // console.table(debugTable);
-        // console.groupEnd();
-        /* =============================================== */
-        
+
+        const wb = workbenchProp ?? {
+          customers: workbenchRes.data?.customers ?? [],
+          orders: workbenchRes.data?.orders ?? [],
+          groups: workbenchRes.data?.groups ?? [],
+          payments: workbenchRes.data?.payments ?? [],
+        };
+
+        const debtMetrics = buildCustomerDebtMetrics(wb);
+        const normalized = normalizeRows(raw).map((r) => {
+          const m = debtMetrics.get(r.customerId);
+          if (!m) return r;
+          return {
+            ...r,
+            cobrableBruto: m.cobrableBruto,
+            abonado: m.abonado,
+            debe: m.debe,
+            ungroupedPending: m.ungroupedPending,
+            groupsPending: m.groupsPending,
+          };
+        });
 
         if (!active) return;
         setRows(normalized);
@@ -279,7 +315,7 @@ export default function CustomersAccordionTable() {
       }
     })();
     return () => { active = false; };
-  }, []);
+  }, [workbenchProp]);
 
   // --- búsqueda
   const filtered = useMemo(() => {
@@ -349,6 +385,10 @@ export default function CustomersAccordionTable() {
         return (a, b) => cmpNumber(toNum(a.units), toNum(b.units), sortDir);
       case "revenueTotal":
         return (a, b) => cmpNumber(toNum(a.revenueTotal), toNum(b.revenueTotal), sortDir);
+      case "cobrableBruto":
+        return (a, b) => cmpNumber(toNum(a.cobrableBruto), toNum(b.cobrableBruto), sortDir);
+      case "abonado":
+        return (a, b) => cmpNumber(toNum(a.abonado), toNum(b.abonado), sortDir);
       case "debt":
         return (a, b) => {
           const dA = getDebt(a);
@@ -416,8 +456,11 @@ export default function CustomersAccordionTable() {
 
   return (
     <Box>
-      <Typography variant="h6" sx={{ mb: 2, textAlign: "center" }}>
+      <Typography variant="h6" sx={{ mb: 1, textAlign: "center", fontWeight: 800 }}>
         Clientes — Ventas y Pedidos
+      </Typography>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 2, textAlign: "center" }}>
+        Cobrable bruto, abonos en grupos abiertos y saldo pendiente (alineado con Cobranzas).
       </Typography>
 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
@@ -457,33 +500,33 @@ export default function CustomersAccordionTable() {
                 </TableSortLabel>
               </TableCell>
 
-              <TableCell align="right" sortDirection={sortBy === "lineItems" ? sortDir : false}>
-                <TableSortLabel
-                  active={sortBy === "lineItems"}
-                  direction={sortBy === "lineItems" ? sortDir : "desc"}
-                  onClick={() => requestSort("lineItems")}
-                >
-                  Líneas
-                </TableSortLabel>
-              </TableCell>
-
-              <TableCell align="right" sortDirection={sortBy === "units" ? sortDir : false}>
-                <TableSortLabel
-                  active={sortBy === "units"}
-                  direction={sortBy === "units" ? sortDir : "desc"}
-                  onClick={() => requestSort("units")}
-                >
-                  Unidades
-                </TableSortLabel>
-              </TableCell>
-
               <TableCell align="right" sortDirection={sortBy === "revenueTotal" ? sortDir : false}>
                 <TableSortLabel
                   active={sortBy === "revenueTotal"}
                   direction={sortBy === "revenueTotal" ? sortDir : "desc"}
                   onClick={() => requestSort("revenueTotal")}
                 >
-                  Total
+                  Total ventas
+                </TableSortLabel>
+              </TableCell>
+
+              <TableCell align="right" sortDirection={sortBy === "cobrableBruto" ? sortDir : false}>
+                <TableSortLabel
+                  active={sortBy === "cobrableBruto"}
+                  direction={sortBy === "cobrableBruto" ? sortDir : "desc"}
+                  onClick={() => requestSort("cobrableBruto")}
+                >
+                  Cobrable
+                </TableSortLabel>
+              </TableCell>
+
+              <TableCell align="right" sortDirection={sortBy === "abonado" ? sortDir : false}>
+                <TableSortLabel
+                  active={sortBy === "abonado"}
+                  direction={sortBy === "abonado" ? sortDir : "desc"}
+                  onClick={() => requestSort("abonado")}
+                >
+                  Abonado
                 </TableSortLabel>
               </TableCell>
 
@@ -493,7 +536,7 @@ export default function CustomersAccordionTable() {
                   direction={sortBy === "debt" ? sortDir : "desc"}
                   onClick={() => requestSort("debt")}
                 >
-                  Deuda
+                  Debe
                 </TableSortLabel>
               </TableCell>
 

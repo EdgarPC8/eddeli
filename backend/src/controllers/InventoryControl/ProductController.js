@@ -36,6 +36,7 @@ const safeUnlink = (fullPath) => {
 };
 import path from "path";
 import fsp from "fs/promises";
+import { logger } from "../../log/LogActivity.js";
 
 const normalize = (p = "") =>
   String(p || "")
@@ -258,6 +259,71 @@ const isImageInUseElsewhere = async (filename, currentProductId = null) => {
 
 
 
+
+/** Ajuste directo de stock/minStock desde dashboard (solo Programador, sin movimiento). */
+export const patchProductStock = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { stock, minStock } = req.body ?? {};
+
+    const row = await InventoryProduct.findByPk(id);
+    if (!row) return res.status(404).json({ message: "Producto no encontrado" });
+
+    const prevStock = Number(row.stock ?? 0);
+    const prevMinStock = Number(row.minStock ?? 0);
+    const updates = {};
+
+    if (stock !== undefined && stock !== null && stock !== "") {
+      const n = Number(stock);
+      if (!Number.isFinite(n) || n < 0) {
+        return res.status(400).json({ message: "Stock inválido" });
+      }
+      updates.stock = n;
+    }
+
+    if (minStock !== undefined && minStock !== null && minStock !== "") {
+      const n = Number(minStock);
+      if (!Number.isFinite(n) || n < 0) {
+        return res.status(400).json({ message: "Stock mínimo inválido" });
+      }
+      updates.minStock = n;
+    }
+
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ message: "Indica stock y/o minStock" });
+    }
+
+    await row.update(updates);
+    await row.reload();
+
+    const nextStock = Number(row.stock ?? 0);
+    const nextMinStock = Number(row.minStock ?? 0);
+
+    logger({
+      httpMethod: "PATCH",
+      endPoint: `/inventory/products/${id}/stock`,
+      action: "Ajuste directo de stock (dashboard)",
+      description: `Producto #${id} "${row.name}": stock ${prevStock} → ${nextStock}, minStock ${prevMinStock} → ${nextMinStock}. Sin movimiento de inventario.`,
+      system: req.headers["user-agent"] || "dashboard",
+    });
+
+    return res.json({
+      message: "Stock actualizado",
+      product: {
+        id: row.id,
+        name: row.name,
+        price: Number(row.price ?? 0),
+        stock: nextStock,
+        minStock: nextMinStock,
+        type: row.type,
+        isActive: row.isActive,
+      },
+    });
+  } catch (error) {
+    console.error("patchProductStock:", error);
+    return res.status(500).json({ message: "Error al actualizar stock", error: error.message });
+  }
+};
 
 // Obtener todos los productos con categoría y unidad
 export const getAllProducts = async (req, res) => {

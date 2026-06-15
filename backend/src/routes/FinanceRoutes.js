@@ -13,6 +13,8 @@ import {
 } from "../controllers/InventoryControl/FinanceController.js";
 import { isAuthenticated } from "../middlewares/authMiddelware.js";
 import { getOrderAnalytics, getWeeklySales,getTopProductsDailySales,getProductRotationAnalysis,getIncomeExpenseBreakdown,getCustomerSalesSummary, getOrdersForCharts,getExpensesForChart } from "../controllers/InventoryControl/AnalyticsController.js";
+import { getFinanceDashboard } from "../controllers/InventoryControl/DashboardController.js";
+import { getCalendarMonthSummary, getCalendarDayDetail } from "../controllers/InventoryControl/CalendarFinanceController.js";
 
 
 const router = new Router();
@@ -31,6 +33,9 @@ router.delete("/expenses/:id", isAuthenticated, deleteExpense);
 
 // 📊 Resumen financiero
 router.get("/summary", isAuthenticated, getFinanceSummary);
+router.get("/dashboard", isAuthenticated, getFinanceDashboard);
+router.get("/calendar-month", isAuthenticated, getCalendarMonthSummary);
+router.get("/calendar-day", isAuthenticated, getCalendarDayDetail);
 
 
 router.get("/overview",isAuthenticated, getOrderAnalytics);

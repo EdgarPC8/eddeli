@@ -11,13 +11,20 @@ import { ItemGroup, ItemGroupItem, Payment } from "../../models/Finance.js";
 /**
  * Ingresos futuros / por cobrar: alineado con cobranzas por grupos.
  * - Ítems en un grupo abierto: solo el saldo (total líneas − abonos), no el bruto del ítem.
- * - Ítems sin grupo: suma price*quantity si paidAt es null.
+ * - Ítems sin grupo: cantidad cobrable × precio si paidAt es null.
+ *   Cantidad cobrable = max(0, quantity − damagedQty − giftQty) — misma lógica que workbench.
  * Así los abonos (ya en Income) no duplican el monto en projectedBalance.
  */
 export const getFinanceSummary = async (req, res) => {
   const toNum = (v) => {
     const n = Number(v);
     return Number.isFinite(n) ? n : 0;
+  };
+
+  const billableLineTotal = (it) => {
+    const qty = toNum(it.quantity);
+    const billable = Math.max(0, qty - toNum(it.damagedQty) - toNum(it.giftQty));
+    return Number((billable * toNum(it.price)).toFixed(2));
   };
 
   try {
@@ -50,14 +57,11 @@ export const getFinanceSummary = async (req, res) => {
     if (idsInOpenGroups.length > 0) {
       const groupedItems = await OrderItem.findAll({
         where: { id: { [Op.in]: idsInOpenGroups } },
-        attributes: ['id', 'price', 'quantity'],
+        attributes: ['id', 'price', 'quantity', 'damagedQty', 'giftQty'],
         raw: true,
       });
       const lineTotalByItemId = new Map(
-        groupedItems.map((it) => [
-          it.id,
-          Number((toNum(it.price) * toNum(it.quantity)).toFixed(2)),
-        ])
+        groupedItems.map((it) => [it.id, billableLineTotal(it)])
       );
 
       for (const [groupId, itemIds] of itemsByOpenGroupId) {
@@ -73,7 +77,19 @@ export const getFinanceSummary = async (req, res) => {
     };
 
     const futureIncomeRow = await OrderItem.findOne({
-      attributes: [[fn('COALESCE', fn('SUM', literal('price * quantity')), 0), 'futureIncome']],
+      attributes: [[
+        fn(
+          'COALESCE',
+          fn(
+            'SUM',
+            literal(
+              'price * GREATEST(0, quantity - COALESCE(damagedQty, 0) - COALESCE(giftQty, 0))'
+            )
+          ),
+          0
+        ),
+        'futureIncome',
+      ]],
       where: ungroupedWhere,
       raw: true,
     });

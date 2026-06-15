@@ -22,6 +22,7 @@ import {
   deleteOrderItem,
   deleteOrder,
   command,
+  getOrderStatusWorkbench,
 
 
 } from "../controllers/InventoryControl/OrderController.js";
@@ -132,6 +133,7 @@ router.post("", isAuthenticated, createOrder);
 router.post("/:orderId/items", isAuthenticated, addOrderItem);
 router.put("/:id", isAuthenticated, updateOrder);
 router.put("/:id/status", isAuthenticated, updateOrderStatus);
+router.get("/status-workbench", isAuthenticated, getOrderStatusWorkbench);
 router.get("", isAuthenticated, getAllOrders);
 
 // Montado en /orders → ruta correcta /:id/mark-paid (antes /orders/:id duplicaba prefijo)

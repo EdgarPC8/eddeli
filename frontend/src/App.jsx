@@ -11,6 +11,7 @@ import CategoryPage from "./pages/eddeli/inventoryControl/CategoryPage.jsx";
 import UnitPage from "./pages/eddeli/inventoryControl/UnitPage.jsx";
 import MovementPage from "./pages/eddeli/inventoryControl/MovementPage.jsx";
 import RecipePage from "./pages/eddeli/inventoryControl/RecipePage.jsx";
+import GenericIngredientsPage from "./pages/eddeli/inventoryControl/GenericIngredientsPage.jsx";
 import OrderPage from "./pages/eddeli/inventoryControl/OrderPage.jsx";
 import CustomerPage from "./pages/eddeli/inventoryControl/CustomerPage.jsx";
 import FinancePage from "./pages/eddeli/inventoryControl/FinancePage.jsx";
@@ -137,6 +138,7 @@ export default function App() {
             <Route path="/inventory/units" element={<UnitPage />} />
             <Route path="/inventory/movement" element={<MovementPage />} />
             <Route path="/inventory/recipes" element={<RecipePage />} />
+            <Route path="/inventory/insumos" element={<GenericIngredientsPage />} />
             <Route path="/inventory/orders" element={<OrderPage />} />
             <Route path="/inventory/customers" element={<CustomerPage />} />
             <Route path="/inventory/finance" element={<FinancePage />} />

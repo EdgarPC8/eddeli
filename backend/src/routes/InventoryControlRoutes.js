@@ -1,6 +1,6 @@
 // routes/inventoryRoutes.js
 import express from 'express';
-import { isAuthenticated } from "../middlewares/authMiddelware.js";
+import { isAuthenticated, requireProgrammer } from "../middlewares/authMiddelware.js";
 
 // Product Controllers
 import {
@@ -8,7 +8,17 @@ import {
   getAllProducts,
   updateProduct,
   deleteProduct,
+  patchProductStock,
 } from '../controllers/InventoryControl/ProductController.js';
+
+import {
+  getGenericIngredientsWorkbench,
+  bootstrapGenericIngredients,
+  createGenericIngredient,
+  createPresentation,
+  linkPresentation,
+  unlinkPresentation,
+} from '../controllers/InventoryControl/GenericIngredientController.js';
 
 // Movement and Recipe Controllers (aún en InventoryController.js)
 import { 
@@ -159,8 +169,19 @@ router.delete('/customers/:id', isAuthenticated, deleteCustomer);
 // ----------------------------------
 router.post('/products', isAuthenticated, edDeliUploadSingle, createProduct);            // Crear producto
 router.get('/products', isAuthenticated, getAllProducts);           // Obtener todos los productos
+router.patch('/products/:id/stock', isAuthenticated, requireProgrammer, patchProductStock);
 router.put('/products/:id', isAuthenticated, edDeliUploadSingle, updateProduct);        // Editar producto
 router.delete('/products/:id', isAuthenticated, deleteProduct);     // Eliminar producto
+
+// ----------------------------------
+// 🧪 INSUMOS GENÉRICOS Y PRESENTACIONES
+// ----------------------------------
+router.get('/generic-ingredients', isAuthenticated, getGenericIngredientsWorkbench);
+router.post('/generic-ingredients/bootstrap', isAuthenticated, bootstrapGenericIngredients);
+router.post('/generic-ingredients', isAuthenticated, createGenericIngredient);
+router.post('/generic-ingredients/:genericId/presentations', isAuthenticated, createPresentation);
+router.patch('/generic-ingredients/presentations/:productId/link', isAuthenticated, linkPresentation);
+router.patch('/generic-ingredients/presentations/:productId/unlink', isAuthenticated, unlinkPresentation);
 
 // ----------------------------------
 // 🔁 MOVIMIENTOS

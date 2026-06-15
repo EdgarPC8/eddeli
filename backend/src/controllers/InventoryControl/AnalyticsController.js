@@ -355,10 +355,10 @@ export const getIncomeExpenseBreakdown = async (req, res) => {
 
     // --- Payload crudo para que el frontend calcule % según necesite
     const payload = {
-      platforms, // montos por plataforma
+      platforms,
       groups: {
-        Ingresos: incomeGroup, // montos por categoría de ingresos
-        Gastos: expenseGroup,  // montos por categoría de gastos
+        Ingresos: incomeGroup,
+        Gastos: expenseGroup,
       },
       meta: {
         totals: {
@@ -372,6 +372,43 @@ export const getIncomeExpenseBreakdown = async (req, res) => {
         },
       },
     };
+
+    if (req.query.detail === "1") {
+      const [incomeRows, expenseRows] = await Promise.all([
+        Income.findAll({
+          where: commonWhere,
+          attributes: ["id", "date", "concept", "category", "amount", "counterpartyName"],
+          order: [["date", "DESC"], ["id", "DESC"]],
+        }),
+        Expense.findAll({
+          where: commonWhere,
+          attributes: ["id", "date", "concept", "category", "amount", "counterpartyName", "referenceId"],
+          include: [
+            { model: InventoryProduct, as: "ERP_inventory_product", attributes: ["name"], required: false },
+          ],
+          order: [["date", "DESC"], ["id", "DESC"]],
+        }),
+      ]);
+
+      payload.incomeLines = incomeRows.map((r) => ({
+        id: r.id,
+        date: r.date,
+        concept: r.concept,
+        category: r.category ?? "Sin categoría",
+        amount: round2(r.amount),
+        counterpartyName: r.counterpartyName,
+      }));
+
+      payload.expenseLines = expenseRows.map((r) => ({
+        id: r.id,
+        date: r.date,
+        concept: r.concept,
+        category: r.category ?? "Sin categoría",
+        amount: round2(r.amount),
+        counterpartyName: r.counterpartyName,
+        productName: r.ERP_inventory_product?.name ?? null,
+      }));
+    }
 
     return res.json(payload);
   } catch (error) {

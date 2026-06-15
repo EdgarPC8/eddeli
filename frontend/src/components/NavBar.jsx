@@ -54,6 +54,7 @@ import GroupIcon from "@mui/icons-material/Group";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import ScienceIcon from "@mui/icons-material/Science";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
 import RequestQuoteIcon from "@mui/icons-material/RequestQuote";
@@ -116,6 +117,7 @@ const MENU_GROUPS = [
       { name: "Movimientos", link: "/inventory/movement", icon: <CompareArrowsIcon />, roles: ["Programador", "Administrador"] },
       { name: "Categorías", link: "/inventory/categories", icon: <CategoryIcon />, roles: ["Programador", "Administrador"] },
       { name: "Unidades", link: "/inventory/units", icon: <StraightenIcon />, roles: ["Programador", "Administrador"] },
+      { name: "Insumos y marcas", link: "/inventory/insumos", icon: <ScienceIcon />, roles: ["Programador", "Administrador"] },
       { name: "Recetas", link: "/inventory/recipes", icon: <ReceiptLongIcon />, roles: ["Programador", "Administrador"] },
     ],
   },
@@ -358,7 +360,7 @@ export default function NavBar() {
   );
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh" }}>
+    <Box sx={{ display: "flex", minHeight: "100vh", width: "100%", overflowX: "hidden" }}>
       <AppBar
         position="fixed"
         sx={{
@@ -573,7 +575,7 @@ export default function NavBar() {
         </Drawer>
       )}
 
-      <Box component="main" sx={{ flexGrow: 1, pt: 10, px: { xs: 2, md: 3 }, pb: 3, width: "100%" }}>
+      <Box component="main" sx={{ flexGrow: 1, pt: 10, px: { xs: 1.5, sm: 2, md: 3 }, pb: 3, width: "100%", minWidth: 0, overflowX: "hidden", boxSizing: "border-box" }}>
         <Outlet />
       </Box>
     </Box>

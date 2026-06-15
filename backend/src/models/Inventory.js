@@ -138,6 +138,12 @@ export const InventoryProduct = sequelize.define('ERP_inventory_products', {
   // 🏷️ Estado y metadatos
   isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
   primaryImageUrl: { type: DataTypes.STRING(500), allowNull: true }, // imagen rápida para listado
+  /** Insumo genérico de receta (Harina, Aceite…). No es compra por marca. */
+  isGenericIngredient: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: false },
+  /** Si no es null, este producto es presentación/marca del insumo genérico indicado. */
+  genericProductId: { type: DataTypes.INTEGER, allowNull: true },
+  /** Detalle de presentación: "Funda 900ml", "Quintal Pani Plus", etc. */
+  purchasePresentation: { type: DataTypes.STRING(200), allowNull: true },
 }, {
   timestamps: true,
   indexes: [
@@ -369,6 +375,16 @@ InventoryProduct.hasMany(InventoryMovement, { foreignKey: 'productId', onDelete:
 InventoryMovement.belongsTo(InventoryProduct, { foreignKey: 'productId' });
 InventoryUnit.hasMany(InventoryProduct, { foreignKey: 'unitId' });
 InventoryProduct.belongsTo(InventoryUnit, { foreignKey: 'unitId' });
+
+// Insumo genérico ↔ presentaciones / marcas
+InventoryProduct.belongsTo(InventoryProduct, {
+  as: 'genericProduct',
+  foreignKey: 'genericProductId',
+});
+InventoryProduct.hasMany(InventoryProduct, {
+  as: 'brandedPresentations',
+  foreignKey: 'genericProductId',
+});
 
 InventoryMovement.belongsTo(Account, { foreignKey: "createdBy" });
 

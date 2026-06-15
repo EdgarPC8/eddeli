@@ -81,6 +81,38 @@ export const getCatalogBySections = (sections = [], params = {}) => {
 
 
 
+// 🟢 INSUMOS GENÉRICOS Y PRESENTACIONES
+
+export const getGenericIngredientsWorkbench = async () =>
+  await axios.get("/inventory/generic-ingredients", {
+    headers: { Authorization: jwt() },
+  });
+
+export const bootstrapGenericIngredientsRequest = async () =>
+  await axios.post("/inventory/generic-ingredients/bootstrap", null, {
+    headers: { Authorization: jwt() },
+  });
+
+export const createGenericIngredientRequest = async (data) =>
+  await axios.post("/inventory/generic-ingredients", data, {
+    headers: { Authorization: jwt(), "Content-Type": "application/json" },
+  });
+
+export const createPresentationRequest = async (genericId, data) =>
+  await axios.post(`/inventory/generic-ingredients/${genericId}/presentations`, data, {
+    headers: { Authorization: jwt(), "Content-Type": "application/json" },
+  });
+
+export const linkPresentationRequest = async (productId, data) =>
+  await axios.patch(`/inventory/generic-ingredients/presentations/${productId}/link`, data, {
+    headers: { Authorization: jwt(), "Content-Type": "application/json" },
+  });
+
+export const unlinkPresentationRequest = async (productId) =>
+  await axios.patch(`/inventory/generic-ingredients/presentations/${productId}/unlink`, null, {
+    headers: { Authorization: jwt() },
+  });
+
 // 🟢 PRODUCTOS
 
 // Obtener todos los productos con categoría y unidad asociadas
@@ -98,6 +130,12 @@ export const createProduct = async (data) =>
 // Editar un producto existente por ID
 export const updateProduct = async (id, data) =>
   await axios.put(`/inventory/products/${id}`, data, {
+    headers: { Authorization: jwt() },
+  });
+
+/** Ajuste directo de stock/minStock (solo Programador, sin movimiento). */
+export const patchProductStockRequest = async (id, data) =>
+  await axios.patch(`/inventory/products/${id}/stock`, data, {
     headers: { Authorization: jwt() },
   });
 

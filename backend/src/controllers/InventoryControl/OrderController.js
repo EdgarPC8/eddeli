@@ -1070,6 +1070,67 @@ export const updateOrderStatus = async (req, res) => {
   }
 };
 
+export const getOrderStatusWorkbench = async (req, res) => {
+  try {
+    const orders = await Order.findAll({
+      where: { notes: { [Op.notLike]: `%${CAJA_POS_TAG}%` } },
+      include: [
+        { model: Customer, as: "ERP_customer" },
+        {
+          model: OrderItem,
+          as: "ERP_order_items",
+          include: [
+            {
+              model: InventoryProduct,
+              as: "ERP_inventory_product",
+              attributes: ["id", "name", "stock", "minStock"],
+            },
+          ],
+        },
+      ],
+      order: [["date", "DESC"]],
+    });
+
+    const formatted = formatOrdersList(orders).map((order) => ({
+      ...order,
+      ERP_order_items: order.ERP_order_items.map((item) => ({
+        ...item,
+        productName: item.ERP_inventory_product?.name ?? null,
+        productStock: Number(item.ERP_inventory_product?.stock ?? 0),
+        productMinStock: Number(item.ERP_inventory_product?.minStock ?? 0),
+      })),
+    }));
+
+    let unpaid = 0;
+    let paidUndelivered = 0;
+    let unpaidUndelivered = 0;
+    let deliveredUnpaid = 0;
+
+    for (const order of formatted) {
+      const items = order.ERP_order_items || [];
+      if (!items.length) continue;
+      const allPaid = items.every((i) => !!i.paidAt);
+      const allDelivered = items.every((i) => !!i.deliveredAt);
+      if (!allPaid) unpaid += 1;
+      if (allPaid && !allDelivered) paidUndelivered += 1;
+      if (!allPaid && !allDelivered) unpaidUndelivered += 1;
+      if (allDelivered && !allPaid) deliveredUnpaid += 1;
+    }
+
+    const overview = [
+      { id: "unpaidOrders", label: "No Pagados", value: unpaid },
+      { id: "paidUndeliveredOrders", label: "Pagados no Entregados", value: paidUndelivered },
+      { id: "unpaidUndeliveredOrders", label: "No Pagados ni Entregados", value: unpaidUndelivered },
+      { id: "deliveredUnpaidOrders", label: "Entregados no Pagados", value: deliveredUnpaid },
+    ];
+
+    res.json({ orders: formatted, overview });
+  } catch (error) {
+    console.error("getOrderStatusWorkbench:", error);
+    res.status(500).json({ message: "Error al cargar estados de pedido" });
+  }
+};
+
 // Obtener pedidos con items y cliente. Query opcional: ?from=YYYY-MM-DD&to=YYYY-MM-DD
 function formatOrdersList(orders) {
   return orders.map((order) => {

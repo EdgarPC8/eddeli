@@ -102,6 +102,12 @@ export const getFinanceWorkbenchAllRequest = async () =>
     headers: { Authorization: jwt() },
   });
 
+/** Pedidos con estados, stock de producto y resumen (módulo estados). */
+export const getOrderStatusWorkbenchRequest = async () =>
+  await axios.get("/orders/status-workbench", {
+    headers: { Authorization: jwt() },
+  });
+
 /**
  * 🔹 Crear grupo por ITEMS
  * POST /orders/workbench/item-groups

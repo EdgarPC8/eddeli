@@ -85,7 +85,21 @@ function RecipeForm({ isEditing = false, datos = [], onClose, reload, productFin
 
   const loadData = async () => {
     const { data } = await getAllProducts();
-    setRawOptions(data.filter((p) => p.id !== productFinalId));
+    const options = data.filter(
+      (p) =>
+        p.id !== productFinalId &&
+        p.type === "raw" &&
+        p.isGenericIngredient &&
+        !p.genericProductId
+    );
+    // Compatibilidad: si aún no hay flags, mostrar raw sin padre genérico
+    setRawOptions(
+      options.length > 0
+        ? options
+        : data.filter(
+            (p) => p.id !== productFinalId && p.type === "raw" && !p.genericProductId
+          )
+    );
     if (isEditing && datos) {
       setValue("productRawId", datos.productRawId);
       setValue("quantity", datos.quantity);
@@ -104,7 +118,7 @@ function RecipeForm({ isEditing = false, datos = [], onClose, reload, productFin
       <Grid container spacing={2}>
       <Grid item xs={12}>
   <SearchableSelect
-    label="Materia Prima"
+    label="Insumo genérico (receta)"
     items={rawOptions}
     value={watch("productRawId")}
     onChange={(val) => {

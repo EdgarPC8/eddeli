@@ -68,6 +68,29 @@ export const getFinanceSummaryRequest = async () => {
     headers: { Authorization: jwt() },
   });
 };
+
+/** Carga agregada del dashboard (una sola petición). */
+export const getFinanceDashboardRequest = async () => {
+  return await axios.get("/finance/dashboard", {
+    headers: { Authorization: jwt() },
+  });
+};
+
+/** Resumen ligero del calendario por mes (solo totales por día). */
+export const getCalendarMonthSummaryRequest = async (year, month) => {
+  return await axios.get("/finance/calendar-month", {
+    params: { year, month },
+    headers: { Authorization: jwt() },
+  });
+};
+
+/** Detalle de un día para el modal del calendario. */
+export const getCalendarDayDetailRequest = async (date) => {
+  return await axios.get("/finance/calendar-day", {
+    params: { date },
+    headers: { Authorization: jwt() },
+  });
+};
 export const getOverViewRequest = async () => {
   return await axios.get("/finance/overview", {
     headers: { Authorization: jwt() },
@@ -91,6 +114,14 @@ export const getProductRotationAnalysis = async () => {
 };
 export const getIncomeExpenseBreakdown = async () => {
   return await axios.get("/finance/getIncomeExpenseBreakdown", {
+    headers: { Authorization: jwt() },
+  });
+};
+
+/** Desglose por categoría con líneas de detalle (modal). */
+export const getIncomeExpenseBreakdownDetail = async () => {
+  return await axios.get("/finance/getIncomeExpenseBreakdown", {
+    params: { detail: "1" },
     headers: { Authorization: jwt() },
   });
 };

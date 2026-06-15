@@ -67,12 +67,12 @@
       "roleId": 2
     },
     {
-      "accountId": 1,
-      "roleId": 4
-    },
-    {
       "accountId": 248,
       "roleId": 2
+    },
+    {
+      "accountId": 1,
+      "roleId": 4
     }
   ],
   "UserData": [],
@@ -107,6 +107,120 @@
       "name": "Pastelería",
       "description": "",
       "isPublic": 1
+    },
+    {
+      "id": 6,
+      "name": "Harina",
+      "description": "Familia de insumo: Harina",
+      "isPublic": 0
+    },
+    {
+      "id": 7,
+      "name": "Azucar",
+      "description": "Familia de insumo: Azucar",
+      "isPublic": 0
+    },
+    {
+      "id": 8,
+      "name": "Mantequilla",
+      "description": "Familia de insumo: Mantequilla",
+      "isPublic": 0
+    },
+    {
+      "id": 9,
+      "name": "Huevos",
+      "description": "Familia de insumo: Huevos",
+      "isPublic": 0
+    },
+    {
+      "id": 10,
+      "name": "Levadura",
+      "description": "Familia de insumo: Levadura",
+      "isPublic": 0
+    },
+    {
+      "id": 11,
+      "name": "Cocoa",
+      "description": "Familia de insumo: Cocoa",
+      "isPublic": 0
+    },
+    {
+      "id": 12,
+      "name": "Grajeas",
+      "description": "Familia de insumo: Grajeas",
+      "isPublic": 0
+    },
+    {
+      "id": 13,
+      "name": "Manjar",
+      "description": "Familia de insumo: Manjar",
+      "isPublic": 0
+    },
+    {
+      "id": 14,
+      "name": "Leche",
+      "description": "Familia de insumo: Leche",
+      "isPublic": 0
+    },
+    {
+      "id": 15,
+      "name": "Royal",
+      "description": "Familia de insumo: Royal",
+      "isPublic": 0
+    },
+    {
+      "id": 16,
+      "name": "Bicarbonato",
+      "description": "Familia de insumo: Bicarbonato",
+      "isPublic": 0
+    },
+    {
+      "id": 17,
+      "name": "Harina de Maiz",
+      "description": "Familia de insumo: Harina de Maiz",
+      "isPublic": 0
+    },
+    {
+      "id": 18,
+      "name": "Harina Integral",
+      "description": "Familia de insumo: Harina Integral",
+      "isPublic": 0
+    },
+    {
+      "id": 19,
+      "name": "Aceite",
+      "description": "Familia de insumo: Aceite",
+      "isPublic": 0
+    },
+    {
+      "id": 20,
+      "name": "Crema de leche",
+      "description": "Familia de insumo: Crema de leche",
+      "isPublic": 0
+    },
+    {
+      "id": 21,
+      "name": "Azúcar impalpable",
+      "description": "Familia de insumo: Azúcar impalpable",
+      "isPublic": 0
+    },
+    {
+      "id": 22,
+      "name": "Crema de leche Masscream",
+      "description": "Familia de insumo: Crema de leche Masscream",
+      "isPublic": 0
+    },
+    {
+      "id": 23,
+      "name": "Mantequilla Hojaldrina",
+      "description": "Familia de insumo: Mantequilla Hojaldrina",
+      "isPublic": 0
+    },
+    {
+      "id": 24,
+      "name": "Premezcla de Chocolate",
+      "description": "Familia de insumo: Premezcla de Chocolate",
+      "isPublic": 0
     }
   ],
   "InventoryUnit": [
@@ -174,11 +288,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-06-24T00:14:50.000Z",
-      "updatedAt": "2026-06-15T13:59:23.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-06-24T00:14:50.000Z",
+      "updatedAt": "2026-06-15T19:14:04.000Z"
     },
     {
       "id": 2,
@@ -200,11 +314,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-06-24T00:15:14.000Z",
-      "updatedAt": "2026-06-15T13:59:23.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-06-24T00:15:14.000Z",
+      "updatedAt": "2026-06-15T19:27:25.000Z"
     },
     {
       "id": 3,
@@ -226,11 +340,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-06-24T00:15:58.000Z",
-      "updatedAt": "2026-06-15T13:59:23.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-06-24T00:15:58.000Z",
+      "updatedAt": "2026-06-15T19:14:05.000Z"
     },
     {
       "id": 4,
@@ -252,11 +366,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-06-24T00:16:38.000Z",
-      "updatedAt": "2026-06-15T13:59:23.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-06-24T00:16:38.000Z",
+      "updatedAt": "2026-06-15T19:14:06.000Z"
     },
     {
       "id": 5,
@@ -278,11 +392,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-06-24T00:17:05.000Z",
-      "updatedAt": "2026-06-15T13:59:23.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-06-24T00:17:05.000Z",
+      "updatedAt": "2026-06-15T19:14:06.000Z"
     },
     {
       "id": 6,
@@ -304,11 +418,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-06-24T00:18:40.000Z",
-      "updatedAt": "2026-06-15T13:59:23.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-06-24T00:18:40.000Z",
+      "updatedAt": "2026-06-15T13:59:23.000Z"
     },
     {
       "id": 7,
@@ -330,11 +444,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-06-24T00:18:54.000Z",
-      "updatedAt": "2026-06-15T13:59:23.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-06-24T00:18:54.000Z",
+      "updatedAt": "2026-06-15T19:14:06.000Z"
     },
     {
       "id": 8,
@@ -356,11 +470,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-06-24T00:21:53.000Z",
-      "updatedAt": "2026-06-15T13:59:23.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-06-24T00:21:53.000Z",
+      "updatedAt": "2026-06-15T19:14:07.000Z"
     },
     {
       "id": 9,
@@ -382,11 +496,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-06-24T00:22:41.000Z",
-      "updatedAt": "2026-06-15T13:59:23.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-06-24T00:22:41.000Z",
+      "updatedAt": "2026-06-15T13:59:23.000Z"
     },
     {
       "id": 10,
@@ -408,11 +522,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-06-24T00:23:13.000Z",
-      "updatedAt": "2026-06-15T13:59:23.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-06-24T00:23:13.000Z",
+      "updatedAt": "2026-06-15T13:59:23.000Z"
     },
     {
       "id": 11,
@@ -423,7 +537,7 @@
       "categoryId": 2,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 13,
+      "stock": 228,
       "minStock": 0,
       "price": "0.25",
       "wholesaleRules": "[]",
@@ -434,11 +548,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/dona-normal-decorada-de-chocolate-f4eeh.png",
-      "createdAt": "2025-06-24T00:28:43.000Z",
-      "updatedAt": "2026-06-15T16:58:44.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-06-24T00:28:43.000Z",
+      "updatedAt": "2026-06-15T13:59:43.000Z"
     },
     {
       "id": 12,
@@ -460,11 +574,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/dona-grande-con-manjar-6wt18.png",
-      "createdAt": "2025-07-06T18:28:39.000Z",
-      "updatedAt": "2026-06-11T21:48:15.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-07-06T18:28:39.000Z",
+      "updatedAt": "2026-06-11T21:48:15.000Z"
     },
     {
       "id": 13,
@@ -472,7 +586,7 @@
       "desc": null,
       "type": "raw",
       "unitId": 4,
-      "categoryId": 1,
+      "categoryId": 19,
       "standardWeightGrams": 0,
       "netWeight": 0,
       "stock": 14300,
@@ -486,11 +600,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-07-06T19:08:20.000Z",
-      "updatedAt": "2026-05-27T18:23:31.000Z",
       "isGenericIngredient": 0,
-      "genericProductId": 147,
-      "purchasePresentation": "Funda 900ml"
+      "genericProductId": 153,
+      "purchasePresentation": "Funda 900ml",
+      "createdAt": "2025-07-06T19:08:20.000Z",
+      "updatedAt": "2026-06-15T20:00:34.000Z"
     },
     {
       "id": 14,
@@ -512,11 +626,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-pequeno-decorado-e7n8z.png",
-      "createdAt": "2025-07-09T03:40:13.000Z",
-      "updatedAt": "2026-05-21T17:51:33.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-07-09T03:40:13.000Z",
+      "updatedAt": "2026-05-21T17:51:33.000Z"
     },
     {
       "id": 15,
@@ -538,11 +652,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-pequeno-de-naranja-y9jdr.png",
-      "createdAt": "2025-07-10T13:43:51.000Z",
-      "updatedAt": "2025-11-24T13:46:36.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-07-10T13:43:51.000Z",
+      "updatedAt": "2025-11-24T13:46:36.000Z"
     },
     {
       "id": 16,
@@ -564,11 +678,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-07-12T15:47:49.000Z",
-      "updatedAt": "2025-12-05T16:57:17.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-07-12T15:47:49.000Z",
+      "updatedAt": "2025-12-05T16:57:17.000Z"
     },
     {
       "id": 17,
@@ -579,7 +693,7 @@
       "categoryId": 5,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 1,
+      "stock": 0,
       "minStock": 0,
       "price": "3.50",
       "wholesaleRules": "[]",
@@ -590,11 +704,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-mini-torta-decorado-g4z7l.png",
-      "createdAt": "2025-07-15T21:42:30.000Z",
-      "updatedAt": "2026-06-15T16:38:44.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-07-15T21:42:30.000Z",
+      "updatedAt": "2026-05-15T17:27:44.000Z"
     },
     {
       "id": 18,
@@ -616,11 +730,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-mediano-decorado-y93o1.png",
-      "createdAt": "2025-07-15T21:43:07.000Z",
-      "updatedAt": "2026-06-07T01:35:19.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-07-15T21:43:07.000Z",
+      "updatedAt": "2026-06-07T01:35:19.000Z"
     },
     {
       "id": 19,
@@ -642,11 +756,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-07-31T03:14:56.000Z",
-      "updatedAt": "2026-06-09T15:09:24.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-07-31T03:14:56.000Z",
+      "updatedAt": "2026-06-15T19:14:07.000Z"
     },
     {
       "id": 20,
@@ -654,7 +768,7 @@
       "desc": null,
       "type": "raw",
       "unitId": 2,
-      "categoryId": 4,
+      "categoryId": 20,
       "standardWeightGrams": 1000,
       "netWeight": 0,
       "stock": 500,
@@ -668,11 +782,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-07-31T20:44:58.000Z",
-      "updatedAt": "2026-05-21T22:57:30.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-07-31T20:44:58.000Z",
+      "updatedAt": "2026-06-15T19:14:10.000Z"
     },
     {
       "id": 21,
@@ -694,11 +808,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-08-04T21:54:54.000Z",
-      "updatedAt": "2026-06-07T01:34:35.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-08-04T21:54:54.000Z",
+      "updatedAt": "2026-06-07T01:34:35.000Z"
     },
     {
       "id": 22,
@@ -720,11 +834,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-08-04T21:57:17.000Z",
-      "updatedAt": "2026-06-12T19:23:24.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-08-04T21:57:17.000Z",
+      "updatedAt": "2026-06-15T19:14:07.000Z"
     },
     {
       "id": 23,
@@ -746,11 +860,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-08-04T21:59:02.000Z",
-      "updatedAt": "2026-06-07T01:34:35.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-08-04T21:59:02.000Z",
+      "updatedAt": "2026-06-15T19:14:07.000Z"
     },
     {
       "id": 24,
@@ -772,11 +886,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-pequeno-vainilla-9ftdf.png",
-      "createdAt": "2025-08-06T21:23:58.000Z",
-      "updatedAt": "2026-06-07T01:34:35.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-08-06T21:23:58.000Z",
+      "updatedAt": "2026-06-07T01:34:35.000Z"
     },
     {
       "id": 25,
@@ -798,11 +912,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-mediano-vainilla-nwl9j.png",
-      "createdAt": "2025-08-06T21:26:12.000Z",
-      "updatedAt": "2026-05-22T21:13:56.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-08-06T21:26:12.000Z",
+      "updatedAt": "2026-05-22T21:13:56.000Z"
     },
     {
       "id": 26,
@@ -824,11 +938,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-minitorta-vainilla-2edvn.png",
-      "createdAt": "2025-08-06T21:27:49.000Z",
-      "updatedAt": "2026-05-15T17:33:03.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-08-06T21:27:49.000Z",
+      "updatedAt": "2026-05-15T17:33:03.000Z"
     },
     {
       "id": 27,
@@ -850,11 +964,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-mini-torta-de-naranja-w98ka.png",
-      "createdAt": "2025-08-06T21:29:45.000Z",
-      "updatedAt": "2025-11-24T13:46:19.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-08-06T21:29:45.000Z",
+      "updatedAt": "2025-11-24T13:46:19.000Z"
     },
     {
       "id": 28,
@@ -876,11 +990,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-mediano-de-naranja-qh7im.png",
-      "createdAt": "2025-08-06T21:37:18.000Z",
-      "updatedAt": "2026-05-22T21:13:08.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-08-06T21:37:18.000Z",
+      "updatedAt": "2026-05-22T21:13:08.000Z"
     },
     {
       "id": 29,
@@ -902,11 +1016,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-09-08T14:43:45.000Z",
-      "updatedAt": "2026-05-07T18:49:52.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-08T14:43:45.000Z",
+      "updatedAt": "2026-05-07T18:49:52.000Z"
     },
     {
       "id": 30,
@@ -928,11 +1042,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-09-08T14:44:28.000Z",
-      "updatedAt": "2026-05-07T18:49:52.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-08T14:44:28.000Z",
+      "updatedAt": "2026-05-07T18:49:52.000Z"
     },
     {
       "id": 31,
@@ -954,11 +1068,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-09-08T14:46:23.000Z",
-      "updatedAt": "2026-06-04T13:35:25.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-08T14:46:23.000Z",
+      "updatedAt": "2026-06-04T13:35:25.000Z"
     },
     {
       "id": 32,
@@ -969,7 +1083,7 @@
       "categoryId": 1,
       "standardWeightGrams": 0,
       "netWeight": 450,
-      "stock": -450,
+      "stock": -1350,
       "minStock": 50,
       "price": "2.00",
       "wholesaleRules": null,
@@ -980,11 +1094,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-09-08T14:47:50.000Z",
-      "updatedAt": "2026-06-15T17:21:29.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-08T14:47:50.000Z",
+      "updatedAt": "2026-06-15T19:14:08.000Z"
     },
     {
       "id": 33,
@@ -1006,11 +1120,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-09-08T14:48:18.000Z",
-      "updatedAt": "2026-06-12T18:12:50.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-08T14:48:18.000Z",
+      "updatedAt": "2026-06-15T19:14:08.000Z"
     },
     {
       "id": 34,
@@ -1032,11 +1146,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-09-08T14:48:59.000Z",
-      "updatedAt": "2026-05-07T18:49:52.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-08T14:48:59.000Z",
+      "updatedAt": "2026-05-07T18:49:52.000Z"
     },
     {
       "id": 35,
@@ -1058,11 +1172,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/funda-de-masapan-qvs3g.png",
-      "createdAt": "2025-09-09T13:30:23.000Z",
-      "updatedAt": "2026-06-15T14:03:34.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-09T13:30:23.000Z",
+      "updatedAt": "2026-06-15T14:03:34.000Z"
     },
     {
       "id": 36,
@@ -1084,11 +1198,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-09-23T21:07:23.000Z",
-      "updatedAt": "2026-05-21T17:50:26.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-23T21:07:23.000Z",
+      "updatedAt": "2026-06-15T19:14:09.000Z"
     },
     {
       "id": 37,
@@ -1110,11 +1224,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-09-23T21:10:18.000Z",
-      "updatedAt": "2026-06-08T00:27:20.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-23T21:10:18.000Z",
+      "updatedAt": "2026-06-08T00:27:20.000Z"
     },
     {
       "id": 38,
@@ -1136,11 +1250,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-09-23T21:12:01.000Z",
-      "updatedAt": "2026-05-06T22:42:25.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-23T21:12:01.000Z",
+      "updatedAt": "2026-05-06T22:42:25.000Z"
     },
     {
       "id": 39,
@@ -1162,11 +1276,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/funda-de-rosca-integral-yg5qo.png",
-      "createdAt": "2025-09-24T23:28:33.000Z",
-      "updatedAt": "2026-05-21T17:50:53.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-24T23:28:33.000Z",
+      "updatedAt": "2026-05-21T17:50:53.000Z"
     },
     {
       "id": 40,
@@ -1188,11 +1302,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-09-24T23:29:40.000Z",
-      "updatedAt": "2026-03-27T20:38:15.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-24T23:29:40.000Z",
+      "updatedAt": "2026-03-27T20:38:15.000Z"
     },
     {
       "id": 41,
@@ -1214,11 +1328,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-grande-vainilla-eggnp.png",
-      "createdAt": "2025-09-25T19:57:18.000Z",
-      "updatedAt": "2026-05-09T23:11:59.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-25T19:57:18.000Z",
+      "updatedAt": "2026-05-09T23:11:59.000Z"
     },
     {
       "id": 42,
@@ -1240,11 +1354,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-grande-decorado-8frv8.png",
-      "createdAt": "2025-09-25T19:57:48.000Z",
-      "updatedAt": "2026-06-07T01:35:19.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-25T19:57:48.000Z",
+      "updatedAt": "2026-06-07T01:35:19.000Z"
     },
     {
       "id": 43,
@@ -1252,7 +1366,7 @@
       "desc": null,
       "type": "raw",
       "unitId": 2,
-      "categoryId": 1,
+      "categoryId": 21,
       "standardWeightGrams": 0,
       "netWeight": 0,
       "stock": 11500,
@@ -1266,11 +1380,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-09-26T19:48:20.000Z",
-      "updatedAt": "2026-06-09T15:18:17.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-26T19:48:20.000Z",
+      "updatedAt": "2026-06-15T19:27:25.000Z"
     },
     {
       "id": 44,
@@ -1292,11 +1406,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/funda-de-relampago-qfl9s.png",
-      "createdAt": "2025-09-29T17:14:30.000Z",
-      "updatedAt": "2026-06-15T14:02:26.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-29T17:14:30.000Z",
+      "updatedAt": "2026-06-15T14:02:26.000Z"
     },
     {
       "id": 45,
@@ -1318,11 +1432,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/funda-de-suspiros-grandes-b9h1b.png",
-      "createdAt": "2025-09-29T17:16:07.000Z",
-      "updatedAt": "2025-11-22T16:39:03.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-09-29T17:16:07.000Z",
+      "updatedAt": "2025-11-22T16:39:03.000Z"
     },
     {
       "id": 46,
@@ -1344,11 +1458,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-10-01T02:33:19.000Z",
-      "updatedAt": "2026-05-15T17:30:03.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-10-01T02:33:19.000Z",
+      "updatedAt": "2026-05-15T17:30:03.000Z"
     },
     {
       "id": 47,
@@ -1370,11 +1484,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-10-01T02:36:04.000Z",
-      "updatedAt": "2025-10-28T20:37:30.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-10-01T02:36:04.000Z",
+      "updatedAt": "2025-10-28T20:37:30.000Z"
     },
     {
       "id": 48,
@@ -1396,11 +1510,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-10-01T02:36:38.000Z",
-      "updatedAt": "2025-12-05T16:32:28.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-10-01T02:36:38.000Z",
+      "updatedAt": "2025-12-05T16:32:28.000Z"
     },
     {
       "id": 49,
@@ -1422,11 +1536,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-10-01T18:51:05.000Z",
-      "updatedAt": "2026-05-15T17:19:34.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-10-01T18:51:05.000Z",
+      "updatedAt": "2026-05-15T17:19:34.000Z"
     },
     {
       "id": 50,
@@ -1448,11 +1562,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/funda-de-pan-integral-wpz7z.png",
-      "createdAt": "2025-10-01T18:55:36.000Z",
-      "updatedAt": "2026-03-20T20:16:15.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-10-01T18:55:36.000Z",
+      "updatedAt": "2026-03-20T20:16:15.000Z"
     },
     {
       "id": 51,
@@ -1474,11 +1588,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/suspiro-grande-1b4o8.png",
-      "createdAt": "2025-10-09T21:52:59.000Z",
-      "updatedAt": "2026-06-14T17:35:41.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-10-09T21:52:59.000Z",
+      "updatedAt": "2026-06-14T17:35:41.000Z"
     },
     {
       "id": 52,
@@ -1500,11 +1614,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-10-28T16:19:47.000Z",
-      "updatedAt": "2025-10-28T16:24:54.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-10-28T16:19:47.000Z",
+      "updatedAt": "2025-10-28T16:24:54.000Z"
     },
     {
       "id": 53,
@@ -1526,11 +1640,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-10-28T16:25:39.000Z",
-      "updatedAt": "2025-10-28T16:25:39.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-10-28T16:25:39.000Z",
+      "updatedAt": "2025-10-28T16:25:39.000Z"
     },
     {
       "id": 54,
@@ -1552,11 +1666,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-10-28T16:26:26.000Z",
-      "updatedAt": "2026-03-14T18:06:01.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-10-28T16:26:26.000Z",
+      "updatedAt": "2026-03-14T18:06:01.000Z"
     },
     {
       "id": 55,
@@ -1578,11 +1692,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-10-28T16:27:06.000Z",
-      "updatedAt": "2025-10-28T16:27:06.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-10-28T16:27:06.000Z",
+      "updatedAt": "2025-10-28T16:27:06.000Z"
     },
     {
       "id": 56,
@@ -1604,11 +1718,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-10-28T16:28:22.000Z",
-      "updatedAt": "2026-03-27T20:45:03.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-10-28T16:28:22.000Z",
+      "updatedAt": "2026-03-27T20:45:03.000Z"
     },
     {
       "id": 57,
@@ -1630,11 +1744,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/guagua-de-pan-jsfix.jpg",
-      "createdAt": "2025-10-28T22:00:06.000Z",
-      "updatedAt": "2025-12-05T16:33:46.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-10-28T22:00:06.000Z",
+      "updatedAt": "2025-12-05T16:33:46.000Z"
     },
     {
       "id": 58,
@@ -1656,11 +1770,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-10-29T17:13:55.000Z",
-      "updatedAt": "2026-06-08T16:31:28.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-10-29T17:13:55.000Z",
+      "updatedAt": "2026-06-08T16:31:28.000Z"
     },
     {
       "id": 59,
@@ -1682,11 +1796,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-mini-torta-de-chocolate-zf9d6.png",
-      "createdAt": "2025-11-03T20:20:36.000Z",
-      "updatedAt": "2025-11-22T16:39:33.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-11-03T20:20:36.000Z",
+      "updatedAt": "2025-11-22T16:39:33.000Z"
     },
     {
       "id": 60,
@@ -1708,11 +1822,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-pequeno-de-chocolate-l8pv4.png",
-      "createdAt": "2025-11-03T20:22:20.000Z",
-      "updatedAt": "2025-11-22T16:39:52.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-11-03T20:22:20.000Z",
+      "updatedAt": "2025-11-22T16:39:52.000Z"
     },
     {
       "id": 61,
@@ -1734,11 +1848,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-mediano-de-chocolate-72chh.png",
-      "createdAt": "2025-11-03T20:24:08.000Z",
-      "updatedAt": "2026-05-08T16:01:28.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-11-03T20:24:08.000Z",
+      "updatedAt": "2026-05-08T16:01:28.000Z"
     },
     {
       "id": 62,
@@ -1760,11 +1874,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-grande-de-chocolate-0urc9.png",
-      "createdAt": "2025-11-03T20:25:01.000Z",
-      "updatedAt": "2025-11-22T16:40:25.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-11-03T20:25:01.000Z",
+      "updatedAt": "2025-11-22T16:40:25.000Z"
     },
     {
       "id": 63,
@@ -1786,11 +1900,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-grande-de-naranja-bxvki.png",
-      "createdAt": "2025-11-03T20:36:02.000Z",
-      "updatedAt": "2025-11-24T13:47:03.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-11-03T20:36:02.000Z",
+      "updatedAt": "2025-11-24T13:47:03.000Z"
     },
     {
       "id": 64,
@@ -1801,7 +1915,7 @@
       "categoryId": 3,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 44,
+      "stock": 49,
       "minStock": 0,
       "price": "0.50",
       "wholesaleRules": "[]",
@@ -1812,11 +1926,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/conos-0kx4a.png",
-      "createdAt": "2025-11-18T19:44:08.000Z",
-      "updatedAt": "2026-06-15T17:52:43.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-11-18T19:44:08.000Z",
+      "updatedAt": "2026-06-12T21:37:46.000Z"
     },
     {
       "id": 65,
@@ -1838,11 +1952,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/yoyos-jnw46.png",
-      "createdAt": "2025-11-18T19:44:58.000Z",
-      "updatedAt": "2025-11-30T22:01:39.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-11-18T19:44:58.000Z",
+      "updatedAt": "2025-11-30T22:01:39.000Z"
     },
     {
       "id": 66,
@@ -1864,11 +1978,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/torres-5w9ns.png",
-      "createdAt": "2025-11-18T19:46:22.000Z",
-      "updatedAt": "2025-11-30T21:41:47.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-11-18T19:46:22.000Z",
+      "updatedAt": "2025-11-30T21:41:47.000Z"
     },
     {
       "id": 67,
@@ -1890,11 +2004,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-11-18T19:47:29.000Z",
-      "updatedAt": "2025-11-18T19:47:29.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-11-18T19:47:29.000Z",
+      "updatedAt": "2025-11-18T19:47:29.000Z"
     },
     {
       "id": 68,
@@ -1916,11 +2030,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-11-18T20:02:57.000Z",
-      "updatedAt": "2025-11-18T20:02:57.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-11-18T20:02:57.000Z",
+      "updatedAt": "2025-11-18T20:02:57.000Z"
     },
     {
       "id": 69,
@@ -1942,11 +2056,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pack-de-donas-tgb63.png",
-      "createdAt": "2025-11-24T16:00:12.000Z",
-      "updatedAt": "2025-11-24T16:06:51.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-11-24T16:00:12.000Z",
+      "updatedAt": "2025-11-24T16:06:51.000Z"
     },
     {
       "id": 70,
@@ -1968,11 +2082,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-11-25T17:50:29.000Z",
-      "updatedAt": "2026-06-11T19:41:48.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-11-25T17:50:29.000Z",
+      "updatedAt": "2026-06-11T19:41:48.000Z"
     },
     {
       "id": 71,
@@ -1983,7 +2097,7 @@
       "categoryId": 3,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 3,
+      "stock": 59,
       "minStock": 0,
       "price": "0.15",
       "wholesaleRules": "[]",
@@ -1994,11 +2108,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pan-de-dulce-zzehz.jpg",
-      "createdAt": "2025-12-05T16:25:33.000Z",
-      "updatedAt": "2026-06-15T17:40:47.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-12-05T16:25:33.000Z",
+      "updatedAt": "2026-06-15T14:01:26.000Z"
     },
     {
       "id": 72,
@@ -2020,11 +2134,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-12-18T19:55:45.000Z",
-      "updatedAt": "2026-03-14T18:06:10.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-12-18T19:55:45.000Z",
+      "updatedAt": "2026-03-14T18:06:10.000Z"
     },
     {
       "id": 73,
@@ -2046,11 +2160,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-12-24T18:42:53.000Z",
-      "updatedAt": "2026-01-12T01:55:15.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-12-24T18:42:53.000Z",
+      "updatedAt": "2026-01-12T01:55:15.000Z"
     },
     {
       "id": 74,
@@ -2072,11 +2186,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-12-25T17:50:29.000Z",
-      "updatedAt": "2026-03-04T14:34:00.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-12-25T17:50:29.000Z",
+      "updatedAt": "2026-03-04T14:34:00.000Z"
     },
     {
       "id": 75,
@@ -2098,11 +2212,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-12-25T17:53:17.000Z",
-      "updatedAt": "2026-01-01T01:23:08.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2025-12-25T17:53:17.000Z",
+      "updatedAt": "2026-01-01T01:23:08.000Z"
     },
     {
       "id": 76,
@@ -2124,11 +2238,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-01-07T20:27:15.000Z",
-      "updatedAt": "2026-01-08T15:53:17.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-01-07T20:27:15.000Z",
+      "updatedAt": "2026-01-08T15:53:17.000Z"
     },
     {
       "id": 77,
@@ -2136,7 +2250,7 @@
       "desc": null,
       "type": "raw",
       "unitId": 2,
-      "categoryId": 4,
+      "categoryId": 20,
       "standardWeightGrams": 0,
       "netWeight": 0,
       "stock": 3250,
@@ -2150,11 +2264,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-01-15T18:59:37.000Z",
-      "updatedAt": "2026-05-02T21:07:37.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-01-15T18:59:37.000Z",
+      "updatedAt": "2026-06-15T19:14:09.000Z"
     },
     {
       "id": 78,
@@ -2176,11 +2290,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-01-17T19:01:00.000Z",
-      "updatedAt": "2026-03-27T20:37:14.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-01-17T19:01:00.000Z",
+      "updatedAt": "2026-03-27T20:37:14.000Z"
     },
     {
       "id": 79,
@@ -2202,11 +2316,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-01-17T19:31:02.000Z",
-      "updatedAt": "2026-03-27T20:36:08.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-01-17T19:31:02.000Z",
+      "updatedAt": "2026-03-27T20:36:08.000Z"
     },
     {
       "id": 80,
@@ -2214,7 +2328,7 @@
       "desc": null,
       "type": "raw",
       "unitId": 2,
-      "categoryId": 2,
+      "categoryId": 8,
       "standardWeightGrams": 0,
       "netWeight": 2500,
       "stock": 2500,
@@ -2228,11 +2342,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-02-05T19:47:52.000Z",
-      "updatedAt": "2026-02-05T19:47:52.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-05T19:47:52.000Z",
+      "updatedAt": "2026-06-15T19:14:10.000Z"
     },
     {
       "id": 81,
@@ -2254,11 +2368,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-mini-torta-decorado-g4z7l.png",
-      "createdAt": "2026-02-23T00:00:00.000Z",
-      "updatedAt": "2026-02-23T17:05:25.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-23T00:00:00.000Z",
+      "updatedAt": "2026-02-23T17:05:25.000Z"
     },
     {
       "id": 82,
@@ -2280,11 +2394,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-mini-torta-decorado-g4z7l.png",
-      "createdAt": "2026-02-23T00:00:00.000Z",
-      "updatedAt": "2026-02-23T17:03:21.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-23T00:00:00.000Z",
+      "updatedAt": "2026-02-23T17:03:21.000Z"
     },
     {
       "id": 83,
@@ -2306,11 +2420,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-pequeno-decorado-e7n8z.png",
-      "createdAt": "2026-02-23T00:00:00.000Z",
-      "updatedAt": "2026-03-23T22:05:17.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-23T00:00:00.000Z",
+      "updatedAt": "2026-03-23T22:05:17.000Z"
     },
     {
       "id": 84,
@@ -2332,11 +2446,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-pequeno-decorado-e7n8z.png",
-      "createdAt": "2026-02-23T00:00:00.000Z",
-      "updatedAt": "2026-02-27T16:47:26.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-23T00:00:00.000Z",
+      "updatedAt": "2026-02-27T16:47:26.000Z"
     },
     {
       "id": 85,
@@ -2358,11 +2472,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-mediano-decorado-y93o1.png",
-      "createdAt": "2026-02-23T00:00:00.000Z",
-      "updatedAt": "2026-05-15T17:34:09.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-23T00:00:00.000Z",
+      "updatedAt": "2026-05-15T17:34:09.000Z"
     },
     {
       "id": 86,
@@ -2384,11 +2498,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-mediano-decorado-y93o1.png",
-      "createdAt": "2026-02-23T00:00:00.000Z",
-      "updatedAt": "2026-05-15T17:16:07.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-23T00:00:00.000Z",
+      "updatedAt": "2026-05-15T17:16:07.000Z"
     },
     {
       "id": 87,
@@ -2410,11 +2524,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-grande-decorado-8frv8.png",
-      "createdAt": "2026-02-23T00:00:00.000Z",
-      "updatedAt": "2026-02-23T00:00:00.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-23T00:00:00.000Z",
+      "updatedAt": "2026-02-23T00:00:00.000Z"
     },
     {
       "id": 88,
@@ -2436,11 +2550,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pastel-grande-decorado-8frv8.png",
-      "createdAt": "2026-02-23T00:00:00.000Z",
-      "updatedAt": "2026-04-16T02:05:32.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-23T00:00:00.000Z",
+      "updatedAt": "2026-04-16T02:05:32.000Z"
     },
     {
       "id": 89,
@@ -2462,11 +2576,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/mini-torta-de-chocolate-semihumedo-decorado-4e4ou.jpg",
-      "createdAt": "2026-02-27T15:14:03.000Z",
-      "updatedAt": "2026-02-27T16:23:10.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-27T15:14:03.000Z",
+      "updatedAt": "2026-02-27T16:23:10.000Z"
     },
     {
       "id": 90,
@@ -2488,11 +2602,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-02-27T15:20:25.000Z",
-      "updatedAt": "2026-02-27T15:25:29.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-27T15:20:25.000Z",
+      "updatedAt": "2026-02-27T15:25:29.000Z"
     },
     {
       "id": 91,
@@ -2514,11 +2628,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-02-27T15:20:46.000Z",
-      "updatedAt": "2026-02-27T15:25:36.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-27T15:20:46.000Z",
+      "updatedAt": "2026-02-27T15:25:36.000Z"
     },
     {
       "id": 92,
@@ -2540,11 +2654,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-02-27T15:21:02.000Z",
-      "updatedAt": "2026-02-27T15:25:48.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-27T15:21:02.000Z",
+      "updatedAt": "2026-02-27T15:25:48.000Z"
     },
     {
       "id": 93,
@@ -2566,11 +2680,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-02-27T15:21:27.000Z",
-      "updatedAt": "2026-02-27T15:26:04.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-27T15:21:27.000Z",
+      "updatedAt": "2026-02-27T15:26:04.000Z"
     },
     {
       "id": 94,
@@ -2592,11 +2706,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-02-27T15:21:58.000Z",
-      "updatedAt": "2026-02-27T15:26:46.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-27T15:21:58.000Z",
+      "updatedAt": "2026-02-27T15:26:46.000Z"
     },
     {
       "id": 95,
@@ -2618,11 +2732,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-02-27T15:22:11.000Z",
-      "updatedAt": "2026-02-27T15:26:36.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-27T15:22:11.000Z",
+      "updatedAt": "2026-02-27T15:26:36.000Z"
     },
     {
       "id": 96,
@@ -2644,11 +2758,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-02-27T15:22:36.000Z",
-      "updatedAt": "2026-02-27T15:26:25.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-27T15:22:36.000Z",
+      "updatedAt": "2026-02-27T15:26:25.000Z"
     },
     {
       "id": 97,
@@ -2670,11 +2784,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-02-27T15:46:45.000Z",
-      "updatedAt": "2026-02-27T15:47:10.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-27T15:46:45.000Z",
+      "updatedAt": "2026-02-27T15:47:10.000Z"
     },
     {
       "id": 98,
@@ -2682,7 +2796,7 @@
       "desc": null,
       "type": "raw",
       "unitId": 2,
-      "categoryId": 5,
+      "categoryId": 11,
       "standardWeightGrams": 0,
       "netWeight": 1000,
       "stock": 1000,
@@ -2696,11 +2810,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-02-27T20:13:46.000Z",
-      "updatedAt": "2026-06-12T18:05:11.000Z",
       "isGenericIngredient": 1,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-02-27T20:13:46.000Z",
+      "updatedAt": "2026-06-15T19:14:10.000Z"
     },
     {
       "id": 99,
@@ -2722,11 +2836,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-03-02T20:16:08.000Z",
-      "updatedAt": "2026-05-07T19:00:50.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-03-02T20:16:08.000Z",
+      "updatedAt": "2026-05-07T19:00:50.000Z"
     },
     {
       "id": 100,
@@ -2748,11 +2862,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-03-10T23:54:46.000Z",
-      "updatedAt": "2026-03-14T18:02:14.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-03-10T23:54:46.000Z",
+      "updatedAt": "2026-03-14T18:02:14.000Z"
     },
     {
       "id": 101,
@@ -2774,11 +2888,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-03-16T18:39:03.000Z",
-      "updatedAt": "2026-03-19T14:51:05.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-03-16T18:39:03.000Z",
+      "updatedAt": "2026-03-19T14:51:05.000Z"
     },
     {
       "id": 102,
@@ -2800,11 +2914,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-03-19T15:24:22.000Z",
-      "updatedAt": "2026-03-20T20:44:18.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-03-19T15:24:22.000Z",
+      "updatedAt": "2026-03-20T20:44:18.000Z"
     },
     {
       "id": 103,
@@ -2815,7 +2929,7 @@
       "categoryId": 3,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 24,
+      "stock": 38,
       "minStock": 0,
       "price": "0.15",
       "wholesaleRules": "[]",
@@ -2826,11 +2940,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pan-de-sal-kdeyc.jpg",
-      "createdAt": "2026-03-20T20:33:31.000Z",
-      "updatedAt": "2026-06-15T17:11:29.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-03-20T20:33:31.000Z",
+      "updatedAt": "2026-06-14T19:03:15.000Z"
     },
     {
       "id": 104,
@@ -2852,11 +2966,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-03-23T22:03:14.000Z",
-      "updatedAt": "2026-04-24T23:45:22.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-03-23T22:03:14.000Z",
+      "updatedAt": "2026-04-24T23:45:22.000Z"
     },
     {
       "id": 105,
@@ -2878,11 +2992,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-03-24T19:42:52.000Z",
-      "updatedAt": "2026-05-08T15:57:40.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-03-24T19:42:52.000Z",
+      "updatedAt": "2026-05-08T15:57:40.000Z"
     },
     {
       "id": 106,
@@ -2893,7 +3007,7 @@
       "categoryId": 2,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 7,
+      "stock": 12,
       "minStock": 0,
       "price": "0.15",
       "wholesaleRules": "[]",
@@ -2904,11 +3018,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-05-01T20:36:44.000Z",
-      "updatedAt": "2026-06-15T17:33:54.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-05-01T20:36:44.000Z",
+      "updatedAt": "2026-06-14T18:48:00.000Z"
     },
     {
       "id": 107,
@@ -2930,11 +3044,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-05-04T21:25:29.000Z",
-      "updatedAt": "2026-06-15T13:50:25.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-05-04T21:25:29.000Z",
+      "updatedAt": "2026-06-15T13:50:25.000Z"
     },
     {
       "id": 108,
@@ -2956,11 +3070,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-05-04T21:29:56.000Z",
-      "updatedAt": "2026-05-04T21:31:20.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-05-04T21:29:56.000Z",
+      "updatedAt": "2026-05-04T21:31:20.000Z"
     },
     {
       "id": 109,
@@ -2982,11 +3096,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-05-08T15:55:46.000Z",
-      "updatedAt": "2026-05-08T15:58:11.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-05-08T15:55:46.000Z",
+      "updatedAt": "2026-05-08T15:58:11.000Z"
     },
     {
       "id": 110,
@@ -3008,11 +3122,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/suspiro-pollitos-en-bandeja-0jqw4.jpg",
-      "createdAt": "2026-05-09T15:47:31.000Z",
-      "updatedAt": "2026-06-15T14:02:24.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-05-09T15:47:31.000Z",
+      "updatedAt": "2026-06-15T14:02:24.000Z"
     },
     {
       "id": 111,
@@ -3034,11 +3148,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-05-09T15:51:15.000Z",
-      "updatedAt": "2026-05-16T01:43:41.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-05-09T15:51:15.000Z",
+      "updatedAt": "2026-05-16T01:43:41.000Z"
     },
     {
       "id": 112,
@@ -3060,11 +3174,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-05-14T20:44:19.000Z",
-      "updatedAt": "2026-06-15T14:02:28.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-05-14T20:44:19.000Z",
+      "updatedAt": "2026-06-15T14:02:28.000Z"
     },
     {
       "id": 113,
@@ -3086,11 +3200,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-05-15T17:37:46.000Z",
-      "updatedAt": "2026-05-16T18:22:50.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-05-15T17:37:46.000Z",
+      "updatedAt": "2026-05-16T18:22:50.000Z"
     },
     {
       "id": 114,
@@ -3101,7 +3215,7 @@
       "categoryId": 3,
       "standardWeightGrams": 24,
       "netWeight": 24,
-      "stock": 40,
+      "stock": 48,
       "minStock": 0,
       "price": "0.15",
       "wholesaleRules": "[]",
@@ -3112,11 +3226,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-05-15T17:40:30.000Z",
-      "updatedAt": "2026-06-15T17:38:05.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-05-15T17:40:30.000Z",
+      "updatedAt": "2026-06-14T19:12:01.000Z"
     },
     {
       "id": 115,
@@ -3138,11 +3252,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-05-15T17:41:31.000Z",
-      "updatedAt": "2026-05-15T17:41:31.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-05-15T17:41:31.000Z",
+      "updatedAt": "2026-05-15T17:41:31.000Z"
     },
     {
       "id": 116,
@@ -3164,11 +3278,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-05-15T17:43:01.000Z",
-      "updatedAt": "2026-05-15T17:43:01.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-05-15T17:43:01.000Z",
+      "updatedAt": "2026-05-15T17:43:01.000Z"
     },
     {
       "id": 117,
@@ -3190,11 +3304,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pan-enrollado-p335t.jpg",
-      "createdAt": "2026-06-08T16:31:03.000Z",
-      "updatedAt": "2026-06-14T16:59:21.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-08T16:31:03.000Z",
+      "updatedAt": "2026-06-14T16:59:21.000Z"
     },
     {
       "id": 118,
@@ -3205,7 +3319,7 @@
       "categoryId": 3,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 16,
+      "stock": 28,
       "minStock": 0,
       "price": "0.15",
       "wholesaleRules": "[]",
@@ -3216,11 +3330,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-08T16:37:27.000Z",
-      "updatedAt": "2026-06-15T17:11:29.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-08T16:37:27.000Z",
+      "updatedAt": "2026-06-15T14:38:35.000Z"
     },
     {
       "id": 119,
@@ -3231,7 +3345,7 @@
       "categoryId": 3,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 51,
+      "stock": 56,
       "minStock": 0,
       "price": "0.25",
       "wholesaleRules": null,
@@ -3242,11 +3356,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-09T17:17:54.000Z",
-      "updatedAt": "2026-06-15T17:33:54.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-09T17:17:54.000Z",
+      "updatedAt": "2026-06-13T16:42:08.000Z"
     },
     {
       "id": 120,
@@ -3257,7 +3371,7 @@
       "categoryId": 3,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 9,
+      "stock": 10,
       "minStock": 0,
       "price": "0.50",
       "wholesaleRules": null,
@@ -3268,11 +3382,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-09T17:19:20.000Z",
-      "updatedAt": "2026-06-15T16:56:49.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-09T17:19:20.000Z",
+      "updatedAt": "2026-06-14T19:12:01.000Z"
     },
     {
       "id": 121,
@@ -3294,11 +3408,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-09T17:21:15.000Z",
-      "updatedAt": "2026-06-13T18:29:08.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-09T17:21:15.000Z",
+      "updatedAt": "2026-06-13T18:29:08.000Z"
     },
     {
       "id": 122,
@@ -3320,41 +3434,15 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-09T23:23:38.000Z",
-      "updatedAt": "2026-06-14T18:48:00.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-09T23:23:38.000Z",
+      "updatedAt": "2026-06-14T18:48:00.000Z"
     },
     {
       "id": 123,
       "name": "Pan de Chocolate",
-      "desc": null,
-      "type": "final",
-      "unitId": 1,
-      "categoryId": 3,
-      "standardWeightGrams": 0,
-      "netWeight": 0,
-      "stock": 14,
-      "minStock": 0,
-      "price": "0.15",
-      "wholesaleRules": "[]",
-      "packageTiers": "[{\"qty\":2,\"totalPrice\":0.25},{\"qty\":4,\"totalPrice\":0.5},{\"qty\":8,\"totalPrice\":1}]",
-      "distributorPrice": "0.12",
-      "taxRate": "0.00",
-      "sku": null,
-      "barcode": null,
-      "isActive": 1,
-      "primaryImageUrl": "EdDeli/products/pan-de-chocolate-ddwl0.jpg",
-      "createdAt": "2026-06-10T19:43:58.000Z",
-      "updatedAt": "2026-06-15T17:27:17.000Z",
-      "isGenericIngredient": 0,
-      "genericProductId": null,
-      "purchasePresentation": null
-    },
-    {
-      "id": 124,
-      "name": "Roscas",
       "desc": null,
       "type": "final",
       "unitId": 1,
@@ -3371,12 +3459,38 @@
       "sku": null,
       "barcode": null,
       "isActive": 1,
-      "primaryImageUrl": "EdDeli/products/roscas-sgx41.jpg",
-      "createdAt": "2026-06-10T19:44:42.000Z",
-      "updatedAt": "2026-06-15T17:11:29.000Z",
+      "primaryImageUrl": "EdDeli/products/pan-de-chocolate-ddwl0.jpg",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-10T19:43:58.000Z",
+      "updatedAt": "2026-06-14T19:28:17.000Z"
+    },
+    {
+      "id": 124,
+      "name": "Roscas",
+      "desc": null,
+      "type": "final",
+      "unitId": 1,
+      "categoryId": 3,
+      "standardWeightGrams": 0,
+      "netWeight": 0,
+      "stock": 12,
+      "minStock": 0,
+      "price": "0.15",
+      "wholesaleRules": "[]",
+      "packageTiers": "[{\"qty\":2,\"totalPrice\":0.25},{\"qty\":4,\"totalPrice\":0.5},{\"qty\":8,\"totalPrice\":1}]",
+      "distributorPrice": "0.12",
+      "taxRate": "0.00",
+      "sku": null,
+      "barcode": null,
+      "isActive": 1,
+      "primaryImageUrl": "EdDeli/products/roscas-sgx41.jpg",
+      "isGenericIngredient": 0,
+      "genericProductId": null,
+      "purchasePresentation": null,
+      "createdAt": "2026-06-10T19:44:42.000Z",
+      "updatedAt": "2026-06-15T14:07:01.000Z"
     },
     {
       "id": 125,
@@ -3398,11 +3512,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-10T19:45:10.000Z",
-      "updatedAt": "2026-06-12T17:58:38.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-10T19:45:10.000Z",
+      "updatedAt": "2026-06-12T17:58:38.000Z"
     },
     {
       "id": 126,
@@ -3424,11 +3538,11 @@
       "barcode": "7862109437698",
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/cola-pepsi-pequena-868jw.jpg",
-      "createdAt": "2026-06-10T20:07:54.000Z",
-      "updatedAt": "2026-06-14T15:16:34.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-10T20:07:54.000Z",
+      "updatedAt": "2026-06-14T15:16:34.000Z"
     },
     {
       "id": 127,
@@ -3450,11 +3564,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pulp-nectar-de-durazno-triangulo-swxae.jpg",
-      "createdAt": "2026-06-10T20:07:54.000Z",
-      "updatedAt": "2026-06-12T18:34:45.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-10T20:07:54.000Z",
+      "updatedAt": "2026-06-12T18:34:45.000Z"
     },
     {
       "id": 128,
@@ -3465,7 +3579,7 @@
       "categoryId": 4,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 2,
+      "stock": 4,
       "minStock": 0,
       "price": "0.50",
       "wholesaleRules": null,
@@ -3476,11 +3590,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/pulp-nectar-de-durazno-u355y.jpg",
-      "createdAt": "2026-06-10T20:07:54.000Z",
-      "updatedAt": "2026-06-15T17:52:43.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-10T20:07:54.000Z",
+      "updatedAt": "2026-06-15T13:50:25.000Z"
     },
     {
       "id": 129,
@@ -3502,11 +3616,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/cola-gallito-pequena-koali.jpg",
-      "createdAt": "2026-06-10T20:07:54.000Z",
-      "updatedAt": "2026-06-11T02:59:02.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-10T20:07:54.000Z",
+      "updatedAt": "2026-06-11T02:59:02.000Z"
     },
     {
       "id": 130,
@@ -3528,11 +3642,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-10T20:13:57.000Z",
-      "updatedAt": "2026-06-13T18:29:08.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-10T20:13:57.000Z",
+      "updatedAt": "2026-06-13T18:29:08.000Z"
     },
     {
       "id": 131,
@@ -3554,11 +3668,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-10T20:16:21.000Z",
-      "updatedAt": "2026-06-11T03:08:16.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-10T20:16:21.000Z",
+      "updatedAt": "2026-06-11T03:08:16.000Z"
     },
     {
       "id": 132,
@@ -3580,11 +3694,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-10T20:17:03.000Z",
-      "updatedAt": "2026-06-14T18:14:38.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-10T20:17:03.000Z",
+      "updatedAt": "2026-06-14T18:14:38.000Z"
     },
     {
       "id": 133,
@@ -3606,11 +3720,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-11T16:38:54.000Z",
-      "updatedAt": "2026-06-11T17:04:40.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-11T16:38:54.000Z",
+      "updatedAt": "2026-06-11T17:04:40.000Z"
     },
     {
       "id": 134,
@@ -3621,7 +3735,7 @@
       "categoryId": 5,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 29,
+      "stock": 31,
       "minStock": 0,
       "price": "0.25",
       "wholesaleRules": null,
@@ -3632,11 +3746,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-11T23:02:42.000Z",
-      "updatedAt": "2026-06-15T16:22:36.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-11T23:02:42.000Z",
+      "updatedAt": "2026-06-13T18:52:48.000Z"
     },
     {
       "id": 135,
@@ -3647,7 +3761,7 @@
       "categoryId": 4,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 0,
+      "stock": 1,
       "minStock": 0,
       "price": "0.50",
       "wholesaleRules": null,
@@ -3658,11 +3772,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-11T23:03:29.000Z",
-      "updatedAt": "2026-06-15T17:11:29.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-11T23:03:29.000Z",
+      "updatedAt": "2026-06-14T17:25:58.000Z"
     },
     {
       "id": 136,
@@ -3684,11 +3798,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-11T23:04:20.000Z",
-      "updatedAt": "2026-06-11T23:59:06.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-11T23:04:20.000Z",
+      "updatedAt": "2026-06-11T23:59:06.000Z"
     },
     {
       "id": 137,
@@ -3710,11 +3824,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-12T00:00:26.000Z",
-      "updatedAt": "2026-06-12T00:01:09.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-12T00:00:26.000Z",
+      "updatedAt": "2026-06-12T00:01:09.000Z"
     },
     {
       "id": 138,
@@ -3736,11 +3850,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-12T21:45:18.000Z",
-      "updatedAt": "2026-06-12T21:45:46.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-12T21:45:18.000Z",
+      "updatedAt": "2026-06-12T21:45:46.000Z"
     },
     {
       "id": 139,
@@ -3762,11 +3876,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/mini-kiki-coco-yy2ze.jpg",
-      "createdAt": "2026-06-12T22:36:44.000Z",
-      "updatedAt": "2026-06-12T22:37:13.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-12T22:36:44.000Z",
+      "updatedAt": "2026-06-12T22:37:13.000Z"
     },
     {
       "id": 140,
@@ -3788,11 +3902,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": "EdDeli/products/galletq-oreo-pequena-ybc2z.jpg",
-      "createdAt": "2026-06-12T23:03:13.000Z",
-      "updatedAt": "2026-06-12T23:04:49.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-12T23:03:13.000Z",
+      "updatedAt": "2026-06-12T23:04:49.000Z"
     },
     {
       "id": 141,
@@ -3814,11 +3928,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-13T18:15:11.000Z",
-      "updatedAt": "2026-06-13T18:15:27.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-13T18:15:11.000Z",
+      "updatedAt": "2026-06-13T18:15:27.000Z"
     },
     {
       "id": 142,
@@ -3840,11 +3954,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-14T17:00:53.000Z",
-      "updatedAt": "2026-06-15T13:50:25.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-14T17:00:53.000Z",
+      "updatedAt": "2026-06-15T13:50:25.000Z"
     },
     {
       "id": 143,
@@ -3855,7 +3969,7 @@
       "categoryId": 3,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 0,
+      "stock": 11,
       "minStock": 0,
       "price": "0.15",
       "wholesaleRules": null,
@@ -3866,11 +3980,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-14T17:18:12.000Z",
-      "updatedAt": "2026-06-15T17:04:03.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-14T17:18:12.000Z",
+      "updatedAt": "2026-06-14T18:14:38.000Z"
     },
     {
       "id": 144,
@@ -3892,11 +4006,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-15T13:50:56.000Z",
-      "updatedAt": "2026-06-15T13:52:09.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-15T13:50:56.000Z",
+      "updatedAt": "2026-06-15T13:52:09.000Z"
     },
     {
       "id": 145,
@@ -3918,11 +4032,11 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-15T13:51:27.000Z",
-      "updatedAt": "2026-06-15T13:51:47.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-15T13:51:27.000Z",
+      "updatedAt": "2026-06-15T13:51:47.000Z"
     },
     {
       "id": 146,
@@ -3944,45 +4058,22 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2026-06-15T14:37:46.000Z",
-      "updatedAt": "2026-06-15T14:38:35.000Z",
       "isGenericIngredient": 0,
       "genericProductId": null,
-      "purchasePresentation": null
-    },
-    {
-      "id": 147,
-      "name": "Aceite",
-      "desc": "",
-      "type": "raw",
-      "standardWeightGrams": 0,
-      "netWeight": 0,
-      "minStock": 0,
-      "price": "10.00",
-      "wholesaleRules": null,
-      "packageTiers": null,
-      "distributorPrice": "0.00",
-      "taxRate": "0.00",
-      "sku": null,
-      "barcode": null,
-      "isActive": 1,
-      "primaryImageUrl": null,
-      "createdAt": "2025-06-24T00:15:14.000Z",
-      "updatedAt": "2026-06-15T20:07:17.017Z",
-      "unitId": 4,
-      "categoryId": 1,
-      "stock": 0,
-      "isGenericIngredient": 1,
-      "genericProductId": null,
-      "purchasePresentation": null
+      "purchasePresentation": null,
+      "createdAt": "2026-06-15T14:37:46.000Z",
+      "updatedAt": "2026-06-15T14:38:35.000Z"
     },
     {
       "id": 148,
       "name": "Quintal de azúcar",
-      "desc": "",
+      "desc": null,
       "type": "raw",
+      "unitId": 5,
+      "categoryId": 7,
       "standardWeightGrams": 0,
       "netWeight": 0,
+      "stock": 65610,
       "minStock": 0,
       "price": "10.00",
       "wholesaleRules": null,
@@ -3993,22 +4084,22 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-06-24T00:15:14.000Z",
-      "updatedAt": "2026-06-15T20:07:17.018Z",
-      "unitId": 5,
-      "categoryId": 1,
-      "stock": 1.4464,
       "isGenericIngredient": 0,
       "genericProductId": 2,
-      "purchasePresentation": "Quintal"
+      "purchasePresentation": "Quintal",
+      "createdAt": "2026-06-15T19:27:25.000Z",
+      "updatedAt": "2026-06-15T19:27:25.000Z"
     },
     {
       "id": 149,
       "name": "Arroba de azúcar",
-      "desc": "",
+      "desc": null,
       "type": "raw",
+      "unitId": 6,
+      "categoryId": 7,
       "standardWeightGrams": 0,
       "netWeight": 0,
+      "stock": 0,
       "minStock": 0,
       "price": "10.00",
       "wholesaleRules": null,
@@ -4019,24 +4110,24 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-06-24T00:15:14.000Z",
-      "updatedAt": "2026-06-15T20:07:17.018Z",
-      "unitId": 6,
-      "categoryId": 1,
-      "stock": 0,
       "isGenericIngredient": 0,
       "genericProductId": 2,
-      "purchasePresentation": "Arroba"
+      "purchasePresentation": "Arroba",
+      "createdAt": "2026-06-15T19:27:25.000Z",
+      "updatedAt": "2026-06-15T19:27:25.000Z"
     },
     {
       "id": 150,
       "name": "Quintal de harina",
-      "desc": "",
+      "desc": null,
       "type": "raw",
+      "unitId": 5,
+      "categoryId": 6,
       "standardWeightGrams": 0,
       "netWeight": 0,
+      "stock": 0,
       "minStock": 0,
-      "price": "10.00",
+      "price": "41.00",
       "wholesaleRules": null,
       "packageTiers": null,
       "distributorPrice": "0.00",
@@ -4045,24 +4136,24 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-06-24T00:15:14.000Z",
-      "updatedAt": "2026-06-15T20:07:17.018Z",
-      "unitId": 5,
-      "categoryId": 1,
-      "stock": 0,
       "isGenericIngredient": 0,
       "genericProductId": 1,
-      "purchasePresentation": "Quintal"
+      "purchasePresentation": "Quintal",
+      "createdAt": "2026-06-15T19:27:25.000Z",
+      "updatedAt": "2026-06-15T19:27:25.000Z"
     },
     {
       "id": 151,
       "name": "Arroba de harina",
-      "desc": "",
+      "desc": null,
       "type": "raw",
+      "unitId": 6,
+      "categoryId": 6,
       "standardWeightGrams": 0,
       "netWeight": 0,
+      "stock": 0,
       "minStock": 0,
-      "price": "10.00",
+      "price": "41.00",
       "wholesaleRules": null,
       "packageTiers": null,
       "distributorPrice": "0.00",
@@ -4071,14 +4162,37 @@
       "barcode": null,
       "isActive": 1,
       "primaryImageUrl": null,
-      "createdAt": "2025-06-24T00:15:14.000Z",
-      "updatedAt": "2026-06-15T20:07:17.018Z",
-      "unitId": 6,
-      "categoryId": 1,
-      "stock": 0,
       "isGenericIngredient": 0,
       "genericProductId": 1,
-      "purchasePresentation": "Arroba"
+      "purchasePresentation": "Arroba",
+      "createdAt": "2026-06-15T19:27:25.000Z",
+      "updatedAt": "2026-06-15T19:27:25.000Z"
+    },
+    {
+      "id": 153,
+      "name": "Aceite",
+      "desc": null,
+      "type": "raw",
+      "unitId": 4,
+      "categoryId": 19,
+      "standardWeightGrams": 0,
+      "netWeight": 0,
+      "stock": 0,
+      "minStock": 0,
+      "price": "0.00",
+      "wholesaleRules": null,
+      "packageTiers": null,
+      "distributorPrice": "0.00",
+      "taxRate": "0.00",
+      "sku": null,
+      "barcode": null,
+      "isActive": 1,
+      "primaryImageUrl": null,
+      "isGenericIngredient": 1,
+      "genericProductId": null,
+      "purchasePresentation": null,
+      "createdAt": "2026-06-15T20:00:34.000Z",
+      "updatedAt": "2026-06-15T20:00:34.000Z"
     }
   ],
   "InventoryRecipe": [
@@ -77527,501 +77641,6 @@
       "createdBy": 1,
       "createdAt": "2026-06-15T14:38:35.000Z",
       "updatedAt": "2026-06-15T14:38:35.000Z"
-    },
-    {
-      "id": 4837,
-      "productId": 118,
-      "quantity": 4,
-      "description": "Venta POS · pedido #800",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 800,
-      "date": "2026-06-15T15:28:19.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T15:28:19.000Z",
-      "updatedAt": "2026-06-15T15:28:19.000Z"
-    },
-    {
-      "id": 4838,
-      "productId": 123,
-      "quantity": 4,
-      "description": "Venta POS · pedido #800",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 800,
-      "date": "2026-06-15T15:28:19.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T15:28:19.000Z",
-      "updatedAt": "2026-06-15T15:28:19.000Z"
-    },
-    {
-      "id": 4839,
-      "productId": 71,
-      "quantity": 32,
-      "description": "Venta POS · pedido #801",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 801,
-      "date": "2026-06-15T15:35:53.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T15:35:53.000Z",
-      "updatedAt": "2026-06-15T15:35:53.000Z"
-    },
-    {
-      "id": 4840,
-      "productId": 143,
-      "quantity": 8,
-      "description": "Venta POS · pedido #802",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 802,
-      "date": "2026-06-15T15:49:39.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T15:49:39.000Z",
-      "updatedAt": "2026-06-15T15:49:39.000Z"
-    },
-    {
-      "id": 4841,
-      "productId": 103,
-      "quantity": 8,
-      "description": "Venta POS · pedido #803",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 803,
-      "date": "2026-06-15T15:54:01.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T15:54:01.000Z",
-      "updatedAt": "2026-06-15T15:54:01.000Z"
-    },
-    {
-      "id": 4842,
-      "productId": 119,
-      "quantity": 1,
-      "description": "Venta POS · pedido #804",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 804,
-      "date": "2026-06-15T15:59:07.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T15:59:07.000Z",
-      "updatedAt": "2026-06-15T15:59:07.000Z"
-    },
-    {
-      "id": 4843,
-      "productId": 123,
-      "quantity": 30,
-      "description": "Entrada desde caja (ajuste de stock)",
-      "price": null,
-      "type": "entrada",
-      "reason": "ENTRADA_OTRA",
-      "referenceType": "caja_stock_adjust",
-      "referenceId": null,
-      "date": "2026-06-15T16:22:35.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T16:22:35.000Z",
-      "updatedAt": "2026-06-15T16:22:35.000Z"
-    },
-    {
-      "id": 4844,
-      "productId": 123,
-      "quantity": 8,
-      "description": "Venta POS · pedido #805",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 805,
-      "date": "2026-06-15T16:22:36.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T16:22:36.000Z",
-      "updatedAt": "2026-06-15T16:22:36.000Z"
-    },
-    {
-      "id": 4845,
-      "productId": 134,
-      "quantity": 2,
-      "description": "Venta POS · pedido #805",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 805,
-      "date": "2026-06-15T16:22:36.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T16:22:36.000Z",
-      "updatedAt": "2026-06-15T16:22:36.000Z"
-    },
-    {
-      "id": 4846,
-      "productId": 114,
-      "quantity": 4,
-      "description": "Venta POS · pedido #805",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 805,
-      "date": "2026-06-15T16:22:36.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T16:22:36.000Z",
-      "updatedAt": "2026-06-15T16:22:36.000Z"
-    },
-    {
-      "id": 4847,
-      "productId": 17,
-      "quantity": 2,
-      "description": "Entrada desde caja (ajuste de stock)",
-      "price": null,
-      "type": "entrada",
-      "reason": "ENTRADA_OTRA",
-      "referenceType": "caja_stock_adjust",
-      "referenceId": null,
-      "date": "2026-06-15T16:38:44.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T16:38:44.000Z",
-      "updatedAt": "2026-06-15T16:38:44.000Z"
-    },
-    {
-      "id": 4848,
-      "productId": 17,
-      "quantity": 1,
-      "description": "Venta POS · pedido #806",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 806,
-      "date": "2026-06-15T16:38:44.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T16:38:44.000Z",
-      "updatedAt": "2026-06-15T16:38:44.000Z"
-    },
-    {
-      "id": 4849,
-      "productId": 120,
-      "quantity": 1,
-      "description": "Venta POS · pedido #807",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 807,
-      "date": "2026-06-15T16:56:49.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T16:56:49.000Z",
-      "updatedAt": "2026-06-15T16:56:49.000Z"
-    },
-    {
-      "id": 4850,
-      "productId": 11,
-      "quantity": 215,
-      "description": "Entrega venta normal (orderItem #1076)",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order_item",
-      "referenceId": 1076,
-      "date": "2026-06-15T16:58:44.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T16:58:44.000Z",
-      "updatedAt": "2026-06-15T16:58:44.000Z"
-    },
-    {
-      "id": 4851,
-      "productId": 143,
-      "quantity": 2,
-      "description": "Entrada desde caja (ajuste de stock)",
-      "price": null,
-      "type": "entrada",
-      "reason": "ENTRADA_OTRA",
-      "referenceType": "caja_stock_adjust",
-      "referenceId": null,
-      "date": "2026-06-15T17:04:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:04:02.000Z",
-      "updatedAt": "2026-06-15T17:04:02.000Z"
-    },
-    {
-      "id": 4852,
-      "productId": 143,
-      "quantity": 5,
-      "description": "Venta POS · pedido #808",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 808,
-      "date": "2026-06-15T17:04:03.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:04:03.000Z",
-      "updatedAt": "2026-06-15T17:04:03.000Z"
-    },
-    {
-      "id": 4853,
-      "productId": 103,
-      "quantity": 2,
-      "description": "Venta POS · pedido #808",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 808,
-      "date": "2026-06-15T17:04:03.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:04:03.000Z",
-      "updatedAt": "2026-06-15T17:04:03.000Z"
-    },
-    {
-      "id": 4854,
-      "productId": 64,
-      "quantity": 4,
-      "description": "Venta POS · pedido #808",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 808,
-      "date": "2026-06-15T17:04:03.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:04:03.000Z",
-      "updatedAt": "2026-06-15T17:04:03.000Z"
-    },
-    {
-      "id": 4855,
-      "productId": 71,
-      "quantity": 8,
-      "description": "Venta POS · pedido #808",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 808,
-      "date": "2026-06-15T17:04:03.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:04:03.000Z",
-      "updatedAt": "2026-06-15T17:04:03.000Z"
-    },
-    {
-      "id": 4856,
-      "productId": 118,
-      "quantity": 8,
-      "description": "Venta POS · pedido #809",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 809,
-      "date": "2026-06-15T17:11:29.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:11:29.000Z",
-      "updatedAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 4857,
-      "productId": 71,
-      "quantity": 8,
-      "description": "Venta POS · pedido #809",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 809,
-      "date": "2026-06-15T17:11:29.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:11:29.000Z",
-      "updatedAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 4858,
-      "productId": 103,
-      "quantity": 4,
-      "description": "Venta POS · pedido #809",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 809,
-      "date": "2026-06-15T17:11:29.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:11:29.000Z",
-      "updatedAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 4859,
-      "productId": 124,
-      "quantity": 8,
-      "description": "Venta POS · pedido #809",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 809,
-      "date": "2026-06-15T17:11:29.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:11:29.000Z",
-      "updatedAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 4860,
-      "productId": 135,
-      "quantity": 1,
-      "description": "Venta POS · pedido #809",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 809,
-      "date": "2026-06-15T17:11:29.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:11:29.000Z",
-      "updatedAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 4861,
-      "productId": 32,
-      "quantity": 900,
-      "description": "Entraron 900 gr de Bicarbonato. Precio unitario: $0,00",
-      "price": 4,
-      "type": "entrada",
-      "reason": "ENTRADA_COMPRA",
-      "referenceType": null,
-      "referenceId": null,
-      "date": "2026-06-15T12:00:00.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:21:29.000Z",
-      "updatedAt": "2026-06-15T17:21:29.000Z"
-    },
-    {
-      "id": 4862,
-      "productId": 123,
-      "quantity": 8,
-      "description": "Venta POS · pedido #811",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 811,
-      "date": "2026-06-15T17:27:17.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:27:17.000Z",
-      "updatedAt": "2026-06-15T17:27:17.000Z"
-    },
-    {
-      "id": 4863,
-      "productId": 119,
-      "quantity": 4,
-      "description": "Venta POS · pedido #812",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 812,
-      "date": "2026-06-15T17:33:54.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:33:54.000Z",
-      "updatedAt": "2026-06-15T17:33:54.000Z"
-    },
-    {
-      "id": 4864,
-      "productId": 106,
-      "quantity": 5,
-      "description": "Venta POS · pedido #812",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 812,
-      "date": "2026-06-15T17:33:54.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:33:54.000Z",
-      "updatedAt": "2026-06-15T17:33:54.000Z"
-    },
-    {
-      "id": 4865,
-      "productId": 128,
-      "quantity": 1,
-      "description": "Venta POS · pedido #812",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 812,
-      "date": "2026-06-15T17:33:54.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:33:54.000Z",
-      "updatedAt": "2026-06-15T17:33:54.000Z"
-    },
-    {
-      "id": 4866,
-      "productId": 114,
-      "quantity": 4,
-      "description": "Venta POS · pedido #813",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 813,
-      "date": "2026-06-15T17:38:05.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:38:05.000Z",
-      "updatedAt": "2026-06-15T17:38:05.000Z"
-    },
-    {
-      "id": 4867,
-      "productId": 71,
-      "quantity": 8,
-      "description": "Venta POS · pedido #814",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 814,
-      "date": "2026-06-15T17:40:47.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:40:47.000Z",
-      "updatedAt": "2026-06-15T17:40:47.000Z"
-    },
-    {
-      "id": 4868,
-      "productId": 64,
-      "quantity": 1,
-      "description": "Venta POS · pedido #815",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 815,
-      "date": "2026-06-15T17:52:43.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:52:43.000Z",
-      "updatedAt": "2026-06-15T17:52:43.000Z"
-    },
-    {
-      "id": 4869,
-      "productId": 128,
-      "quantity": 1,
-      "description": "Venta POS · pedido #815",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 815,
-      "date": "2026-06-15T17:52:43.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:52:43.000Z",
-      "updatedAt": "2026-06-15T17:52:43.000Z"
     }
   ],
   "CashShift": [
@@ -78405,23 +78024,6 @@
       "expenseId": 551,
       "createdAt": "2026-06-13T19:26:29.000Z",
       "updatedAt": "2026-06-13T19:26:29.000Z"
-    },
-    {
-      "id": 12,
-      "shiftId": 8,
-      "accountId": 1,
-      "userId": 1,
-      "direction": "out",
-      "category": "gasto_operativo",
-      "amount": "2.50",
-      "concept": "almuerzo",
-      "notes": null,
-      "productId": null,
-      "quantity": null,
-      "inventoryMovementId": null,
-      "expenseId": 560,
-      "createdAt": "2026-06-15T17:38:32.000Z",
-      "updatedAt": "2026-06-15T17:38:32.000Z"
     }
   ],
   "Customer": [
@@ -84116,20 +83718,6 @@
       "updatedAt": "2025-12-05T16:18:54.000Z"
     },
     {
-      "id": 401,
-      "customerId": 22,
-      "status": "pendiente",
-      "notes": "",
-      "shiftId": null,
-      "paymentMethod": null,
-      "paidAt": null,
-      "documentType": null,
-      "date": "2025-12-02T22:22:31.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2025-12-04T22:22:32.000Z",
-      "updatedAt": "2026-01-17T19:09:31.000Z"
-    },
-    {
       "id": 402,
       "customerId": 20,
       "status": "pagado",
@@ -89522,7 +89110,7 @@
     {
       "id": 796,
       "customerId": 7,
-      "status": "entregado",
+      "status": "pendiente",
       "notes": "",
       "shiftId": null,
       "paymentMethod": null,
@@ -89531,7 +89119,7 @@
       "date": "2026-06-15T13:59:56.000Z",
       "financeIncomeId": null,
       "createdAt": "2026-06-15T13:58:24.000Z",
-      "updatedAt": "2026-06-15T16:58:44.000Z"
+      "updatedAt": "2026-06-15T13:58:24.000Z"
     },
     {
       "id": 797,
@@ -89574,230 +89162,6 @@
       "financeIncomeId": null,
       "createdAt": "2026-06-15T14:38:35.000Z",
       "updatedAt": "2026-06-15T14:38:35.000Z"
-    },
-    {
-      "id": 800,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 8,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-15T15:28:19.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-15T15:28:19.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T15:28:19.000Z",
-      "updatedAt": "2026-06-15T15:28:19.000Z"
-    },
-    {
-      "id": 801,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 8,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-15T15:35:53.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-15T15:35:53.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T15:35:53.000Z",
-      "updatedAt": "2026-06-15T15:35:53.000Z"
-    },
-    {
-      "id": 802,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 8,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-15T15:49:39.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-15T15:49:39.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T15:49:39.000Z",
-      "updatedAt": "2026-06-15T15:49:39.000Z"
-    },
-    {
-      "id": 803,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 8,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-15T15:54:01.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-15T15:54:01.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T15:54:01.000Z",
-      "updatedAt": "2026-06-15T15:54:01.000Z"
-    },
-    {
-      "id": 804,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 8,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-15T15:59:07.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-15T15:59:07.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T15:59:07.000Z",
-      "updatedAt": "2026-06-15T15:59:07.000Z"
-    },
-    {
-      "id": 805,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 8,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-15T16:22:36.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-15T16:22:36.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T16:22:36.000Z",
-      "updatedAt": "2026-06-15T16:22:36.000Z"
-    },
-    {
-      "id": 806,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 8,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-15T16:38:44.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-15T16:38:44.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T16:38:44.000Z",
-      "updatedAt": "2026-06-15T16:38:44.000Z"
-    },
-    {
-      "id": 807,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 8,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-15T16:56:49.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-15T16:56:49.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T16:56:49.000Z",
-      "updatedAt": "2026-06-15T16:56:49.000Z"
-    },
-    {
-      "id": 808,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 8,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-15T17:04:03.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-15T17:04:03.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T17:04:03.000Z",
-      "updatedAt": "2026-06-15T17:04:03.000Z"
-    },
-    {
-      "id": 809,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 8,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-15T17:11:29.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-15T17:11:29.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T17:11:29.000Z",
-      "updatedAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 810,
-      "customerId": 14,
-      "status": "pendiente",
-      "notes": "",
-      "shiftId": null,
-      "paymentMethod": null,
-      "paidAt": null,
-      "documentType": null,
-      "date": "2026-06-12T17:21:39.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T17:20:07.000Z",
-      "updatedAt": "2026-06-15T17:20:07.000Z"
-    },
-    {
-      "id": 811,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 8,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-15T17:27:17.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-15T17:27:17.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T17:27:17.000Z",
-      "updatedAt": "2026-06-15T17:27:17.000Z"
-    },
-    {
-      "id": 812,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 8,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-15T17:33:54.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-15T17:33:54.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T17:33:54.000Z",
-      "updatedAt": "2026-06-15T17:33:54.000Z"
-    },
-    {
-      "id": 813,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 8,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-15T17:38:05.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-15T17:38:05.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T17:38:05.000Z",
-      "updatedAt": "2026-06-15T17:38:05.000Z"
-    },
-    {
-      "id": 814,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 8,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-15T17:40:47.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-15T17:40:47.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T17:40:47.000Z",
-      "updatedAt": "2026-06-15T17:40:47.000Z"
-    },
-    {
-      "id": 815,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 8,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-15T17:52:43.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-15T17:52:43.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-15T17:52:43.000Z",
-      "updatedAt": "2026-06-15T17:52:43.000Z"
     }
   ],
   "OrderItem": [
@@ -95962,19 +95326,6 @@
       "replacedQty": 0,
       "deliveredAt": "2025-12-05T16:18:52.000Z",
       "paidAt": "2025-12-08T02:57:47.000Z"
-    },
-    {
-      "id": 496,
-      "orderId": 401,
-      "productId": 35,
-      "quantity": 6,
-      "price": 0.75,
-      "soldQty": 0,
-      "damagedQty": 5,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2025-12-02T22:22:36.000Z",
-      "paidAt": null
     },
     {
       "id": 497,
@@ -103357,7 +102708,7 @@
       "damagedQty": 0,
       "giftQty": 0,
       "replacedQty": 0,
-      "deliveredAt": "2026-06-15T16:58:44.000Z",
+      "deliveredAt": null,
       "paidAt": null
     },
     {
@@ -103411,383 +102762,6 @@
       "replacedQty": 0,
       "deliveredAt": "2026-06-15T14:38:35.000Z",
       "paidAt": "2026-06-15T14:38:35.000Z"
-    },
-    {
-      "id": 1081,
-      "orderId": 800,
-      "productId": 118,
-      "quantity": 4,
-      "price": 0.125,
-      "soldQty": 4,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T15:28:19.000Z",
-      "paidAt": "2026-06-15T15:28:19.000Z"
-    },
-    {
-      "id": 1082,
-      "orderId": 800,
-      "productId": 123,
-      "quantity": 4,
-      "price": 0.125,
-      "soldQty": 4,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T15:28:19.000Z",
-      "paidAt": "2026-06-15T15:28:19.000Z"
-    },
-    {
-      "id": 1083,
-      "orderId": 801,
-      "productId": 71,
-      "quantity": 32,
-      "price": 0.125,
-      "soldQty": 32,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T15:35:53.000Z",
-      "paidAt": "2026-06-15T15:35:53.000Z"
-    },
-    {
-      "id": 1084,
-      "orderId": 802,
-      "productId": 143,
-      "quantity": 8,
-      "price": 0.125,
-      "soldQty": 8,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T15:49:39.000Z",
-      "paidAt": "2026-06-15T15:49:39.000Z"
-    },
-    {
-      "id": 1085,
-      "orderId": 803,
-      "productId": 103,
-      "quantity": 8,
-      "price": 0.125,
-      "soldQty": 8,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T15:54:01.000Z",
-      "paidAt": "2026-06-15T15:54:01.000Z"
-    },
-    {
-      "id": 1086,
-      "orderId": 804,
-      "productId": 119,
-      "quantity": 1,
-      "price": 0.25,
-      "soldQty": 1,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T15:59:07.000Z",
-      "paidAt": "2026-06-15T15:59:07.000Z"
-    },
-    {
-      "id": 1087,
-      "orderId": 805,
-      "productId": 123,
-      "quantity": 8,
-      "price": 0.125,
-      "soldQty": 8,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T16:22:36.000Z",
-      "paidAt": "2026-06-15T16:22:36.000Z"
-    },
-    {
-      "id": 1088,
-      "orderId": 805,
-      "productId": 134,
-      "quantity": 2,
-      "price": 0.25,
-      "soldQty": 2,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T16:22:36.000Z",
-      "paidAt": "2026-06-15T16:22:36.000Z"
-    },
-    {
-      "id": 1089,
-      "orderId": 805,
-      "productId": 114,
-      "quantity": 4,
-      "price": 0.125,
-      "soldQty": 4,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T16:22:36.000Z",
-      "paidAt": "2026-06-15T16:22:36.000Z"
-    },
-    {
-      "id": 1090,
-      "orderId": 806,
-      "productId": 17,
-      "quantity": 1,
-      "price": 3.5,
-      "soldQty": 1,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T16:38:44.000Z",
-      "paidAt": "2026-06-15T16:38:44.000Z"
-    },
-    {
-      "id": 1091,
-      "orderId": 807,
-      "productId": 120,
-      "quantity": 1,
-      "price": 0.5,
-      "soldQty": 1,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T16:56:49.000Z",
-      "paidAt": "2026-06-15T16:56:49.000Z"
-    },
-    {
-      "id": 1092,
-      "orderId": 808,
-      "productId": 143,
-      "quantity": 5,
-      "price": 0.15,
-      "soldQty": 5,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:04:03.000Z",
-      "paidAt": "2026-06-15T17:04:03.000Z"
-    },
-    {
-      "id": 1093,
-      "orderId": 808,
-      "productId": 103,
-      "quantity": 2,
-      "price": 0.125,
-      "soldQty": 2,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:04:03.000Z",
-      "paidAt": "2026-06-15T17:04:03.000Z"
-    },
-    {
-      "id": 1094,
-      "orderId": 808,
-      "productId": 64,
-      "quantity": 4,
-      "price": 0.5,
-      "soldQty": 4,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:04:03.000Z",
-      "paidAt": "2026-06-15T17:04:03.000Z"
-    },
-    {
-      "id": 1095,
-      "orderId": 808,
-      "productId": 71,
-      "quantity": 8,
-      "price": 0.125,
-      "soldQty": 8,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:04:03.000Z",
-      "paidAt": "2026-06-15T17:04:03.000Z"
-    },
-    {
-      "id": 1096,
-      "orderId": 809,
-      "productId": 118,
-      "quantity": 8,
-      "price": 0.125,
-      "soldQty": 8,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:11:29.000Z",
-      "paidAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 1097,
-      "orderId": 809,
-      "productId": 71,
-      "quantity": 8,
-      "price": 0.125,
-      "soldQty": 8,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:11:29.000Z",
-      "paidAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 1098,
-      "orderId": 809,
-      "productId": 103,
-      "quantity": 4,
-      "price": 0.125,
-      "soldQty": 4,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:11:29.000Z",
-      "paidAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 1099,
-      "orderId": 809,
-      "productId": 124,
-      "quantity": 8,
-      "price": 0.125,
-      "soldQty": 8,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:11:29.000Z",
-      "paidAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 1100,
-      "orderId": 809,
-      "productId": 135,
-      "quantity": 1,
-      "price": 0.5,
-      "soldQty": 1,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:11:29.000Z",
-      "paidAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 1101,
-      "orderId": 810,
-      "productId": 42,
-      "quantity": 1,
-      "price": 15,
-      "soldQty": 0,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": null,
-      "paidAt": null
-    },
-    {
-      "id": 1102,
-      "orderId": 811,
-      "productId": 123,
-      "quantity": 8,
-      "price": 0.125,
-      "soldQty": 8,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:27:17.000Z",
-      "paidAt": "2026-06-15T17:27:17.000Z"
-    },
-    {
-      "id": 1103,
-      "orderId": 812,
-      "productId": 119,
-      "quantity": 4,
-      "price": 0.25,
-      "soldQty": 4,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:33:54.000Z",
-      "paidAt": "2026-06-15T17:33:54.000Z"
-    },
-    {
-      "id": 1104,
-      "orderId": 812,
-      "productId": 106,
-      "quantity": 5,
-      "price": 0.1,
-      "soldQty": 5,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:33:54.000Z",
-      "paidAt": "2026-06-15T17:33:54.000Z"
-    },
-    {
-      "id": 1105,
-      "orderId": 812,
-      "productId": 128,
-      "quantity": 1,
-      "price": 0.5,
-      "soldQty": 1,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:33:54.000Z",
-      "paidAt": "2026-06-15T17:33:54.000Z"
-    },
-    {
-      "id": 1106,
-      "orderId": 813,
-      "productId": 114,
-      "quantity": 4,
-      "price": 0.125,
-      "soldQty": 4,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:38:05.000Z",
-      "paidAt": "2026-06-15T17:38:05.000Z"
-    },
-    {
-      "id": 1107,
-      "orderId": 814,
-      "productId": 71,
-      "quantity": 8,
-      "price": 0.125,
-      "soldQty": 8,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:40:47.000Z",
-      "paidAt": "2026-06-15T17:40:47.000Z"
-    },
-    {
-      "id": 1108,
-      "orderId": 815,
-      "productId": 64,
-      "quantity": 1,
-      "price": 0.5,
-      "soldQty": 1,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:52:43.000Z",
-      "paidAt": "2026-06-15T17:52:43.000Z"
-    },
-    {
-      "id": 1109,
-      "orderId": 815,
-      "productId": 128,
-      "quantity": 1,
-      "price": 0.5,
-      "soldQty": 1,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-15T17:52:43.000Z",
-      "paidAt": "2026-06-15T17:52:43.000Z"
     }
   ],
   "TaskPlan": [],
@@ -103798,10 +102772,10 @@
       "name": "Panaderia Chile",
       "description": "",
       "status": "active",
-      "screenIds": "\"\\\"[]\\\"\"",
+      "screenIds": "\"\\\"\\\\\\\"\\\\\\\\\\\\\\\"[]\\\\\\\\\\\\\\\"\\\\\\\"\\\"\"",
       "loop": 1,
       "musicMode": "single_loop",
-      "musicTracks": "\"\\\"[{\\\\\\\"id\\\\\\\":\\\\\\\"track_EdDeli/media/file_1781300805843_1fda61d3.mp3\\\\\\\",\\\\\\\"title\\\\\\\":\\\\\\\"canciones saxofon.mp3\\\\\\\",\\\\\\\"mediaPath\\\\\\\":\\\\\\\"EdDeli/media/file_1781300805843_1fda61d3.mp3\\\\\\\",\\\\\\\"durationSeconds\\\\\\\":180,\\\\\\\"order\\\\\\\":0}]\\\"\"",
+      "musicTracks": "\"\\\"\\\\\\\"\\\\\\\\\\\\\\\"[{\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"id\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"track_EdDeli/media/file_1781300805843_1fda61d3.mp3\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"title\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"canciones saxofon.mp3\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"mediaPath\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"EdDeli/media/file_1781300805843_1fda61d3.mp3\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"durationSeconds\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\":180,\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"order\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\":0}]\\\\\\\\\\\\\\\"\\\\\\\"\\\"\"",
       "createdByAccountId": 1,
       "createdAt": "2026-06-12T18:23:31.000Z",
       "updatedAt": "2026-06-12T21:53:31.000Z"
@@ -103811,10 +102785,10 @@
       "name": "Productos Eddeli",
       "description": "",
       "status": "active",
-      "screenIds": "\"\\\"[]\\\"\"",
+      "screenIds": "\"\\\"\\\\\\\"\\\\\\\\\\\\\\\"[]\\\\\\\\\\\\\\\"\\\\\\\"\\\"\"",
       "loop": 1,
       "musicMode": "single_loop",
-      "musicTracks": "\"\\\"[{\\\\\\\"id\\\\\\\":\\\\\\\"track_EdDeli/media/file_1781299903362_7381e058.mp3\\\\\\\",\\\\\\\"title\\\\\\\":\\\\\\\"Le festín - Camille  Traducido al Español.mp3\\\\\\\",\\\\\\\"mediaPath\\\\\\\":\\\\\\\"EdDeli/media/file_1781299903362_7381e058.mp3\\\\\\\",\\\\\\\"durationSeconds\\\\\\\":180,\\\\\\\"order\\\\\\\":0}]\\\"\"",
+      "musicTracks": "\"\\\"\\\\\\\"\\\\\\\\\\\\\\\"[{\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"id\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"track_EdDeli/media/file_1781299903362_7381e058.mp3\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"title\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"Le festín - Camille  Traducido al Español.mp3\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"mediaPath\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"EdDeli/media/file_1781299903362_7381e058.mp3\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"durationSeconds\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\":180,\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\"order\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\":0}]\\\\\\\\\\\\\\\"\\\\\\\"\\\"\"",
       "createdByAccountId": 1,
       "createdAt": "2026-06-12T21:21:40.000Z",
       "updatedAt": "2026-06-12T21:35:01.000Z"
@@ -103824,10 +102798,10 @@
       "name": "Video Ambiental Panaderia",
       "description": "",
       "status": "active",
-      "screenIds": "\"[]\"",
+      "screenIds": "\"\\\"\\\\\\\"[]\\\\\\\"\\\"\"",
       "loop": 1,
       "musicMode": "single_loop",
-      "musicTracks": "\"[{\\\"id\\\":\\\"track_EdDeli/media/file_1781447185022_4721a51e.mp3\\\",\\\"title\\\":\\\"le-festin-camille.mp3\\\",\\\"mediaPath\\\":\\\"EdDeli/media/file_1781447185022_4721a51e.mp3\\\",\\\"durationSeconds\\\":180,\\\"order\\\":0}]\"",
+      "musicTracks": "\"\\\"\\\\\\\"[{\\\\\\\\\\\\\\\"id\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"track_EdDeli/media/file_1781447185022_4721a51e.mp3\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"title\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"le-festin-camille.mp3\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"mediaPath\\\\\\\\\\\\\\\":\\\\\\\\\\\\\\\"EdDeli/media/file_1781447185022_4721a51e.mp3\\\\\\\\\\\\\\\",\\\\\\\\\\\\\\\"durationSeconds\\\\\\\\\\\\\\\":180,\\\\\\\\\\\\\\\"order\\\\\\\\\\\\\\\":0}]\\\\\\\"\\\"\"",
       "createdByAccountId": 1,
       "createdAt": "2026-06-14T14:15:44.000Z",
       "updatedAt": "2026-06-14T14:31:31.000Z"
@@ -104032,11 +103006,11 @@
       "deviceId": "tv1",
       "label": null,
       "status": "disabled",
-      "lastSeenAt": "2026-06-15T19:32:36.000Z",
+      "lastSeenAt": "2026-06-15T14:45:05.000Z",
       "notes": null,
       "campaignId": 3,
       "createdAt": "2026-06-12T20:58:07.000Z",
-      "updatedAt": "2026-06-15T19:32:36.000Z"
+      "updatedAt": "2026-06-15T14:45:05.000Z"
     }
   ],
   "Expense": [
@@ -111739,48 +110713,6 @@
       "createdBy": 1,
       "createdAt": "2026-06-15T00:09:43.000Z",
       "updatedAt": "2026-06-15T00:09:43.000Z"
-    },
-    {
-      "id": 558,
-      "date": "2026-06-15",
-      "amount": "1.25",
-      "concept": "carrera",
-      "category": "Otro",
-      "referenceId": null,
-      "referenceType": null,
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T16:46:25.000Z",
-      "updatedAt": "2026-06-15T16:46:25.000Z"
-    },
-    {
-      "id": 559,
-      "date": "2026-06-15",
-      "amount": "4.00",
-      "concept": "Compra de Bicarbonato",
-      "category": "Compras",
-      "referenceId": 32,
-      "referenceType": "inventory_entry",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:21:29.000Z",
-      "updatedAt": "2026-06-15T17:21:29.000Z"
-    },
-    {
-      "id": 560,
-      "date": "2026-06-15",
-      "amount": "2.50",
-      "concept": "almuerzo",
-      "category": "Gastos operativos",
-      "referenceId": 12,
-      "referenceType": "cash_shift_movement",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:38:32.000Z",
-      "updatedAt": "2026-06-15T17:38:32.000Z"
     }
   ],
   "Income": [
@@ -125083,398 +124015,6 @@
       "createdBy": 1,
       "createdAt": "2026-06-15T14:38:35.000Z",
       "updatedAt": "2026-06-15T14:38:35.000Z"
-    },
-    {
-      "id": 970,
-      "date": "2026-06-15",
-      "amount": "0.50",
-      "concept": "Venta POS Cañita con manjar x4 (Ord #800)",
-      "category": "Venta",
-      "referenceId": 1081,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T15:28:19.000Z",
-      "updatedAt": "2026-06-15T15:28:19.000Z"
-    },
-    {
-      "id": 971,
-      "date": "2026-06-15",
-      "amount": "0.50",
-      "concept": "Venta POS Pan de Chocolate x4 (Ord #800)",
-      "category": "Venta",
-      "referenceId": 1082,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T15:28:19.000Z",
-      "updatedAt": "2026-06-15T15:28:19.000Z"
-    },
-    {
-      "id": 972,
-      "date": "2026-06-15",
-      "amount": "4.00",
-      "concept": "Venta POS Pan de Dulce x32 (Ord #801)",
-      "category": "Venta",
-      "referenceId": 1083,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T15:35:53.000Z",
-      "updatedAt": "2026-06-15T15:35:53.000Z"
-    },
-    {
-      "id": 973,
-      "date": "2026-06-15",
-      "amount": "1.00",
-      "concept": "Venta POS Pan de Cacho x8 (Ord #802)",
-      "category": "Venta",
-      "referenceId": 1084,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T15:49:39.000Z",
-      "updatedAt": "2026-06-15T15:49:39.000Z"
-    },
-    {
-      "id": 974,
-      "date": "2026-06-15",
-      "amount": "1.00",
-      "concept": "Venta POS Pan de Sal x8 (Ord #803)",
-      "category": "Venta",
-      "referenceId": 1085,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T15:54:01.000Z",
-      "updatedAt": "2026-06-15T15:54:01.000Z"
-    },
-    {
-      "id": 975,
-      "date": "2026-06-15",
-      "amount": "0.25",
-      "concept": "Venta POS Orejitas x1 (Ord #804)",
-      "category": "Venta",
-      "referenceId": 1086,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T15:59:07.000Z",
-      "updatedAt": "2026-06-15T15:59:07.000Z"
-    },
-    {
-      "id": 976,
-      "date": "2026-06-15",
-      "amount": "1.00",
-      "concept": "Venta POS Pan de Chocolate x8 (Ord #805)",
-      "category": "Venta",
-      "referenceId": 1087,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T16:22:36.000Z",
-      "updatedAt": "2026-06-15T16:22:36.000Z"
-    },
-    {
-      "id": 977,
-      "date": "2026-06-15",
-      "amount": "0.50",
-      "concept": "Venta POS Melvas x2 (Ord #805)",
-      "category": "Venta",
-      "referenceId": 1088,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T16:22:36.000Z",
-      "updatedAt": "2026-06-15T16:22:36.000Z"
-    },
-    {
-      "id": 978,
-      "date": "2026-06-15",
-      "amount": "0.50",
-      "concept": "Venta POS Rosca Roja x4 (Ord #805)",
-      "category": "Venta",
-      "referenceId": 1089,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T16:22:36.000Z",
-      "updatedAt": "2026-06-15T16:22:36.000Z"
-    },
-    {
-      "id": 979,
-      "date": "2026-06-15",
-      "amount": "3.50",
-      "concept": "Venta POS Pastel Mini Torta Decorado x1 (Ord #806)",
-      "category": "Venta",
-      "referenceId": 1090,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T16:38:44.000Z",
-      "updatedAt": "2026-06-15T16:38:44.000Z"
-    },
-    {
-      "id": 980,
-      "date": "2026-06-15",
-      "amount": "0.50",
-      "concept": "Venta POS Chicharrón de hojaldre x1 (Ord #807)",
-      "category": "Venta",
-      "referenceId": 1091,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T16:56:49.000Z",
-      "updatedAt": "2026-06-15T16:56:49.000Z"
-    },
-    {
-      "id": 981,
-      "date": "2026-06-15",
-      "amount": "0.75",
-      "concept": "Venta POS Pan de Cacho x5 (Ord #808)",
-      "category": "Venta",
-      "referenceId": 1092,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:04:03.000Z",
-      "updatedAt": "2026-06-15T17:04:03.000Z"
-    },
-    {
-      "id": 982,
-      "date": "2026-06-15",
-      "amount": "0.25",
-      "concept": "Venta POS Pan de Sal x2 (Ord #808)",
-      "category": "Venta",
-      "referenceId": 1093,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:04:03.000Z",
-      "updatedAt": "2026-06-15T17:04:03.000Z"
-    },
-    {
-      "id": 983,
-      "date": "2026-06-15",
-      "amount": "2.00",
-      "concept": "Venta POS Conos x4 (Ord #808)",
-      "category": "Venta",
-      "referenceId": 1094,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:04:03.000Z",
-      "updatedAt": "2026-06-15T17:04:03.000Z"
-    },
-    {
-      "id": 984,
-      "date": "2026-06-15",
-      "amount": "1.00",
-      "concept": "Venta POS Pan de Dulce x8 (Ord #808)",
-      "category": "Venta",
-      "referenceId": 1095,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:04:03.000Z",
-      "updatedAt": "2026-06-15T17:04:03.000Z"
-    },
-    {
-      "id": 985,
-      "date": "2026-06-15",
-      "amount": "1.00",
-      "concept": "Venta POS Cañita con manjar x8 (Ord #809)",
-      "category": "Venta",
-      "referenceId": 1096,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:11:29.000Z",
-      "updatedAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 986,
-      "date": "2026-06-15",
-      "amount": "1.00",
-      "concept": "Venta POS Pan de Dulce x8 (Ord #809)",
-      "category": "Venta",
-      "referenceId": 1097,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:11:29.000Z",
-      "updatedAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 987,
-      "date": "2026-06-15",
-      "amount": "0.50",
-      "concept": "Venta POS Pan de Sal x4 (Ord #809)",
-      "category": "Venta",
-      "referenceId": 1098,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:11:29.000Z",
-      "updatedAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 988,
-      "date": "2026-06-15",
-      "amount": "1.00",
-      "concept": "Venta POS Roscas x8 (Ord #809)",
-      "category": "Venta",
-      "referenceId": 1099,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:11:29.000Z",
-      "updatedAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 989,
-      "date": "2026-06-15",
-      "amount": "0.50",
-      "concept": "Venta POS Coca Cola pequeña x1 (Ord #809)",
-      "category": "Venta",
-      "referenceId": 1100,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:11:29.000Z",
-      "updatedAt": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 990,
-      "date": "2026-06-15",
-      "amount": "1.00",
-      "concept": "Venta POS Pan de Chocolate x8 (Ord #811)",
-      "category": "Venta",
-      "referenceId": 1102,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:27:17.000Z",
-      "updatedAt": "2026-06-15T17:27:17.000Z"
-    },
-    {
-      "id": 991,
-      "date": "2026-06-15",
-      "amount": "1.00",
-      "concept": "Venta POS Orejitas x4 (Ord #812)",
-      "category": "Venta",
-      "referenceId": 1103,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:33:54.000Z",
-      "updatedAt": "2026-06-15T17:33:54.000Z"
-    },
-    {
-      "id": 992,
-      "date": "2026-06-15",
-      "amount": "0.50",
-      "concept": "Venta POS Galletas punto rojo x5 (Ord #812)",
-      "category": "Venta",
-      "referenceId": 1104,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:33:54.000Z",
-      "updatedAt": "2026-06-15T17:33:54.000Z"
-    },
-    {
-      "id": 993,
-      "date": "2026-06-15",
-      "amount": "0.50",
-      "concept": "Venta POS Pulp néctar de durazno x1 (Ord #812)",
-      "category": "Venta",
-      "referenceId": 1105,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:33:54.000Z",
-      "updatedAt": "2026-06-15T17:33:54.000Z"
-    },
-    {
-      "id": 994,
-      "date": "2026-06-15",
-      "amount": "0.50",
-      "concept": "Venta POS Rosca Roja x4 (Ord #813)",
-      "category": "Venta",
-      "referenceId": 1106,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:38:05.000Z",
-      "updatedAt": "2026-06-15T17:38:05.000Z"
-    },
-    {
-      "id": 995,
-      "date": "2026-06-15",
-      "amount": "1.00",
-      "concept": "Venta POS Pan de Dulce x8 (Ord #814)",
-      "category": "Venta",
-      "referenceId": 1107,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:40:47.000Z",
-      "updatedAt": "2026-06-15T17:40:47.000Z"
-    },
-    {
-      "id": 996,
-      "date": "2026-06-15",
-      "amount": "0.50",
-      "concept": "Venta POS Conos x1 (Ord #815)",
-      "category": "Venta",
-      "referenceId": 1108,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:52:43.000Z",
-      "updatedAt": "2026-06-15T17:52:43.000Z"
-    },
-    {
-      "id": 997,
-      "date": "2026-06-15",
-      "amount": "0.50",
-      "concept": "Venta POS Pulp néctar de durazno x1 (Ord #815)",
-      "category": "Venta",
-      "referenceId": 1109,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-15T17:52:43.000Z",
-      "updatedAt": "2026-06-15T17:52:43.000Z"
     }
   ],
   "Store": [
@@ -133280,208 +131820,46 @@
       "id": 452,
       "httpMethod": "POST",
       "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
+      "endPoint": "/eddeliapi/changeRole",
       "description": "EL Programador Edgar Torres realizó una acción",
       "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T15:28:19.000Z"
+      "date": "2026-06-15T15:15:07.000Z"
     },
     {
       "id": 453,
       "httpMethod": "POST",
       "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
+      "endPoint": "/eddeliapi/changeRole",
       "description": "EL Programador Edgar Torres realizó una acción",
       "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T15:35:53.000Z"
+      "date": "2026-06-15T15:26:52.000Z"
     },
     {
       "id": 454,
-      "httpMethod": "POST",
+      "httpMethod": "DELETE",
       "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
+      "endPoint": "/eddeliapi/orders/order/401",
       "description": "EL Programador Edgar Torres realizó una acción",
       "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T15:49:39.000Z"
+      "date": "2026-06-15T15:28:03.000Z"
     },
     {
       "id": 455,
       "httpMethod": "POST",
       "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
+      "endPoint": "/eddeliapi/inventory/generic-ingredients/bootstrap",
       "description": "EL Programador Edgar Torres realizó una acción",
       "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T15:54:01.000Z"
+      "date": "2026-06-15T19:14:03.000Z"
     },
     {
       "id": 456,
       "httpMethod": "POST",
       "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
+      "endPoint": "/eddeliapi/comands/upload-backup",
       "description": "EL Programador Edgar Torres realizó una acción",
       "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T15:59:07.000Z"
-    },
-    {
-      "id": 457,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/inventory/movements",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T16:22:35.000Z"
-    },
-    {
-      "id": 458,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T16:22:36.000Z"
-    },
-    {
-      "id": 459,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/inventory/movements",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T16:38:44.000Z"
-    },
-    {
-      "id": 460,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T16:38:44.000Z"
-    },
-    {
-      "id": 461,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/finance/expenses",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T16:46:25.000Z"
-    },
-    {
-      "id": 462,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T16:56:49.000Z"
-    },
-    {
-      "id": 463,
-      "httpMethod": "PUT",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/order-items/1076/mark-delivered",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T16:58:44.000Z"
-    },
-    {
-      "id": 464,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/inventory/movements",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T17:04:02.000Z"
-    },
-    {
-      "id": 465,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T17:04:03.000Z"
-    },
-    {
-      "id": 466,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T17:11:29.000Z"
-    },
-    {
-      "id": 467,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T17:20:07.000Z"
-    },
-    {
-      "id": 468,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/inventory/movements",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T17:21:29.000Z"
-    },
-    {
-      "id": 469,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T17:27:17.000Z"
-    },
-    {
-      "id": 470,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T17:33:54.000Z"
-    },
-    {
-      "id": 471,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T17:38:05.000Z"
-    },
-    {
-      "id": 472,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/shifts/8/movements",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T17:38:32.000Z"
-    },
-    {
-      "id": 473,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T17:40:47.000Z"
-    },
-    {
-      "id": 474,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-15T17:52:43.000Z"
+      "date": "2026-06-15T19:36:25.000Z"
     }
   ]
 }
