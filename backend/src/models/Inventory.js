@@ -125,10 +125,14 @@ export const InventoryProduct = sequelize.define('ERP_inventory_products', {
   minStock: { type: DataTypes.FLOAT, defaultValue: 0 },
 
   // 💰 Precios
+  /** Precio de venta al público (lo que normalmente vale). */
   price: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
+  /** Precio al que el proveedor vende a la panadería. */
+  supplierPrice: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
   wholesaleRules: { type: DataTypes.JSON, allowNull: true },
   /** Tramos opcionales: [{ qty, totalPrice }] — ej. 2 pans = $0.25 */
   packageTiers: { type: DataTypes.JSON, allowNull: true },
+  /** Precio para que distribuidores revendan. */
   distributorPrice: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
   taxRate: { type: DataTypes.DECIMAL(5,2), defaultValue: 0 }, // % IVA
   // 📦 Identificadores
@@ -388,6 +392,92 @@ InventoryProduct.hasMany(InventoryProduct, {
 
 InventoryMovement.belongsTo(Account, { foreignKey: "createdBy" });
 
+// Grupos comparativos de productos (vitrina: pasteles vainilla/chocolate × tamaño × humedad)
+export const ProductCompareGroup = sequelize.define("ERP_product_compare_groups", {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING(150), allowNull: false },
+  description: { type: DataTypes.TEXT, allowNull: true },
+  subtitle: { type: DataTypes.STRING(250), allowNull: true },
+  imageUrl: { type: DataTypes.STRING(500), allowNull: true },
+  section: {
+    type: DataTypes.ENUM(
+      "home",
+      "ofertas",
+      "recomendados",
+      "bajo_pedido",
+      "novedades",
+      "descuentos",
+      "populares",
+      "temporada",
+      "especiales",
+      "limitados"
+    ),
+    allowNull: false,
+    defaultValue: "home",
+  },
+  fillings: { type: DataTypes.JSON, allowNull: true },
+  rowLabel: { type: DataTypes.STRING(80), allowNull: true, defaultValue: "Tamaño" },
+  columnLabel: { type: DataTypes.STRING(80), allowNull: true, defaultValue: "Tipo" },
+  variantLabel: { type: DataTypes.STRING(80), allowNull: true, defaultValue: "Sabor" },
+  position: { type: DataTypes.INTEGER, defaultValue: 0 },
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+  hideMemberProducts: { type: DataTypes.BOOLEAN, defaultValue: true },
+}, {
+  timestamps: true,
+  indexes: [
+    { fields: ["section", "isActive"] },
+    { fields: ["position"] },
+  ],
+});
 
+export const ProductCompareGroupItem = sequelize.define("ERP_product_compare_group_items", {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  groupId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: { model: "ERP_product_compare_groups", key: "id" },
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  },
+  productId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: { model: "ERP_inventory_products", key: "id" },
+    onDelete: "CASCADE",
+    onUpdate: "CASCADE",
+  },
+  rowKey: { type: DataTypes.STRING(120), allowNull: false, defaultValue: "" },
+  rowSort: { type: DataTypes.INTEGER, defaultValue: 0 },
+  rowMeta: { type: DataTypes.STRING(120), allowNull: true },
+  columnKey: { type: DataTypes.STRING(120), allowNull: false, defaultValue: "" },
+  columnSort: { type: DataTypes.INTEGER, defaultValue: 0 },
+  variantKey: { type: DataTypes.STRING(120), allowNull: false, defaultValue: "default" },
+  variantSort: { type: DataTypes.INTEGER, defaultValue: 0 },
+}, {
+  timestamps: true,
+  indexes: [
+    { fields: ["groupId"] },
+    { fields: ["productId"] },
+    { unique: true, fields: ["groupId", "productId"] },
+  ],
+});
+
+ProductCompareGroup.hasMany(ProductCompareGroupItem, {
+  foreignKey: "groupId",
+  as: "items",
+  onDelete: "CASCADE",
+});
+ProductCompareGroupItem.belongsTo(ProductCompareGroup, {
+  foreignKey: "groupId",
+  as: "group",
+});
+ProductCompareGroupItem.belongsTo(InventoryProduct, {
+  foreignKey: "productId",
+  as: "product",
+});
+InventoryProduct.hasMany(ProductCompareGroupItem, {
+  foreignKey: "productId",
+  as: "compareGroupItems",
+});
 
 

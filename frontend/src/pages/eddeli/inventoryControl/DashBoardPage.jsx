@@ -1,19 +1,16 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Grid, Paper, Box, Stack } from "@mui/material";
 import { getFinanceDashboardRequest } from "../../../api/financeRequest";
-import BarChartDays from "./components/Charts/BarChartDays";
-import LineChartMonth from "./components/Charts/LineChartMonth";
 import CustomersAccordionTable from "./components/CustomersAccordionTable";
-import BarChartOp from "./components/Charts/BarChartOp";
 import ChartCalendaryInfo from "./components/Charts/ChartCalendaryInfo";
-import ExpenseByDateLine from "./components/Charts/ExpenseByDateLine";
+import ProductChartsPanel from "./components/Charts/ProductChartsPanel";
 import ExpensePurchaseStats from "./components/Charts/ExpensePurchaseStats";
 import ChartBlockHeader from "../../../components/Charts/ChartBlockHeader";
-import GlobalFinanceBudgetPanel from "./components/Charts/GlobalFinanceBudgetPanel";
 import FinanceSummaryCards from "./components/FinanceSummaryCards";
 import DashboardStockPanel from "./components/DashboardStockPanel";
 import OrderStatusSummaryPanel from "./components/OrderStatusSummaryPanel";
 import IncomeExpenseCategoryChart from "./components/IncomeExpenseCategoryChart";
+import ObligationsSummaryPanel from "./components/ObligationsSummaryPanel";
 import { buildPendingCollectionsBreakdown } from "./finance/pendingCollections.js";
 
 const paperSx = {
@@ -29,21 +26,19 @@ const defaultProductsStock = { agotados: [], porAgotarse: [] };
 
 export const DashBoardPage = () => {
     const [loading, setLoading] = useState(true);
-    const [dataOrders, setDataOrders] = useState([]);
     const [summary, setSummary] = useState({ totalIncome: 0, totalExpense: 0 });
     const [productsStock, setProductsStock] = useState(defaultProductsStock);
     const [overView, setOverView] = useState([]);
-    const [ordersForCharts, setOrdersForCharts] = useState([]);
-    const [expensesForChart, setExpensesForChart] = useState([]);
-    const [allExpensesList, setAllExpensesList] = useState([]);
     const [incomeExpenseBreakdown, setIncomeExpenseBreakdown] = useState({});
-    const [weeklySales, setWeeklySales] = useState({});
-    const [topProductsDailySales, setTopProductsDailySales] = useState({});
     const [workbench, setWorkbench] = useState({
         customers: [],
         orders: [],
         groups: [],
         payments: [],
+    });
+    const [obligations, setObligations] = useState({
+        summary: { totalReceivable: 0, totalPayable: 0, openCount: 0 },
+        topOpen: [],
     });
 
     const pendingBreakdown = useMemo(
@@ -58,20 +53,18 @@ export const DashBoardPage = () => {
                 const { data } = await getFinanceDashboardRequest();
 
                 setSummary(data.summary ?? {});
-                setDataOrders(data.orders ?? []);
                 setOverView(data.overView ?? []);
-                setWeeklySales(data.weeklySales ?? { labels: [], values: [] });
-                setTopProductsDailySales(data.topProductsDailySales ?? {});
                 setIncomeExpenseBreakdown(data.incomeExpenseBreakdown ?? {});
-                setOrdersForCharts(data.ordersForCharts ?? []);
-                setExpensesForChart(data.expensesForChart ?? []);
-                setAllExpensesList(Array.isArray(data.expenses) ? data.expenses : []);
                 setProductsStock(data.productsStock ?? defaultProductsStock);
                 setWorkbench({
                     customers: data.workbench?.customers ?? [],
                     orders: data.workbench?.orders ?? [],
                     groups: data.workbench?.groups ?? [],
                     payments: data.workbench?.payments ?? [],
+                });
+                setObligations(data.obligations ?? {
+                    summary: { totalReceivable: 0, totalPayable: 0, openCount: 0 },
+                    topOpen: [],
                 });
             } catch (err) {
                 console.error("Error al cargar dashboard:", err);
@@ -99,6 +92,7 @@ export const DashBoardPage = () => {
                 <FinanceSummaryCards
                     summary={summary}
                     pendingTotal={pendingBreakdown.total}
+                    obligationsSummary={obligations.summary}
                 />
             </Box>
 
@@ -114,18 +108,11 @@ export const DashBoardPage = () => {
                     </Stack>
                 </Grid>
 
-                {/* Columna derecha: estados + ventas semanales */}
+                {/* Columna derecha: estados + préstamos/deudas */}
                 <Grid item xs={12} lg={4}>
                     <Stack spacing={{ xs: 1.5, sm: 2 }} sx={{ minWidth: 0 }}>
                         <OrderStatusSummaryPanel overView={overView} />
-                        <Paper sx={paperSx}>
-                            <Box sx={{ textAlign: "left", minWidth: 0, overflowX: "auto" }}>
-                                <BarChartDays
-                                    dataDays={weeklySales.labels}
-                                    dataValues={weeklySales.values}
-                                />
-                            </Box>
-                        </Paper>
+                        <ObligationsSummaryPanel obligations={obligations} />
                     </Stack>
                 </Grid>
 
@@ -136,35 +123,9 @@ export const DashBoardPage = () => {
                     </Paper>
                 </Grid>
 
-                {/* Top productos / barras */}
-                <Grid item xs={12} md={7}>
-                    <Paper sx={{ ...paperSx, overflowX: "auto" }}>
-                        <LineChartMonth bundle={topProductsDailySales} />
-                    </Paper>
-                </Grid>
-                <Grid item xs={12} md={5}>
-                    <Paper sx={{ ...paperSx, overflowX: "auto" }}>
-                        <BarChartOp orders={ordersForCharts} />
-                    </Paper>
-                </Grid>
-
-                {/* Presupuesto global */}
+                {/* Ingresos y compras por producto (Top 8) */}
                 <Grid item xs={12}>
-                    <Paper sx={paperSx}>
-                        <Box sx={{ textAlign: "left", minWidth: 0, overflowX: "auto" }}>
-                            <GlobalFinanceBudgetPanel
-                                orders={dataOrders}
-                                expenses={allExpensesList}
-                            />
-                        </Box>
-                    </Paper>
-                </Grid>
-
-                {/* Gastos por fecha */}
-                <Grid item xs={12}>
-                    <Paper sx={{ ...paperSx, overflowX: "auto" }}>
-                        <ExpenseByDateLine sampleExpenses={expensesForChart} />
-                    </Paper>
+                    <ProductChartsPanel />
                 </Grid>
 
                 {/* Clientes */}
@@ -185,7 +146,7 @@ export const DashBoardPage = () => {
                 {/* Estadísticas de compras */}
                 <Grid item xs={12}>
                     <Paper sx={{ ...paperSx, overflowX: "auto" }}>
-                        <ExpensePurchaseStats sampleExpenses={expensesForChart} />
+                        <ExpensePurchaseStats />
                     </Paper>
                 </Grid>
             </Grid>

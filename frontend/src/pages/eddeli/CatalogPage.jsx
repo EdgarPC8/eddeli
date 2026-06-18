@@ -33,13 +33,15 @@ import StarIcon from "@mui/icons-material/Star";
 import WhatshotIcon from "@mui/icons-material/Whatshot";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import CalculateIcon from "@mui/icons-material/Calculate";
+import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import BakeryDiningIcon from "@mui/icons-material/BakeryDining";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
-import { getCatalogBySection, getCategories } from "../../api/inventoryControlRequest";
+import { getCatalogBySection, getCategories, getPublicCompareGroups } from "../../api/inventoryControlRequest";
 import { pathImg } from "../../api/axios";
+import ProductCompareTable from "../../components/eddeli/ProductCompareTable";
 
 
 
@@ -483,6 +485,126 @@ function ProductCard({ entry, onPreview }) {
   );
 }
 
+function getGroupPrices(group) {
+  const prices = [];
+  for (const variant of group?.variants || []) {
+    for (const cell of Object.values(variant.cells || {})) {
+      const price = Number(cell?.product?.price);
+      if (Number.isFinite(price)) prices.push(price);
+    }
+  }
+  return prices;
+}
+
+function getGroupCoverImage(group) {
+  if (group?.imageUrl) {
+    const url = group.imageUrl;
+    if (url.startsWith("http") || url.startsWith("/") || url.startsWith("data:")) return url;
+    return `${pathImg}${url}`;
+  }
+  for (const variant of group?.variants || []) {
+    for (const cell of Object.values(variant.cells || {})) {
+      const img = cell?.product?.primaryImageUrl;
+      if (img) return toImageSrc(img);
+    }
+  }
+  return "";
+}
+
+function getGroupCardTitle(group) {
+  const name = String(group?.name || "productos").trim();
+  if (/^grupo\s+de/i.test(name)) return name;
+  return `Grupo de ${name}`;
+}
+
+function CompareGroupCard({ group, onPreview }) {
+  const theme = useTheme();
+  const isXs = useMediaQuery(theme.breakpoints.down("sm"));
+  const img = getGroupCoverImage(group);
+  const prices = getGroupPrices(group);
+  const minPrice = prices.length ? Math.min(...prices) : 0;
+  const maxPrice = prices.length ? Math.max(...prices) : 0;
+  const variantCount = (group?.variants || []).length;
+  const productCount = group?.productIds?.length || prices.length;
+
+  return (
+    <Card
+      sx={{
+        borderRadius: 3,
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+      }}
+    >
+      <Box onClick={() => onPreview?.(group)} sx={{ cursor: "pointer" }}>
+        <SmartProductImage
+          src={img}
+          alt={getGroupCardTitle(group)}
+          heights={{ xs: 160, sm: 180, md: 200 }}
+        />
+      </Box>
+
+      <CardContent sx={{ flexGrow: 1, p: { xs: 1.5, sm: 2 } }}>
+        <Stack direction="row" spacing={1} alignItems="center" mb={1} flexWrap="wrap" rowGap={0.5}>
+          <Chip
+            size="small"
+            color="primary"
+            icon={<CompareArrowsIcon />}
+            label="Grupo"
+            sx={{ fontWeight: 700 }}
+          />
+          {variantCount > 1 && (
+            <Chip size="small" variant="outlined" label={`${variantCount} sabores`} />
+          )}
+        </Stack>
+
+        <Typography
+          variant={isXs ? "subtitle1" : "h6"}
+          fontWeight={800}
+          gutterBottom
+          sx={{ lineHeight: 1.2 }}
+        >
+          {getGroupCardTitle(group)}
+        </Typography>
+
+        {group?.subtitle && (
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+            {group.subtitle}
+          </Typography>
+        )}
+
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" mb={1.5} rowGap={0.5}>
+          <Chip size="small" icon={<BakeryDiningIcon />} label={`${productCount} opciones`} />
+        </Stack>
+
+        <Stack spacing={0.5} mb={1.5}>
+          <Typography variant="h6" fontWeight={800} color="primary.main">
+            {minPrice === maxPrice
+              ? currency(minPrice)
+              : `Desde ${currency(minPrice)}`}
+          </Typography>
+          {minPrice !== maxPrice && (
+            <Typography variant="caption" color="text.secondary">
+              Hasta {currency(maxPrice)} según tamaño y tipo
+            </Typography>
+          )}
+        </Stack>
+
+        <Button
+          fullWidth
+          variant="outlined"
+          size="small"
+          startIcon={<CompareArrowsIcon />}
+          onClick={() => onPreview?.(group)}
+          sx={{ fontWeight: 700 }}
+        >
+          Ver precios y opciones
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 
 // -------------------- Secciones de catálogo --------------------
@@ -510,20 +632,53 @@ export default function CatalogoPage() {
 
   const [categories, setCategories] = useState([{ value: "todas", label: "Todas" }]);
   const [entries, setEntries] = useState([]);
+  const [compareGroups, setCompareGroups] = useState([]);
   const [loading, setLoading] = useState(false);
 
 // ✅ Preview (SimpleDialog)
 const [previewOpen, setPreviewOpen] = useState(false);
 const [previewEntry, setPreviewEntry] = useState(null);
+const [previewGroupParent, setPreviewGroupParent] = useState(null);
 
 const handlePreview = (entry) => {
-  setPreviewEntry(entry);
+  setPreviewGroupParent(null);
+  setPreviewEntry({ type: "product", ...entry });
   setPreviewOpen(true);
+};
+
+const handleCompareGroupPreview = (group) => {
+  setPreviewGroupParent(null);
+  setPreviewEntry({
+    type: "compareGroup",
+    compareGroup: group,
+    title: getGroupCardTitle(group),
+  });
+  setPreviewOpen(true);
+};
+
+const handleCompareProductSelect = (product, group) => {
+  setPreviewGroupParent(group);
+  setPreviewEntry({
+    type: "product",
+    id: `compare-${product.id}`,
+    title: product.name,
+    product: {
+      ...product,
+      wholesaleRules: [],
+      wholesaleTiers: [],
+    },
+  });
+};
+
+const handleBackToGroup = () => {
+  if (!previewGroupParent) return;
+  handleCompareGroupPreview(previewGroupParent);
 };
 
 const handleClosePreview = () => {
   setPreviewOpen(false);
   setPreviewEntry(null);
+  setPreviewGroupParent(null);
 };
 
 
@@ -550,13 +705,18 @@ const handleClosePreview = () => {
   const fetchSection = async (sec) => {
     setLoading(true);
     try {
-      const { data } = await getCatalogBySection(sec, { onlyActive: true });
-      const rows = Array.isArray(data) ? data : [];
+      const [catalogRes, groupsRes] = await Promise.all([
+        getCatalogBySection(sec, { onlyActive: true }),
+        getPublicCompareGroups({ section: sec, onlyActive: true }),
+      ]);
+      const rows = Array.isArray(catalogRes.data) ? catalogRes.data : [];
       rows.sort((a, b) => (a.position || 0) - (b.position || 0));
       setEntries(rows);
+      setCompareGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
     } catch (e) {
       console.error("Error cargando sección:", e);
       setEntries([]);
+      setCompareGroups([]);
     } finally {
       setLoading(false);
     }
@@ -569,9 +729,37 @@ const handleClosePreview = () => {
     fetchSection(section);
   }, [section]);
 
+  const hiddenCompareProductIds = useMemo(() => {
+    const ids = new Set();
+    compareGroups.forEach((g) => {
+      if (!g.hideMemberProducts) return;
+      (g.productIds || []).forEach((id) => ids.add(id));
+    });
+    return ids;
+  }, [compareGroups]);
+
+  const visibleCompareGroups = useMemo(() => {
+    if (!query.trim() && category === "todas") return compareGroups;
+    const q = query.trim().toLowerCase();
+    return compareGroups.filter((g) => {
+      if (q) {
+        const inGroup =
+          g.name?.toLowerCase().includes(q) ||
+          g.description?.toLowerCase().includes(q) ||
+          g.subtitle?.toLowerCase().includes(q);
+        if (!inGroup) return false;
+      }
+      return true;
+    });
+  }, [compareGroups, query, category]);
+
   // Filtro y orden
   const filtered = useMemo(() => {
     let list = [...entries];
+
+    if (hiddenCompareProductIds.size > 0) {
+      list = list.filter((e) => !hiddenCompareProductIds.has(e.product?.id));
+    }
 
     if (category !== "todas") {
       list = list.filter((e) => e.product?.categorySlug === category);
@@ -596,10 +784,26 @@ const handleClosePreview = () => {
     }
 
     return list;
-  }, [entries, category, query, sort]);
+  }, [entries, category, query, sort, hiddenCompareProductIds]);
 
   const uniqueToday = filtered.filter((e) => e.product?.isUniqueToday);
   const regularList = filtered;
+
+  const catalogGridItems = useMemo(() => {
+    const groups = visibleCompareGroups.map((g) => ({
+      kind: "group",
+      id: `group-${g.id}`,
+      position: g.position ?? 0,
+      data: g,
+    }));
+    const products = regularList.map((e) => ({
+      kind: "product",
+      id: `product-${e.id}`,
+      position: (e.position ?? 0) + 1000,
+      data: e,
+    }));
+    return [...groups, ...products].sort((a, b) => a.position - b.position);
+  }, [visibleCompareGroups, regularList]);
 
   return (
     <Box sx={{ p: { xs: 1.5, sm: 3 }, maxWidth: 1400, mx: "auto" }}>
@@ -616,8 +820,40 @@ const handleClosePreview = () => {
   open={previewOpen}
   onClose={handleClosePreview}
   title={previewEntry?.title || previewEntry?.product?.name || "Producto"}
+  maxWidth={previewEntry?.type === "compareGroup" ? "md" : "sm"}
+  fullWidth
 >
-  {(() => {
+  {previewEntry?.type === "compareGroup" ? (
+    <Stack spacing={2} sx={{ p: 1 }}>
+      {(() => {
+        const group = previewEntry.compareGroup;
+        const img = getGroupCoverImage(group);
+        return img ? (
+          <SmartProductImage
+            src={img}
+            alt={getGroupCardTitle(group)}
+            heights={{ xs: 200, sm: 240, md: 260 }}
+          />
+        ) : null;
+      })()}
+      {previewEntry.compareGroup?.description && (
+        <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: "pre-wrap" }}>
+          {previewEntry.compareGroup.description}
+        </Typography>
+      )}
+      <ProductCompareTable
+        group={previewEntry.compareGroup}
+        embedded
+        onSelectProduct={handleCompareProductSelect}
+      />
+      <Stack direction="row" justifyContent="flex-end">
+        <Button variant="outlined" onClick={handleClosePreview}>
+          Cerrar
+        </Button>
+      </Stack>
+    </Stack>
+  ) : (
+  (() => {
     const p = previewEntry?.product || {};
 
     const img =
@@ -644,6 +880,11 @@ const handleClosePreview = () => {
 
     return (
       <Stack spacing={2} sx={{ p: 1 }}>
+        {previewGroupParent && (
+          <Button size="small" onClick={handleBackToGroup} sx={{ alignSelf: "flex-start" }}>
+            ← Volver al grupo
+          </Button>
+        )}
         <SmartProductImage
           src={img}
           alt={p.name}
@@ -713,7 +954,8 @@ const handleClosePreview = () => {
         </Stack>
       </Stack>
     );
-  })()}
+  })()
+  )}
 </SimpleDialog>
 
         <Stack direction="row" spacing={1} alignItems="center">
@@ -856,8 +1098,8 @@ const handleClosePreview = () => {
       </Stack>
 
       <Grid container spacing={{ xs: 1.5, sm: 2 }}>
-        {(loading ? Array.from({ length: 8 }) : regularList).map((e, idx) => (
-          <Grid key={e?.id || idx} item xs={12} sm={6} md={4} lg={3}>
+        {(loading ? Array.from({ length: 8 }) : catalogGridItems).map((item, idx) => (
+          <Grid key={item?.id || idx} item xs={12} sm={6} md={4} lg={3}>
             {loading ? (
               <Paper
                 sx={{
@@ -866,8 +1108,10 @@ const handleClosePreview = () => {
                   bgcolor: "action.hover",
                 }}
               />
+            ) : item.kind === "group" ? (
+              <CompareGroupCard group={item.data} onPreview={handleCompareGroupPreview} />
             ) : (
-              <ProductCard entry={e} onPreview={handlePreview} />
+              <ProductCard entry={item.data} onPreview={handlePreview} />
             )}
           </Grid>
         ))}

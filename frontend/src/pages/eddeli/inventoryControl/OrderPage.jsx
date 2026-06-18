@@ -2,11 +2,16 @@ import {
   Container,
   Button,
   Typography,
+  Box,
 } from "@mui/material";
 import { useCallback, useRef, useState } from "react";
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
 import OrderForm from "./components/OrderForm";
-import { getOrdersForMonthRequest } from "../../../api/ordersRequest";
+import SupplierOrderForm from "./components/SupplierOrderForm";
+import {
+  getOrdersForMonthRequest,
+  getSupplierOrdersForMonthRequest,
+} from "../../../api/ordersRequest";
 import OrderCalendaryTable from "./components/OrderCalendaryTable";
 import {
   mergeOrdersById,
@@ -21,9 +26,12 @@ function OrderPage() {
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
+  const [openSupplierDialog, setOpenSupplierDialog] = useState(false);
   const [titleDialog, setTitleDialog] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [orderToEdit, setOrderToEdit] = useState(null);
+  const [isEditingSupplier, setIsEditingSupplier] = useState(false);
+  const [supplierOrderToEdit, setSupplierOrderToEdit] = useState(null);
 
   const loadedMonthsRef = useRef(new Set());
   const visibleMonthRef = useRef(new Date());
@@ -34,10 +42,18 @@ function OrderPage() {
 
     setLoadingOrders(true);
     try {
-      const { data } = await getOrdersForMonthRequest(visibleMonth);
+      const [customerRes, supplierRes] = await Promise.all([
+        getOrdersForMonthRequest(visibleMonth),
+        getSupplierOrdersForMonthRequest(visibleMonth),
+      ]);
       loadedMonthsRef.current.add(key);
-      const manualOrders = (Array.isArray(data) ? data : []).filter((o) => !isCajaPosOrder(o));
-      setOrders((prev) => mergeOrdersById(prev, manualOrders));
+      const manualOrders = (Array.isArray(customerRes.data) ? customerRes.data : [])
+        .filter((o) => !isCajaPosOrder(o))
+        .map((o) => ({ ...o, orderKind: o.orderKind || "customer" }));
+      const supplierOrders = (Array.isArray(supplierRes.data) ? supplierRes.data : []).map(
+        (o) => ({ ...o, orderKind: "supplier" })
+      );
+      setOrders((prev) => mergeOrdersById(prev, [...manualOrders, ...supplierOrders]));
     } catch (e) {
       console.error("OrderPage: cargar pedidos", e);
     } finally {
@@ -53,7 +69,6 @@ function OrderPage() {
     [loadOrdersForMonth],
   );
 
-  /** Invalida caché del mes visible y vuelve a pedir ese rango. */
   const refreshCurrentRange = useCallback(async () => {
     const month = visibleMonthRef.current;
     loadedMonthsRef.current.delete(monthCacheKey(month));
@@ -64,8 +79,8 @@ function OrderPage() {
     setOrders((prev) => patchOrderItemInList(prev, orderId, itemId, fields));
   }, []);
 
-  const removeOrder = useCallback((orderId) => {
-    setOrders((prev) => removeOrderFromList(prev, orderId));
+  const removeOrder = useCallback((orderId, orderKind = "customer") => {
+    setOrders((prev) => removeOrderFromList(prev, orderId, orderKind));
   }, []);
 
   const removeOrderItem = useCallback((orderId, itemId) => {
@@ -73,6 +88,7 @@ function OrderPage() {
   }, []);
 
   const handleDialog = () => setOpenDialog(!openDialog);
+  const handleSupplierDialog = () => setOpenSupplierDialog(!openSupplierDialog);
 
   const closeDialog = useCallback(async () => {
     setIsEditing(false);
@@ -81,11 +97,54 @@ function OrderPage() {
     await refreshCurrentRange();
   }, [refreshCurrentRange]);
 
+  const closeSupplierDialog = useCallback(async () => {
+    setIsEditingSupplier(false);
+    setSupplierOrderToEdit(null);
+    setOpenSupplierDialog(false);
+    await refreshCurrentRange();
+  }, [refreshCurrentRange]);
+
   return (
     <Container>
-      <Typography variant="h6" sx={{ mb: 2 }}>
-        Pedidos Registrados
-      </Typography>
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 0.75,
+          mb: 1,
+        }}
+      >
+        <Typography variant="subtitle1" sx={{ flex: '1 1 auto', minWidth: 120, mb: 0, fontWeight: 600 }}>
+          Pedidos Registrados
+        </Typography>
+        <Button
+          size="small"
+          variant="contained"
+          sx={{ py: 0.4, px: 1.25, minHeight: 28, fontSize: '0.8125rem' }}
+          onClick={() => {
+            setIsEditing(false);
+            setOrderToEdit(null);
+            setTitleDialog("Registrar nuevo pedido");
+            handleDialog();
+          }}
+        >
+          Crear pedido (cliente)
+        </Button>
+        <Button
+          size="small"
+          variant="contained"
+          color="secondary"
+          sx={{ py: 0.4, px: 1.25, minHeight: 28, fontSize: '0.8125rem' }}
+          onClick={() => {
+            setIsEditingSupplier(false);
+            setSupplierOrderToEdit(null);
+            handleSupplierDialog();
+          }}
+        >
+          Pedido a proveedor
+        </Button>
+      </Box>
 
       <SimpleDialog
         open={openDialog}
@@ -104,18 +163,26 @@ function OrderPage() {
         />
       </SimpleDialog>
 
-      <Button
-        variant="contained"
-        onClick={() => {
-          setIsEditing(false);
-          setOrderToEdit(null);
-          setTitleDialog("Registrar nuevo pedido");
-          handleDialog();
+      <SimpleDialog
+        open={openSupplierDialog}
+        onClose={() => {
+          setIsEditingSupplier(false);
+          setSupplierOrderToEdit(null);
+          handleSupplierDialog();
         }}
-        sx={{ mb: 2 }}
+        tittle={
+          isEditingSupplier
+            ? "Editar pedido a proveedor"
+            : "Registrar pedido a proveedor"
+        }
       >
-        Crear Pedido
-      </Button>
+        <SupplierOrderForm
+          onClose={closeSupplierDialog}
+          reload={refreshCurrentRange}
+          isEditing={isEditingSupplier}
+          datos={supplierOrderToEdit}
+        />
+      </SimpleDialog>
 
       <OrderCalendaryTable
         orders={orders}
@@ -130,6 +197,11 @@ function OrderPage() {
           setOrderToEdit(pedido);
           setTitleDialog("Editar Pedido");
           setOpenDialog(true);
+        }}
+        onEditSupplier={(pedido) => {
+          setIsEditingSupplier(true);
+          setSupplierOrderToEdit(pedido);
+          setOpenSupplierDialog(true);
         }}
       />
     </Container>

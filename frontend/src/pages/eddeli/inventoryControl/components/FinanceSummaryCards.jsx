@@ -12,6 +12,8 @@ import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import TrendingDownIcon from "@mui/icons-material/TrendingDown";
 import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import SavingsIcon from "@mui/icons-material/Savings";
+import HandshakeIcon from "@mui/icons-material/Handshake";
+import CreditCardOffIcon from "@mui/icons-material/CreditCardOff";
 import { money } from "../collections/helpers.js";
 
 function SummaryCard({ title, value, subtitle, icon: Icon, color }) {
@@ -62,15 +64,18 @@ function SummaryCard({ title, value, subtitle, icon: Icon, color }) {
   );
 }
 
-export default function FinanceSummaryCards({ summary, pendingTotal }) {
+export default function FinanceSummaryCards({ summary, pendingTotal, obligationsSummary }) {
   const balance = Number(summary?.balance ?? 0);
   const totalIncome = Number(summary?.totalIncome ?? 0);
   const totalExpense = Number(summary?.totalExpense ?? 0);
-  const futureIncome =
+  const collectionsPending =
     pendingTotal != null
       ? Number(pendingTotal)
       : Number(summary?.futureIncome ?? 0);
-  const projectedBalance = Number((balance + futureIncome).toFixed(2));
+  const loansReceivable = Number(obligationsSummary?.totalReceivable ?? 0);
+  const debtsPayable = Number(obligationsSummary?.totalPayable ?? 0);
+  const totalReceivable = Number((collectionsPending + loansReceivable).toFixed(2));
+  const projectedBalance = Number((balance + totalReceivable - debtsPayable).toFixed(2));
 
   const cards = [
     {
@@ -95,16 +100,30 @@ export default function FinanceSummaryCards({ summary, pendingTotal }) {
       color: "error",
     },
     {
-      title: "Por cobrar",
-      value: money(futureIncome),
+      title: "Por cobrar (pedidos)",
+      value: money(collectionsPending),
       subtitle: "Pendiente en Cobranzas",
       icon: HourglassTopIcon,
       color: "warning",
     },
     {
+      title: "Préstamos por cobrar",
+      value: money(loansReceivable),
+      subtitle: "Módulo préstamos y deudas",
+      icon: HandshakeIcon,
+      color: "info",
+    },
+    {
+      title: "Deudas por pagar",
+      value: money(debtsPayable),
+      subtitle: "Obligaciones abiertas",
+      icon: CreditCardOffIcon,
+      color: "secondary",
+    },
+    {
       title: "Dinero esperado",
       value: money(projectedBalance),
-      subtitle: "Balance + por cobrar",
+      subtitle: "Balance + por cobrar − deudas",
       icon: SavingsIcon,
       color: "info",
     },
@@ -119,7 +138,7 @@ export default function FinanceSummaryCards({ summary, pendingTotal }) {
             xs: "1fr",
             sm: "repeat(2, minmax(0, 1fr))",
             md: "repeat(3, minmax(0, 1fr))",
-            xl: "repeat(5, minmax(0, 1fr))",
+            xl: "repeat(4, minmax(0, 1fr))",
           },
           gap: { xs: 1.5, sm: 2 },
         }}
@@ -162,8 +181,28 @@ export default function FinanceSummaryCards({ summary, pendingTotal }) {
             +
           </Typography>
           <Chip
-            label={`Por cobrar: ${money(futureIncome)}`}
+            label={`Por cobrar pedidos: ${money(collectionsPending)}`}
             color="warning"
+            variant="outlined"
+            size="small"
+            sx={{ fontWeight: 700, maxWidth: "100%" }}
+          />
+          <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1, flexShrink: 0 }}>
+            +
+          </Typography>
+          <Chip
+            label={`Préstamos: ${money(loansReceivable)}`}
+            color="info"
+            variant="outlined"
+            size="small"
+            sx={{ fontWeight: 700, maxWidth: "100%" }}
+          />
+          <Typography variant="body1" color="text.secondary" sx={{ lineHeight: 1, flexShrink: 0 }}>
+            −
+          </Typography>
+          <Chip
+            label={`Deudas: ${money(debtsPayable)}`}
+            color="secondary"
             variant="outlined"
             size="small"
             sx={{ fontWeight: 700, maxWidth: "100%" }}
@@ -179,8 +218,8 @@ export default function FinanceSummaryCards({ summary, pendingTotal }) {
           />
         </Stack>
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, textAlign: "center" }}>
-          El dinero esperado suma lo que ya tienes registrado más lo que aún falta cobrar en pedidos
-          pendientes (misma lógica que el módulo de Cobranzas).
+          El dinero esperado suma el balance actual, lo pendiente en Cobranzas, los préstamos por cobrar
+          y resta las deudas abiertas del módulo Préstamos y deudas.
         </Typography>
       </Paper>
     </Box>

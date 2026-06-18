@@ -287,6 +287,17 @@ export const updateOrderItem = async (req, res) => {
     const token = getHeaderToken(req);
     const user = await verifyJWT(token);
 
+    const isDashboardCorrection =
+      req.body?.programmerDashboard === true || req.body?.programmerDashboard === "true";
+    if (isDashboardCorrection) {
+      if (user?.loginRol !== "Programador") {
+        return res.status(403).json({
+          message: "Solo el rol Programador puede ejecutar esta acción",
+        });
+      }
+      return programmerDashboardOrderItemCorrection(req, res);
+    }
+
     console.log("[updateOrderItem] itemId:", itemId);
     console.log("[updateOrderItem] body:", req.body);
 
@@ -1308,6 +1319,7 @@ function formatOrdersList(orders) {
 
     return {
       ...order.toJSON(),
+      orderKind: "customer",
       date: format(new Date(order.date), "dd/MM/yyyy HH:mm:ss", { locale: es }),
       createdAt: format(new Date(order.createdAt), "dd/MM/yyyy HH:mm:ss", { locale: es }),
       updatedAt: format(new Date(order.updatedAt), "dd/MM/yyyy HH:mm:ss", { locale: es }),

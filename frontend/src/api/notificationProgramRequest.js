@@ -1,9 +1,5 @@
 /**
  * API de notificaciones programadas (CRUD y envío inmediato).
- *
- * PENDIENTE: no hay rutas backend /notification-programs registradas.
- * El menú está oculto en NavBar hasta implementar modelo + router.
- * La página NotificationProgramsPage muestra aviso si BACKEND_ENABLED = false.
  */
 import axios, { authHeaders } from "./axios.js";
 

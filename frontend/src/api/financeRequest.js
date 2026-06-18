@@ -69,6 +69,13 @@ export const getFinanceSummaryRequest = async () => {
   });
 };
 
+/** Series Top 8 ingresos/compras por producto (semana | mes | año). */
+export const getProductSeriesChartsRequest = async (period = "month", band = 1) =>
+  axios.get("/finance/product-series", {
+    params: { period, band },
+    headers: { Authorization: jwt() },
+  });
+
 /** Carga agregada del dashboard (una sola petición). */
 export const getFinanceDashboardRequest = async () => {
   return await axios.get("/finance/dashboard", {
@@ -135,8 +142,39 @@ export const getOrdersForCharts = async () => {
     headers: { Authorization: jwt() },
   });
 };
-export const getExpensesForChart = async () => {
+export const getExpensesForChart = async ({ startDate, endDate } = {}) => {
+  const params = {};
+  if (startDate) params.startDate = startDate;
+  if (endDate) params.endDate = endDate;
   return await axios.get("/finance/getExpensesForChart", {
+    params,
     headers: { Authorization: jwt() },
   });
 };
+
+// Préstamos y deudas (sin pedido)
+export const getObligationsWorkbenchRequest = async (params = {}) =>
+  axios.get("/finance/obligations/workbench", {
+    params,
+    headers: { Authorization: jwt() },
+  });
+
+export const getObligationByIdRequest = async (id) =>
+  axios.get(`/finance/obligations/${id}`, {
+    headers: { Authorization: jwt() },
+  });
+
+export const createObligationRequest = async (data) =>
+  axios.post("/finance/obligations", data, {
+    headers: { Authorization: jwt(), "Content-Type": "application/json" },
+  });
+
+export const payObligationRequest = async (id, data) =>
+  axios.post(`/finance/obligations/${id}/pay`, data, {
+    headers: { Authorization: jwt(), "Content-Type": "application/json" },
+  });
+
+export const cancelObligationRequest = async (id) =>
+  axios.patch(`/finance/obligations/${id}/cancel`, null, {
+    headers: { Authorization: jwt() },
+  });

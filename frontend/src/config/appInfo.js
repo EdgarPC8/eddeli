@@ -4,8 +4,9 @@ export const activeApp = {
   name: "EdDeli - Panadería, Pastelería y Repostería",
   alias: "EdDeli",
   version: "1.0.0",
+  phone: "0969236901",
   socials: {
-    whatsapp: "https://wa.me/593992371711",
+    whatsapp: "https://wa.me/593969236901",
     facebook: "https://facebook.com/profile.php?id=61581806494763",
     instagram: "https://instagram.com/panaderia_eddeli",
     tiktok: "https://tiktok.com/@panaderia_eddeli",

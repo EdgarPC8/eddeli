@@ -28,6 +28,11 @@ export const Notifications = sequelize.define("notifications", {
     type: DataTypes.STRING(255),
     allowNull: true,
   },
+  /** Clave para evitar duplicados (ej. stock_min:42) */
+  sourceKey: {
+    type: DataTypes.STRING(120),
+    allowNull: true,
+  },
   deleted: {
     type: DataTypes.BOOLEAN,
     defaultValue: false

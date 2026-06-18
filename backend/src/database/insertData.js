@@ -19,14 +19,25 @@ import {
   Store,
   Catalog,
   StoreProduct,
+  ProductCompareGroup,
+  ProductCompareGroupItem,
 } from "../models/Inventory.js";
-import { Customer, Order, OrderItem } from "../models/Orders.js";
+import {
+  Customer,
+  Order,
+  OrderItem,
+  Supplier,
+  SupplierOrder,
+  SupplierOrderItem,
+} from "../models/Orders.js";
 import {
   Expense,
   Income,
   ItemGroup,
   ItemGroupItem,
   Payment,
+  FinancialObligation,
+  ObligationPayment,
 } from "../models/Finance.js";
 import {
   EditorTemplate,
@@ -73,6 +84,9 @@ export const BACKUP_TABLE_ENTRIES = [
   { key: "Customer", model: Customer },
   { key: "Order", model: Order },
   { key: "OrderItem", model: OrderItem },
+  { key: "Supplier", model: Supplier },
+  { key: "SupplierOrder", model: SupplierOrder },
+  { key: "SupplierOrderItem", model: SupplierOrderItem },
   { key: "TaskPlan", model: TaskPlan },
   { key: "TaskItem", model: TaskItem },
   { key: "PublicidadCampaign", model: PublicidadCampaign },
@@ -83,10 +97,14 @@ export const BACKUP_TABLE_ENTRIES = [
   { key: "Store", model: Store },
   { key: "HomeProduct", model: HomeProduct },
   { key: "Catalog", model: Catalog },
+  { key: "ProductCompareGroup", model: ProductCompareGroup },
+  { key: "ProductCompareGroupItem", model: ProductCompareGroupItem },
   { key: "StoreProduct", model: StoreProduct },
   { key: "ItemGroup", model: ItemGroup },
   { key: "ItemGroupItem", model: ItemGroupItem },
   { key: "Payment", model: Payment },
+  { key: "FinancialObligation", model: FinancialObligation },
+  { key: "ObligationPayment", model: ObligationPayment },
   { key: "EditorTemplate", model: EditorTemplate },
   { key: "EditorTemplateGroup", model: EditorTemplateGroup },
   { key: "EditorTemplateLayer", model: EditorTemplateLayer },

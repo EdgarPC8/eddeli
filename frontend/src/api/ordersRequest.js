@@ -73,7 +73,10 @@ export const markItemAsPaidRequest = async (itemId) =>
 
 /** Solo Programador — dashboard estados de pedido (fechas + stock, solo Logs). */
 export const programmerDashboardOrderItemCorrectionRequest = async (itemId, data) =>
-  await axios.patch(`/orders/order-items/${itemId}/programmer-dashboard`, data, {
+  await axios.put(`/orders/order-items/${itemId}`, {
+    ...data,
+    programmerDashboard: true,
+  }, {
     headers: { Authorization: jwt() },
   });
 
@@ -94,6 +97,57 @@ export const deleteOrder = async (id) =>
   await axios.delete(`/orders/order/${id}`, { headers: { Authorization: jwt() } });
 export const deleteOrderItem = async (id) =>
   await axios.delete(`/orders/order-items/${id}`, { headers: { Authorization: jwt() } });
+/** Rango mes visible + mes anterior (proveedores). */
+export const getSupplierOrdersForMonthRequest = async (visibleMonth) => {
+  const from = startOfMonth(subMonths(visibleMonth, 1));
+  const to = endOfMonth(visibleMonth);
+  return getAllSupplierOrdersRequest({ from, to });
+};
+
+// ===============================
+// 🟠 PROVEEDORES Y PEDIDOS A PROVEEDOR
+// ===============================
+export const getAllSuppliersRequest = async () =>
+  await axios.get("/orders/suppliers", { headers: { Authorization: jwt() } });
+
+export const createSupplierRequest = async (data) =>
+  await axios.post("/orders/suppliers", data, { headers: { Authorization: jwt() } });
+
+export const updateSupplierRequest = async (id, data) =>
+  await axios.put(`/orders/suppliers/${id}`, data, { headers: { Authorization: jwt() } });
+
+export const deleteSupplierRequest = async (id) =>
+  await axios.delete(`/orders/suppliers/${id}`, { headers: { Authorization: jwt() } });
+
+export const getAllSupplierOrdersRequest = async ({ from, to } = {}) => {
+  const params = new URLSearchParams();
+  if (from) params.set("from", format(from, "yyyy-MM-dd"));
+  if (to) params.set("to", format(to, "yyyy-MM-dd"));
+  const qs = params.toString();
+  return axios.get(`/orders/supplier-orders${qs ? `?${qs}` : ""}`, {
+    headers: { Authorization: jwt() },
+  });
+};
+
+export const createSupplierOrderRequest = async (data) =>
+  await axios.post("/orders/supplier-orders", data, { headers: { Authorization: jwt() } });
+
+export const updateSupplierOrderRequest = async (id, data) =>
+  await axios.put(`/orders/supplier-orders/${id}`, data, { headers: { Authorization: jwt() } });
+
+export const deleteSupplierOrderRequest = async (id) =>
+  await axios.delete(`/orders/supplier-orders/${id}`, { headers: { Authorization: jwt() } });
+
+export const markSupplierOrderReceivedRequest = async (id, data = {}) =>
+  await axios.put(`/orders/supplier-orders/${id}/received`, data, {
+    headers: { Authorization: jwt() },
+  });
+
+export const markSupplierOrderPaidRequest = async (id, data = {}) =>
+  await axios.put(`/orders/supplier-orders/${id}/paid`, data, {
+    headers: { Authorization: jwt() },
+  });
+
 // ===============================
 // 🟣 FINANCE WORKBENCH (COBRANZAS)
 // ===============================

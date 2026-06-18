@@ -261,6 +261,7 @@ function DuplicateDialog({ open, product, onClose, onSuccess }) {
     fd.append("unitId", String(unitId));
     if (categoryId) fd.append("categoryId", String(categoryId));
     if (p?.price != null) fd.append("price", String(p.price));
+    if (p?.supplierPrice != null) fd.append("supplierPrice", String(p.supplierPrice));
     if (p?.distributorPrice != null) fd.append("distributorPrice", String(p.distributorPrice));
     if (p?.netWeight != null) fd.append("netWeight", String(p.netWeight));
     if (p?.minStock != null) fd.append("minStock", String(p.minStock));

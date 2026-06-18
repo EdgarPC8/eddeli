@@ -1,4 +1,5 @@
 import { Notifications } from "../models/Notifications.js";
+import { createAndPushNotification } from "../services/notificationService.js";
 // controllers/NotificationsController.js
 
 export const getUnreadCountByUser = async (req, res) => {
@@ -45,12 +46,12 @@ export const getNotificationsByUser = async (req, res) => {
 export const createNotification = async (req, res) => {
   const { userId, type, title, message, link } = req.body;
   try {
-    const notification = await Notifications.create({
+    const notification = await createAndPushNotification({
       userId,
-      type,
+      type: type || "info",
       title,
       message,
-      link
+      link,
     });
     res.status(201).json(notification);
   } catch (error) {

@@ -15,12 +15,14 @@ import GenericIngredientsPage from "./pages/eddeli/inventoryControl/GenericIngre
 import OrderPage from "./pages/eddeli/inventoryControl/OrderPage.jsx";
 import CustomerPage from "./pages/eddeli/inventoryControl/CustomerPage.jsx";
 import FinancePage from "./pages/eddeli/inventoryControl/FinancePage.jsx";
+import LoansDebtsPage from "./pages/eddeli/inventoryControl/LoansDebtsPage.jsx";
 import CollectionsPage from "./pages/eddeli/inventoryControl/CollectionsPage.jsx";
 import ProductionManagerPage from "./pages/eddeli/inventoryControl/ProductionManagerPage.jsx";
 import HomeProductPage from "./pages/eddeli/inventoryControl/HomeProduct.jsx";
 import StoresManagerPage from "./pages/eddeli/inventoryControl/StoresManagerPage.jsx";
 import StoresPublicPage from "./pages/eddeli/inventoryControl/StoresPublicPage.jsx";
 import CatalogManagerPage from "./pages/eddeli/inventoryControl/CatalogManagerPage.jsx";
+import ProductCompareGroupsPage from "./pages/eddeli/inventoryControl/ProductCompareGroupsPage.jsx";
 import CatalogoPage from "./pages/eddeli/CatalogPage.jsx";
 import AdTemplateEditor from "./pages/eddeli/AdTemplateEditor.jsx";
 import EditorPage from "./pages/eddeli/photoshop/EditorPage.jsx";
@@ -118,6 +120,7 @@ export default function App() {
             <Route path="/roles" element={<RolesPage />} />
             <Route path="/backery" element={<CatalogoPage />} />
             <Route path="/catalog_manager" element={<CatalogManagerPage />} />
+            <Route path="/compare_groups" element={<ProductCompareGroupsPage />} />
             {/* —— Módulo Diseño Promocional (editor tipo Photoshop + plantillas) —— */}
             <Route path="/diseno-promocional/editor" element={<EditorPage />} />
             <Route path="/diseno-promocional/vista" element={<ProductTemplateStudio />} />
@@ -143,6 +146,7 @@ export default function App() {
             <Route path="/inventory/customers" element={<CustomerPage />} />
             <Route path="/inventory/finance" element={<FinancePage />} />
             <Route path="/inventory/collections" element={<CollectionsPage />} />
+            <Route path="/inventory/prestamos-deudas" element={<LoansDebtsPage />} />
             <Route path="/inventory/production" element={<ProductionManagerPage />} />
             <Route path="/inventory/productos-destacados" element={<HomeProductPage />} />
             <Route path="/inventory/puntos-venta" element={<StoresManagerPage />} />

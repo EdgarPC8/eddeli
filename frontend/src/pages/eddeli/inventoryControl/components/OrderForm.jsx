@@ -1,6 +1,7 @@
-import { Grid, TextField, Box, Button } from "@mui/material";
+import { Grid, TextField, Box, Button, IconButton, Tooltip } from "@mui/material";
+import PrintIcon from "@mui/icons-material/Print";
 import { useForm } from "react-hook-form";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   createOrderRequest,
   updateOrderRequest,
@@ -10,6 +11,11 @@ import {
 import { getAllProducts } from "../../../../api/inventoryControlRequest";
 import { useAuth } from "../../../../context/AuthContext";
 import SearchableSelect from "../../../../components/SearchableSelect";
+import ProductPriceReference, {
+  getDefaultDistributorPrice,
+} from "./ProductPriceReference";
+import PrintFormatDialog from "../../../../components/saleReceipt/PrintFormatDialog.jsx";
+import { buildReceiptFromCustomerOrder } from "../../../../utils/saleReceiptUtils.js";
 
 /* ========= Utils de fecha en LOCAL (sin UTC) ========= */
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -75,19 +81,39 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
   // Estos estados son solo para controlar el UI del SearchableSelect
   const [selectedProduct, setSelectedProduct] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState("");
+  const [printOpen, setPrintOpen] = useState(false);
 
   const { toast } = useAuth();
 
   const selectedProductId = watch("productId");
 
-  // Autocompletar precio al seleccionar producto
+  const currentProduct = useMemo(() => {
+    if (!selectedProductId) return null;
+    return products.find((p) => p.id === Number(selectedProductId)) || null;
+  }, [selectedProductId, products]);
+
+  const printReceipt = useMemo(() => {
+    if (!isEditing || !datos?.id) return null;
+    return buildReceiptFromCustomerOrder({
+      ...datos,
+      ERP_order_items: items.map((it) => ({
+        productId: it.productId,
+        quantity: it.quantity,
+        price: it.price,
+        ERP_inventory_product: { name: it.name },
+      })),
+      ERP_customer: customers.find((c) => String(c.id) === String(selectedCustomer)) || datos.ERP_customer,
+    });
+  }, [isEditing, datos, items, customers, selectedCustomer]);
+
+  // Autocompletar precio distribuidor al seleccionar producto
   useEffect(() => {
-    if (!selectedProductId) return;
-    const product = products.find((p) => p.id === Number(selectedProductId));
-    if (product && product.distributorPrice != null) {
-      setValue("price", product.distributorPrice);
+    if (!currentProduct) return;
+    const defaultPrice = getDefaultDistributorPrice(currentProduct);
+    if (defaultPrice > 0) {
+      setValue("price", defaultPrice);
     }
-  }, [selectedProductId, products, setValue]);
+  }, [currentProduct, setValue]);
 
   const fetchProducts = async () => {
     const { data } = await getAllProducts();
@@ -223,7 +249,7 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
           />
         </Grid>
 
-        <Grid item xs={6}>
+        <Grid item xs={12}>
           <input type="hidden" {...register("productId")} />
 
           <SearchableSelect
@@ -237,7 +263,13 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
           />
         </Grid>
 
-        <Grid item xs={2}>
+        {currentProduct && (
+          <Grid item xs={12}>
+            <ProductPriceReference product={currentProduct} />
+          </Grid>
+        )}
+
+        <Grid item xs={12} sm={4}>
           <TextField
             label="Cantidad"
             type="number"
@@ -248,20 +280,27 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
           />
         </Grid>
 
-        <Grid item xs={2}>
+        <Grid item xs={12} sm={4}>
           <TextField
-            label="Precio"
+            label="Precio distribuidor"
             type="number"
             fullWidth
             variant="standard"
             inputProps={{ step: "any", min: 0 }}
             InputLabelProps={{ shrink: true }}
+            helperText={
+              currentProduct
+                ? `Por defecto: $${getDefaultDistributorPrice(currentProduct).toFixed(2)}`
+                : undefined
+            }
             {...register("price")}
           />
         </Grid>
 
-        <Grid item xs={2}>
-          <Button onClick={addItem}>Agregar</Button>
+        <Grid item xs={12} sm={4} sx={{ display: "flex", alignItems: "flex-end" }}>
+          <Button onClick={addItem} variant="outlined" fullWidth>
+            Agregar
+          </Button>
         </Grid>
 
         <Grid item xs={12}>
@@ -303,12 +342,25 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
           />
         </Grid>
 
-        <Grid item xs={4}>
-          <Button variant="contained" fullWidth type="submit">
+        <Grid item xs={12} display="flex" justifyContent="flex-end" alignItems="center" gap={1}>
+          {isEditing && printReceipt && (
+            <Tooltip title="Comprobante / factura">
+              <IconButton color="primary" onClick={() => setPrintOpen(true)}>
+                <PrintIcon />
+              </IconButton>
+            </Tooltip>
+          )}
+          <Button variant="contained" fullWidth type="submit" sx={{ maxWidth: 280 }}>
             {!isEditing ? "Guardar Pedido" : "Actualizar Pedido"}
           </Button>
         </Grid>
       </Grid>
+
+      <PrintFormatDialog
+        open={printOpen}
+        onClose={() => setPrintOpen(false)}
+        receipt={printReceipt}
+      />
     </Box>
   );
 }

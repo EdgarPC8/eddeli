@@ -156,8 +156,57 @@ export function normalizeSaleReceipt(sale) {
     subtotal,
     iva,
     total,
-    notes: String(sale.notes || "").replace(/\[CAJA_POS\]/g, "").replace(/\[CONTADO\]/g, "").replace(/\[CREDITO\]/g, "").trim(),
+    notes: String(sale.notes || "")
+      .replace(/\[CAJA_POS\]/g, "")
+      .replace(/\[CONTADO\]/g, "")
+      .replace(/\[CREDITO\]/g, "")
+      .trim(),
   };
+}
+
+/** Comprobante desde pedido de cliente (módulo pedidos). */
+export function buildReceiptFromCustomerOrder(order) {
+  if (!order) return null;
+  const rawItems = order.ERP_order_items || order.items || [];
+  const items = rawItems.map((row) => {
+    const qty = Number(row.quantity || 0);
+    const price = to2(row.price);
+    const lineTotal = to2(qty * price);
+    const taxRate = Number(row.ERP_inventory_product?.taxRate || row.taxRate || 0);
+    let subtotal = lineTotal;
+    let iva = 0;
+    if (taxRate > 0) {
+      subtotal = to2(lineTotal / (1 + taxRate / 100));
+      iva = to2(lineTotal - subtotal);
+    }
+    return {
+      name: row.ERP_inventory_product?.name || row.name || "Producto",
+      quantity: qty,
+      price,
+      taxRate,
+      subtotal,
+      iva,
+      lineTotal,
+    };
+  });
+  const subtotal = items.reduce((a, r) => a + r.subtotal, 0);
+  const iva = items.reduce((a, r) => a + r.iva, 0);
+  const total = items.reduce((a, r) => a + r.lineTotal, 0);
+  const customer = order.ERP_customer || order.customer || {};
+
+  return normalizeSaleReceipt({
+    id: order.id,
+    date: order.date,
+    paidAt: order.paidAt,
+    paymentMethod: order.paymentMethod || "credito",
+    documentType: order.documentType || "nota_venta",
+    notes: order.notes,
+    customer,
+    items,
+    subtotal,
+    iva,
+    total,
+  });
 }
 
 export function buildReceiptFromCheckout({

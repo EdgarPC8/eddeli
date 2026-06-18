@@ -1,4 +1,8 @@
-import { TextField, Alert } from "@mui/material";
+import { Box, IconButton, TextField, Tooltip } from "@mui/material";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
+
+const PROGRAMMER_HINT =
+  "Modo Programador: puedes registrar con fecha pasada o corregir el historial.";
 
 /** Campo de fecha personalizada — visible solo para rol Programador. */
 export default function ProgrammerMovementDateField({
@@ -10,21 +14,24 @@ export default function ProgrammerMovementDateField({
   if (!isProgrammer) return null;
 
   return (
-    <>
-      <Alert severity="info" sx={{ py: 0.5 }}>
-        Modo Programador: puedes registrar con fecha pasada o corregir el historial.
-      </Alert>
+    <Box sx={{ display: "flex", alignItems: "flex-start", gap: 0.5 }}>
       <TextField
         label={label}
         type="date"
         fullWidth
-        variant="standard"
+        size="small"
+        variant="outlined"
         value={value || ""}
         onChange={(e) => onChange(e.target.value)}
         InputLabelProps={{ shrink: true }}
-        helperText="Si lo dejas vacío, se usa la fecha y hora actual."
+        helperText="Vacío = fecha y hora actuales"
       />
-    </>
+      <Tooltip title={PROGRAMMER_HINT} arrow placement="top">
+        <IconButton size="small" color="info" sx={{ mt: 0.5 }} aria-label={PROGRAMMER_HINT}>
+          <InfoOutlinedIcon fontSize="small" />
+        </IconButton>
+      </Tooltip>
+    </Box>
   );
 }
 

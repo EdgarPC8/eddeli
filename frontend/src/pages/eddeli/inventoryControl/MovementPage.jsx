@@ -2,8 +2,10 @@ import {
   Container,
   Button,
   Stack,
-  Alert,
+  Tooltip,
+  IconButton,
 } from "@mui/material";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useEffect, useState } from "react";
 import AddCircleOutlineIcon from "@mui/icons-material/AddCircleOutline";
 
@@ -89,13 +91,21 @@ function MovementPage() {
 
   return (
     <Container>
-      {isProgrammer && (
-        <Alert severity="info" sx={{ mb: 2 }}>
-          Modo <b>Programador</b>: las producciones aparecen agrupadas por operación (misma OP).
-          Puedes cambiar la <b>fecha grupal</b> de todos los insumos/entradas de una producción, o
-          editar cada movimiento por separado.
-        </Alert>
-      )}
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+        <Button variant="text" endIcon={<AddCircleOutlineIcon />} onClick={handleDialog}>
+          Registrar Movimiento
+        </Button>
+        {isProgrammer && (
+          <Tooltip
+            title="Modo Programador: producciones agrupadas por OP; puedes cambiar fecha grupal o editar cada movimiento."
+            arrow
+          >
+            <IconButton size="small" color="info" aria-label="Ayuda modo programador">
+              <InfoOutlinedIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Stack>
 
       <SimpleDialog
         open={openDialog}
@@ -103,7 +113,18 @@ function MovementPage() {
           setOpenDialog(false);
           setEditingMovement(null);
         }}
-        tittle={editingMovement ? `Editar movimiento #${editingMovement.id}` : "Registrar Movimiento"}
+        tittle={editingMovement ? `Editar movimiento #${editingMovement.id}` : "Registrar movimiento"}
+        maxWidth="md"
+        fullWidth
+        contentSx={{
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+          p: 2,
+          pt: 1,
+          pb: 0,
+          maxHeight: "min(78vh, 720px)",
+        }}
       >
         <MovementForm
           productOptions={products}
@@ -118,12 +139,6 @@ function MovementPage() {
           }}
         />
       </SimpleDialog>
-
-      <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-        <Button variant="text" endIcon={<AddCircleOutlineIcon />} onClick={handleDialog}>
-          Registrar Movimiento
-        </Button>
-      </Stack>
 
       <MovementsListPanel
         movements={movements}

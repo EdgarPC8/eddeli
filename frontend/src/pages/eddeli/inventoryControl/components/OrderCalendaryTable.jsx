@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box, Button, Typography, Grid, Paper, Collapse, TextField, IconButton, Tooltip,
   Accordion, AccordionSummary, AccordionDetails, Divider,
-  useTheme, CircularProgress
+  useTheme, CircularProgress, ToggleButton, ToggleButtonGroup,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 
@@ -20,6 +20,9 @@ import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import PrintIcon from '@mui/icons-material/Print';
 
 import {
   updateOrderItemRequest,
@@ -35,7 +38,14 @@ import { getAllProducts } from '../../../../api/inventoryControlRequest';
 import { useAuth } from '../../../../context/AuthContext';
 import SimpleDialog from '../../../../components/Dialogs/SimpleDialog';
 import SearchableSelect from '../../../../components/SearchableSelect';
+import ProductPriceReference, {
+  getDefaultDistributorPrice,
+} from './ProductPriceReference';
+import DocumentAttachmentIcon from './DocumentAttachmentIcon';
+import PrintFormatDialog from '../../../../components/saleReceipt/PrintFormatDialog.jsx';
+import { buildReceiptFromCustomerOrder } from '../../../../utils/saleReceiptUtils.js';
 import { formatOrderItemFromApi } from '../../../../utils/orderListUtils';
+import SupplierOrderAccordion from './SupplierOrderAccordion';
 
 
 /* ---------------- Utils ---------------- */
@@ -62,12 +72,25 @@ function getOrderStatusSeverity(items) {
   return 1;
 }
 
+function getSupplierOrderSeverity(order) {
+  const received = Boolean(order?.receivedAt);
+  const paid = Boolean(order?.paidAt);
+  if (paid && received) return 3;
+  if (!paid && !received) return 0;
+  if (received && !paid) return 1;
+  if (paid && !received) return 2;
+  return 1;
+}
+
+function getOrderSeverity(order) {
+  if (order?.orderKind === 'supplier') return getSupplierOrderSeverity(order);
+  return getOrderStatusSeverity(order.ERP_order_items || []);
+}
+
 /** Color del día en calendario: gana el pedido “peor” (si hay uno rojo y otro verde → rojo). */
 function getCalendarDayBaseColor(dailyOrders, theme) {
   if (!dailyOrders?.length) return null;
-  const worst = Math.min(
-    ...dailyOrders.map((o) => getOrderStatusSeverity(o.ERP_order_items || []))
-  );
+  const worst = Math.min(...dailyOrders.map((o) => getOrderSeverity(o)));
   const { palette } = theme;
   if (worst === 0) return palette.error.main;
   if (worst === 1) return palette.warning.main;
@@ -120,9 +143,11 @@ export default function OrderCalendarView({
   onRemoveOrder,
   onRemoveOrderItem,
   onEdit,
+  onEditSupplier,
 }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
+  const [orderFilter, setOrderFilter] = useState('all');
   const [fields, setFields] = useState({});
   const [editMode, setEditMode] = useState({});
 
@@ -175,6 +200,8 @@ export default function OrderCalendarView({
   const [products, setProducts] = useState([]);
   /** Borrador por pedido: agregar línea sin abrir otro formulario */
   const [addLineDraft, setAddLineDraft] = useState({});
+  const [printOpen, setPrintOpen] = useState(false);
+  const [printReceipt, setPrintReceipt] = useState(null);
 
   const handlePrevMonth = () => setCurrentDate((prev) => addMonths(prev, -1));
   const handleNextMonth = () => setCurrentDate((prev) => addMonths(prev, 1));
@@ -208,6 +235,21 @@ export default function OrderCalendarView({
   const endWeek = endOfWeek(endDay, { weekStartsOn: 1 });
   const daysToShow = eachDayOfInterval({ start: startWeek, end: endWeek });
   const weeks = chunkArray(daysToShow, 7);
+
+  const filteredOrders = useMemo(() => {
+    if (orderFilter === 'customer') {
+      return orders.filter((o) => o.orderKind !== 'supplier');
+    }
+    if (orderFilter === 'supplier') {
+      return orders.filter((o) => o.orderKind === 'supplier');
+    }
+    return orders;
+  }, [orders, orderFilter]);
+
+  const ordersOnDate = (date) =>
+    filteredOrders.filter((order) =>
+      isSameDay(parse(order.date, 'dd/MM/yyyy HH:mm:ss', new Date()), date)
+    );
 
   const handleDeliver = async (itemId) => {
     await runMutation(markItemAsDeliveredRequest(itemId), async (res) => {
@@ -272,11 +314,7 @@ export default function OrderCalendarView({
     });
   };
 
-  const selectedOrders = selectedDate
-    ? orders.filter(order =>
-        isSameDay(parse(order.date, 'dd/MM/yyyy HH:mm:ss', new Date()), selectedDate)
-      )
-    : [];
+  const selectedOrders = selectedDate ? ordersOnDate(selectedDate) : [];
 
   const handleDayClick = (date) => {
     if (selectedDate && isSameDay(date, selectedDate)) setSelectedDate(null);
@@ -334,8 +372,9 @@ export default function OrderCalendarView({
     const newOrderFields = {};
 
     orders.forEach(order => {
+      if (order.orderKind === 'supplier') return;
       // Ítems
-      order.ERP_order_items.forEach(item => {
+      (order.ERP_order_items || []).forEach(item => {
         const paidDate = item.paidAt ? parse(item.paidAt, 'dd/MM/yyyy HH:mm:ss', new Date()) : null;
         const deliveredDate = item.deliveredAt ? parse(item.deliveredAt, 'dd/MM/yyyy HH:mm:ss', new Date()) : null;
         newFields[item.id] = {
@@ -369,7 +408,8 @@ export default function OrderCalendarView({
   }, [orders]);
 
   return (
-    <Box sx={{ padding: 2 }}>
+    <>
+    <Box sx={{ pt: 0, pb: 1 }}>
       {/* Dialogs globales */}
       <SimpleDialog
         open={openDeleteOrder}
@@ -393,16 +433,58 @@ export default function OrderCalendarView({
           : ''}? Esta acción no se puede deshacer.
       </SimpleDialog>
 
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 1, mb: 1 }}>
-        <Typography variant="h5" align="center" gutterBottom sx={{ mb: 0 }}>
-          {format(currentDate, 'MMMM yyyy', { locale: es })}
-        </Typography>
-        {loadingOrders ? <CircularProgress size={22} /> : null}
-      </Box>
+      <Box
+        sx={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          gap: 0.5,
+          mb: 0.75,
+        }}
+      >
+        <Box sx={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>
+          <IconButton size="small" onClick={handlePrevMonth} aria-label="Mes anterior" sx={{ p: 0.25 }}>
+            <ChevronLeftIcon fontSize="small" />
+          </IconButton>
+          <Typography
+            variant="subtitle2"
+            sx={{
+              minWidth: 108,
+              textAlign: 'center',
+              lineHeight: 1.2,
+              textTransform: 'capitalize',
+              fontWeight: 600,
+            }}
+          >
+            {format(currentDate, 'MMMM yyyy', { locale: es })}
+          </Typography>
+          <IconButton size="small" onClick={handleNextMonth} aria-label="Mes siguiente" sx={{ p: 0.25 }}>
+            <ChevronRightIcon fontSize="small" />
+          </IconButton>
+          {loadingOrders ? <CircularProgress size={14} sx={{ ml: 0.25 }} /> : null}
+        </Box>
 
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-        <Button variant="contained" onClick={handlePrevMonth}>Mes Anterior</Button>
-        <Button variant="contained" onClick={handleNextMonth}>Mes Siguiente</Button>
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          value={orderFilter}
+          onChange={(_e, val) => val && setOrderFilter(val)}
+          sx={{
+            flex: { xs: '1 1 100%', sm: '0 1 auto' },
+            justifyContent: { xs: 'center', sm: 'flex-start' },
+            '& .MuiToggleButton-root': {
+              py: 0.2,
+              px: 0.9,
+              minHeight: 26,
+              fontSize: '0.75rem',
+              lineHeight: 1.2,
+            },
+          }}
+        >
+          <ToggleButton value="all" sx={{ textTransform: 'none' }}>Todos</ToggleButton>
+          <ToggleButton value="customer" sx={{ textTransform: 'none' }}>Clientes</ToggleButton>
+          <ToggleButton value="supplier" sx={{ textTransform: 'none' }}>Proveedores</ToggleButton>
+        </ToggleButtonGroup>
       </Box>
 
       <Grid container spacing={1}>
@@ -420,9 +502,9 @@ export default function OrderCalendarView({
           <React.Fragment key={weekIndex}>
             <Grid container spacing={1}>
               {week.map((date) => {
-                const dailyOrders = orders.filter(order =>
-                  isSameDay(parse(order.date, 'dd/MM/yyyy HH:mm:ss', new Date()), date)
-                );
+                const dailyOrders = ordersOnDate(date);
+                const customerCount = dailyOrders.filter((o) => o.orderKind !== 'supplier').length;
+                const supplierCount = dailyOrders.filter((o) => o.orderKind === 'supplier').length;
                 const isSelected = selectedDate && isSameDay(date, selectedDate);
 
                 const statusBase = getCalendarDayBaseColor(dailyOrders, theme);
@@ -468,9 +550,24 @@ export default function OrderCalendarView({
 
                       {dailyOrders.length > 0 ? (
                         <Box sx={{ mt: 1 }}>
-                          <Typography variant="body2">
-                            {dailyOrders.length} {dailyOrders.length === 1 ? 'pedido' : 'pedidos'}
-                          </Typography>
+                          {orderFilter === 'all' ? (
+                            <>
+                              {customerCount > 0 && (
+                                <Typography variant="caption" color="info.main" display="block">
+                                  Cli: {customerCount}
+                                </Typography>
+                              )}
+                              {supplierCount > 0 && (
+                                <Typography variant="caption" color="secondary.main" display="block">
+                                  Prov: {supplierCount}
+                                </Typography>
+                              )}
+                            </>
+                          ) : (
+                            <Typography variant="body2">
+                              {dailyOrders.length} {dailyOrders.length === 1 ? 'pedido' : 'pedidos'}
+                            </Typography>
+                          )}
                         </Box>
                       ) : (
                         <Box sx={{ mt: 1 }}>
@@ -504,7 +601,22 @@ export default function OrderCalendarView({
                 )}
 
                 {selectedOrders.map((order) => {
-                  const orderItems = order.ERP_order_items;
+                  if (order.orderKind === 'supplier') {
+                    return (
+                      <SupplierOrderAccordion
+                        key={`supplier-${order.id}`}
+                        order={order}
+                        canManage={canManageOrders}
+                        tone={tones.state}
+                        toast={toastAuth}
+                        onReload={onReload}
+                        onRemove={(id) => onRemoveOrder?.(id, 'supplier')}
+                        onEdit={onEditSupplier}
+                      />
+                    );
+                  }
+
+                  const orderItems = order.ERP_order_items || [];
                   const orderColor = getColorByStatus(orderItems, theme, tones.state);
 
                   return (
@@ -535,6 +647,21 @@ export default function OrderCalendarView({
 
                           {/* Acciones de la orden */}
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Tooltip title="Comprobante / factura">
+                              <IconButton
+                                size="small"
+                                color="primary"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPrintReceipt(buildReceiptFromCustomerOrder(order));
+                                  setPrintOpen(true);
+                                }}
+                                onFocus={(e) => e.stopPropagation()}
+                              >
+                                <PrintIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+
                             {canManageOrders && (
                               <Tooltip title={orderEditMode[order.id] ? "Cancelar edición" : "Editar orden"}>
                                 <IconButton
@@ -931,8 +1058,8 @@ export default function OrderCalendarView({
                                           ...prev[order.id],
                                           productId: val != null && val !== '' ? String(val) : '',
                                           price:
-                                            p?.distributorPrice != null
-                                              ? String(p.distributorPrice)
+                                            p != null
+                                              ? String(getDefaultDistributorPrice(p))
                                               : (prev[order.id]?.price ?? ''),
                                         },
                                       }));
@@ -941,6 +1068,13 @@ export default function OrderCalendarView({
                                     getOptionValue={(p) => p?.id ?? ''}
                                     placeholder="Buscar producto…"
                                   />
+                                  {(() => {
+                                    const draftPid = addLineDraft[order.id]?.productId;
+                                    const p = draftPid
+                                      ? products.find((x) => String(x.id) === String(draftPid))
+                                      : null;
+                                    return p ? <ProductPriceReference product={p} compact /> : null;
+                                  })()}
                                 </Grid>
                                 <Grid item xs={6} sm={3}>
                                   <TextField
@@ -960,7 +1094,7 @@ export default function OrderCalendarView({
                                 </Grid>
                                 <Grid item xs={6} sm={3}>
                                   <TextField
-                                    label="Precio (USD)"
+                                    label="Precio distribuidor"
                                     type="number"
                                     inputProps={{ min: 0, step: 'any' }}
                                     size="small"
@@ -998,5 +1132,12 @@ export default function OrderCalendarView({
         );
       })}
     </Box>
+
+    <PrintFormatDialog
+      open={printOpen}
+      onClose={() => setPrintOpen(false)}
+      receipt={printReceipt}
+    />
+    </>
   );
 }

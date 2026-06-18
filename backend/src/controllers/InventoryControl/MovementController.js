@@ -1,12 +1,20 @@
 // controllers/MovementController.js
+import { randomUUID } from "crypto";
 import { sequelize } from "../../database/connection.js";
+import { onInventoryStockChanged } from "../../services/notificationService.js";
 import { verifyJWT, getHeaderToken } from "../../libs/jwt.js";
 import { Expense } from "../../models/Finance.js";
 
 
 
 
-import { InventoryMovement, InventoryProduct } from '../../models/Inventory.js';
+import { InventoryMovement, InventoryProduct, InventoryUnit } from '../../models/Inventory.js';
+import {
+  productStockToGrams,
+  resolveGramFactor,
+  isCountUnit,
+  round2,
+} from '../../utils/genericIngredientUtils.js';
 
 import { Op, fn, col, literal } from "sequelize";
 
@@ -623,9 +631,9 @@ function resolveAjusteReasonForDb(reasonIncoming, stockAnterior, stockNuevo) {
  */
 async function registerExpenseCompraSiAplica({ product, reason, priceTotal, accountId, transaction }) {
   if (reason !== "ENTRADA_COMPRA" || priceTotal == null || Number.isNaN(Number(priceTotal))) {
-    return;
+    return null;
   }
-  await Expense.create(
+  const expense = await Expense.create(
     {
       date: new Date(),
       amount: priceTotal,
@@ -637,6 +645,7 @@ async function registerExpenseCompraSiAplica({ product, reason, priceTotal, acco
     },
     { transaction },
   );
+  return expense.id;
 }
 
 /**
@@ -718,100 +727,308 @@ async function syncProductStockFromMovements(productId, transaction) {
   return stock;
 }
 
-// Crear un movimiento y actualizar el stock del producto
-export const registerMovement = async (req, res) => {
-  try {
-    const {
-      productId,
-      type,
-      reason,
-      quantity,
-      description,
-      price,
-      referenceType,
-      referenceId,
-      date: movementDateInput,
-    } = req.body;
+const PRESENTATION_OPEN_REF = "presentation_open";
 
+function gramsToProductStockUnits(product, unit, grams) {
+  const g = num(grams);
+  const u = unit || product?.InventoryUnit || product?.ERP_inventory_unit;
+  if (isCountUnit(u)) {
+    const sw = num(product?.standardWeightGrams) || 1;
+    return g / sw;
+  }
+  const factor = resolveGramFactor(u);
+  return factor > 0 ? g / factor : g;
+}
+
+/**
+ * POST /inventory/movements/open-presentation
+ * Abre presentación(es) de compra y transfiere stock al insumo genérico (sin precio).
+ */
+export const openPresentationMovement = async (req, res) => {
+  try {
     const token = getHeaderToken(req);
     const user = await verifyJWT(token);
+
+    const {
+      presentationProductId,
+      packsToOpen = 1,
+      description,
+      date: movementDateInput,
+    } = req.body;
 
     if (movementDateInput != null && movementDateInput !== "" && !assertProgrammerRole(user)) {
       return res.status(403).json({ message: PROGRAMMER_ONLY_MSG });
     }
 
-    if (!productId || !type || quantity == null) {
-      return res.status(400).json({ message: "Faltan campos obligatorios" });
+    const presentationId = Number(presentationProductId);
+    const packs = Math.max(1, Math.floor(num(packsToOpen)) || 1);
+
+    if (!presentationId) {
+      return res.status(400).json({ message: "Selecciona una presentación." });
     }
 
-    if (!MOVEMENT_TYPES.includes(type)) {
-      return res.status(400).json({ message: `type inválido. Use: ${MOVEMENT_TYPES.join(", ")}` });
-    }
-
-    const qty = parseFloat(quantity);
-    if (Number.isNaN(qty)) {
-      return res.status(400).json({ message: "quantity no numérica" });
-    }
-
-    // reason obligatorio salvo ajuste (se infiere / normaliza)
-    if (type !== "ajuste" && !reason) {
-      return res.status(400).json({ message: "Falta reason (motivo del movimiento)" });
-    }
-
-    await sequelize.transaction(async (t) => {
-      const product = await InventoryProduct.findByPk(productId, {
+    const result = await sequelize.transaction(async (t) => {
+      const presentation = await InventoryProduct.findByPk(presentationId, {
+        include: [{ model: InventoryUnit }],
         transaction: t,
         lock: t.LOCK.UPDATE,
       });
-      if (!product) {
-        const err = new Error("Producto no encontrado");
+
+      if (!presentation) {
+        const err = new Error("Presentación no encontrada");
         err.statusCode = 404;
         throw err;
       }
-
-      const stockAntes = parseFloat(product.stock) || 0;
-      const reasonParaDb = normalizeMovementReason(type, reason, stockAntes, qty);
-
-      if (type === "entrada") {
-        await applyMovementEntrada(product, qty, t);
-      } else if (type === "produccion") {
-        await applyMovementProduccion(product, qty, t);
-      } else if (type === "salida") {
-        await applyMovementSalida(product, qty, t);
-      } else if (type === "ajuste") {
-        await applyMovementAjuste(product, qty, t);
+      if (!presentation.genericProductId) {
+        const err = new Error("Este producto no está enlazado a un insumo genérico.");
+        err.statusCode = 400;
+        throw err;
       }
 
-      if (type === "entrada") {
-        await registerExpenseCompraSiAplica({
-          product,
-          reason: reasonParaDb,
-          priceTotal: price,
-          accountId: user.accountId,
-          transaction: t,
-        });
+      const generic = await InventoryProduct.findByPk(presentation.genericProductId, {
+        include: [{ model: InventoryUnit }],
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+
+      if (!generic?.isGenericIngredient) {
+        const err = new Error("El insumo genérico asociado no es válido.");
+        err.statusCode = 400;
+        throw err;
       }
 
-      const priceParaDb = type === "ajuste" ? null : price ?? null;
+      const presStock = num(presentation.stock);
+      if (presStock < packs) {
+        const err = new Error(
+          `Stock insuficiente en presentación (hay ${presStock}, se pidieron ${packs}).`,
+        );
+        err.statusCode = 400;
+        throw err;
+      }
 
-      await createInventoryMovementRow(
+      const gramsPerPack = productStockToGrams(
+        { ...presentation.toJSON(), stock: 1 },
+        presentation.InventoryUnit,
+      );
+      const totalGrams = round2(gramsPerPack * packs);
+      const genericQty = round2(
+        gramsToProductStockUnits(generic, generic.InventoryUnit, totalGrams),
+      );
+
+      if (totalGrams <= 0 || genericQty <= 0) {
+        const err = new Error(
+          "No se pudo calcular la cantidad a transferir. Revisa unidades de la presentación y del genérico.",
+        );
+        err.statusCode = 400;
+        throw err;
+      }
+
+      await applyMovementSalida(presentation, packs, t);
+      await applyMovementEntrada(generic, genericQty, t);
+
+      const presLabel =
+        presentation.purchasePresentation || presentation.name;
+      const desc =
+        description?.trim() ||
+        `Apertura: ${packs} × ${presLabel} → ${generic.name} (+${totalGrams} g)`;
+
+      const movementDate = resolveMovementDate(movementDateInput, user);
+      const batchRef = Date.now();
+
+      const salida = await createInventoryMovementRow(
         {
-          productId,
-          type,
-          reason: reasonParaDb,
-          quantity: qty,
-          description,
-          price: priceParaDb,
-          referenceType,
-          referenceId,
+          productId: presentation.id,
+          type: "salida",
+          reason: "SALIDA_OTRA",
+          quantity: packs,
+          description: desc,
+          price: null,
+          referenceType: PRESENTATION_OPEN_REF,
+          referenceId: batchRef,
           createdBy: user.accountId,
-          date: resolveMovementDate(movementDateInput, user),
+          date: movementDate,
         },
         t,
       );
+
+      const entrada = await createInventoryMovementRow(
+        {
+          productId: generic.id,
+          type: "entrada",
+          reason: "ENTRADA_OTRA",
+          quantity: genericQty,
+          description: desc,
+          price: null,
+          referenceType: PRESENTATION_OPEN_REF,
+          referenceId: batchRef,
+          createdBy: user.accountId,
+          date: movementDate,
+        },
+        t,
+      );
+
+      return {
+        presentation: {
+          id: presentation.id,
+          name: presentation.name,
+          stockAfter: round2(num(presentation.stock)),
+        },
+        generic: {
+          id: generic.id,
+          name: generic.name,
+          stockAfter: round2(num(generic.stock)),
+          addedGrams: totalGrams,
+          addedInUnit: genericQty,
+          unitAbbrev: generic.InventoryUnit?.abbreviation ?? "—",
+        },
+        packsOpened: packs,
+        movementIds: [salida.id, entrada.id],
+      };
     });
 
-    res.status(201).json({ message: "Movimiento registrado exitosamente" });
+    return res.status(201).json({
+      message: "Presentación abierta y stock transferido al insumo genérico.",
+      ...result,
+    });
+  } catch (error) {
+    const status = error?.statusCode || 500;
+    return res.status(status).json({
+      message: error?.message || "Error al abrir presentación",
+      error: String(error?.message || error),
+    });
+  }
+};
+
+const BATCH_MOVEMENT_TYPES = new Set(["entrada", "salida", "ajuste"]);
+
+/**
+ * Registra un movimiento dentro de una transacción existente.
+ */
+async function applyMovementRecord(
+  {
+    productId,
+    type,
+    reason,
+    quantity,
+    description,
+    price,
+    referenceType,
+    referenceId,
+    date: movementDateInput,
+  },
+  user,
+  transaction,
+  { batchRef } = {},
+) {
+  if (!productId || !type || quantity == null) {
+    const err = new Error("Faltan campos obligatorios en un ítem del lote");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (!MOVEMENT_TYPES.includes(type)) {
+    const err = new Error(`type inválido: ${type}`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const qty = parseFloat(quantity);
+  if (Number.isNaN(qty)) {
+    const err = new Error("quantity no numérica");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (type !== "ajuste" && !reason) {
+    const err = new Error("Falta reason (motivo del movimiento)");
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const product = await InventoryProduct.findByPk(productId, {
+    transaction,
+    lock: transaction.LOCK.UPDATE,
+  });
+  if (!product) {
+    const err = new Error(`Producto ${productId} no encontrado`);
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const stockAntes = parseFloat(product.stock) || 0;
+  const reasonParaDb = normalizeMovementReason(type, reason, stockAntes, qty);
+
+  if (type === "entrada") {
+    await applyMovementEntrada(product, qty, transaction);
+  } else if (type === "produccion") {
+    await applyMovementProduccion(product, qty, transaction);
+  } else if (type === "salida") {
+    await applyMovementSalida(product, qty, transaction);
+  } else if (type === "ajuste") {
+    await applyMovementAjuste(product, qty, transaction);
+  }
+
+  let expenseId = null;
+  if (type === "entrada") {
+    expenseId = await registerExpenseCompraSiAplica({
+      product,
+      reason: reasonParaDb,
+      priceTotal: price,
+      accountId: user.accountId,
+      transaction,
+    });
+  }
+
+  const priceParaDb = type === "ajuste" ? null : price ?? null;
+
+  const movement = await createInventoryMovementRow(
+    {
+      productId,
+      type,
+      reason: reasonParaDb,
+      quantity: qty,
+      description,
+      price: priceParaDb,
+      referenceType: batchRef ? "movement_batch" : referenceType ?? null,
+      referenceId: batchRef ?? (referenceId != null ? referenceId : null),
+      createdBy: user.accountId,
+      date: resolveMovementDate(movementDateInput, user),
+    },
+    transaction,
+  );
+
+  onInventoryStockChanged(productId).catch((err) => {
+    console.warn("onInventoryStockChanged:", err?.message || err);
+  });
+
+  return { movement, expenseId };
+}
+
+// Crear un movimiento y actualizar el stock del producto
+export const registerMovement = async (req, res) => {
+  try {
+    const body = req.body;
+    const token = getHeaderToken(req);
+    const user = await verifyJWT(token);
+
+    if (body.date != null && body.date !== "" && !assertProgrammerRole(user)) {
+      return res.status(403).json({ message: PROGRAMMER_ONLY_MSG });
+    }
+
+    let movementId = null;
+    let expenseId = null;
+    await sequelize.transaction(async (t) => {
+      const result = await applyMovementRecord(body, user, t);
+      movementId = result.movement.id;
+      expenseId = result.expenseId;
+    });
+
+    res.status(201).json({
+      message: "Movimiento registrado exitosamente",
+      movementId,
+      expenseId,
+      expenseIds: expenseId ? [expenseId] : [],
+    });
   } catch (error) {
     const status = error?.statusCode || 500;
     const message =
@@ -819,6 +1036,73 @@ export const registerMovement = async (req, res) => {
         ? error?.message || "Error al registrar movimiento"
         : error?.message || "Error al registrar movimiento";
     res.status(status).json({ message, error: String(error?.message || error) });
+  }
+};
+
+/**
+ * POST /inventory/movements/batch
+ * Registra varios movimientos (entrada, salida, ajuste) en una sola transacción.
+ */
+export const registerMovementsBatch = async (req, res) => {
+  try {
+    const { items, date: movementDateInput } = req.body;
+    const token = getHeaderToken(req);
+    const user = await verifyJWT(token);
+
+    if (movementDateInput != null && movementDateInput !== "" && !assertProgrammerRole(user)) {
+      return res.status(403).json({ message: PROGRAMMER_ONLY_MSG });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "Envía al menos un movimiento en items." });
+    }
+
+    if (items.length > 100) {
+      return res.status(400).json({ message: "Máximo 100 movimientos por lote." });
+    }
+
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (!BATCH_MOVEMENT_TYPES.has(it?.type)) {
+        return res.status(400).json({
+          message: `Ítem ${i + 1}: solo entrada, salida o ajuste en lote.`,
+        });
+      }
+    }
+
+    const batchKey = randomUUID();
+    const batchRef = Date.now();
+
+    const result = await sequelize.transaction(async (t) => {
+      const movementIds = [];
+      const expenseIds = [];
+      for (const it of items) {
+        const { movement, expenseId } = await applyMovementRecord(
+          { ...it, date: movementDateInput ?? it.date },
+          user,
+          t,
+          { batchRef },
+        );
+        movementIds.push(movement.id);
+        if (expenseId) expenseIds.push(expenseId);
+      }
+      return { movementIds, expenseIds };
+    });
+
+    return res.status(201).json({
+      message: `${result.movementIds.length} movimiento(s) registrados.`,
+      count: result.movementIds.length,
+      batchKey,
+      batchRef,
+      movementIds: result.movementIds,
+      expenseIds: result.expenseIds,
+    });
+  } catch (error) {
+    const status = error?.statusCode || 500;
+    return res.status(status).json({
+      message: error?.message || "Error al registrar lote de movimientos",
+      error: String(error?.message || error),
+    });
   }
 };
 

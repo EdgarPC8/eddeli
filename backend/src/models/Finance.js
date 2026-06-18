@@ -6,7 +6,7 @@ import { Account } from "./Account.js";
 import { InventoryProduct } from "./Inventory.js";
 
 // ✅ Ajusta a tu proyecto real:
-import { OrderItem } from "./Orders.js"; // <-- AJUSTA
+import { OrderItem, Customer } from "./Orders.js";
 
 // =====================================================
 // 1) GRUPO de ítems (deuda agrupada)
@@ -168,7 +168,129 @@ export const Expense = sequelize.define("ERP_finance_expenses", {
 });
 
 // =====================================================
-// 5) RELACIONES
+// 5) OBLIGACIONES (préstamos / deudas sin pedido)
+// receivable = te deben (prestaste) → apertura Expense, cobros Income
+// payable    = debes tú        → apertura Income, pagos Expense
+// =====================================================
+export const FinancialObligation = sequelize.define("ERP_finance_obligations", {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+
+  direction: {
+    type: DataTypes.ENUM("receivable", "payable"),
+    allowNull: false,
+    comment: "receivable=por cobrar (prestaste), payable=por pagar (debes)",
+  },
+
+  partyType: {
+    type: DataTypes.ENUM("customer", "employee", "supplier", "other"),
+    allowNull: false,
+    defaultValue: "other",
+  },
+
+  customerId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: "Opcional si partyType=customer",
+  },
+
+  partyName: {
+    type: DataTypes.STRING(150),
+    allowNull: false,
+    comment: "Nombre visible (empleado, proveedor, etc.)",
+  },
+
+  concept: {
+    type: DataTypes.STRING(250),
+    allowNull: false,
+  },
+
+  originalAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+  },
+
+  openDate: {
+    type: DataTypes.DATEONLY,
+    allowNull: false,
+  },
+
+  dueDate: {
+    type: DataTypes.DATEONLY,
+    allowNull: true,
+  },
+
+  status: {
+    type: DataTypes.ENUM("open", "closed", "cancelled"),
+    allowNull: false,
+    defaultValue: "open",
+  },
+
+  initialFinanceType: {
+    type: DataTypes.ENUM("income", "expense"),
+    allowNull: true,
+    comment: "Tipo del movimiento contable inicial",
+  },
+
+  initialFinanceId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+  },
+
+  note: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+  },
+
+  createdBy: { type: DataTypes.INTEGER, allowNull: false },
+}, {
+  timestamps: true,
+  indexes: [
+    { fields: ["direction", "status"] },
+    { fields: ["customerId"] },
+    { fields: ["partyName"] },
+  ],
+});
+
+export const ObligationPayment = sequelize.define("ERP_finance_obligation_payments", {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+
+  obligationId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: { model: "ERP_finance_obligations", key: "id" },
+    onDelete: "CASCADE",
+  },
+
+  date: { type: DataTypes.DATEONLY, allowNull: false },
+  amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
+  method: { type: DataTypes.STRING, allowNull: false, defaultValue: "efectivo" },
+  note: { type: DataTypes.STRING(500), allowNull: true },
+
+  financeType: {
+    type: DataTypes.ENUM("income", "expense"),
+    allowNull: false,
+  },
+
+  financeId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    comment: "ID en Income o Expense",
+  },
+
+  status: {
+    type: DataTypes.ENUM("completed", "cancelled"),
+    allowNull: false,
+    defaultValue: "completed",
+  },
+
+  createdBy: { type: DataTypes.INTEGER, allowNull: false },
+}, {
+  timestamps: true,
+  indexes: [{ fields: ["obligationId"] }],
+});
+
+// =====================================================
+// 6) RELACIONES (continuación)
 // =====================================================
 
 // Income/Expense -> Account
@@ -196,6 +318,20 @@ Payment.belongsTo(Account, { foreignKey: "createdBy" });
 // Payment -> Group
 Payment.belongsTo(ItemGroup, { foreignKey: "groupId" });
 ItemGroup.hasMany(Payment, { foreignKey: "groupId" });
+
+FinancialObligation.belongsTo(Account, { foreignKey: "createdBy" });
+FinancialObligation.hasMany(ObligationPayment, {
+  foreignKey: "obligationId",
+  as: "payments",
+  onDelete: "CASCADE",
+});
+ObligationPayment.belongsTo(FinancialObligation, {
+  foreignKey: "obligationId",
+  as: "obligation",
+});
+ObligationPayment.belongsTo(Account, { foreignKey: "createdBy" });
+
+FinancialObligation.belongsTo(Customer, { foreignKey: "customerId", as: "customer" });
 
 /*
   ✅ RECOMENDACIONES (migrations):

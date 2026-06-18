@@ -8,6 +8,7 @@ export const template = {
         "id": null,
         "name": "",
         "price": 0,
+        "supplierPrice": 0,
         "distributorPrice": 0,
         "categoryId": null,
         "unitId": null,

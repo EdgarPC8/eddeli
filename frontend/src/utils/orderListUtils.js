@@ -1,4 +1,4 @@
-import { format, startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { format, startOfMonth, endOfMonth, subMonths, parse } from "date-fns";
 
 /** Formato de fechas igual que getAllOrders en el backend. */
 export function formatOrderTimestamp(value) {
@@ -34,8 +34,9 @@ export function patchOrderItemInList(orders, orderId, itemId, fields) {
   });
 }
 
-export function removeOrderFromList(orders, orderId) {
-  return orders.filter((order) => order.id !== orderId);
+export function removeOrderFromList(orders, orderId, orderKind = "customer") {
+  const key = orderKind === "supplier" ? `s:${orderId}` : `c:${orderId}`;
+  return orders.filter((order) => orderListKey(order) !== key);
 }
 
 export function removeOrderItemFromList(orders, orderId, itemId) {
@@ -59,9 +60,28 @@ export function monthCacheKey(date) {
   return format(date, "yyyy-MM");
 }
 
+/** Clave única mezclando pedidos cliente y proveedor (mismo id numérico en tablas distintas). */
+export function orderListKey(order) {
+  return order?.orderKind === "supplier" ? `s:${order.id}` : `c:${order.id}`;
+}
+
 /** Une pedidos por id (recargas parciales sin duplicar). */
 export function mergeOrdersById(existing, incoming) {
-  const map = new Map((existing || []).map((o) => [o.id, o]));
-  for (const o of incoming || []) map.set(o.id, o);
-  return Array.from(map.values()).sort((a, b) => b.id - a.id);
+  const map = new Map((existing || []).map((o) => [orderListKey(o), o]));
+  for (const o of incoming || []) map.set(orderListKey(o), o);
+  return Array.from(map.values()).sort((a, b) => {
+    const ta = parseOrderDateMs(a);
+    const tb = parseOrderDateMs(b);
+    if (tb !== ta) return tb - ta;
+    return (b.id || 0) - (a.id || 0);
+  });
+}
+
+function parseOrderDateMs(order) {
+  if (!order?.date) return 0;
+  try {
+    return parse(order.date, "dd/MM/yyyy HH:mm:ss", new Date()).getTime();
+  } catch {
+    return 0;
+  }
 }

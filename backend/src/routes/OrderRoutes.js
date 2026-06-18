@@ -29,6 +29,21 @@ import {
 } from "../controllers/InventoryControl/OrderController.js";
 
 
+import {
+  getAllSuppliers,
+  createSupplier,
+  updateSupplier,
+  deleteSupplier,
+} from "../controllers/InventoryControl/SupplierController.js";
+import {
+  getSupplierOrders,
+  createSupplierOrder,
+  updateSupplierOrder,
+  deleteSupplierOrder,
+  markSupplierOrderReceived,
+  markSupplierOrderPaid,
+} from "../controllers/InventoryControl/SupplierOrderController.js";
+
 import { isAuthenticated, requireProgrammer } from "../middlewares/authMiddelware.js";
 import { 
     // ✅ WORKBENCH
@@ -126,6 +141,21 @@ router.put("/workbench/payments/:paymentId", isAuthenticated, updateGroupPayment
 router.delete("/workbench/payments/:paymentId", isAuthenticated, deleteGroupPayment);
 
 // =====================================================
+// ✅ PROVEEDORES Y PEDIDOS A PROVEEDOR
+// =====================================================
+router.get("/suppliers", isAuthenticated, getAllSuppliers);
+router.post("/suppliers", isAuthenticated, createSupplier);
+router.put("/suppliers/:id", isAuthenticated, updateSupplier);
+router.delete("/suppliers/:id", isAuthenticated, deleteSupplier);
+
+router.get("/supplier-orders", isAuthenticated, getSupplierOrders);
+router.post("/supplier-orders", isAuthenticated, createSupplierOrder);
+router.put("/supplier-orders/:id", isAuthenticated, updateSupplierOrder);
+router.delete("/supplier-orders/:id", isAuthenticated, deleteSupplierOrder);
+router.put("/supplier-orders/:id/received", isAuthenticated, markSupplierOrderReceived);
+router.put("/supplier-orders/:id/paid", isAuthenticated, markSupplierOrderPaid);
+
+// =====================================================
 // ✅ ÓRDENES (LO TUYO NORMAL)
 // =====================================================
 router.get("/pos/sales", isAuthenticated, getPosSales);
@@ -155,6 +185,13 @@ router.put("/order-items/:itemId/mark-delivered", isAuthenticated, markItemAsDel
 router.put("/order-items/:itemId/mark-paid", isAuthenticated, markItemAsPaid);
 
 router.patch(
+  "/order-items/:itemId/programmer-dashboard",
+  isAuthenticated,
+  requireProgrammer,
+  programmerDashboardOrderItemCorrection,
+);
+
+router.put(
   "/order-items/:itemId/programmer-dashboard",
   isAuthenticated,
   requireProgrammer,

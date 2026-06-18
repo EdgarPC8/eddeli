@@ -30,9 +30,12 @@ import { ensurePublicidadSchema } from "./src/database/ensurePublicidadSchema.js
 
 import ImgRoutes from "./src/routes/ImgRoutes.js";
 import FilesRoutes from "./src/routes/FilesRoutes.js";
+import DocumentRoutes from "./src/routes/DocumentRoutes.js";
 import EditorRoutes from "./src/routes/EditorRoutes.js";
 import ComandsRoutes from "./src/routes/ComandsRoutes.js";
 
+import NotificationProgramRoutes from "./src/routes/NotificationProgramRoutes.js";
+import { startNotificationScheduler } from "./src/services/notificationScheduler.js";
 import { initNotificationSocket } from "./src/sockets/notificationSocket.js";
 import { initPublicidadSocket } from "./src/sockets/publicidadSocket.js";
 import { Server } from "socket.io";
@@ -78,6 +81,7 @@ app.use(`/${api}/img`, ImgRoutes);
 
 app.use(`/${api}/img`, express.static(path.resolve(__dirname, "src/img")));
 app.use(`/${api}/files`, FilesRoutes);
+app.use(`/${api}/documents`, DocumentRoutes);
 
 // Sirve los archivos guardados en src/files
 app.use(`/${api}/files`, express.static(path.resolve(__dirname, "src/files")));
@@ -89,6 +93,7 @@ app.use(`/${api}/users`, UsersRoutes);
 app.use(`/${api}`, AuthRoutes);
 app.use(`/${api}`, AccountsRoutes);
 app.use(`/${api}/notifications`, NotificationsRoutes);
+app.use(`/${api}/notification-programs`, NotificationProgramRoutes);
 app.use(`/${api}/inventory`, InventoryControlRoutes);
 app.use(`/${api}/orders`, OrderRoutes);
 app.use(`/${api}/finance`, FinanceRoutes);
@@ -124,8 +129,9 @@ export async function main() {
       console.log("✅ Conexión realizada y esquema sincronizado (DB_SYNC_ALTER activo).");
     }
 
-    httpServer.listen(PORT, () => {
+    httpServer.listen(PORT, async () => {
       console.log(`🟢 Backend + Socket.IO escuchando en puerto ${PORT}`);
+      await startNotificationScheduler();
     });
   } catch (error) {
     console.error("❌ Error en la conexión a la base de datos:", error);

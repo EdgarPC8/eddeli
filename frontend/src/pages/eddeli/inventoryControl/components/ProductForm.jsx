@@ -341,6 +341,7 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
     setValue("unitId", datos.unitId || "");
     setValue("categoryId", datos.categoryId || "");
     setValue("price", datos.price || 0);
+    setValue("supplierPrice", datos.supplierPrice || 0);
     setValue("distributorPrice", datos.distributorPrice || 0);
     setValue("minStock", datos.minStock || 0);
     setValue("stock", datos.stock || 0);
@@ -428,6 +429,7 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
     fd.append("unitId", String(data.unitId || ""));
     if (data.categoryId) fd.append("categoryId", String(data.categoryId));
     if (data.price != null) fd.append("price", String(data.price));
+    if (data.supplierPrice != null) fd.append("supplierPrice", String(data.supplierPrice));
     if (data.distributorPrice != null)
       fd.append("distributorPrice", String(data.distributorPrice));
     if (data.netWeight != null) fd.append("netWeight", String(data.netWeight));
@@ -654,13 +656,38 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
           </TextField>
         </Grid>
 
-        <Grid item xs={12} sm={3}>
+        <Grid item xs={12} sm={4}>
           <TextField
-            label="Precio"
+            label="Precio proveedor"
             type="number"
             fullWidth
             variant="standard"
-            inputProps={{ step: "any" }}
+            inputProps={{ step: "any", min: 0 }}
+            helperText="Lo que te cobra el proveedor"
+            {...register("supplierPrice", { required: true })}
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={4}>
+          <TextField
+            label="Precio distribuidor"
+            type="number"
+            fullWidth
+            variant="standard"
+            inputProps={{ step: "any", min: 0 }}
+            helperText="Precio para que lo revendan"
+            {...register("distributorPrice", { required: true })}
+          />
+        </Grid>
+
+        <Grid item xs={12} sm={4}>
+          <TextField
+            label="Precio venta"
+            type="number"
+            fullWidth
+            variant="standard"
+            inputProps={{ step: "any", min: 0 }}
+            helperText="Precio normal al público"
             {...register("price", { required: true })}
           />
         </Grid>
@@ -693,17 +720,6 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
             fullWidth
             variant="standard"
             {...register("stock", { required: true })}
-          />
-        </Grid>
-
-        <Grid item xs={12} sm={6}>
-          <TextField
-            label="Precio Distribuidor"
-            type="number"
-            fullWidth
-            variant="standard"
-            inputProps={{ step: "any" }}
-            {...register("distributorPrice", { required: true })}
           />
         </Grid>
 

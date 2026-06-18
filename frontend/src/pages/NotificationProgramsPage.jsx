@@ -44,8 +44,8 @@ import { getRolRequest } from "../api/accountRequest.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { Navigate } from "react-router-dom";
 
-/** Cambiar a true al implementar backend (ver notificationProgramRequest.js). */
-const BACKEND_ENABLED = false;
+/** Backend activo — CRUD en /notification-programs */
+const BACKEND_ENABLED = true;
 
 const ALLOWED = new Set(["Programador", "Administrador"]);
 
@@ -60,6 +60,9 @@ const initialForm = {
   targetType: "all_users",
   targetRoleIds: [],
   active: true,
+  notificationType: "info",
+  handlerType: "static",
+  scheduleIntervalMinutes: 60,
 };
 
 export default function NotificationProgramsPage() {
@@ -123,6 +126,9 @@ export default function NotificationProgramsPage() {
         targetType: item.targetType || "all_users",
         targetRoleIds: item.targetRoleIds || [],
         active: item.active ?? true,
+        notificationType: item.notificationType || "info",
+        handlerType: item.handlerType || "static",
+        scheduleIntervalMinutes: item.scheduleIntervalMinutes ?? 60,
       });
     } else {
       setEditingId(null);
@@ -255,12 +261,17 @@ export default function NotificationProgramsPage() {
                         label={
                           item.scheduleType === "daily"
                             ? `Diario ${item.scheduleTime || ""}`
-                            : "Manual"
+                            : item.scheduleType === "interval"
+                              ? `Cada ${item.scheduleIntervalMinutes || 60} min`
+                              : "Manual"
                         }
                         color={
-                          item.scheduleType === "daily" ? "primary" : "default"
+                          item.scheduleType === "manual" ? "default" : "primary"
                         }
                       />
+                      {item.handlerType === "stock_min" && (
+                        <Chip size="small" label="Stock mínimo" color="warning" />
+                      )}
                       <Chip
                         size="small"
                         label={
@@ -362,6 +373,7 @@ export default function NotificationProgramsPage() {
                   Manual (enviar cuando quieras)
                 </MenuItem>
                 <MenuItem value="daily">Diario (hora fija)</MenuItem>
+                <MenuItem value="interval">Intervalo (cada X minutos)</MenuItem>
               </Select>
             </FormControl>
             {form.scheduleType === "daily" && (
@@ -373,6 +385,21 @@ export default function NotificationProgramsPage() {
                   setForm((f) => ({ ...f, scheduleTime: e.target.value }))
                 }
                 InputLabelProps={{ shrink: true }}
+                fullWidth
+              />
+            )}
+            {form.scheduleType === "interval" && (
+              <TextField
+                label="Intervalo (minutos)"
+                type="number"
+                inputProps={{ min: 5, step: 5 }}
+                value={form.scheduleIntervalMinutes ?? 60}
+                onChange={(e) =>
+                  setForm((f) => ({
+                    ...f,
+                    scheduleIntervalMinutes: Number(e.target.value) || 60,
+                  }))
+                }
                 fullWidth
               />
             )}

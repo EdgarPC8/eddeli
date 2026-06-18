@@ -15,6 +15,14 @@ import { isAuthenticated } from "../middlewares/authMiddelware.js";
 import { getOrderAnalytics, getWeeklySales,getTopProductsDailySales,getProductRotationAnalysis,getIncomeExpenseBreakdown,getCustomerSalesSummary, getOrdersForCharts,getExpensesForChart } from "../controllers/InventoryControl/AnalyticsController.js";
 import { getFinanceDashboard } from "../controllers/InventoryControl/DashboardController.js";
 import { getCalendarMonthSummary, getCalendarDayDetail } from "../controllers/InventoryControl/CalendarFinanceController.js";
+import {
+  getObligationsWorkbench,
+  getObligationById,
+  createObligation,
+  payObligation,
+  cancelObligation,
+} from "../controllers/InventoryControl/LoanObligationController.js";
+import { getProductSeriesCharts } from "../controllers/InventoryControl/ProductSeriesController.js";
 
 
 const router = new Router();
@@ -46,5 +54,13 @@ router.get("/getIncomeExpenseBreakdown",isAuthenticated, getIncomeExpenseBreakdo
 router.get("/getCustomerSalesSummary",isAuthenticated, getCustomerSalesSummary);
 router.get("/getOrdersForCharts",isAuthenticated, getOrdersForCharts);
 router.get("/getExpensesForChart",isAuthenticated, getExpensesForChart);
+router.get("/product-series", isAuthenticated, getProductSeriesCharts);
+
+// Préstamos y deudas (sin pedido)
+router.get("/obligations/workbench", isAuthenticated, getObligationsWorkbench);
+router.get("/obligations/:id", isAuthenticated, getObligationById);
+router.post("/obligations", isAuthenticated, createObligation);
+router.post("/obligations/:id/pay", isAuthenticated, payObligation);
+router.patch("/obligations/:id/cancel", isAuthenticated, cancelObligation);
 
 export default router;

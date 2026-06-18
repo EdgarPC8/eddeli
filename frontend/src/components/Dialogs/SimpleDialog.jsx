@@ -18,6 +18,7 @@ function SimpleDialog({
   onClickAccept,
   message,
   title,
+  tittle,
   open,
   onClose,
   children,
@@ -25,9 +26,11 @@ function SimpleDialog({
   fullWidth = false,
   hideClose = false,
   disableClose = false,
+  contentSx,
 }) {
   const titleId = useId();
   const descId = useId();
+  const dialogTitle = title ?? tittle;
 
   const handleClose = (event, reason) => {
     if (
@@ -50,7 +53,7 @@ function SimpleDialog({
     >
       <Box display="flex" justifyContent="space-between" alignItems="center">
         <DialogTitle id={titleId} sx={{ flexGrow: 1 }}>
-          {title}
+          {dialogTitle}
         </DialogTitle>
         {!hideClose && (
           <IconButton
@@ -65,7 +68,7 @@ function SimpleDialog({
         )}
       </Box>
 
-      <DialogContent>
+      <DialogContent sx={contentSx}>
         {children ? (
           children
         ) : (

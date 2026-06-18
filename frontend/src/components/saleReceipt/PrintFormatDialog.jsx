@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Button,
@@ -14,17 +14,25 @@ import {
 import PrintIcon from "@mui/icons-material/Print";
 import DescriptionIcon from "@mui/icons-material/Description";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import ImageIcon from "@mui/icons-material/Image";
+import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
 import SaleReceiptContent from "./SaleReceiptContent.jsx";
 import {
   DOCUMENT_TYPE_OPTIONS,
   applyReceiptDocumentType,
   printSaleReceipt,
 } from "../../utils/saleReceiptUtils.js";
+import {
+  downloadReceiptAsPdf,
+  downloadReceiptAsPng,
+} from "../../utils/saleReceiptExport.js";
 
 /** Modal: formato de impresión, tipo de documento (solo al imprimir) y vista previa. */
 export default function PrintFormatDialog({ open, onClose, receipt, initialFormat = "a4" }) {
   const [format, setFormat] = useState(initialFormat);
   const [documentType, setDocumentType] = useState("documento");
+  const [exporting, setExporting] = useState(false);
+  const previewRef = useRef(null);
 
   useEffect(() => {
     if (open) {
@@ -38,19 +46,41 @@ export default function PrintFormatDialog({ open, onClose, receipt, initialForma
     [receipt, documentType],
   );
 
+  const baseFilename = `comprobante-${receipt?.id || "pedido"}`;
+
   const handlePrint = () => {
     if (!previewReceipt) return;
     printSaleReceipt(previewReceipt, format);
   };
 
+  const handleDownloadPng = async () => {
+    if (!previewRef.current) return;
+    setExporting(true);
+    try {
+      await downloadReceiptAsPng(previewRef.current, `${baseFilename}.png`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!previewRef.current) return;
+    setExporting(true);
+    try {
+      await downloadReceiptAsPdf(previewRef.current, format, `${baseFilename}.pdf`);
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="md">
-      <DialogTitle>Imprimir comprobante</DialogTitle>
+      <DialogTitle>Comprobante / factura</DialogTitle>
       <DialogContent dividers>
         <Stack spacing={2}>
           <Box>
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              Tipo de documento (solo para esta impresión)
+              Tipo de documento (solo para esta impresión o descarga)
             </Typography>
             <ToggleButtonGroup
               exclusive
@@ -69,7 +99,7 @@ export default function PrintFormatDialog({ open, onClose, receipt, initialForma
 
           <Box>
             <Typography variant="body2" color="text.secondary" gutterBottom>
-              Formato de impresión
+              Formato
             </Typography>
             <ToggleButtonGroup
               exclusive
@@ -92,6 +122,7 @@ export default function PrintFormatDialog({ open, onClose, receipt, initialForma
             Vista previa
           </Typography>
           <Box
+            ref={previewRef}
             sx={{
               overflow: "auto",
               maxHeight: "55vh",
@@ -106,9 +137,31 @@ export default function PrintFormatDialog({ open, onClose, receipt, initialForma
           </Box>
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ px: 2, py: 1.5 }}>
+      <DialogActions sx={{ px: 2, py: 1.5, flexWrap: "wrap", gap: 1 }}>
         <Button onClick={onClose}>Cerrar</Button>
-        <Button variant="contained" startIcon={<PrintIcon />} onClick={handlePrint} disabled={!previewReceipt}>
+        <Box sx={{ flex: 1 }} />
+        <Button
+          variant="outlined"
+          startIcon={<ImageIcon />}
+          onClick={handleDownloadPng}
+          disabled={!previewReceipt || exporting}
+        >
+          PNG
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<PictureAsPdfIcon />}
+          onClick={handleDownloadPdf}
+          disabled={!previewReceipt || exporting}
+        >
+          PDF
+        </Button>
+        <Button
+          variant="contained"
+          startIcon={<PrintIcon />}
+          onClick={handlePrint}
+          disabled={!previewReceipt || exporting}
+        >
           Imprimir
         </Button>
       </DialogActions>

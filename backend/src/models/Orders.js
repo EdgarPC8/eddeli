@@ -93,6 +93,47 @@ export const OrderItem = sequelize.define("ERP_order_items", {
   timestamps: false,
 });
 
+// Proveedores
+export const Supplier = sequelize.define("ERP_suppliers", {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING(150), allowNull: false },
+  phone: { type: DataTypes.STRING(40), allowNull: true },
+  email: { type: DataTypes.STRING(120), allowNull: true },
+  address: { type: DataTypes.STRING(250), allowNull: true },
+  notes: { type: DataTypes.TEXT, allowNull: true },
+}, {
+  timestamps: true,
+});
+
+// Pedidos a proveedor (compras planificadas)
+export const SupplierOrder = sequelize.define("ERP_supplier_orders", {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  supplierId: { type: DataTypes.INTEGER, allowNull: false },
+  date: { type: DataTypes.DATE, allowNull: false, defaultValue: Sequelize.NOW },
+  notes: { type: DataTypes.TEXT, allowNull: true },
+  status: {
+    type: DataTypes.ENUM("pendiente", "recibido", "cancelado"),
+    allowNull: false,
+    defaultValue: "pendiente",
+  },
+  receivedAt: { type: DataTypes.DATE, allowNull: true },
+  paidAt: { type: DataTypes.DATE, allowNull: true },
+  paymentMethod: { type: DataTypes.STRING(40), allowNull: true },
+  financeExpenseId: { type: DataTypes.INTEGER, allowNull: true },
+}, {
+  timestamps: true,
+});
+
+export const SupplierOrderItem = sequelize.define("ERP_supplier_order_items", {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  orderId: { type: DataTypes.INTEGER, allowNull: false },
+  productId: { type: DataTypes.INTEGER, allowNull: false },
+  quantity: { type: DataTypes.FLOAT, allowNull: false },
+  unitPrice: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+}, {
+  timestamps: false,
+});
+
 // Relaciones
 Customer.hasMany(Order, { foreignKey: 'customerId' });
 Order.belongsTo(Customer, { foreignKey: 'customerId' });
@@ -105,3 +146,19 @@ OrderItem.belongsTo(InventoryProduct, { foreignKey: 'productId' });
 
 CashShift.hasMany(Order, { foreignKey: 'shiftId', as: 'orders' });
 Order.belongsTo(CashShift, { foreignKey: 'shiftId', as: 'shift' });
+
+Supplier.hasMany(SupplierOrder, { foreignKey: 'supplierId', onDelete: 'RESTRICT' });
+SupplierOrder.belongsTo(Supplier, { foreignKey: 'supplierId', as: 'ERP_supplier' });
+
+SupplierOrder.hasMany(SupplierOrderItem, {
+  foreignKey: 'orderId',
+  as: 'ERP_supplier_order_items',
+  onDelete: 'CASCADE',
+});
+SupplierOrderItem.belongsTo(SupplierOrder, { foreignKey: 'orderId' });
+
+InventoryProduct.hasMany(SupplierOrderItem, { foreignKey: 'productId' });
+SupplierOrderItem.belongsTo(InventoryProduct, {
+  foreignKey: 'productId',
+  as: 'ERP_inventory_product',
+});

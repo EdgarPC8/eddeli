@@ -57,6 +57,7 @@ import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
 import ScienceIcon from "@mui/icons-material/Science";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
+import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import RequestQuoteIcon from "@mui/icons-material/RequestQuote";
 import FactoryIcon from "@mui/icons-material/Factory";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
@@ -95,6 +96,7 @@ const MENU_ITEMS = [
   { name: "Tareas", link: "/tareas", icon: <AssignmentTurnedInIcon />, roles: ["Programador", "Administrador", "Empleado"] },
   { name: "Facturación", link: "/facturacion", icon: <ReceiptIcon />, roles: ["Programador", "Administrador"] },
   { name: "Catálogo config", link: "/catalog_manager", icon: <ViewModuleIcon />, roles: ["Programador", "Administrador"] },
+  { name: "Grupos comparativos", link: "/compare_groups", icon: <CompareArrowsIcon />, roles: ["Programador", "Administrador"] },
   { name: "Notificaciones", link: "/notifications", icon: <NotificationsIcon />, roles: ["Programador", "Administrador", "Empleado"] },
 ];
 
@@ -107,6 +109,7 @@ const MENU_GROUPS = [
       { name: "Clientes", link: "/inventory/customers", icon: <PeopleIcon />, roles: ["Programador", "Administrador"] },
       { name: "Finanzas", link: "/inventory/finance", icon: <MonetizationOnIcon />, roles: ["Programador", "Administrador"] },
       { name: "Cobranzas", link: "/inventory/collections", icon: <RequestQuoteIcon />, roles: ["Programador", "Administrador"] },
+      { name: "Préstamos y deudas", link: "/inventory/prestamos-deudas", icon: <AccountBalanceWalletIcon />, roles: ["Programador", "Administrador"] },
     ],
   },
   {

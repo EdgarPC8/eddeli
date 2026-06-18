@@ -40,18 +40,56 @@ import {
   orderMatchesStatus,
   parseDisplayDateToInput,
   inputToApiDate,
+  formatShortDisplayDate,
+  formatShortOrderDate,
 } from "./orderStatusHelpers.js";
 
-function StatusChip({ ok, labelOk, labelNo, icon, okColor = "success", noColor = "default" }) {
+const cellSx = { px: 0.75, py: 0.5, fontSize: "0.78rem", overflow: "hidden" };
+const headSx = { ...cellSx, fontWeight: 700 };
+
+function StatusChip({ ok, labelOk, labelNo, icon, okColor = "success", noColor = "default", tooltip }) {
+  const short = ok ? formatShortDisplayDate(labelOk) || "Sí" : labelNo;
   return (
-    <Chip
-      size="small"
-      icon={icon}
-      color={ok ? okColor : noColor}
-      variant={ok ? "filled" : "outlined"}
-      label={ok ? labelOk : labelNo}
-      sx={{ fontWeight: ok ? 700 : 500 }}
-    />
+    <Tooltip title={tooltip || (ok ? labelOk : labelNo) || ""} arrow placement="top">
+      <Chip
+        size="small"
+        icon={icon}
+        color={ok ? okColor : noColor}
+        variant={ok ? "filled" : "outlined"}
+        label={short}
+        sx={{
+          fontWeight: ok ? 700 : 500,
+          maxWidth: "100%",
+          "& .MuiChip-label": { px: 0.75, fontSize: "0.7rem" },
+        }}
+      />
+    </Tooltip>
+  );
+}
+
+function CompactDateField({ value, onChange, onNow }) {
+  return (
+    <Stack spacing={0.25}>
+      <TextField
+        type="datetime-local"
+        size="small"
+        value={value}
+        onChange={onChange}
+        fullWidth
+        sx={{
+          "& .MuiInputBase-root": { fontSize: "0.7rem" },
+          "& .MuiInputBase-input": { py: 0.5, px: 0.5 },
+        }}
+      />
+      <Button
+        size="small"
+        variant="text"
+        onClick={onNow}
+        sx={{ minWidth: 0, p: 0, fontSize: "0.65rem", textTransform: "none", alignSelf: "flex-start" }}
+      >
+        Ahora
+      </Button>
+    </Stack>
   );
 }
 
@@ -331,33 +369,37 @@ export default function OrderStatusWorkbenchContent({
               border: "1px solid",
               borderColor: alpha(tabColor, 0.25),
               borderRadius: 1.5,
-              overflowX: "auto",
+              overflow: "hidden",
             }}
           >
-            <Table size="small" stickyHeader>
+            <Table
+              size="small"
+              stickyHeader
+              sx={{ tableLayout: "fixed", width: "100%" }}
+            >
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 700, bgcolor: alpha(tabColor, 0.06) }}>Pedido</TableCell>
-                  <TableCell sx={{ fontWeight: 700, bgcolor: alpha(tabColor, 0.06) }}>Cliente</TableCell>
-                  <TableCell sx={{ fontWeight: 700, bgcolor: alpha(tabColor, 0.06) }}>Fecha</TableCell>
-                  <TableCell sx={{ fontWeight: 700, bgcolor: alpha(tabColor, 0.06) }}>Producto</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700, bgcolor: alpha(tabColor, 0.06) }}>
+                  <TableCell sx={{ ...headSx, width: "5%", bgcolor: alpha(tabColor, 0.06) }}>Ped.</TableCell>
+                  <TableCell sx={{ ...headSx, width: "14%", bgcolor: alpha(tabColor, 0.06) }}>Cliente</TableCell>
+                  <TableCell sx={{ ...headSx, width: "8%", bgcolor: alpha(tabColor, 0.06) }}>Fecha</TableCell>
+                  <TableCell sx={{ ...headSx, width: isProgrammer ? "17%" : "20%", bgcolor: alpha(tabColor, 0.06) }}>Producto</TableCell>
+                  <TableCell align="right" sx={{ ...headSx, width: "5%", bgcolor: alpha(tabColor, 0.06) }}>
                     Cant.
                   </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700, bgcolor: alpha(tabColor, 0.06) }}>
+                  <TableCell align="right" sx={{ ...headSx, width: "7%", bgcolor: alpha(tabColor, 0.06) }}>
                     Precio
                   </TableCell>
-                  <TableCell sx={{ fontWeight: 700, bgcolor: alpha(tabColor, 0.06) }}>Entrega</TableCell>
-                  <TableCell sx={{ fontWeight: 700, bgcolor: alpha(tabColor, 0.06) }}>Pago</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700, bgcolor: alpha(tabColor, 0.06) }}>
+                  <TableCell sx={{ ...headSx, width: isProgrammer ? "12%" : "14%", bgcolor: alpha(tabColor, 0.06) }}>Entrega</TableCell>
+                  <TableCell sx={{ ...headSx, width: isProgrammer ? "12%" : "14%", bgcolor: alpha(tabColor, 0.06) }}>Pago</TableCell>
+                  <TableCell align="right" sx={{ ...headSx, width: "7%", bgcolor: alpha(tabColor, 0.06) }}>
                     Stock
                   </TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700, bgcolor: alpha(tabColor, 0.06) }}>
+                  <TableCell align="right" sx={{ ...headSx, width: "5%", bgcolor: alpha(tabColor, 0.06) }}>
                     Mín.
                   </TableCell>
                   {isProgrammer && (
-                    <TableCell align="right" sx={{ fontWeight: 700, bgcolor: alpha(tabColor, 0.06) }}>
-                      Acciones
+                    <TableCell align="center" sx={{ ...headSx, width: "5%", bgcolor: alpha(tabColor, 0.06) }}>
+                      ···
                     </TableCell>
                   )}
                 </TableRow>
@@ -367,77 +409,84 @@ export default function OrderStatusWorkbenchContent({
                   const isEditing = editingItemId === item.id;
                   return (
                     <TableRow key={`${orderId}-${item.id}`} hover>
-                      <TableCell sx={{ fontWeight: 700, whiteSpace: "nowrap" }}>#{orderId}</TableCell>
-                      <TableCell sx={{ minWidth: 120 }}>{customer}</TableCell>
-                      <TableCell sx={{ whiteSpace: "nowrap" }}>{orderDate}</TableCell>
-                      <TableCell sx={{ fontWeight: 600, minWidth: 140 }}>{productLabel}</TableCell>
-                      <TableCell align="right">{item.quantity}</TableCell>
-                      <TableCell align="right">{money(item.price)}</TableCell>
-                      <TableCell>
+                      <TableCell sx={{ ...cellSx, fontWeight: 700 }}>#{orderId}</TableCell>
+                      <TableCell
+                        sx={{
+                          ...cellSx,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={customer}
+                      >
+                        {customer}
+                      </TableCell>
+                      <TableCell sx={cellSx} title={orderDate}>
+                        {formatShortOrderDate(orderDate)}
+                      </TableCell>
+                      <TableCell
+                        sx={{
+                          ...cellSx,
+                          fontWeight: 600,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={productLabel}
+                      >
+                        {productLabel}
+                      </TableCell>
+                      <TableCell align="right" sx={cellSx}>{item.quantity}</TableCell>
+                      <TableCell align="right" sx={{ ...cellSx, whiteSpace: "nowrap" }}>
+                        {money(item.price)}
+                      </TableCell>
+                      <TableCell sx={cellSx}>
                         {isEditing ? (
-                          <Stack spacing={0.5} sx={{ minWidth: 200 }}>
-                            <TextField
-                              type="datetime-local"
-                              size="small"
-                              value={draft.deliveredAt}
-                              onChange={(e) =>
-                                setDraft((d) => ({ ...d, deliveredAt: e.target.value }))
-                              }
-                              InputLabelProps={{ shrink: true }}
-                            />
-                            <Button
-                              size="small"
-                              variant="text"
-                              onClick={() => setNow("deliveredAt")}
-                              sx={{ alignSelf: "flex-start", textTransform: "none", py: 0 }}
-                            >
-                              Ahora
-                            </Button>
-                          </Stack>
+                          <CompactDateField
+                            value={draft.deliveredAt}
+                            onChange={(e) =>
+                              setDraft((d) => ({ ...d, deliveredAt: e.target.value }))
+                            }
+                            onNow={() => setNow("deliveredAt")}
+                          />
                         ) : (
                           <StatusChip
                             ok={!!item.deliveredAt}
                             labelOk={item.deliveredAt || "Entregado"}
-                            labelNo="Sin entregar"
-                            icon={<LocalShippingIcon />}
+                            labelNo="Pend."
+                            icon={<LocalShippingIcon sx={{ fontSize: "14px !important" }} />}
                             okColor="info"
                             noColor="warning"
                           />
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell sx={cellSx}>
                         {isEditing ? (
-                          <Stack spacing={0.5} sx={{ minWidth: 200 }}>
-                            <TextField
-                              type="datetime-local"
-                              size="small"
-                              value={draft.paidAt}
-                              onChange={(e) =>
-                                setDraft((d) => ({ ...d, paidAt: e.target.value }))
-                              }
-                              InputLabelProps={{ shrink: true }}
-                            />
-                            <Button
-                              size="small"
-                              variant="text"
-                              onClick={() => setNow("paidAt")}
-                              sx={{ alignSelf: "flex-start", textTransform: "none", py: 0 }}
-                            >
-                              Ahora
-                            </Button>
-                          </Stack>
+                          <CompactDateField
+                            value={draft.paidAt}
+                            onChange={(e) =>
+                              setDraft((d) => ({ ...d, paidAt: e.target.value }))
+                            }
+                            onNow={() => setNow("paidAt")}
+                          />
                         ) : (
                           <StatusChip
                             ok={!!item.paidAt}
                             labelOk={item.paidAt || "Pagado"}
-                            labelNo="Sin pagar"
-                            icon={item.paidAt ? <CheckCircleIcon /> : <CancelIcon />}
+                            labelNo="Pend."
+                            icon={
+                              item.paidAt ? (
+                                <CheckCircleIcon sx={{ fontSize: "14px !important" }} />
+                              ) : (
+                                <CancelIcon sx={{ fontSize: "14px !important" }} />
+                              )
+                            }
                             okColor="success"
                             noColor="error"
                           />
                         )}
                       </TableCell>
-                      <TableCell align="right">
+                      <TableCell align="right" sx={cellSx}>
                         {isEditing ? (
                           <TextField
                             type="number"
@@ -446,7 +495,11 @@ export default function OrderStatusWorkbenchContent({
                             onChange={(e) =>
                               setDraft((d) => ({ ...d, stock: e.target.value }))
                             }
-                            sx={{ width: 72 }}
+                            fullWidth
+                            sx={{
+                              "& .MuiInputBase-root": { fontSize: "0.75rem" },
+                              "& .MuiInputBase-input": { py: 0.5, px: 0.5, textAlign: "right" },
+                            }}
                             inputProps={{ min: 0, step: "any" }}
                           />
                         ) : (
@@ -456,15 +509,17 @@ export default function OrderStatusWorkbenchContent({
                             color={
                               Number(item.productStock ?? 0) <= 0
                                 ? "error"
-                                : Number(item.productStock ?? 0) <= Number(item.productMinStock ?? 0)
+                                : Number(item.productStock ?? 0) <=
+                                    Number(item.productMinStock ?? 0)
                                   ? "warning"
                                   : "default"
                             }
                             variant="outlined"
+                            sx={{ "& .MuiChip-label": { px: 0.5, fontSize: "0.7rem" } }}
                           />
                         )}
                       </TableCell>
-                      <TableCell align="right">
+                      <TableCell align="right" sx={cellSx}>
                         {isEditing ? (
                           <TextField
                             type="number"
@@ -473,7 +528,11 @@ export default function OrderStatusWorkbenchContent({
                             onChange={(e) =>
                               setDraft((d) => ({ ...d, minStock: e.target.value }))
                             }
-                            sx={{ width: 72 }}
+                            fullWidth
+                            sx={{
+                              "& .MuiInputBase-root": { fontSize: "0.75rem" },
+                              "& .MuiInputBase-input": { py: 0.5, px: 0.5, textAlign: "right" },
+                            }}
                             inputProps={{ min: 0, step: "any" }}
                           />
                         ) : (
@@ -481,7 +540,7 @@ export default function OrderStatusWorkbenchContent({
                         )}
                       </TableCell>
                       {isProgrammer && (
-                        <TableCell align="right" sx={{ whiteSpace: "nowrap" }}>
+                        <TableCell align="center" sx={{ ...cellSx, px: 0.25 }}>
                           {isEditing ? (
                             <>
                               <Tooltip title="Guardar">

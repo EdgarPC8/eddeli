@@ -98,6 +98,20 @@ export function parseDisplayDateToInput(display) {
   return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
 }
 
+export function formatShortDisplayDate(display) {
+  if (!display) return null;
+  const m = String(display).match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
+  if (!m) return String(display).slice(0, 14);
+  return `${m[1]}/${m[2]} ${m[4]}:${m[5]}`;
+}
+
+export function formatShortOrderDate(display) {
+  if (!display || display === "—") return "—";
+  const m = String(display).match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if (!m) return String(display).slice(0, 10);
+  return `${m[1]}/${m[2]}/${m[3]}`;
+}
+
 export function inputToApiDate(value) {
   if (!value) return null;
   const d = new Date(value);

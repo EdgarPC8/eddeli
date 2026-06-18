@@ -135,9 +135,22 @@ function ProductsPage() {
       render: (params) => params.ERP_inventory_category?.name,
     },
     {
-      label: "Precio",
+      label: "P. proveedor",
+      id: "supplierPrice",
+      width: 90,
+      render: (row) => `$${Number(row.supplierPrice ?? 0).toFixed(2)}`,
+    },
+    {
+      label: "P. distribuidor",
+      id: "distributorPrice",
+      width: 100,
+      render: (row) => `$${Number(row.distributorPrice ?? 0).toFixed(2)}`,
+    },
+    {
+      label: "P. venta",
       id: "price",
-      width: 50,
+      width: 80,
+      render: (row) => `$${Number(row.price ?? 0).toFixed(2)}`,
     },
     {
       label: "Stock",

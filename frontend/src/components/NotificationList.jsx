@@ -16,6 +16,10 @@ import {
 } from "@mui/material";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import NotificationsNoneIcon from "@mui/icons-material/NotificationsNone";
+import WbSunnyIcon from "@mui/icons-material/WbSunny";
+import NightsStayIcon from "@mui/icons-material/NightsStay";
+import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import EventNoteIcon from "@mui/icons-material/EventNote";
 import StorefrontIcon from "@mui/icons-material/Storefront";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -24,6 +28,27 @@ import {
   deleteNotification,
 } from "../api/notificationsRequest.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { useNotificationSocket } from "../hooks/useNotificationSocket.js";
+
+function notificationAvatar(notif) {
+  const title = String(notif?.title || "").toLowerCase();
+  if (notif?.type === "alert") {
+    return { icon: <WarningAmberIcon />, bgcolor: "warning.main" };
+  }
+  if (notif?.type === "reminder") {
+    return { icon: <EventNoteIcon />, bgcolor: "info.main" };
+  }
+  if (title.includes("buenas noches")) {
+    return { icon: <NightsStayIcon />, bgcolor: "secondary.main" };
+  }
+  if (title.includes("buenas tardes")) {
+    return { icon: <WbSunnyIcon />, bgcolor: "warning.light" };
+  }
+  if (title.includes("buenos días") || title.includes("buenos dias")) {
+    return { icon: <WbSunnyIcon />, bgcolor: "primary.main" };
+  }
+  return { icon: <StorefrontIcon />, bgcolor: "primary.main" };
+}
 
 function parseNotificationDate(dateString) {
   if (!dateString) return null;
@@ -108,6 +133,16 @@ export default function NotificationList({ setCount }) {
     fetchData();
   }, [user?.userId, setCount]);
 
+  useNotificationSocket(user?.userId, user?.accountId, (notif) => {
+    if (!notif?.id) return;
+    setNotifications((prev) => {
+      if (prev.some((n) => n.id === notif.id)) return prev;
+      const next = [notif, ...prev];
+      if (setCount) setCount(next.filter((n) => !n.seen).length);
+      return next;
+    });
+  });
+
   const handleMarkAsRead = async () => {
     if (!selectedNotifId) return;
     const id = selectedNotifId;
@@ -190,7 +225,9 @@ export default function NotificationList({ setCount }) {
           No hay notificaciones
         </Typography>
       ) : (
-        filtered.map((notif) => (
+        filtered.map((notif) => {
+          const avatar = notificationAvatar(notif);
+          return (
           <Box
             key={notif.id}
             sx={{
@@ -204,8 +241,8 @@ export default function NotificationList({ setCount }) {
             }}
             onClick={() => notif.link && navigate(notif.link)}
           >
-            <Avatar sx={{ mr: 2, bgcolor: "primary.main" }}>
-              <StorefrontIcon />
+            <Avatar sx={{ mr: 2, bgcolor: avatar.bgcolor }}>
+              {avatar.icon}
             </Avatar>
             <Box flex={1}>
               <Typography variant="body1" fontWeight={notif.seen ? 400 : 700}>
@@ -230,7 +267,8 @@ export default function NotificationList({ setCount }) {
               <MoreVertIcon fontSize="small" />
             </IconButton>
           </Box>
-        ))
+          );
+        })
       )}
       <Menu anchorEl={menuAnchor} open={Boolean(menuAnchor)} onClose={() => setMenuAnchor(null)}>
         <MenuItem onClick={handleMarkAsRead}>Marcar como leída</MenuItem>

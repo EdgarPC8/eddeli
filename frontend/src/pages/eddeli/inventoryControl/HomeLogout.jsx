@@ -212,7 +212,7 @@ export default function HomeLogout() {
         </Stack>
 
         <Typography variant="body2" color="text.secondary">
-          📞 {activeApp.phone || "0992371711"} — {activeApp.alias}
+          📞 {activeApp.phone || "0969236901"} — {activeApp.alias}
         </Typography>
 
         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>

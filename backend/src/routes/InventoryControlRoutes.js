@@ -48,6 +48,8 @@ import {
 
 import {
   registerMovement,
+  registerMovementsBatch,
+  openPresentationMovement,
   getMovementsByProduct,
   getAllMovements,
   updateMovement,
@@ -97,6 +99,15 @@ import {
   getCatalogBySection,
   getCatalogBySections,
 } from "../controllers/InventoryControl/CatalogVitrinaController.js";
+import {
+  getPublicCompareGroups,
+  getCompareGroups,
+  getCompareGroupById,
+  createCompareGroup,
+  updateCompareGroup,
+  deleteCompareGroup,
+  bootstrapPastelesCompareGroup,
+} from "../controllers/InventoryControl/ProductCompareGroupController.js";
 
 import {
   getProductsByStore,
@@ -135,6 +146,15 @@ router.post("/catalog/reorder", isAuthenticated, reorderCatalogEntries);
 // CatalogVitrinaController: vitrina /backery (CatalogPage)
 router.get("/catalog/section/:section", getCatalogBySection);   // → CatalogPage
 router.get("/catalog/sections", getCatalogBySections);
+
+// Grupos comparativos (pasteles, etc.)
+router.get("/compare-groups/public", getPublicCompareGroups);
+router.get("/compare-groups", isAuthenticated, getCompareGroups);
+router.get("/compare-groups/:id", isAuthenticated, getCompareGroupById);
+router.post("/compare-groups", isAuthenticated, createCompareGroup);
+router.post("/compare-groups/bootstrap-pasteles", isAuthenticated, bootstrapPastelesCompareGroup);
+router.put("/compare-groups/:id", isAuthenticated, updateCompareGroup);
+router.delete("/compare-groups/:id", isAuthenticated, deleteCompareGroup);
 
 
 
@@ -188,6 +208,8 @@ router.patch('/generic-ingredients/presentations/:productId/unlink', isAuthentic
 // ----------------------------------
 // Registrar un nuevo movimiento de inventario
 router.post('/movements', isAuthenticated, registerMovement);
+router.post('/movements/batch', isAuthenticated, registerMovementsBatch);
+router.post('/movements/open-presentation', isAuthenticated, openPresentationMovement);
 router.put('/movements/batch/date', isAuthenticated, updateMovementsDateBatch);
 router.put('/movements/:movementId', isAuthenticated, updateMovement);
 router.delete('/movements/:movementId', isAuthenticated, deleteMovement);

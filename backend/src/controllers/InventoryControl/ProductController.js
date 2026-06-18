@@ -147,6 +147,7 @@ export const createProduct = async (req, res) => {
       "stock",
       "minStock",
       "price",
+      "supplierPrice",
       "distributorPrice",
       "taxRate",
     ].forEach((k) => {

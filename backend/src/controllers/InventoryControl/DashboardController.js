@@ -1,16 +1,14 @@
 import { getFinanceSummary, getAllExpenses } from "./FinanceController.js";
 import {
   getOrderAnalytics,
-  getWeeklySales,
-  getTopProductsDailySales,
   getIncomeExpenseBreakdown,
-  getOrdersForCharts,
   getExpensesForChart,
 } from "./AnalyticsController.js";
 import { getAllOrders } from "./OrderController.js";
 import { getFinanceWorkbenchAll } from "./OrderGroupFinanceController.js";
 import { getAllProducts } from "./ProductController.js";
 import { invokeController, buildProductsStockAlerts } from "../../utils/invokeController.js";
+import { computeObligationsDashboardData } from "./LoanObligationController.js";
 
 /**
  * GET /finance/dashboard — carga agregada para el dashboard (una sola petición).
@@ -22,25 +20,21 @@ export const getFinanceDashboard = async (req, res) => {
       expenses,
       orders,
       overView,
-      weeklySales,
-      topProductsDailySales,
       incomeExpenseBreakdown,
-      ordersForCharts,
       expensesForChart,
       workbench,
       products,
+      obligations,
     ] = await Promise.all([
       invokeController(getFinanceSummary, req),
       invokeController(getAllExpenses, req),
       invokeController(getAllOrders, req),
       invokeController(getOrderAnalytics, req),
-      invokeController(getWeeklySales, req),
-      invokeController(getTopProductsDailySales, req),
       invokeController(getIncomeExpenseBreakdown, req),
-      invokeController(getOrdersForCharts, req),
       invokeController(getExpensesForChart, req),
       invokeController(getFinanceWorkbenchAll, req),
       invokeController(getAllProducts, req),
+      computeObligationsDashboardData(),
     ]);
 
     const productsStock = buildProductsStockAlerts(products);
@@ -50,10 +44,7 @@ export const getFinanceDashboard = async (req, res) => {
       expenses: Array.isArray(expenses) ? expenses : [],
       orders: Array.isArray(orders) ? orders : [],
       overView: Array.isArray(overView) ? overView : [],
-      weeklySales: weeklySales ?? { labels: [], values: [] },
-      topProductsDailySales: topProductsDailySales ?? {},
       incomeExpenseBreakdown: incomeExpenseBreakdown ?? {},
-      ordersForCharts: Array.isArray(ordersForCharts) ? ordersForCharts : [],
       expensesForChart: Array.isArray(expensesForChart) ? expensesForChart : [],
       workbench: {
         customers: workbench?.customers ?? [],
@@ -62,6 +53,10 @@ export const getFinanceDashboard = async (req, res) => {
         payments: workbench?.payments ?? [],
       },
       productsStock,
+      obligations: obligations ?? {
+        summary: { totalReceivable: 0, totalPayable: 0, openCount: 0 },
+        topOpen: [],
+      },
     });
   } catch (error) {
     console.error("getFinanceDashboard:", error);

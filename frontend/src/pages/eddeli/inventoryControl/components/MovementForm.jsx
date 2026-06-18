@@ -1,22 +1,43 @@
 import {
-  Grid,
-  TextField,
   Box,
   Button,
-  MenuItem,
-  Typography,
-  Divider,
+  Chip,
   FormControl,
-  FormLabel,
-  RadioGroup,
   FormControlLabel,
+  FormLabel,
+  Grid,
+  IconButton,
+  List,
+  ListItem,
+  ListItemText,
+  MenuItem,
+  Paper,
   Radio,
+  RadioGroup,
+  Stack,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Typography,
+  alpha,
+  useTheme,
 } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import InventoryIcon from "@mui/icons-material/Inventory";
+import CallReceivedIcon from "@mui/icons-material/CallReceived";
+import CallMadeIcon from "@mui/icons-material/CallMade";
+import TuneIcon from "@mui/icons-material/Tune";
+import PrecisionManufacturingIcon from "@mui/icons-material/PrecisionManufacturing";
+import UnarchiveIcon from "@mui/icons-material/Unarchive";
 import { useForm } from "react-hook-form";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../../../context/AuthContext";
 import {
+  openPresentationMovementRequest,
   registerMovement,
+  registerMovementsBatchRequest,
+  registerProductionFinalFromPayload,
   updateMovement,
 } from "../../../../api/inventoryControlRequest";
 import SimulateProductionComponent from "./SimulateProduction.jsx";
@@ -26,55 +47,92 @@ import ProgrammerMovementDateField, {
   todayDateInput,
   isoToDateInput,
 } from "./ProgrammerMovementDateField.jsx";
+import {
+  MOVEMENT_TYPES,
+  REASON_OPTIONS,
+  estimateGramsPerPack,
+  getUnitAbbr,
+  gramsToGenericDisplay,
+  getMovementQuantityLabel,
+  getMovementQuantityHelper,
+  getMovementCatalogPrice,
+  getMovementCatalogPriceLabel,
+  isGenericIngredientProduct,
+  isPresentationProduct,
+  isPriceRequired,
+  isPriceOptional,
+  showPriceField,
+} from "./movementFormConfig.js";
+import AttachmentField from "./AttachmentField.jsx";
+import { uploadMovementVoucher } from "../../../../api/documentRequest.js";
 
-function normalizeAbbr(abbr) {
-  return String(abbr || "").trim().toLowerCase();
+const BATCH_TYPES = new Set(["entrada", "salida", "ajuste"]);
+
+function reasonLabel(type, reason) {
+  return REASON_OPTIONS[type]?.find((r) => r.value === reason)?.label || reason || "—";
 }
 
-// Detecta si la unidad es "unidad" (un, u, und, unidad, pcs, etc.)
-function isUnitBasedByAbbr(abbr) {
-  const a = normalizeAbbr(abbr);
-  return ["un", "u", "und", "unidad", "unit", "units", "pc", "pcs"].includes(a);
+function typeLabel(type) {
+  return MOVEMENT_TYPES.find((t) => t.value === type)?.label || type;
 }
 
-// Detecta si es basado en gramos/kilos (g, gr, kg)
-function isGramBasedByAbbr(abbr) {
-  const a = normalizeAbbr(abbr);
-  return ["g", "gr", "gram", "grams", "kg", "kilo", "kilos"].includes(a);
+function newCartId() {
+  return `line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
+
+const TYPE_ICONS = {
+  entrada: CallReceivedIcon,
+  salida: CallMadeIcon,
+  ajuste: TuneIcon,
+  produccion: PrecisionManufacturingIcon,
+  apertura: UnarchiveIcon,
+};
 
 function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = null }) {
+  const theme = useTheme();
+  const { toast: toastAuth, user } = useAuth();
+  const isProgrammer = user?.loginRol === "Programador";
+  const isEdit = Boolean(movementToEdit?.id);
+
   const { handleSubmit, register, reset, setValue, watch } = useForm({
     defaultValues: {
       productId: "",
       type: "entrada",
-      reason: "", // ✅ obligatorio ahora
+      reason: "ENTRADA_COMPRA",
       quantity: "",
       price: "",
       description: "",
       referenceType: "",
       referenceId: "",
-      pricingRuleMode: "auto", // ✅ NUEVO: auto | invert
+      pricingRuleMode: "auto",
+      packsToOpen: "1",
     },
   });
 
-  const { toast: toastAuth, user } = useAuth();
-  const isProgrammer = user?.loginRol === "Programador";
-  const isEdit = Boolean(movementToEdit?.id);
   const [movementDate, setMovementDate] = useState(todayDateInput());
   const [simulatedData, setSimulatedData] = useState(null);
+  const [cart, setCart] = useState([]);
+  const [pendingVoucherFile, setPendingVoucherFile] = useState(null);
 
   const selectedProductId = watch("productId");
   const selectedType = watch("type");
   const selectedReason = watch("reason");
-  const pricingRuleMode = watch("pricingRuleMode"); // auto | invert
-
-  const isAjuste = selectedType === "ajuste";
-
+  const pricingRuleMode = watch("pricingRuleMode");
   const quantityRaw = watch("quantity");
+  const packsRaw = watch("packsToOpen");
+
   const quantityValue = Number(quantityRaw || 0);
   const quantityIsEmpty = quantityRaw === "" || quantityRaw == null;
+  const packsToOpen = Math.max(1, Math.floor(Number(packsRaw) || 1));
   const priceInputValue = watch("price") === "" ? null : Number(watch("price"));
+
+  const isAjuste = selectedType === "ajuste";
+  const isApertura = selectedType === "apertura";
+  const isProduccion = selectedType === "produccion";
+  const isBatchType = BATCH_TYPES.has(selectedType) && !isEdit;
+  const needsPrice = showPriceField(selectedType, selectedReason);
+  const priceRequired = isPriceRequired(selectedType, selectedReason);
+  const priceOptional = isPriceOptional(selectedType);
 
   const productById = useMemo(() => {
     const map = new Map();
@@ -82,46 +140,70 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
     return map;
   }, [productOptions]);
 
+  const genericById = useMemo(() => {
+    const map = new Map();
+    (productOptions || []).forEach((p) => {
+      if (p.isGenericIngredient && !p.genericProductId) map.set(Number(p.id), p);
+    });
+    return map;
+  }, [productOptions]);
+
+  const filteredProductOptions = useMemo(() => {
+    if (isApertura) {
+      return (productOptions || []).filter(isPresentationProduct);
+    }
+    return productOptions || [];
+  }, [productOptions, isApertura]);
+
   const selectedProduct = useMemo(() => {
     const pid = Number(selectedProductId);
     if (!pid) return null;
     return productById.get(pid) || null;
   }, [selectedProductId, productById]);
 
-  // ✅ IMPORTANTE:
-  // Ajusta estos accesos si tu include llega con otro nombre.
-  const unitAbbr =
-    selectedProduct?.unit?.abbreviation ||
-    selectedProduct?.InventoryUnit?.abbreviation ||
-    selectedProduct?.ERP_inventory_unit?.abbreviation ||
-    "";
+  const linkedGeneric = useMemo(() => {
+    if (!selectedProduct?.genericProductId) return null;
+    return genericById.get(Number(selectedProduct.genericProductId)) || null;
+  }, [selectedProduct, genericById]);
 
-  const quantityLabel = isAjuste
-    ? unitAbbr
-      ? `Nuevo stock (${unitAbbr})`
-      : "Nuevo stock"
-    : unitAbbr
-      ? `Cantidad (${unitAbbr})`
-      : "Cantidad";
+  const unitAbbr = getUnitAbbr(selectedProduct);
+  const quantityLabel = getMovementQuantityLabel(selectedProduct, { isAjuste });
+  const quantityHelper = getMovementQuantityHelper(selectedProduct);
+  const catalogPrice = getMovementCatalogPrice(selectedProduct, selectedType, selectedReason);
+  const catalogPriceLabel = getMovementCatalogPriceLabel(selectedType, selectedReason);
 
-  const reasonOptionsByType = {
-    entrada: [
-      { value: "ENTRADA_COMPRA", label: "Entrada por compra" },
-      { value: "ENTRADA_DEVOLUCION", label: "Entrada por devolución" },
-      { value: "ENTRADA_OTRA", label: "Otra entrada" },
-    ],
-    salida: [
-      { value: "SALIDA_VENTA", label: "Salida por venta" },
-      { value: "SALIDA_CONSUMO", label: "Salida por consumo/uso interno" },
-      { value: "SALIDA_MERMA", label: "Salida por merma/daño" },
-      { value: "SALIDA_OTRA", label: "Otra salida" },
-    ],
-    ajuste: [{ value: "AJUSTE_INVENTARIO", label: "Ajuste de inventario" }],
-    produccion: [
-      { value: "PRODUCCION_FINAL", label: "Producción (producto final)" },
-      { value: "PRODUCCION_INTERMEDIA", label: "Producción (intermedio)" },
-    ],
-  };
+  const showVoucherField = useMemo(() => {
+    if (isEdit) return false;
+    if (cart.some((l) => l.type === "entrada" && l.reason === "ENTRADA_COMPRA")) return true;
+    return selectedType === "entrada" && selectedReason === "ENTRADA_COMPRA";
+  }, [isEdit, cart, selectedType, selectedReason]);
+
+  const shouldMultiply = pricingRuleMode === "invert";
+
+  const totalToSave = useMemo(() => {
+    if (!needsPrice || priceInputValue == null || Number.isNaN(priceInputValue)) return null;
+    if (shouldMultiply) {
+      const qty = Number(quantityValue || 0);
+      if (!qty || Number.isNaN(qty)) return null;
+      return qty * priceInputValue;
+    }
+    return priceInputValue;
+  }, [needsPrice, priceInputValue, quantityValue, shouldMultiply]);
+
+  const aperturaPreview = useMemo(() => {
+    if (!isApertura || !selectedProduct) return null;
+    const gramsPerPack = estimateGramsPerPack(selectedProduct);
+    const totalGrams = gramsPerPack * packsToOpen;
+    const genericDisplay = linkedGeneric
+      ? gramsToGenericDisplay(linkedGeneric, totalGrams)
+      : null;
+    return {
+      gramsPerPack,
+      totalGrams,
+      genericDisplay,
+      presStock: Number(selectedProduct.stock ?? 0),
+    };
+  }, [isApertura, selectedProduct, packsToOpen, linkedGeneric]);
 
   useEffect(() => {
     if (!movementToEdit) return;
@@ -136,153 +218,250 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
     setSimulatedData(null);
   }, [movementToEdit, setValue]);
 
-  // ✅ setea producto inicial si hay opciones (solo crear)
   useEffect(() => {
     if (isEdit) return;
-    if ((productOptions || []).length > 0) {
-      const firstId = String(productOptions[0].id);
+    if (filteredProductOptions.length > 0) {
+      const firstId = String(filteredProductOptions[0].id);
       setValue("productId", firstId, { shouldValidate: true, shouldDirty: false });
+    } else {
+      setValue("productId", "", { shouldDirty: false });
     }
-  }, [productOptions, setValue, isEdit]);
+  }, [filteredProductOptions, setValue, isEdit, selectedType]);
 
-  // Motivo por defecto según tipo (no sobrescribir al editar)
   useEffect(() => {
     if (isEdit) return;
     if (selectedType === "entrada") setValue("reason", "ENTRADA_COMPRA", { shouldDirty: false });
     else if (selectedType === "salida") setValue("reason", "SALIDA_CONSUMO", { shouldDirty: false });
     else if (selectedType === "ajuste") setValue("reason", "AJUSTE_INVENTARIO", { shouldDirty: false });
-    else if (selectedType === "produccion") setValue("reason", "PRODUCCION_FINAL", { shouldDirty: false });
-  }, [selectedType, setValue]);
+    setValue("price", "", { shouldDirty: false });
+    setValue("pricingRuleMode", "auto", { shouldDirty: false });
+    setSimulatedData(null);
+    setPendingVoucherFile(null);
+  }, [selectedType, setValue, isEdit]);
 
-  // ✅ si cambia tipo/producto/cantidad, resetea simulación cuando no aplique
   useEffect(() => {
-    if (selectedType !== "produccion") {
-      setSimulatedData(null);
-      return;
-    }
-    if (!selectedProductId || quantityValue <= 0) {
-      setSimulatedData(null);
-    }
+    if (selectedType !== "produccion") setSimulatedData(null);
   }, [selectedType, selectedProductId, quantityValue]);
 
   useEffect(() => {
-    if (selectedType === "ajuste") {
-      setValue("price", "", { shouldDirty: false });
-      setValue("pricingRuleMode", "auto", { shouldDirty: false });
+    if (!needsPrice) setValue("price", "", { shouldDirty: false });
+  }, [needsPrice, setValue]);
+
+  useEffect(() => {
+    if (isEdit || !needsPrice || !selectedProduct) return;
+    const ref = getMovementCatalogPrice(selectedProduct, selectedType, selectedReason);
+    if (ref > 0) {
+      setValue("price", String(ref), { shouldDirty: false });
     }
-  }, [selectedType, setValue]);
+  }, [
+    selectedProductId,
+    selectedType,
+    selectedReason,
+    needsPrice,
+    isEdit,
+    selectedProduct,
+    setValue,
+  ]);
 
-  /**
-   * ✅ REGLA CORREGIDA:
-   * - Por defecto NO multiplica (el precio ingresado es el TOTAL pagado)
-   * - Si el usuario quiere ingresar precio unitario, puede usar "invertir regla"
-   * - Esto evita errores donde se multiplica cuando no se debe
-   */
-  const baseShouldMultiply = useMemo(() => {
-    // Por defecto NO multiplicamos - el precio es el total
-    return false;
-  }, []);
+  const buildDescription = (formData, product, totalPrice) => {
+    let description = formData.description?.trim() || null;
+    if (description || !product) return description;
 
-  const shouldMultiply = useMemo(() => {
-    if (pricingRuleMode === "invert") return !baseShouldMultiply;
-    return baseShouldMultiply;
-  }, [pricingRuleMode, baseShouldMultiply]);
-
-  // ✅ Total a guardar en BD (para compras y para mostrar confirmación)
-  const totalToSave = useMemo(() => {
-    if (priceInputValue == null || Number.isNaN(priceInputValue)) return null;
-
-    if (shouldMultiply) {
-      const qty = Number(quantityValue || 0);
-      if (!qty || Number.isNaN(qty)) return null;
-      return qty * priceInputValue;
+    const qty = Number(formData.quantity) || 0;
+    const abbr = getUnitAbbr(product);
+    const actionMap = {
+      entrada: "Entraron",
+      salida: "Salieron",
+      ajuste: "Ajuste a",
+      produccion: "Producción de",
+    };
+    description = `${actionMap[formData.type] || "Movimiento de"} ${qty} ${abbr || "unidades"} de ${product.name}`;
+    if (totalPrice != null && qty > 0) {
+      const unit = totalPrice / qty;
+      description += `. Precio unitario: ${new Intl.NumberFormat("es-EC", {
+        style: "currency",
+        currency: "USD",
+      }).format(unit)}`;
     }
+    return description;
+  };
 
-    return priceInputValue;
-  }, [priceInputValue, quantityValue, shouldMultiply]);
-
-  const priceLabel = useMemo(() => {
-    // Por defecto el precio es TOTAL (lo que pagaste)
-    // Solo si el usuario invierte la regla, entonces es precio unitario
-    if (selectedType === "entrada" && selectedReason === "ENTRADA_COMPRA") {
-      return shouldMultiply ? "Precio Unitario" : "Precio Total (lo que pagaste)";
+  const buildCurrentLinePayload = (formData) => {
+    const product = productById.get(Number(formData.productId));
+    const abbr = getUnitAbbr(product);
+    const type = formData.type;
+    const reason =
+      type === "ajuste" ? "AJUSTE_INVENTARIO" : formData.reason;
+    const needsPriceLine = showPriceField(type, reason);
+    let lineTotal = null;
+    if (
+      needsPriceLine &&
+      priceInputValue != null &&
+      !Number.isNaN(priceInputValue) &&
+      (priceRequired || priceInputValue > 0)
+    ) {
+      lineTotal = shouldMultiply ? quantityValue * priceInputValue : priceInputValue;
     }
-    return shouldMultiply ? "Precio Unitario" : "Precio Total";
-  }, [selectedType, selectedReason, shouldMultiply]);
+    const description = buildDescription(formData, product, lineTotal);
 
-  const ruleText = useMemo(() => {
-    const u = unitAbbr ? `(${unitAbbr})` : "";
-    if (shouldMultiply) {
-      return `Regla aplicada: TOTAL = Cantidad ${u} × Precio Unitario.`;
-    }
-    return `Regla aplicada: TOTAL = Precio Total ingresado (no se multiplica).`;
-  }, [shouldMultiply, unitAbbr]);
+    return {
+      productId: Number(formData.productId),
+      type,
+      reason,
+      quantity: Number(formData.quantity),
+      description,
+      price: type === "ajuste" || !needsPriceLine ? null : lineTotal,
+      referenceType: formData.referenceType || null,
+      referenceId: formData.referenceId ? Number(formData.referenceId) : null,
+      _meta: {
+        productName: product?.name || "—",
+        unitAbbr: abbr,
+        typeLabel: typeLabel(type),
+        reasonLabel: type === "ajuste" ? "Ajuste" : reasonLabel(type, reason),
+        priceDisplay: lineTotal,
+      },
+    };
+  };
+
+  const clearLineFields = () => {
+    setValue("quantity", "", { shouldDirty: false });
+    setValue("price", "", { shouldDirty: false });
+    setValue("description", "", { shouldDirty: false });
+  };
+
+  const addCurrentLineToCart = (formData) => {
+    const payload = buildCurrentLinePayload(formData);
+    const { _meta, ...apiLine } = payload;
+    setCart((prev) => [
+      ...prev,
+      {
+        id: newCartId(),
+        ...apiLine,
+        ..._meta,
+      },
+    ]);
+    clearLineFields();
+  };
+
+  const removeCartLine = (id) => {
+    setCart((prev) => prev.filter((line) => line.id !== id));
+  };
 
   const submitForm = async (formData) => {
-    // ✅ Generar descripción automática si no hay descripción
-    let description = formData.description?.trim() || null;
-    
-    if (!description && selectedProduct) {
-      const productName = selectedProduct.name || "producto";
-      const quantity = Number(formData.quantity) || 0;
-      const priceTotal = totalToSave;
-      
-      // Determinar texto según tipo de movimiento
-      let actionText = "";
-      switch (formData.type) {
-        case "entrada":
-          actionText = "Entraron";
-          break;
-        case "salida":
-          actionText = "Salieron";
-          break;
-        case "ajuste":
-          actionText = "Ajuste a";
-          break;
-        case "produccion":
-          actionText = "Producción de";
-          break;
-        default:
-          actionText = "Movimiento de";
-      }
-      
-      // Construir descripción base
-      description = `${actionText} ${quantity} ${unitAbbr || "unidades"} de ${productName}`;
-      
-      // Si hay precio, agregar información del precio unitario
-      if (priceTotal != null && quantity > 0) {
-        const priceUnit = priceTotal / quantity;
-        const priceUnitFormatted = new Intl.NumberFormat("es-EC", {
-          style: "currency",
-          currency: "USD",
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2,
-        }).format(priceUnit);
-        
-        description += `. Precio unitario: ${priceUnitFormatted}`;
-      }
-    }
-    
     const dateApi = isProgrammer ? movementDateForApi(movementDate) : undefined;
 
+    if (isApertura && !isEdit) {
+      const promise = openPresentationMovementRequest({
+        presentationProductId: Number(formData.productId),
+        packsToOpen,
+        description: formData.description?.trim() || undefined,
+        ...(dateApi ? { date: dateApi } : {}),
+      });
+      toastAuth({
+        promise,
+        successMessage: "Presentación abierta — stock transferido al insumo genérico",
+        onSuccess: () => {
+          onClose?.();
+          onSaved?.(Number(formData.productId));
+          reset();
+          setMovementDate(todayDateInput());
+        },
+      });
+      return;
+    }
+
+    if (isProduccion && !isEdit) {
+      if (!simulatedData) return;
+      const promise = registerProductionFinalFromPayload({
+        productId: Number(simulatedData.id ?? formData.productId),
+        quantity: Number(simulatedData.cantidadDeseada ?? formData.quantity),
+        simulated: simulatedData,
+        type: "produccion",
+        description:
+          formData.description?.trim() ||
+          `Producción final de ${simulatedData.producto || selectedProduct?.name || "producto"}`,
+        ...(dateApi ? { movementDate: dateApi } : {}),
+      });
+      toastAuth({
+        promise,
+        successMessage: "Producción registrada",
+        onSuccess: () => {
+          onClose?.();
+          onSaved?.(Number(formData.productId));
+          reset();
+          setMovementDate(todayDateInput());
+          setSimulatedData(null);
+        },
+      });
+      return;
+    }
+
+    if (isBatchType) {
+      const stripMeta = (payload) => {
+        const { _meta, ...line } = payload;
+        return line;
+      };
+
+      const itemsToSave = cart.map(({ id, productName, unitAbbr, typeLabel, reasonLabel, priceDisplay, ...line }) => line);
+
+      const isCompraFlow =
+        itemsToSave.length > 0
+          ? itemsToSave.some((i) => i.type === "entrada" && i.reason === "ENTRADA_COMPRA")
+          : formData.type === "entrada" && formData.reason === "ENTRADA_COMPRA";
+
+      const voucherFile = pendingVoucherFile;
+
+      const promise =
+        itemsToSave.length > 0
+          ? registerMovementsBatchRequest(itemsToSave, dateApi)
+          : registerMovement({
+              ...stripMeta(buildCurrentLinePayload(formData)),
+              ...(dateApi ? { date: dateApi } : {}),
+            });
+
+      toastAuth({
+        promise,
+        successMessage:
+          itemsToSave.length > 1
+            ? `${itemsToSave.length} movimientos registrados`
+            : "Movimiento registrado",
+        onSuccess: async (result) => {
+          if (voucherFile && isCompraFlow) {
+            try {
+              await uploadMovementVoucher(voucherFile, result);
+            } catch {
+              toastAuth({
+                message: "Movimiento guardado, pero no se pudo subir el comprobante.",
+                variant: "warning",
+              });
+            }
+          }
+          onClose?.();
+          onSaved?.();
+          reset();
+          setCart([]);
+          setPendingVoucherFile(null);
+          setMovementDate(todayDateInput());
+        },
+      });
+      return;
+    }
+
+    const description = buildDescription(formData, selectedProduct, totalToSave);
     const dataToSend = {
       productId: Number(formData.productId),
       type: formData.type,
       reason: formData.type === "ajuste" ? "AJUSTE_INVENTARIO" : formData.reason,
       quantity: Number(formData.quantity),
-      description: description,
-
+      description,
       price:
-        formData.type === "ajuste"
+        formData.type === "ajuste" || !needsPrice
           ? null
           : totalToSave == null
             ? null
             : Number(totalToSave),
-
       referenceType: formData.referenceType || null,
       referenceId: formData.referenceId ? Number(formData.referenceId) : null,
-
-      simulated: isEdit ? null : simulatedData,
       ...(dateApi ? { date: dateApi } : {}),
     };
 
@@ -301,298 +480,555 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
 
     toastAuth({
       promise: savePromise,
-      successMessage: isEdit ? "Movimiento actualizado" : "Movimiento registrado con éxito",
+      successMessage: isEdit ? "Movimiento actualizado" : "Movimiento registrado",
       onSuccess: () => {
-        if (onClose) onClose();
-        if (onSaved) onSaved(Number(formData.productId));
+        onClose?.();
+        onSaved?.(Number(formData.productId));
         reset();
         setMovementDate(todayDateInput());
       },
     });
   };
 
+  const canSubmit = useMemo(() => {
+    if (!selectedProductId || !selectedType) return false;
+    if (isApertura && !isEdit) {
+      return (
+        Boolean(selectedProduct?.genericProductId) &&
+        packsToOpen >= 1 &&
+        Number(selectedProduct?.stock ?? 0) >= packsToOpen &&
+        (aperturaPreview?.totalGrams ?? 0) > 0
+      );
+    }
+    if (isProduccion && !isEdit) {
+      return !quantityIsEmpty && quantityValue > 0 && Boolean(simulatedData);
+    }
+    if (isAjuste) return !quantityIsEmpty && Number.isFinite(Number(quantityRaw));
+    if (quantityIsEmpty || !Number.isFinite(quantityValue) || quantityValue <= 0) return false;
+    if (!isAjuste && !selectedReason) return false;
+    if (priceRequired && (totalToSave == null || Number.isNaN(totalToSave))) return false;
+    return true;
+  }, [
+    selectedProductId,
+    selectedType,
+    isApertura,
+    isEdit,
+    selectedProduct,
+    packsToOpen,
+    aperturaPreview,
+    isProduccion,
+    quantityIsEmpty,
+    quantityValue,
+    simulatedData,
+    isAjuste,
+    quantityRaw,
+    selectedReason,
+    priceRequired,
+    totalToSave,
+  ]);
+
+  const canSaveBatch = isBatchType && (cart.length > 0 || canSubmit);
+
+  const editableTypes = isEdit
+    ? MOVEMENT_TYPES.filter((t) => t.value !== "apertura" && t.value !== "produccion")
+    : MOVEMENT_TYPES;
+
+  const submitLabel = isEdit
+    ? "Guardar cambios"
+    : isApertura
+      ? "Abrir y transferir al genérico"
+      : isProduccion
+        ? "Registrar producción"
+        : isBatchType && cart.length > 0
+          ? `Guardar todo (${cart.length})`
+          : "Registrar movimiento";
+
+  const showMotivo = !isAjuste && !isApertura && !isProduccion;
+
+  const summaryContent = (
+    <Paper variant="outlined" sx={{ p: 1.5, borderRadius: 2, height: "100%" }}>
+      <Typography variant="subtitle2" gutterBottom sx={{ fontWeight: 700 }}>
+        Resumen
+      </Typography>
+      {isApertura ? (
+        aperturaPreview && selectedProduct ? (
+          <Stack spacing={0.75}>
+            <Typography variant="body2">
+              <strong>{selectedProduct.name}</strong> → {linkedGeneric?.name || "genérico"}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              −{packsToOpen} {unitAbbr || "u"} · +
+              {aperturaPreview.totalGrams.toLocaleString("es-EC")} g
+              {aperturaPreview.genericDisplay && (
+                <>
+                  {" "}
+                  (
+                  {aperturaPreview.genericDisplay.value.toLocaleString("es-EC", {
+                    maximumFractionDigits: 2,
+                  })}{" "}
+                  {aperturaPreview.genericDisplay.label})
+                </>
+              )}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Sin precio · transferencia interna
+            </Typography>
+          </Stack>
+        ) : (
+          <Typography variant="body2" color="text.secondary">
+            Elige una presentación enlazada.
+          </Typography>
+        )
+      ) : isAjuste ? (
+        <Typography variant="body2" color="text.secondary">
+          Nuevo stock: {!quantityIsEmpty ? quantityValue : "—"} {unitAbbr} · Sin precio
+        </Typography>
+      ) : isProduccion ? (
+        <Typography variant="body2" color="text.secondary">
+          Cantidad: {quantityValue || "—"} ·{" "}
+          {simulatedData ? "Simulación lista" : "Falta simular receta"}
+        </Typography>
+      ) : (
+        <Stack spacing={0.5}>
+          <Typography variant="body2">
+            Cantidad: {quantityIsEmpty ? "—" : quantityValue} ·{" "}
+            {isGenericIngredientProduct(selectedProduct) ? "genérico" : "unidad"} ({unitAbbr || "—"})
+          </Typography>
+          {needsPrice && catalogPrice > 0 && (
+            <Typography variant="caption" color="text.secondary">
+              Precio ref. {catalogPriceLabel}:{" "}
+              {new Intl.NumberFormat("es-EC", { style: "currency", currency: "USD" }).format(
+                catalogPrice,
+              )}
+            </Typography>
+          )}
+          {needsPrice && totalToSave != null && (
+            <Typography variant="body2">
+              {selectedType === "salida" ? "Valor salida" : "Total compra"}: $
+              {Number(totalToSave).toFixed(2)}
+            </Typography>
+          )}
+          {needsPrice && totalToSave == null && selectedType === "salida" && (
+            <Typography variant="caption" color="text.secondary">
+              Valor de salida opcional (referencia).
+            </Typography>
+          )}
+          {!needsPrice && (
+            <Typography variant="caption" color="text.secondary">
+              Este movimiento no registra precio.
+            </Typography>
+          )}
+        </Stack>
+      )}
+    </Paper>
+  );
+
   return (
-    <Box component="form" onSubmit={handleSubmit(submitForm)}>
-      <Grid container spacing={2}>
-        <Grid item xs={12}>
-          <ProgrammerMovementDateField
-            isProgrammer={isProgrammer}
-            value={movementDate}
-            onChange={setMovementDate}
-          />
-        </Grid>
-
-        <Grid item xs={12}>
-          <SearchableSelect
-            label="Producto"
-            items={productOptions}
-            value={selectedProductId || ""}
-            disabled={isEdit}
-            onChange={(val) => {
-              const nextId =
-                val && typeof val === "object"
-                  ? String(val.id ?? "")
-                  : String(val ?? "");
-              setValue("productId", nextId, { shouldValidate: true, shouldDirty: true });
-
-              // al cambiar producto, también reinicio modo de regla en auto
-              setValue("pricingRuleMode", "auto", { shouldDirty: true });
-            }}
-            getOptionLabel={(opt) => opt?.name ?? ""}
-            getOptionValue={(opt) => opt?.id ?? ""}
-            placeholder="Busca un producto..."
-          />
-        </Grid>
-
-        <Grid item xs={12}>
-          <TextField
-            label="Tipo de Movimiento"
-            select
-            fullWidth
-            variant="standard"
-            value={selectedType || ""}
-            {...register("type", { required: true })}
-          >
-            <MenuItem value="entrada">Entrada</MenuItem>
-            <MenuItem value="salida">Salida</MenuItem>
-            <MenuItem value="ajuste">Ajuste</MenuItem>
-            <MenuItem value="produccion">Producción</MenuItem>
-          </TextField>
-        </Grid>
-
-        {isAjuste && selectedProduct && (
-          <Grid item xs={12}>
-            <Box
+    <Box
+      component="form"
+      onSubmit={handleSubmit(submitForm)}
+      sx={{ display: "flex", flexDirection: "column", minHeight: 0, flex: 1 }}
+    >
+      <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", pr: 0.5 }}>
+        <Stack spacing={1.5}>
+          <Box>
+            <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 0.75 }}>
+              Tipo de movimiento
+            </Typography>
+            <ToggleButtonGroup
+              exclusive
+              fullWidth
+              value={selectedType}
+              onChange={(_, v) => {
+                if (v) setValue("type", v, { shouldDirty: true });
+              }}
               sx={{
-                p: 1.5,
-                borderRadius: 1,
-                bgcolor: "action.hover",
-                border: "1px solid",
-                borderColor: "divider",
+                display: "flex",
+                flexDirection: "row",
+                flexWrap: "nowrap",
+                gap: 0.5,
+                "& .MuiToggleButtonGroup-grouped": {
+                  border: "1px solid !important",
+                  borderRadius: "10px !important",
+                  m: 0,
+                  flex: "1 1 0",
+                  minWidth: 0,
+                },
               }}
             >
-              <Typography variant="body2">
-                <strong>Stock actual en sistema:</strong>{" "}
-                {Number(selectedProduct.stock ?? 0).toLocaleString("es-EC", {
-                  minimumFractionDigits: 0,
-                  maximumFractionDigits: 4,
-                })}
-                {unitAbbr ? ` ${unitAbbr}` : ""}
-              </Typography>
-              {!quantityIsEmpty && Number.isFinite(quantityValue) && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  component="div"
-                  sx={{ mt: 0.75 }}
-                >
-                  Con el valor que ingresaste, el stock quedaría en{" "}
-                  <strong>
-                    {quantityValue.toLocaleString("es-EC", { maximumFractionDigits: 4 })}
-                  </strong>
-                  {unitAbbr ? ` ${unitAbbr}` : ""}
-                  {" · "}
-                  Variación:{" "}
-                  <strong>
-                    {(() => {
-                      const diff = quantityValue - Number(selectedProduct.stock ?? 0);
-                      return `${diff >= 0 ? "+" : ""}${diff.toLocaleString("es-EC", {
-                        maximumFractionDigits: 4,
-                      })}`;
-                    })()}
-                  </strong>
-                  {unitAbbr ? ` ${unitAbbr}` : ""}
-                </Typography>
-              )}
-            </Box>
-          </Grid>
-        )}
-
-        {!isAjuste && (
-          <Grid item xs={12}>
-            <TextField
-              label="Motivo (reason)"
-              select
-              fullWidth
-              variant="standard"
-              value={selectedReason || ""}
-              {...register("reason", { required: true })}
-              onChange={(e) => setValue("reason", e.target.value, { shouldDirty: true })}
-            >
-              {(reasonOptionsByType[selectedType] || []).map((opt) => (
-                <MenuItem key={opt.value} value={opt.value}>
-                  {opt.label}
-                </MenuItem>
-              ))}
-            </TextField>
-          </Grid>
-        )}
-
-        {/* Precio: solo entrada/salida/producción (no ajuste) */}
-        {!isAjuste && (
-          <Grid item xs={12}>
-            <FormControl>
-              <FormLabel>¿Cómo ingresarás el precio?</FormLabel>
-              <RadioGroup
-                row
-                value={pricingRuleMode}
-                onChange={(e) =>
-                  setValue("pricingRuleMode", e.target.value, { shouldDirty: true })
-                }
-              >
-                <FormControlLabel
-                  value="auto"
-                  control={<Radio />}
-                  label="Precio Total (lo que pagaste)"
-                />
-                <FormControlLabel
-                  value="invert"
-                  control={<Radio />}
-                  label="Precio Unitario (por cada unidad)"
-                />
-              </RadioGroup>
-
-              <Typography variant="body2" sx={{ mt: 0.5, color: "text.secondary" }}>
-                {ruleText}
-              </Typography>
-            </FormControl>
-          </Grid>
-        )}
-
-        <Grid item xs={12} md={isAjuste ? 12 : 6}>
-          <TextField
-            label={quantityLabel}
-            type="number"
-            fullWidth
-            variant="standard"
-            inputProps={{ step: "any", min: 0 }}
-            value={watch("quantity") || ""}
-            {...register("quantity", { required: true })}
-            onChange={(e) => setValue("quantity", e.target.value, { shouldDirty: true })}
-            helperText={
-              isAjuste
-                ? `Nuevo stock físico (${unitAbbr || "unidad del producto"}). Reemplaza el stock actual.`
-                : unitAbbr
-                  ? `Ingresa la cantidad en ${unitAbbr}.`
-                  : "Ingresa la cantidad según la unidad del producto."
-            }
-          />
-        </Grid>
-
-        {!isAjuste && (
-          <Grid item xs={12} md={6}>
-            <TextField
-              label={priceLabel}
-              type="number"
-              fullWidth
-              variant="standard"
-              inputProps={{ step: "any", min: 0 }}
-              value={watch("price") || ""}
-              {...register("price")}
-              onChange={(e) => setValue("price", e.target.value, { shouldDirty: true })}
-              helperText={
-                shouldMultiply
-                  ? "Ingresa el precio por cada unidad. Se multiplicará por la cantidad."
-                  : "Ingresa el precio total que pagaste. No se multiplicará."
-              }
-            />
-          </Grid>
-        )}
-
-        <Grid item xs={12}>
-          <Divider sx={{ my: 1 }} />
-          <Box sx={{ p: 1.2, borderRadius: 1, bgcolor: "action.hover" }}>
-            <Typography variant="subtitle2">
-              Confirmación (se guardará en BD)
-            </Typography>
-            <Typography variant="body2" sx={{ mt: 0.5 }}>
-              <b>Unidad:</b> {unitAbbr || "—"}{" "}
-              <b style={{ marginLeft: 12 }}>Cantidad:</b>{" "}
-              {!quantityIsEmpty && Number.isFinite(quantityValue) ? quantityValue : "—"}
-            </Typography>
-            {isAjuste ? (
-              <Typography variant="body2" sx={{ mt: 0.8 }}>
-                {selectedProduct && (
-                  <>
-                    <b>Stock actual:</b>{" "}
-                    {Number(selectedProduct.stock ?? 0).toLocaleString("es-EC", {
-                      maximumFractionDigits: 4,
-                    })}
-                    {unitAbbr ? ` ${unitAbbr}` : ""}
-                    <br />
-                  </>
-                )}
-                <b>Stock quedará en:</b>{" "}
-                {!quantityIsEmpty && Number.isFinite(quantityValue) ? quantityValue : "—"}{" "}
-                {unitAbbr || ""}
-                <Typography component="span" variant="caption" display="block" color="text.secondary">
-                  Sin precio en ajuste.
-                </Typography>
-              </Typography>
-            ) : (
-              <>
-                <Typography variant="body2" sx={{ mt: 0.5 }}>
-                  <b>Precio ingresado:</b>{" "}
-                  {priceInputValue == null || Number.isNaN(priceInputValue) ? "—" : priceInputValue}
-                </Typography>
-                <Typography variant="body1" sx={{ mt: 0.8 }}>
-                  <b>TOTAL a guardar:</b>{" "}
-                  {totalToSave == null || Number.isNaN(totalToSave)
-                    ? "—"
-                    : totalToSave.toFixed(2)}
-                </Typography>
-              </>
-            )}
+              {editableTypes.map((opt) => {
+                const Icon = TYPE_ICONS[opt.value] || InventoryIcon;
+                const palette = theme.palette[opt.color]?.main || theme.palette.primary.main;
+                const active = selectedType === opt.value;
+                return (
+                  <ToggleButton
+                    key={opt.value}
+                    value={opt.value}
+                    sx={{
+                      flexDirection: "column",
+                      py: 0.75,
+                      px: 0.25,
+                      textTransform: "none",
+                      gap: 0.15,
+                      bgcolor: active ? alpha(palette, 0.14) : "background.paper",
+                      borderColor: active ? palette : "divider",
+                      color: active ? palette : "text.secondary",
+                      "&.Mui-selected": {
+                        bgcolor: alpha(palette, 0.14),
+                        color: palette,
+                        "&:hover": { bgcolor: alpha(palette, 0.2) },
+                      },
+                    }}
+                  >
+                    <Icon sx={{ fontSize: 18 }} />
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        fontWeight: active ? 800 : 600,
+                        lineHeight: 1.1,
+                        fontSize: "0.65rem",
+                        display: { xs: "none", sm: "block" },
+                      }}
+                    >
+                      {opt.label}
+                    </Typography>
+                  </ToggleButton>
+                );
+              })}
+            </ToggleButtonGroup>
           </Box>
-        </Grid>
 
-        <Grid item xs={12}>
-          <TextField
-            label="Descripción"
-            fullWidth
-            variant="standard"
-            multiline
-            rows={3}
-            {...register("description")}
-          />
-        </Grid>
+          <Grid container spacing={1.5} alignItems="stretch">
+            <Grid item xs={12} md={6}>
+              <Stack spacing={1.5} sx={{ height: "100%" }}>
+                {isProgrammer && (
+                  <ProgrammerMovementDateField
+                    isProgrammer={isProgrammer}
+                    value={movementDate}
+                    onChange={setMovementDate}
+                  />
+                )}
 
-        {/* Simulación solo al crear producción */}
-        {!isEdit &&
-          selectedType === "produccion" &&
-          selectedProductId &&
-          Number(selectedProductId) > 0 &&
-          quantityValue > 0 && (
-            <Grid item xs={12}>
-              <SimulateProductionComponent
-                embedProductId={Number(selectedProductId)}
-                embedQuantity={quantityValue}
-                onSimulated={(data) => setSimulatedData(data)}
-              />
+                <SearchableSelect
+                  label={isApertura ? "Presentación a abrir" : "Producto"}
+                  items={filteredProductOptions}
+                  value={selectedProductId || ""}
+                  disabled={isEdit}
+                  onChange={(val) => {
+                    const nextId =
+                      val && typeof val === "object" ? String(val.id ?? "") : String(val ?? "");
+                    setValue("productId", nextId, { shouldValidate: true, shouldDirty: true });
+                  }}
+                  getOptionLabel={(opt) => opt?.name ?? ""}
+                  getOptionValue={(opt) => opt?.id ?? ""}
+                  placeholder={isApertura ? "Quintal, arroba, funda…" : "Busca un producto…"}
+                />
+
+                {isApertura && selectedProduct && (
+                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                    <Chip
+                      size="small"
+                      label={`Stock: ${Number(selectedProduct.stock ?? 0)} ${unitAbbr || ""}`}
+                    />
+                    {linkedGeneric && (
+                      <Chip size="small" color="warning" variant="outlined" label={linkedGeneric.name} />
+                    )}
+                    <TextField
+                      label="A abrir"
+                      type="number"
+                      size="small"
+                      sx={{ width: 88 }}
+                      inputProps={{ min: 1, step: 1 }}
+                      value={packsRaw}
+                      onChange={(e) => setValue("packsToOpen", e.target.value, { shouldDirty: true })}
+                    />
+                  </Stack>
+                )}
+
+                {selectedProduct && !isApertura && (
+                  <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap alignItems="center">
+                    <Chip
+                      size="small"
+                      variant="outlined"
+                      label={
+                        isGenericIngredientProduct(selectedProduct)
+                          ? "Insumo genérico"
+                          : selectedProduct.genericProductId
+                            ? "Presentación"
+                            : "Producto"
+                      }
+                      color={isGenericIngredientProduct(selectedProduct) ? "secondary" : "default"}
+                    />
+                    {needsPrice && catalogPrice > 0 && (
+                      <Chip
+                        size="small"
+                        label={`Ref. ${catalogPriceLabel} $${catalogPrice.toFixed(2)}`}
+                        color={selectedType === "salida" ? "error" : "success"}
+                        variant="outlined"
+                      />
+                    )}
+                  </Stack>
+                )}
+
+                {isAjuste && selectedProduct && (
+                  <Typography variant="caption" color="text.secondary">
+                    Stock actual: {Number(selectedProduct.stock ?? 0).toLocaleString("es-EC")}{" "}
+                    {unitAbbr}
+                  </Typography>
+                )}
+
+                {showMotivo && (
+                  <TextField
+                    label="Motivo"
+                    select
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    value={selectedReason || ""}
+                    {...register("reason", { required: true })}
+                    onChange={(e) => setValue("reason", e.target.value, { shouldDirty: true })}
+                  >
+                    {(REASON_OPTIONS[selectedType] || []).map((opt) => (
+                      <MenuItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                )}
+
+                {needsPrice && (
+                  <FormControl size="small" sx={{ width: "100%" }}>
+                    <FormLabel sx={{ fontSize: "0.75rem", mb: 0.25 }}>
+                      {priceOptional ? "Valor de salida (opcional)" : "Precio de compra"}
+                    </FormLabel>
+                    <RadioGroup
+                      row
+                      value={pricingRuleMode}
+                      onChange={(e) =>
+                        setValue("pricingRuleMode", e.target.value, { shouldDirty: true })
+                      }
+                    >
+                      <FormControlLabel
+                        value="auto"
+                        control={<Radio size="small" />}
+                        label="Total"
+                      />
+                      <FormControlLabel
+                        value="invert"
+                        control={<Radio size="small" />}
+                        label="Unitario × cant."
+                      />
+                    </RadioGroup>
+                    {priceOptional && (
+                      <Typography variant="caption" color="text.secondary">
+                        Ayuda para valorar la salida; no es obligatorio.
+                      </Typography>
+                    )}
+                  </FormControl>
+                )}
+
+                {!isApertura && (
+                  <Grid container spacing={1}>
+                    <Grid item xs={12} sm={needsPrice ? 6 : 12}>
+                      <TextField
+                        label={quantityLabel}
+                        type="number"
+                        fullWidth
+                        size="small"
+                        variant="outlined"
+                        inputProps={{ step: "any", min: 0 }}
+                        value={watch("quantity") || ""}
+                        {...register("quantity", { required: !isApertura })}
+                        onChange={(e) => setValue("quantity", e.target.value, { shouldDirty: true })}
+                        helperText={quantityHelper}
+                      />
+                    </Grid>
+                    {needsPrice && (
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          label={
+                            priceOptional
+                              ? shouldMultiply
+                                ? "Valor unit. (opc.)"
+                                : "Valor total (opc.)"
+                              : shouldMultiply
+                                ? "Precio unit."
+                                : "Precio total"
+                          }
+                          type="number"
+                          fullWidth
+                          size="small"
+                          variant="outlined"
+                          required={priceRequired}
+                          inputProps={{ step: "any", min: 0 }}
+                          value={watch("price") || ""}
+                          {...register("price")}
+                          onChange={(e) => setValue("price", e.target.value, { shouldDirty: true })}
+                          helperText={
+                            catalogPrice > 0
+                              ? `Ref. ${catalogPriceLabel}: $${catalogPrice.toFixed(2)}${
+                                  priceOptional ? " (opcional)" : ""
+                                }`
+                              : priceOptional
+                                ? "Opcional"
+                                : undefined
+                          }
+                        />
+                      </Grid>
+                    )}
+                  </Grid>
+                )}
+              </Stack>
             </Grid>
-          )}
 
-        <Grid item xs={12}>
+            <Grid item xs={12} md={6}>
+              <Stack spacing={1.5} sx={{ height: "100%" }}>
+                {isBatchType ? (
+                  <Paper
+                    variant="outlined"
+                    sx={{
+                      p: 1,
+                      borderRadius: 2,
+                      flex: 1,
+                      minHeight: 140,
+                      maxHeight: 280,
+                      overflow: "auto",
+                    }}
+                  >
+                    <Stack
+                      direction="row"
+                      justifyContent="space-between"
+                      alignItems="center"
+                      sx={{ mb: 0.5, px: 0.5 }}
+                    >
+                      <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+                        Lista ({cart.length})
+                      </Typography>
+                      {cart.length > 0 && (
+                        <Button size="small" color="inherit" onClick={() => setCart([])}>
+                          Vaciar
+                        </Button>
+                      )}
+                    </Stack>
+                    {cart.length === 0 ? (
+                      <Typography variant="body2" color="text.secondary" sx={{ px: 0.5, py: 1 }}>
+                        Añade líneas con el botón de abajo. Luego guarda todo de una vez.
+                      </Typography>
+                    ) : (
+                      <List dense disablePadding>
+                        {cart.map((line, idx) => (
+                          <ListItem
+                            key={line.id}
+                            secondaryAction={
+                              <IconButton
+                                edge="end"
+                                size="small"
+                                aria-label="Quitar"
+                                onClick={() => removeCartLine(line.id)}
+                              >
+                                <DeleteOutlineIcon fontSize="small" />
+                              </IconButton>
+                            }
+                            sx={{
+                              borderBottom: "1px solid",
+                              borderColor: "divider",
+                              alignItems: "flex-start",
+                            }}
+                          >
+                            <ListItemText
+                              primary={
+                                <Typography variant="body2" sx={{ fontWeight: 600, pr: 4 }}>
+                                  {idx + 1}. {line.productName}
+                                </Typography>
+                              }
+                              secondary={
+                                <Typography variant="caption" color="text.secondary" component="span">
+                                  {line.typeLabel} · {line.reasonLabel} · {line.quantity}{" "}
+                                  {line.unitAbbr}
+                                  {line.priceDisplay != null &&
+                                    ` · $${Number(line.priceDisplay).toFixed(2)}`}
+                                </Typography>
+                              }
+                            />
+                          </ListItem>
+                        ))}
+                      </List>
+                    )}
+                  </Paper>
+                ) : (
+                  summaryContent
+                )}
+                <TextField
+                  label={isBatchType ? "Notas de esta línea (opcional)" : "Notas (opcional)"}
+                  fullWidth
+                  size="small"
+                  variant="outlined"
+                  multiline
+                  minRows={isBatchType ? 2 : 3}
+                  sx={{ flex: 1 }}
+                  {...register("description")}
+                />
+                {showVoucherField && (
+                  <AttachmentField
+                    label="Factura / comprobante de compra"
+                    helperText="Opcional. Una constancia para todo el lote de compra."
+                    pendingFile={pendingVoucherFile}
+                    onPendingFileChange={setPendingVoucherFile}
+                  />
+                )}
+              </Stack>
+            </Grid>
+          </Grid>
+
+          {!isEdit && isProduccion && selectedProductId && quantityValue > 0 && (
+            <SimulateProductionComponent
+              embedProductId={Number(selectedProductId)}
+              embedQuantity={quantityValue}
+              onSimulated={(data) => setSimulatedData(data)}
+            />
+          )}
+        </Stack>
+      </Box>
+
+      <Box
+        sx={{
+          flexShrink: 0,
+          pt: 1.5,
+          pb: 2,
+          px: 0.5,
+          borderTop: 1,
+          borderColor: "divider",
+          bgcolor: "background.paper",
+          position: "sticky",
+          bottom: 0,
+          zIndex: 2,
+        }}
+      >
+        <Stack direction="row" spacing={1}>
+          {isBatchType && (
+            <Button
+              variant="outlined"
+              size="large"
+              startIcon={<AddIcon />}
+              disabled={!canSubmit}
+              onClick={handleSubmit(addCurrentLineToCart)}
+              sx={{ flex: 1 }}
+            >
+              Añadir a la lista
+            </Button>
+          )}
           <Button
             fullWidth
             variant="contained"
             type="submit"
-            disabled={
-              !selectedProductId ||
-              !selectedType ||
-              (!isAjuste && !selectedReason) ||
-              quantityIsEmpty ||
-              (isAjuste
-                ? !Number.isFinite(Number(quantityRaw))
-                : !Number.isFinite(quantityValue) ||
-                  quantityValue <= 0 ||
-                  totalToSave == null)
-            }
+            disabled={isBatchType ? !canSaveBatch : !canSubmit}
+            size="large"
+            sx={{ flex: isBatchType ? 1.2 : 1 }}
           >
-            {isEdit ? "Guardar cambios" : "Registrar Movimiento"}
+            {submitLabel}
           </Button>
-        </Grid>
-      </Grid>
+        </Stack>
+      </Box>
     </Box>
   );
 }

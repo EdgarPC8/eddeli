@@ -1,11 +1,13 @@
 import { useForm, Controller } from "react-hook-form";
 import { Box, Button, Grid, MenuItem, TextField } from "@mui/material";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   createIncomeRequest, updateIncomeRequest,
   createExpenseRequest, updateExpenseRequest
 } from "../../../../api/financeRequest";
 import { useAuth } from "../../../../context/AuthContext";
+import AttachmentField from "./AttachmentField.jsx";
+import { uploadExpenseVoucher } from "../../../../api/documentRequest.js";
 
 const categories = {
   income: ["Venta", "Donación", "Carrera", "Servicio", "Otro"],
@@ -15,6 +17,7 @@ const categories = {
 const FinanceForm = ({ type = "income", data = null, onClose, onSaved }) => {
   const { toast } = useAuth();
   const isEditing = !!data;
+  const [pendingVoucherFile, setPendingVoucherFile] = useState(null);
 
   const todayISO = useMemo(() => new Date().toISOString().split("T")[0], []);
   const {
@@ -62,16 +65,29 @@ const FinanceForm = ({ type = "income", data = null, onClose, onSaved }) => {
                           : createExpenseRequest;
 
     const call = isEditing ? requestFn(data.id, payload) : requestFn(payload);
+    const voucherFile = type === "expense" ? pendingVoucherFile : null;
 
     try {
       await toast({
         promise: call,
         successMessage: isEditing ? "Actualizado correctamente" : "Registrado correctamente",
         errorMessage: "Hubo un error",
-        onSuccess: async () => {
+        onSuccess: async (result) => {
+          if (voucherFile) {
+            const expenseId = isEditing ? data.id : result?.data?.id;
+            try {
+              await uploadExpenseVoucher(voucherFile, expenseId);
+            } catch {
+              toast({
+                message: "Registro guardado, pero no se pudo subir el comprobante.",
+                variant: "warning",
+              });
+            }
+          }
           if (onSaved) await onSaved();
           if (onClose) onClose();
           reset();
+          setPendingVoucherFile(null);
         },
       });
     } catch {
@@ -135,6 +151,27 @@ const FinanceForm = ({ type = "income", data = null, onClose, onSaved }) => {
             )}
           />
         </Grid>
+
+        {type === "expense" && (
+          <Grid item xs={12}>
+            {isEditing ? (
+              <AttachmentField
+                entityType="expense"
+                entityId={data.id}
+                pendingFile={pendingVoucherFile}
+                onPendingFileChange={setPendingVoucherFile}
+                label="Comprobante de gasto"
+              />
+            ) : (
+              <AttachmentField
+                label="Comprobante de gasto (opcional)"
+                helperText="Factura, recibo o captura del gasto."
+                pendingFile={pendingVoucherFile}
+                onPendingFileChange={setPendingVoucherFile}
+              />
+            )}
+          </Grid>
+        )}
 
         <Grid item xs={12} display="flex" justifyContent="flex-end">
           <Button onClick={onClose} color="inherit" sx={{ mr: 2 }}>

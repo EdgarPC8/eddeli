@@ -78,6 +78,41 @@ export const getCatalogBySections = (sections = [], params = {}) => {
   return axios.get("/inventory/catalog/sections", { params: query });
 };
 
+// Grupos comparativos de productos (pasteles, etc.)
+export const getPublicCompareGroups = (params = {}) =>
+  axios.get("/inventory/compare-groups/public", { params });
+
+export const getCompareGroups = (params = {}) =>
+  axios.get("/inventory/compare-groups", {
+    params,
+    headers: { Authorization: jwt() },
+  });
+
+export const getCompareGroupById = (id) =>
+  axios.get(`/inventory/compare-groups/${id}`, {
+    headers: { Authorization: jwt() },
+  });
+
+export const createCompareGroup = (payload) =>
+  axios.post("/inventory/compare-groups", payload, {
+    headers: { Authorization: jwt(), "Content-Type": "application/json" },
+  });
+
+export const updateCompareGroup = (id, payload) =>
+  axios.put(`/inventory/compare-groups/${id}`, payload, {
+    headers: { Authorization: jwt(), "Content-Type": "application/json" },
+  });
+
+export const deleteCompareGroup = (id) =>
+  axios.delete(`/inventory/compare-groups/${id}`, {
+    headers: { Authorization: jwt() },
+  });
+
+export const bootstrapPastelesCompareGroup = () =>
+  axios.post("/inventory/compare-groups/bootstrap-pasteles", null, {
+    headers: { Authorization: jwt() },
+  });
+
 
 
 
@@ -152,8 +187,20 @@ export const deleteProduct = async (id) =>
 // 🔁 MOVIMIENTOS DE INVENTARIO
 
 // Crear movimiento
+export const registerMovementsBatchRequest = async (items, date) =>
+  await axios.post(
+    "/inventory/movements/batch",
+    { items, ...(date ? { date } : {}) },
+    { headers: { Authorization: jwt() } },
+  );
+
 export const registerMovement = async (data) =>
   await axios.post('/inventory/movements', data, {
+    headers: { Authorization: jwt() },
+  });
+
+export const openPresentationMovementRequest = async (data) =>
+  await axios.post('/inventory/movements/open-presentation', data, {
     headers: { Authorization: jwt() },
   });
 
