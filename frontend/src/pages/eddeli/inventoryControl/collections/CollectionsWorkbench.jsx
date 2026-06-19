@@ -53,6 +53,7 @@ import {
   getBillableQty,
   sameGroupId,
 } from "./helpers.js";
+import { formatDateTime } from "../../../../helpers/functions.js";
 import { buildReportTxtByProduct, buildDetailedReportTxt } from "./reportBuilders.js";
 import ItemsTable from "./ItemsTable.jsx";
 import CollectionsDialogs from "./CollectionsDialogs.jsx";
@@ -1354,7 +1355,7 @@ export default function CollectionsWorkbench() {
                                 </Typography>
                                 <Typography variant="body2" sx={{ color: "text.secondary" }}>
                                   Estado: {g.status || "—"} · Creado:{" "}
-                                  {g.createdAt || g.date || "—"}
+                                  {formatDateTime(g.createdAt || g.date)}
                                 </Typography>
                               </Box>
                               <Stack direction="row" spacing={1} flexWrap="wrap">
@@ -1514,7 +1515,7 @@ export default function CollectionsWorkbench() {
                               }}
                             >
                               <Typography variant="body2" sx={{ flex: 1, minWidth: 0 }}>
-                                {p.date} · {p.note || "Abono"} · {p.method || "—"}
+                                {formatDateTime(p.date)} · {p.note || "Abono"} · {p.method || "—"}
                               </Typography>
                               <Typography variant="body2" sx={{ fontWeight: 800, whiteSpace: "nowrap" }}>
                                 {money(p.amount)}

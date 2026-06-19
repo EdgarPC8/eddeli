@@ -28,6 +28,7 @@ import { addWeeks, format, parseISO, subWeeks } from "date-fns";
 import { es } from "date-fns/locale";
 import { getDailyShiftReport, getWeeklyShiftReport } from "../../api/shiftRequest.js";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { formatDateTime } from "../../helpers/functions.js";
 import { formatMoney } from "../../utils/turnoCashUtils.js";
 import {
   documentTypeLabel,
@@ -66,18 +67,6 @@ function todayInputValue() {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
-}
-
-function formatDateTime(iso) {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString("es-EC", {
-      dateStyle: "short",
-      timeStyle: "short",
-    });
-  } catch {
-    return iso;
-  }
 }
 
 function formatSelectedDate(dateStr) {

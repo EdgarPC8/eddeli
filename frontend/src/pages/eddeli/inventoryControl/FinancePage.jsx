@@ -26,6 +26,7 @@ import { getFinanceWorkbenchAllRequest } from "../../../api/ordersRequest";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import { runMutationReload } from "../../../utils/mutationToast.js";
 import { money } from "./collections/helpers.js";
+import { formatDateTime } from "../../../helpers/functions.js";
 import { buildPendingCollectionsBreakdown } from "./finance/pendingCollections.js";
 
 const defaultSummary = {
@@ -105,7 +106,14 @@ function FinancePage() {
   };
 
   const commonColumns = [
-    { label: "Fecha", id: "date" },
+    {
+      label: "Fecha",
+      id: "date",
+      render: (params) => {
+        const row = params?.row ?? params;
+        return formatDateTime(row?.date);
+      },
+    },
     { label: "Concepto", id: "concept" },
     { label: "Categoría", id: "category" },
     {

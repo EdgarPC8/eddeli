@@ -30,6 +30,7 @@ import TablePro from "../../../components/Tables/TablePro";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import { runMutationReload } from "../../../utils/mutationToast.js";
 import { money, nowLocalDateTime } from "./collections/helpers.js";
+import { formatDateTime } from "../../../helpers/functions.js";
 import {
   getObligationsWorkbenchRequest,
   createObligationRequest,
@@ -181,7 +182,11 @@ export default function LoansDebtsPage() {
 
   const columns = useMemo(
     () => [
-      { id: "openDate", label: "Fecha" },
+      {
+        id: "openDate",
+        label: "Fecha",
+        render: (row) => formatDateTime(row.openDate),
+      },
       {
         id: "direction",
         label: "Tipo",
@@ -673,7 +678,7 @@ export default function LoansDebtsPage() {
                     <Stack direction="row" justifyContent="space-between" alignItems="center">
                       <Box>
                         <Typography variant="body2" fontWeight={600}>
-                          {p.date} — {money(p.amount)}
+                          {formatDateTime(p.date)} — {money(p.amount)}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           {p.method}

@@ -25,23 +25,7 @@ import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 import PaginatedMovementTable from "./PaginatedMovementTable.jsx";
 import { groupMovements } from "./movementGrouping.js";
 import { isoToDateInput, movementDateForApi, todayDateInput } from "./ProgrammerMovementDateField.jsx";
-
-function formatDate(dateStr) {
-  if (!dateStr) return "—";
-  try {
-    const date = new Date(dateStr);
-    if (isNaN(date.getTime())) return dateStr;
-    return date.toLocaleString("es-EC", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  } catch {
-    return dateStr;
-  }
-}
+import { formatDateTime } from "../../../../helpers/functions.js";
 
 function formatPrice(price) {
   if (price == null) return "—";
@@ -108,8 +92,8 @@ function useMovementColumns(isProgrammer, onEdit, onDelete) {
         label: "Fecha",
         id: "date",
         getSortValue: (r) => new Date(r.date || 0).getTime(),
-        getSearchValue: (r) => formatDate(r.date),
-        render: (row) => formatDate(row.date),
+        getSearchValue: (r) => formatDateTime(r.date),
+        render: (row) => formatDateTime(row.date),
       },
       ...(isProgrammer
         ? [
@@ -168,7 +152,7 @@ export default function MovementsListPanel({
         m.type,
         m.reason,
         m.description,
-        formatDate(m.date),
+        formatDateTime(m.date),
       ]
         .join(" ")
         .toLowerCase();
@@ -262,7 +246,7 @@ export default function MovementsListPanel({
                     <Typography sx={{ fontWeight: 800 }}>{group.label}</Typography>
                     <Chip size="small" label={group.opId} variant="outlined" />
                     <Chip size="small" label={`${group.items.length} mov.`} />
-                    <Chip size="small" label={formatDate(group.date)} color="primary" variant="outlined" />
+                    <Chip size="small" label={formatDateTime(group.date)} color="primary" variant="outlined" />
                     {isProgrammer && (
                       <Button
                         size="small"

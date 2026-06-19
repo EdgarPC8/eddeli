@@ -34,6 +34,7 @@ import {
   DEVICE_STATUS,
   DEVICE_STATUS_LABELS,
 } from "./constants.js";
+import { formatDateTime } from "../../../helpers/functions.js";
 
 const statusColor = {
   pending: "warning",
@@ -41,15 +42,6 @@ const statusColor = {
   rejected: "error",
   disabled: "default",
 };
-
-function formatDate(value) {
-  if (!value) return "—";
-  try {
-    return new Date(value).toLocaleString();
-  } catch {
-    return "—";
-  }
-}
 
 export default function PublicidadDevicesPage() {
   const navigate = useNavigate();
@@ -189,7 +181,7 @@ export default function PublicidadDevicesPage() {
       id: "lastSeenAt",
       label: "Última conexión",
       width: 150,
-      render: (row) => formatDate(row.lastSeenAt),
+      render: (row) => formatDateTime(row.lastSeenAt),
     },
     {
       id: "actions",

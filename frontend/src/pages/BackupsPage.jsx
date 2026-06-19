@@ -21,8 +21,7 @@ import StarIcon from "@mui/icons-material/Star";
 import SaveIcon from "@mui/icons-material/Save";
 import RefreshIcon from "@mui/icons-material/Refresh";
 import { Navigate, Link as RouterLink } from "react-router-dom";
-import { format, parseISO } from "date-fns";
-import { es } from "date-fns/locale";
+import { formatDateTime } from "../helpers/functions.js";
 import TablePro from "../components/Tables/TablePro";
 import SimpleDialog from "../components/Dialogs/SimpleDialog";
 import { useAuth } from "../context/AuthContext.jsx";
@@ -37,15 +36,6 @@ import {
   setMainBackupFromStoredRequest,
   deleteStoredBackupRequest,
 } from "../api/comandsRequest.js";
-
-function formatDate(iso) {
-  if (!iso) return "—";
-  try {
-    return format(parseISO(iso), "d MMM yyyy, HH:mm", { locale: es });
-  } catch {
-    return iso;
-  }
-}
 
 function formatSize(mb, bytes) {
   if (mb > 0) return `${mb} MB`;
@@ -82,7 +72,7 @@ function MainBackupCard({ main, onUpload, onDownload, uploading }) {
                 <strong>Tamaño:</strong> {formatSize(main.sizeMB, main.sizeBytes)}
               </Typography>
               <Typography variant="body2">
-                <strong>Actualizado:</strong> {formatDate(main.modifiedAt)}
+                <strong>Actualizado:</strong> {formatDateTime(main.modifiedAt)}
               </Typography>
               <Typography variant="body2" color="text.secondary">
                 {summaryLine(main.counts)} · {main.totalRows ?? 0} filas totales
@@ -235,7 +225,7 @@ export default function BackupsPage() {
       {
         id: "modifiedAt",
         label: "Fecha",
-        render: (row) => formatDate(row.modifiedAt),
+        render: (row) => formatDateTime(row.modifiedAt),
       },
       {
         id: "sizeMB",

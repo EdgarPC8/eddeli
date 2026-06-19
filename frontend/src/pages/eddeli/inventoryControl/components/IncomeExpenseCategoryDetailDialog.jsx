@@ -35,6 +35,7 @@ import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import TrendingDownIcon from "@mui/icons-material/TrendingDown";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 import { money } from "../collections/helpers.js";
+import { formatDateTime } from "../../../../helpers/functions.js";
 
 const TABS = { all: 0, income: 1, expense: 2 };
 
@@ -126,7 +127,7 @@ function CategoryAccordion({ group, moneyFmt, color, showProduct }) {
             <TableBody>
               {group.lines.map((row) => (
                 <TableRow key={row.id} hover>
-                  <TableCell sx={{ whiteSpace: "nowrap" }}>{row.date}</TableCell>
+                  <TableCell sx={{ whiteSpace: "nowrap" }}>{formatDateTime(row.date)}</TableCell>
                   <TableCell>{row.concept || "—"}</TableCell>
                   {showProduct && <TableCell>{row.productName || "—"}</TableCell>}
                   <TableCell>{row.counterpartyName || "—"}</TableCell>

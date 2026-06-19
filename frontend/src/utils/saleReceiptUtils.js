@@ -1,5 +1,6 @@
 import { activeApp } from "../config/appInfo.js";
 import { getOrderCustomerDisplay } from "./eddeliPosOrderUtils.js";
+import { formatDateTime } from "../helpers/functions.js";
 
 const to2 = (n) => Number(Number(n || 0).toFixed(2));
 
@@ -85,16 +86,7 @@ export function formatMoneyReceipt(n) {
 }
 
 export function formatReceiptDate(iso) {
-  if (!iso) return "—";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return String(iso);
-  return d.toLocaleString("es-EC", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  return formatDateTime(iso);
 }
 
 export function paymentMethodLabel(method) {

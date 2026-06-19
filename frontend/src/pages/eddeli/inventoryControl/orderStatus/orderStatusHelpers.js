@@ -2,6 +2,7 @@ import MoneyOffIcon from "@mui/icons-material/MoneyOff";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty";
 import WarningAmberIcon from "@mui/icons-material/WarningAmber";
+import { formatDateTime } from "../../../../helpers/functions.js";
 
 export const ORDER_STATUS_TABS = [
   {
@@ -99,17 +100,11 @@ export function parseDisplayDateToInput(display) {
 }
 
 export function formatShortDisplayDate(display) {
-  if (!display) return null;
-  const m = String(display).match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
-  if (!m) return String(display).slice(0, 14);
-  return `${m[1]}/${m[2]} ${m[4]}:${m[5]}`;
+  return formatDateTime(display);
 }
 
 export function formatShortOrderDate(display) {
-  if (!display || display === "—") return "—";
-  const m = String(display).match(/^(\d{2})\/(\d{2})\/(\d{4})/);
-  if (!m) return String(display).slice(0, 10);
-  return `${m[1]}/${m[2]}/${m[3]}`;
+  return formatDateTime(display);
 }
 
 export function inputToApiDate(value) {

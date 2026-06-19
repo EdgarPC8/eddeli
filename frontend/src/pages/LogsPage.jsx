@@ -10,17 +10,9 @@ import SimpleDialog from "../components/Dialogs/SimpleDialog.jsx";
 import LogsForm from "../components/LogsForm.jsx";
 import { getLogs } from "../api/comandsRequest.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { formatDateTime } from "../helpers/functions.js";
 
 const ALLOWED = new Set(["Programador", "Administrador"]);
-
-function formatDate(d) {
-  if (!d) return "—";
-  try {
-    return new Date(d).toLocaleString();
-  } catch {
-    return String(d);
-  }
-}
 
 export default function LogsPage() {
   const { user } = useAuth();
@@ -62,7 +54,7 @@ export default function LogsPage() {
       id: "date",
       label: "Fecha",
       getSortValue: (r) => r.date,
-      render: (row) => formatDate(row.date),
+      render: (row) => formatDateTime(row.date),
     },
     {
       id: "actions",

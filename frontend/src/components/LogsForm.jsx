@@ -2,15 +2,7 @@
  * Formulario de solo lectura para ver detalle de un registro de log.
  */
 import { Grid, TextField, Box } from "@mui/material";
-
-function formatDate(d) {
-  if (!d) return "";
-  try {
-    return new Date(d).toLocaleString();
-  } catch {
-    return String(d);
-  }
-}
+import { formatDateTime } from "../helpers/functions.js";
 
 export default function LogsForm({ datos = {} }) {
   const readOnly = { readOnly: true };
@@ -34,7 +26,7 @@ export default function LogsForm({ datos = {} }) {
             label="Fecha"
             fullWidth
             size="small"
-            value={formatDate(datos.date)}
+            value={formatDateTime(datos.date)}
             InputProps={readOnly}
             InputLabelProps={shrink ? { shrink: true } : {}}
           />

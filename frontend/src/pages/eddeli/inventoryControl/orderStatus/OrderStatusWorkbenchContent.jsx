@@ -40,17 +40,16 @@ import {
   orderMatchesStatus,
   parseDisplayDateToInput,
   inputToApiDate,
-  formatShortDisplayDate,
-  formatShortOrderDate,
 } from "./orderStatusHelpers.js";
+import { formatDateTime } from "../../../../helpers/functions.js";
 
 const cellSx = { px: 0.75, py: 0.5, fontSize: "0.78rem", overflow: "hidden" };
 const headSx = { ...cellSx, fontWeight: 700 };
 
 function StatusChip({ ok, labelOk, labelNo, icon, okColor = "success", noColor = "default", tooltip }) {
-  const short = ok ? formatShortDisplayDate(labelOk) || "Sí" : labelNo;
+  const short = ok ? formatDateTime(labelOk) : labelNo;
   return (
-    <Tooltip title={tooltip || (ok ? labelOk : labelNo) || ""} arrow placement="top">
+    <Tooltip title={tooltip || (ok ? formatDateTime(labelOk) : labelNo) || ""} arrow placement="top">
       <Chip
         size="small"
         icon={icon}
@@ -422,7 +421,7 @@ export default function OrderStatusWorkbenchContent({
                         {customer}
                       </TableCell>
                       <TableCell sx={cellSx} title={orderDate}>
-                        {formatShortOrderDate(orderDate)}
+                        {formatDateTime(orderDate)}
                       </TableCell>
                       <TableCell
                         sx={{

@@ -31,6 +31,7 @@ import HistoryIcon from "@mui/icons-material/History";
 import AddIcon from "@mui/icons-material/Add";
 import SwapVertIcon from "@mui/icons-material/SwapVert";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { formatDateTime } from "../../helpers/functions.js";
 import {
   closeShift,
   createShiftMovement,
@@ -166,15 +167,7 @@ function StatChip({ label, value, highlight }) {
 }
 
 function formatShiftDate(iso) {
-  if (!iso) return "—";
-  try {
-    return new Date(iso).toLocaleString("es-EC", {
-      dateStyle: "short",
-      timeStyle: "short",
-    });
-  } catch {
-    return iso;
-  }
+  return formatDateTime(iso);
 }
 
 function operatorFromShift(shift, user) {

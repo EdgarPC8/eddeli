@@ -22,6 +22,7 @@ import {
   markSupplierOrderReceivedRequest,
 } from "../../../../api/ordersRequest";
 import SimpleDialog from "../../../../components/Dialogs/SimpleDialog";
+import { formatDateTime } from "../../../../helpers/functions.js";
 import DocumentAttachmentIcon from "./DocumentAttachmentIcon";
 import { useState } from "react";
 
@@ -155,10 +156,10 @@ export default function SupplierOrderAccordion({
         <AccordionDetails>
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 1, mb: 1 }}>
             <Typography variant="caption">
-              Recibido: {order.receivedAt || "Pendiente"}
+              Recibido: {order.receivedAt ? formatDateTime(order.receivedAt) : "Pendiente"}
             </Typography>
             <Typography variant="caption">
-              Pagado: {order.paidAt || "Pendiente"}
+              Pagado: {order.paidAt ? formatDateTime(order.paidAt) : "Pendiente"}
             </Typography>
           </Box>
 

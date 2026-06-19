@@ -27,7 +27,7 @@ import {
   updateOrderItemRequest
 } from '../../../../api/ordersRequest';
 
-import {  formatDate } from '../../../../helpers/functions';
+import { formatDateTime } from '../../../../helpers/functions';
 import { useAuth } from "../../../../context/AuthContext";
 import { withMutationToast } from "../../../../utils/mutationToast";
 
@@ -78,7 +78,7 @@ function OrderRow({ order, onReload, onEdit }) {
           </IconButton>
         </TableCell>
         <TableCell>{order.ERP_customer?.name}</TableCell>
-        <TableCell>{order.date}</TableCell>
+        <TableCell>{formatDateTime(order.date)}</TableCell>
         <TableCell>
           <Typography variant="body2">
             {`${entregados}/${totalItems}`} entregados
@@ -154,7 +154,7 @@ function OrderRow({ order, onReload, onEdit }) {
                           <>
                             <CheckCircleIcon color="success" fontSize="small" sx={{ mr: 1 }} />
                             <Typography variant="caption" display="inline">
-                              {item.paidAt}
+                              {formatDateTime(item.paidAt)}
                             </Typography>
                           </>
                         )}
@@ -171,7 +171,7 @@ function OrderRow({ order, onReload, onEdit }) {
                           <>
                             <CheckCircleIcon color="success" fontSize="small" sx={{ mr: 1 }} />
                             <Typography variant="caption" display="inline">
-                              {item.deliveredAt}
+                              {formatDateTime(item.deliveredAt)}
                             </Typography>
                           </>
                         )}

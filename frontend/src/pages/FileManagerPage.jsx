@@ -41,6 +41,7 @@ import {
     saveBlobAsFile,
   } from "../api/fileRequest";
 import UploadFileForm from "../components/Forms/UploadFileForm";
+import { formatDateTime } from "../helpers/functions.js";
 
   
   const iconByExt = (ext = "") => {
@@ -214,7 +215,7 @@ import UploadFileForm from "../components/Forms/UploadFileForm";
           label: "Modificado",
           id: "mtime",
           width: 180,
-          render: (row) => (row?.mtime ? new Date(row.mtime).toLocaleString() : "—"),
+          render: (row) => formatDateTime(row?.mtime),
         },
         {
           label: "Acciones",
