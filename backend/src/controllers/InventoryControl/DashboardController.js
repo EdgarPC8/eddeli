@@ -9,6 +9,7 @@ import { getFinanceWorkbenchAll } from "./OrderGroupFinanceController.js";
 import { getAllProducts } from "./ProductController.js";
 import { invokeController, buildProductsStockAlerts } from "../../utils/invokeController.js";
 import { computeObligationsDashboardData } from "./LoanObligationController.js";
+import { computeRecurringDashboardData } from "./RecurringExpenseController.js";
 
 /**
  * GET /finance/dashboard — carga agregada para el dashboard (una sola petición).
@@ -25,6 +26,7 @@ export const getFinanceDashboard = async (req, res) => {
       workbench,
       products,
       obligations,
+      recurring,
     ] = await Promise.all([
       invokeController(getFinanceSummary, req),
       invokeController(getAllExpenses, req),
@@ -35,6 +37,7 @@ export const getFinanceDashboard = async (req, res) => {
       invokeController(getFinanceWorkbenchAll, req),
       invokeController(getAllProducts, req),
       computeObligationsDashboardData(),
+      computeRecurringDashboardData(),
     ]);
 
     const productsStock = buildProductsStockAlerts(products);
@@ -56,6 +59,24 @@ export const getFinanceDashboard = async (req, res) => {
       obligations: obligations ?? {
         summary: { totalReceivable: 0, totalPayable: 0, openCount: 0 },
         topOpen: [],
+      },
+      recurring: recurring ?? {
+        summary: {
+          monthlyFixed: 0,
+          monthlyVariableEstimate: 0,
+          monthlyBurden: 0,
+          pendingThisMonth: 0,
+          paidThisMonth: 0,
+          activeTemplates: 0,
+          overdueCount: 0,
+          monthIncome: 0,
+          gapToCover: 0,
+          dailySalesTarget: 0,
+          daysLeftInMonth: 1,
+          isProfitable: false,
+        },
+        upcoming: [],
+        overdue: [],
       },
     });
   } catch (error) {

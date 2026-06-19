@@ -162,8 +162,8 @@ export default function CollectionsDialogs({
               }
             />
             <TextField
-              label="Fecha"
-              type="date"
+              label="Fecha y hora"
+              type="datetime-local"
               value={payDate}
               onChange={(e) => setPayDate(e.target.value)}
               InputLabelProps={{ shrink: true }}
@@ -262,8 +262,8 @@ export default function CollectionsDialogs({
               fullWidth
             />
             <TextField
-              label="Fecha"
-              type="date"
+              label="Fecha y hora"
+              type="datetime-local"
               value={editPaymentDate}
               onChange={(e) => setEditPaymentDate(e.target.value)}
               InputLabelProps={{ shrink: true }}

@@ -29,7 +29,7 @@ import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
 import TablePro from "../../../components/Tables/TablePro";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import { runMutationReload } from "../../../utils/mutationToast.js";
-import { money } from "./collections/helpers.js";
+import { money, nowLocalDateTime } from "./collections/helpers.js";
 import {
   getObligationsWorkbenchRequest,
   createObligationRequest,
@@ -58,7 +58,7 @@ const emptyCreateForm = () => ({
   customerId: "",
   concept: "",
   amount: "",
-  openDate: new Date().toISOString().slice(0, 10),
+  openDate: nowLocalDateTime(),
   dueDate: "",
   note: "",
 });
@@ -116,7 +116,7 @@ export default function LoansDebtsPage() {
     setSelected(row);
     setPayForm({
       amount: String(row.remaining ?? ""),
-      date: new Date().toISOString().slice(0, 10),
+      date: nowLocalDateTime(),
       method: "efectivo",
       note: "",
     });
@@ -495,8 +495,8 @@ export default function LoansDebtsPage() {
 
             <Stack direction="row" spacing={1}>
               <TextField
-                label="Fecha"
-                type="date"
+                label="Fecha y hora"
+                type="datetime-local"
                 size="small"
                 fullWidth
                 InputLabelProps={{ shrink: true }}
@@ -505,7 +505,7 @@ export default function LoansDebtsPage() {
               />
               <TextField
                 label="Vence (opcional)"
-                type="date"
+                type="datetime-local"
                 size="small"
                 fullWidth
                 InputLabelProps={{ shrink: true }}
@@ -567,8 +567,8 @@ export default function LoansDebtsPage() {
               onChange={(e) => setPayForm((f) => ({ ...f, amount: e.target.value }))}
             />
             <TextField
-              label="Fecha"
-              type="date"
+              label="Fecha y hora"
+              type="datetime-local"
               size="small"
               fullWidth
               InputLabelProps={{ shrink: true }}

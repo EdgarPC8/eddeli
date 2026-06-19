@@ -4,7 +4,7 @@ import { InventoryProduct, InventoryMovement, ProductCompareGroup, ProductCompar
 import { Order, Supplier, SupplierOrder, SupplierOrderItem } from "../models/Orders.js";
 import { TaskPlan, TaskItem } from "../models/Tasks.js";
 import { PublicidadCampaign, PublicidadPlaylistItem } from "../models/Publicidad.js";
-import { FinancialObligation, ObligationPayment } from "../models/Finance.js";
+import { FinancialObligation, ObligationPayment, Income, Expense, Payment, RecurringExpenseTemplate, RecurringExpenseOccurrence } from "../models/Finance.js";
 import { DocumentAttachment } from "../models/DocumentAttachment.js";
 import { NotificationProgram, NotificationDispatchLog } from "../models/NotificationProgram.js";
 import { Notifications } from "../models/Notifications.js";
@@ -26,6 +26,11 @@ const MODELS_TO_SYNC = [
   PublicidadPlaylistItem,
   FinancialObligation,
   ObligationPayment,
+  RecurringExpenseTemplate,
+  RecurringExpenseOccurrence,
+  Income,
+  Expense,
+  Payment,
   DocumentAttachment,
   NotificationProgram,
   NotificationDispatchLog,

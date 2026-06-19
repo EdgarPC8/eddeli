@@ -2,6 +2,7 @@ import {
   runScheduledNotificationPrograms,
   seedDefaultNotificationPrograms,
 } from "./notificationService.js";
+import { syncRecurringExpenseReminders } from "../controllers/InventoryControl/RecurringExpenseController.js";
 
 let started = false;
 let tickTimer = null;
@@ -20,6 +21,7 @@ export async function startNotificationScheduler() {
   const tick = async () => {
     try {
       await runScheduledNotificationPrograms();
+      await syncRecurringExpenseReminders();
     } catch (err) {
       console.error("Error en scheduler de notificaciones:", err?.message || err);
     }

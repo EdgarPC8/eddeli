@@ -1,6 +1,6 @@
 import { useForm, Controller } from "react-hook-form";
-import { Box, Button, Grid, MenuItem, TextField } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
+import { Box, Button, Grid, MenuItem, TextField } from "@mui/material";
 import {
   createIncomeRequest, updateIncomeRequest,
   createExpenseRequest, updateExpenseRequest
@@ -8,6 +8,7 @@ import {
 import { useAuth } from "../../../../context/AuthContext";
 import AttachmentField from "./AttachmentField.jsx";
 import { uploadExpenseVoucher } from "../../../../api/documentRequest.js";
+import { nowLocalDateTime, toLocalDateTimeInput } from "../collections/helpers.js";
 
 const categories = {
   income: ["Venta", "Donación", "Carrera", "Servicio", "Otro"],
@@ -19,7 +20,7 @@ const FinanceForm = ({ type = "income", data = null, onClose, onSaved }) => {
   const isEditing = !!data;
   const [pendingVoucherFile, setPendingVoucherFile] = useState(null);
 
-  const todayISO = useMemo(() => new Date().toISOString().split("T")[0], []);
+  const todayISO = useMemo(() => nowLocalDateTime(), []);
   const {
     control,
     register,
@@ -45,7 +46,7 @@ const FinanceForm = ({ type = "income", data = null, onClose, onSaved }) => {
   // Sincroniza el formulario cuando cambian data o type
   useEffect(() => {
     reset({
-      date: data?.date || todayISO,
+      date: data?.date ? toLocalDateTimeInput(data.date) : todayISO,
       amount: data?.amount ?? "",
       concept: data?.concept ?? "",
       category: data?.category ?? "",   // <- aquí se precarga
@@ -100,8 +101,8 @@ const FinanceForm = ({ type = "income", data = null, onClose, onSaved }) => {
       <Grid container spacing={2} sx={{ mt: 1 }}>
         <Grid item xs={12} md={6}>
           <TextField
-            label="Fecha"
-            type="date"
+            label="Fecha y hora"
+            type="datetime-local"
             fullWidth
             InputLabelProps={{ shrink: true }}
             {...register("date", { required: true })}

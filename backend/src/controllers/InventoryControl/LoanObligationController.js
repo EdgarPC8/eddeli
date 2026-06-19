@@ -11,6 +11,7 @@ import {
   Expense,
 } from "../../models/Finance.js";
 import { getHeaderToken, verifyJWT } from "../../libs/jwt.js";
+import { toFinanceDateTime } from "../../utils/financeDateTime.js";
 
 const toNum = (v, def = 0) => {
   const n = Number(v ?? def);
@@ -242,7 +243,7 @@ export const createObligation = async (req, res) => {
     const conceptText =
       String(concept || "").trim() ||
       (direction === "receivable" ? "Préstamo otorgado" : "Deuda registrada");
-    const dateOnly = isoDateOnly(openDate);
+    const dateOnly = toFinanceDateTime(openDate);
 
     const result = await sequelize.transaction(async (t) => {
       const obligation = await FinancialObligation.create(
@@ -254,7 +255,7 @@ export const createObligation = async (req, res) => {
           concept: conceptText,
           originalAmount: amt,
           openDate: dateOnly,
-          dueDate: dueDate ? isoDateOnly(dueDate) : null,
+          dueDate: dueDate ? toFinanceDateTime(dueDate) : null,
           status: "open",
           note: note || null,
           createdBy: user.accountId,
@@ -342,7 +343,7 @@ export const payObligation = async (req, res) => {
         };
       }
 
-      const paymentDate = isoDateOnly(date);
+      const paymentDate = toFinanceDateTime(date);
       const newRemaining = roundMoney(remaining - payAmount);
       const isFull = newRemaining <= EPS;
       const counterparty = obligation.partyName;

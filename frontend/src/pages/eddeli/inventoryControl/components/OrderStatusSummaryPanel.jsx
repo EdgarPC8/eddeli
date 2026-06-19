@@ -9,6 +9,7 @@ import {
   useTheme,
 } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
+import ChartBlockHeader from "../../../../components/Charts/ChartBlockHeader";
 import { buildOverviewCards } from "../orderStatus/orderStatusHelpers.js";
 import OrderStatusDetailDialog from "./OrderStatusDetailDialog.jsx";
 
@@ -22,45 +23,55 @@ function StatusCard({ tab, onClick }) {
       elevation={0}
       onClick={onClick}
       sx={{
-        p: 1.75,
+        p: 1,
         height: "100%",
-        borderRadius: 2,
+        borderRadius: 1.5,
         border: "1px solid",
         borderColor: alpha(main, 0.28),
         background: `linear-gradient(145deg, ${alpha(main, 0.12)} 0%, ${alpha(main, 0.03)} 100%)`,
         transition: "transform 0.15s ease, box-shadow 0.15s ease",
         cursor: "pointer",
         "&:hover": {
-          transform: "translateY(-2px)",
-          boxShadow: `0 6px 16px ${alpha(main, 0.18)}`,
+          transform: "translateY(-1px)",
+          boxShadow: `0 4px 12px ${alpha(main, 0.16)}`,
           borderColor: main,
         },
       }}
     >
-      <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-        <Box>
-          <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 600 }}>
+      <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={0.5}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontWeight: 600, fontSize: "0.68rem", lineHeight: 1.2, display: "block" }}
+          >
             {tab.label}
           </Typography>
-          <Typography variant="h5" sx={{ fontWeight: 800, color: main, mt: 0.5 }}>
+          <Typography variant="subtitle1" sx={{ fontWeight: 800, color: main, lineHeight: 1.2 }}>
             {tab.count}
           </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ display: "block", fontSize: "0.62rem", lineHeight: 1.2, mt: 0.25 }}
+            noWrap
+          >
             {tab.subtitle}
           </Typography>
         </Box>
         <Box
           sx={{
-            width: 36,
-            height: 36,
-            borderRadius: 2,
+            width: 28,
+            height: 28,
+            borderRadius: 1.5,
+            flexShrink: 0,
             display: "grid",
             placeItems: "center",
             bgcolor: alpha(main, 0.15),
             color: main,
           }}
         >
-          <Icon fontSize="small" />
+          <Icon sx={{ fontSize: "0.95rem" }} />
         </Box>
       </Stack>
     </Paper>
@@ -83,28 +94,27 @@ export default function OrderStatusSummaryPanel({ overView = [] }) {
 
   return (
     <>
-      <Paper sx={{ p: 2, borderRadius: 2, height: "100%", minWidth: 0, overflow: "hidden", boxSizing: "border-box" }}>
+      <Paper sx={{ p: { xs: 1, sm: 1.25 }, borderRadius: 2, height: "100%", minWidth: 0, overflow: "hidden", boxSizing: "border-box" }}>
         <Stack
-          direction={{ xs: "column", sm: "row" }}
+          direction="row"
           justifyContent="space-between"
-          alignItems={{ xs: "stretch", sm: "flex-start" }}
-          spacing={1.5}
-          mb={2}
+          alignItems="flex-start"
+          spacing={0.75}
+          mb={1}
         >
-          <Box>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-              Resumen de estados de pedido
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Clic en una tarjeta para ver el detalle. Solo Programador puede corregir entrega, pago y stock.
-            </Typography>
-          </Box>
+          <ChartBlockHeader title="Resumen de estados de pedido" sx={{ mb: 0, flex: 1, minWidth: 0 }} />
           <Button
-            variant="contained"
+            variant="outlined"
             size="small"
-            startIcon={<VisibilityIcon />}
+            startIcon={<VisibilityIcon sx={{ fontSize: "0.95rem !important" }} />}
             onClick={() => openDetail("unpaid")}
-            sx={{ alignSelf: { xs: "stretch", sm: "flex-start" }, whiteSpace: "nowrap" }}
+            sx={{
+              flexShrink: 0,
+              fontSize: "0.7rem",
+              py: 0.25,
+              px: 0.75,
+              minWidth: 0,
+            }}
           >
             Ver detalle
           </Button>
@@ -114,7 +124,7 @@ export default function OrderStatusSummaryPanel({ overView = [] }) {
           sx={{
             display: "grid",
             gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
-            gap: 1.5,
+            gap: 0.75,
           }}
         >
           {cards.map((tab) => (

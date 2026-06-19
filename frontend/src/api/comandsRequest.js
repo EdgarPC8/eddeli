@@ -37,3 +37,42 @@ export const uploadBackup = (formData) => {
     timeout: 120000,
   });
 };
+
+export const getBackupsWorkbenchRequest = () =>
+  axios.get("/comands/backups", auth());
+
+export const setMainBackupFromStoredRequest = (filename) =>
+  axios.post(`/comands/backups/stored/${encodeURIComponent(filename)}/set-main`, null, auth());
+
+export const deleteStoredBackupRequest = (filename) =>
+  axios.delete(`/comands/backups/stored/${encodeURIComponent(filename)}`, auth());
+
+const downloadBlob = (response, filename) => {
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+export const downloadMainBackupFile = async () => {
+  const response = await axios.get("/comands/backups/main/download", {
+    ...auth(),
+    responseType: "blob",
+    timeout: 90000,
+  });
+  downloadBlob(response, "backup.json");
+  return response;
+};
+
+export const downloadStoredBackupFile = async (filename) => {
+  const response = await axios.get(
+    `/comands/backups/stored/${encodeURIComponent(filename)}/download`,
+    { ...auth(), responseType: "blob", timeout: 90000 }
+  );
+  downloadBlob(response, filename);
+  return response;
+};

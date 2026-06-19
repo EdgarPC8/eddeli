@@ -32,6 +32,7 @@ import CalendarDayDetailDialog from './CalendarDayDetailDialog';
 import {
   getCalendarMonthSummaryRequest,
   getCalendarDayDetailRequest,
+  getCalendarPeriodDetailRequest,
 } from '../../../../../api/financeRequest';
 
 function chunkArray(arr, size) {
@@ -119,6 +120,7 @@ function DayValueStrip({
 export default function ChartCalendaryInfo({
   initialDate = new Date(),
   cellMinHeight = 100,
+  navigateToMonth = null,
 }) {
   const theme = useTheme();
   const [currentDate, setCurrentDate] = useState(initialDate);
@@ -134,6 +136,8 @@ export default function ChartCalendaryInfo({
   const [selectedDay, setSelectedDay] = useState(null);
   const [dayDetail, setDayDetail] = useState(null);
   const [dayLoading, setDayLoading] = useState(false);
+  const [periodGranularity, setPeriodGranularity] = useState('day');
+  const [periodLabel, setPeriodLabel] = useState(null);
 
   const chartColors = useMemo(() => {
     const p = theme.palette;
@@ -201,6 +205,8 @@ export default function ChartCalendaryInfo({
 
   const handleDayClick = useCallback(async (date) => {
     setSelectedDay(date);
+    setPeriodGranularity('day');
+    setPeriodLabel(null);
     setDayDetail(null);
     setDayLoading(true);
     try {
@@ -221,10 +227,44 @@ export default function ChartCalendaryInfo({
     }
   }, []);
 
+  const openMonthDetail = useCallback(async (monthDate) => {
+    setCurrentDate(monthDate);
+    setSelectedDay(monthDate);
+    setPeriodGranularity('month');
+    setPeriodLabel(format(monthDate, 'MMMM yyyy', { locale: es }));
+    setDayDetail(null);
+    setDayLoading(true);
+    try {
+      const start = format(startOfMonth(monthDate), 'yyyy-MM-dd');
+      const end = format(endOfMonth(monthDate), 'yyyy-MM-dd');
+      const { data } = await getCalendarPeriodDetailRequest(start, end);
+      setDayDetail(data);
+    } catch (err) {
+      console.error('Error detalle mes:', err);
+      setDayDetail({
+        orders: [],
+        posSales: [],
+        abonos: [],
+        directPayments: [],
+        expenses: [],
+        totals: emptyMetrics(),
+      });
+    } finally {
+      setDayLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!navigateToMonth?.date) return;
+    openMonthDetail(navigateToMonth.date);
+  }, [navigateToMonth?.requestId, navigateToMonth?.date, openMonthDetail]);
+
   const handleCloseModal = useCallback(() => {
     setSelectedDay(null);
     setDayDetail(null);
     setDayLoading(false);
+    setPeriodGranularity('day');
+    setPeriodLabel(null);
   }, []);
 
   const monthIncomeTotal = useMemo(
@@ -609,6 +649,8 @@ export default function ChartCalendaryInfo({
         moneyFmt={moneyFmt}
         colors={chartColors}
         viewMode={viewMode}
+        periodGranularity={periodGranularity}
+        periodLabel={periodLabel}
       />
     </Box>
   );

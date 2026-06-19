@@ -16,6 +16,7 @@ import OrderPage from "./pages/eddeli/inventoryControl/OrderPage.jsx";
 import CustomerPage from "./pages/eddeli/inventoryControl/CustomerPage.jsx";
 import FinancePage from "./pages/eddeli/inventoryControl/FinancePage.jsx";
 import LoansDebtsPage from "./pages/eddeli/inventoryControl/LoansDebtsPage.jsx";
+import RecurringExpensesPage from "./pages/eddeli/inventoryControl/RecurringExpensesPage.jsx";
 import CollectionsPage from "./pages/eddeli/inventoryControl/CollectionsPage.jsx";
 import ProductionManagerPage from "./pages/eddeli/inventoryControl/ProductionManagerPage.jsx";
 import HomeProductPage from "./pages/eddeli/inventoryControl/HomeProduct.jsx";
@@ -43,6 +44,7 @@ import UsersPage from "./pages/UsersPage.jsx";
 import CuentasPage from "./pages/CuentasPage.jsx";
 import RolesPage from "./pages/RolesPage.jsx";
 import ComandosPage from "./pages/ComandosPage.jsx";
+import BackupsPage from "./pages/BackupsPage.jsx";
 import LogsPage from "./pages/LogsPage.jsx";
 import ImgManagerPage from "./pages/ImgManagerPage.jsx";
 import FileManagerPage from "./pages/FileManagerPage.jsx";
@@ -98,6 +100,7 @@ export default function App() {
 
           <Route element={<ProtectedRoute requiredRol={["Programador"]} />}>
             <Route path="/comandos" element={<ComandosPage />} />
+            <Route path="/backups" element={<BackupsPage />} />
             <Route path="/logs" element={<LogsPage />} />
             <Route path="/img" element={<ImgManagerPage />} />
             <Route path="/file" element={<FileManagerPage />} />
@@ -147,6 +150,7 @@ export default function App() {
             <Route path="/inventory/finance" element={<FinancePage />} />
             <Route path="/inventory/collections" element={<CollectionsPage />} />
             <Route path="/inventory/prestamos-deudas" element={<LoansDebtsPage />} />
+            <Route path="/inventory/gastos-recurrentes" element={<RecurringExpensesPage />} />
             <Route path="/inventory/production" element={<ProductionManagerPage />} />
             <Route path="/inventory/productos-destacados" element={<HomeProductPage />} />
             <Route path="/inventory/puntos-venta" element={<StoresManagerPage />} />

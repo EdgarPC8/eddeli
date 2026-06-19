@@ -4,11 +4,17 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Paper, Collapse, IconButton, Typography, Box, TablePagination,
   Tooltip, TextField, Stack, Chip, TableSortLabel, Alert, CircularProgress,
+  Button, Dialog, DialogActions, DialogContent, DialogTitle, useTheme,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
+import { BarChart } from "@mui/x-charts/BarChart";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
-import KeyboardArrowUpIcon   from "@mui/icons-material/KeyboardArrowUp";
+import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import PaidIcon from "@mui/icons-material/AttachMoney";
 import PendingIcon from "@mui/icons-material/HourglassEmpty";
+import TableRowsIcon from "@mui/icons-material/TableRows";
+import CloseIcon from "@mui/icons-material/Close";
+import ChartBlockHeader from "../../../../components/Charts/ChartBlockHeader";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { getCustomerSalesSummary } from "../../../../api/financeRequest";
@@ -63,7 +69,24 @@ const money = (n) =>
   new Intl.NumberFormat("es-EC", { style: "currency", currency: "USD" })
     .format(toNum(n));
 
+const CHART_TOP_N = 10;
+
 const safeArray = (v) => (Array.isArray(v) ? v : []);
+
+function truncateLabel(name, max = 22) {
+  const s = String(name || "");
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
+}
+
+/** Segmentos del gráfico apilado: liquidado + abonado + deuda = total ventas */
+function buildChartSegments(row) {
+  const revenueTotal = toNum(row?.revenueTotal);
+  const abonado = toNum(row?.abonado);
+  const deuda = getDebt(row);
+  const cobrableBruto = numOrNull(row?.cobrableBruto) ?? deuda + abonado;
+  const liquidado = Math.max(0, Number((revenueTotal - cobrableBruto).toFixed(2)));
+  return { liquidado, abonado, deuda, revenueTotal, cobrableBruto };
+}
 
 /** Normaliza el JSON crudo y calcula pendientes por producto (si no vienen) */
 function normalizeRows(rawList) {
@@ -250,14 +273,142 @@ function CustomerRow({ row }) {
   );
 }
 
+function CustomersDataTable({
+  loading,
+  paginated,
+  filteredCount,
+  sortBy,
+  sortDir,
+  requestSort,
+  page,
+  rowsPerPage,
+  onPageChange,
+  onRowsPerPageChange,
+}) {
+  return (
+    <TableContainer component={Paper} variant="outlined">
+      <Table>
+        <TableHead>
+          <TableRow>
+            <TableCell />
+            <TableCell sortDirection={sortBy === "customer" ? sortDir : false}>
+              <TableSortLabel
+                active={sortBy === "customer"}
+                direction={sortBy === "customer" ? sortDir : "asc"}
+                onClick={() => requestSort("customer")}
+              >
+                Cliente
+              </TableSortLabel>
+            </TableCell>
+
+            <TableCell align="right" sortDirection={sortBy === "ordersCount" ? sortDir : false}>
+              <TableSortLabel
+                active={sortBy === "ordersCount"}
+                direction={sortBy === "ordersCount" ? sortDir : "desc"}
+                onClick={() => requestSort("ordersCount")}
+              >
+                # Pedidos
+              </TableSortLabel>
+            </TableCell>
+
+            <TableCell align="right" sortDirection={sortBy === "revenueTotal" ? sortDir : false}>
+              <TableSortLabel
+                active={sortBy === "revenueTotal"}
+                direction={sortBy === "revenueTotal" ? sortDir : "desc"}
+                onClick={() => requestSort("revenueTotal")}
+              >
+                Total ventas
+              </TableSortLabel>
+            </TableCell>
+
+            <TableCell align="right" sortDirection={sortBy === "cobrableBruto" ? sortDir : false}>
+              <TableSortLabel
+                active={sortBy === "cobrableBruto"}
+                direction={sortBy === "cobrableBruto" ? sortDir : "desc"}
+                onClick={() => requestSort("cobrableBruto")}
+              >
+                Cobrable
+              </TableSortLabel>
+            </TableCell>
+
+            <TableCell align="right" sortDirection={sortBy === "abonado" ? sortDir : false}>
+              <TableSortLabel
+                active={sortBy === "abonado"}
+                direction={sortBy === "abonado" ? sortDir : "desc"}
+                onClick={() => requestSort("abonado")}
+              >
+                Abonado
+              </TableSortLabel>
+            </TableCell>
+
+            <TableCell align="right" sortDirection={sortBy === "debt" ? sortDir : false}>
+              <TableSortLabel
+                active={sortBy === "debt"}
+                direction={sortBy === "debt" ? sortDir : "desc"}
+                onClick={() => requestSort("debt")}
+              >
+                Debe
+              </TableSortLabel>
+            </TableCell>
+
+            <TableCell sortDirection={sortBy === "lastOrderAt" ? sortDir : false}>
+              <TableSortLabel
+                active={sortBy === "lastOrderAt"}
+                direction={sortBy === "lastOrderAt" ? sortDir : "desc"}
+                onClick={() => requestSort("lastOrderAt")}
+              >
+                Último pedido
+              </TableSortLabel>
+            </TableCell>
+          </TableRow>
+        </TableHead>
+
+        <TableBody>
+          {loading && (
+            <TableRow>
+              <TableCell colSpan={8} align="center">
+                <Box sx={{ py: 3 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              </TableCell>
+            </TableRow>
+          )}
+
+          {!loading && paginated.map((row, idx) => (
+            <CustomerRow key={row?.customerId ?? row?.customer?.id ?? `row-${idx}`} row={row} />
+          ))}
+
+          {!loading && paginated.length === 0 && (
+            <TableRow>
+              <TableCell colSpan={8} align="center">Sin datos</TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+
+      <TablePagination
+        component="div"
+        count={filteredCount}
+        page={page}
+        onPageChange={onPageChange}
+        rowsPerPage={rowsPerPage}
+        onRowsPerPageChange={onRowsPerPageChange}
+        labelRowsPerPage="Filas por página"
+      />
+    </TableContainer>
+  );
+}
+
 /* --------------- Tabla principal --------------- */
 export default function CustomersAccordionTable({ workbench: workbenchProp = null }) {
+  const theme = useTheme();
   const [rows, setRows] = useState([]);
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState(null);
+  const [detailOpen, setDetailOpen] = useState(false);
 
   // sort state
   const [sortBy, setSortBy] = useState("priority"); // prioridad: deuda>0 (desc), luego total (desc), luego fecha (desc)
@@ -454,137 +605,199 @@ export default function CustomersAccordionTable({ workbench: workbenchProp = nul
     });
   };
 
+  const summary = useMemo(() => {
+    let totalVentas = 0;
+    let totalCobrable = 0;
+    let totalAbonado = 0;
+    let totalDeuda = 0;
+    for (const r of filtered) {
+      const seg = buildChartSegments(r);
+      totalVentas += seg.revenueTotal;
+      totalCobrable += seg.cobrableBruto;
+      totalAbonado += seg.abonado;
+      totalDeuda += seg.deuda;
+    }
+    return {
+      clientes: filtered.length,
+      totalVentas,
+      totalCobrable,
+      totalAbonado,
+      totalDeuda,
+    };
+  }, [filtered]);
+
+  const chartDataset = useMemo(
+    () =>
+      filteredSorted.slice(0, CHART_TOP_N).map((r) => {
+        const seg = buildChartSegments(r);
+        const name = r?.customer?.name ?? `Cliente #${r?.customerId ?? "—"}`;
+        return {
+          label: truncateLabel(name),
+          fullName: name,
+          liquidado: seg.liquidado,
+          abonado: seg.abonado,
+          deuda: seg.deuda,
+          total: seg.revenueTotal,
+        };
+      }),
+    [filteredSorted]
+  );
+
+  const cLiquidado = theme.palette.success.main;
+  const cAbonado = theme.palette.info.main;
+  const cDeuda = theme.palette.error.main;
+
   return (
     <Box>
-      <Typography variant="h6" sx={{ mb: 1, textAlign: "center", fontWeight: 800 }}>
-        Clientes — Ventas y Pedidos
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2, textAlign: "center" }}>
-        Cobrable bruto, abonos en grupos abiertos y saldo pendiente (alineado con Cobranzas).
-      </Typography>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        alignItems={{ xs: "flex-start", sm: "flex-start" }}
+        justifyContent="space-between"
+        spacing={1}
+        sx={{ mb: 0.5 }}
+      >
+        <ChartBlockHeader
+          title="Clientes — Ventas y Pedidos"
+          subtitle="Estado de cuenta por cliente: ventas liquidadas, abonos parciales y saldo pendiente (alineado con Cobranzas)."
+          sx={{ mb: 0, flex: 1 }}
+        />
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<TableRowsIcon />}
+          onClick={() => setDetailOpen(true)}
+          disabled={loading || filteredSorted.length === 0}
+          sx={{ flexShrink: 0, mt: { xs: 0, sm: 0.5 } }}
+        >
+          Ver detalle
+        </Button>
+      </Stack>
 
-      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
+      <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 1.5 }}>
         <TextField
           label="Buscar cliente / teléfono / email"
           size="small"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(0);
+          }}
           fullWidth
         />
       </Stack>
 
       {err && <Alert severity="error" sx={{ mb: 2 }}>Error: {err}</Alert>}
 
-      <TableContainer component={Paper}>
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell />
-              <TableCell sortDirection={sortBy === "customer" ? sortDir : false}>
-                <TableSortLabel
-                  active={sortBy === "customer"}
-                  direction={sortBy === "customer" ? sortDir : "asc"}
-                  onClick={() => requestSort("customer")}
-                >
-                  Cliente
-                </TableSortLabel>
-              </TableCell>
+      <Stack direction="row" spacing={1} sx={{ mb: 1.5, flexWrap: "wrap", rowGap: 0.5 }}>
+        <Chip size="small" label={`Clientes: ${summary.clientes}`} />
+        <Chip size="small" label={`Ventas: ${money(summary.totalVentas)}`} color="primary" />
+        <Chip size="small" label={`Cobrable: ${money(summary.totalCobrable)}`} variant="outlined" />
+        <Chip size="small" label={`Abonado: ${money(summary.totalAbonado)}`} sx={{ bgcolor: alpha(cAbonado, 0.15) }} />
+        <Chip size="small" label={`Deuda: ${money(summary.totalDeuda)}`} color="warning" />
+      </Stack>
 
-              <TableCell align="right" sortDirection={sortBy === "ordersCount" ? sortDir : false}>
-                <TableSortLabel
-                  active={sortBy === "ordersCount"}
-                  direction={sortBy === "ordersCount" ? sortDir : "desc"}
-                  onClick={() => requestSort("ordersCount")}
-                >
-                  # Pedidos
-                </TableSortLabel>
-              </TableCell>
+      <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap", rowGap: 0.5 }}>
+        <Chip size="small" label="Ingresos liquidados" sx={{ bgcolor: cLiquidado, color: theme.palette.getContrastText(cLiquidado) }} />
+        <Chip size="small" label="Abonos realizados" sx={{ bgcolor: cAbonado, color: theme.palette.getContrastText(cAbonado) }} />
+        <Chip size="small" label="Deuda pendiente" sx={{ bgcolor: cDeuda, color: theme.palette.getContrastText(cDeuda) }} />
+      </Stack>
 
-              <TableCell align="right" sortDirection={sortBy === "revenueTotal" ? sortDir : false}>
-                <TableSortLabel
-                  active={sortBy === "revenueTotal"}
-                  direction={sortBy === "revenueTotal" ? sortDir : "desc"}
-                  onClick={() => requestSort("revenueTotal")}
-                >
-                  Total ventas
-                </TableSortLabel>
-              </TableCell>
+      <Paper
+        variant="outlined"
+        sx={{
+          p: 1,
+          borderRadius: 2,
+          bgcolor: alpha(theme.palette.text.primary, theme.palette.mode === "dark" ? 0.04 : 0.02),
+        }}
+      >
+        <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5, px: 0.5 }}>
+          Estado de cuenta por cliente (top {CHART_TOP_N} por prioridad de cobro)
+          {filteredSorted.length > CHART_TOP_N ? ` · ${filteredSorted.length} en total` : ""}
+        </Typography>
 
-              <TableCell align="right" sortDirection={sortBy === "cobrableBruto" ? sortDir : false}>
-                <TableSortLabel
-                  active={sortBy === "cobrableBruto"}
-                  direction={sortBy === "cobrableBruto" ? sortDir : "desc"}
-                  onClick={() => requestSort("cobrableBruto")}
-                >
-                  Cobrable
-                </TableSortLabel>
-              </TableCell>
+        {loading ? (
+          <Box sx={{ py: 4, textAlign: "center" }}>
+            <CircularProgress size={28} />
+          </Box>
+        ) : chartDataset.length === 0 ? (
+          <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
+            Sin clientes con ventas en el período.
+          </Typography>
+        ) : (
+          <BarChart
+            layout="horizontal"
+            dataset={chartDataset}
+            height={Math.max(220, 44 * chartDataset.length)}
+            yAxis={[{ scaleType: "band", dataKey: "label", width: 120 }]}
+            xAxis={[{ valueFormatter: (v) => money(v) }]}
+            series={[
+              {
+                type: "bar",
+                dataKey: "liquidado",
+                label: "Ingresos liquidados",
+                stack: "cuenta",
+                valueFormatter: (v) => money(v),
+                color: cLiquidado,
+              },
+              {
+                type: "bar",
+                dataKey: "abonado",
+                label: "Abonos realizados",
+                stack: "cuenta",
+                valueFormatter: (v) => money(v),
+                color: cAbonado,
+              },
+              {
+                type: "bar",
+                dataKey: "deuda",
+                label: "Deuda pendiente",
+                stack: "cuenta",
+                valueFormatter: (v) => money(v),
+                color: cDeuda,
+              },
+            ]}
+            margin={{ left: 4, right: 12, top: 8, bottom: 36 }}
+            slotProps={{
+              legend: { hidden: true },
+            }}
+          />
+        )}
+      </Paper>
 
-              <TableCell align="right" sortDirection={sortBy === "abonado" ? sortDir : false}>
-                <TableSortLabel
-                  active={sortBy === "abonado"}
-                  direction={sortBy === "abonado" ? sortDir : "desc"}
-                  onClick={() => requestSort("abonado")}
-                >
-                  Abonado
-                </TableSortLabel>
-              </TableCell>
-
-              <TableCell align="right" sortDirection={sortBy === "debt" ? sortDir : false}>
-                <TableSortLabel
-                  active={sortBy === "debt"}
-                  direction={sortBy === "debt" ? sortDir : "desc"}
-                  onClick={() => requestSort("debt")}
-                >
-                  Debe
-                </TableSortLabel>
-              </TableCell>
-
-              <TableCell sortDirection={sortBy === "lastOrderAt" ? sortDir : false}>
-                <TableSortLabel
-                  active={sortBy === "lastOrderAt"}
-                  direction={sortBy === "lastOrderAt" ? sortDir : "desc"}
-                  onClick={() => requestSort("lastOrderAt")}
-                >
-                  Último pedido
-                </TableSortLabel>
-              </TableCell>
-            </TableRow>
-          </TableHead>
-
-          <TableBody>
-            {loading && (
-              <TableRow>
-                <TableCell colSpan={8} align="center">
-                  <Box sx={{ py: 3 }}>
-                    <CircularProgress size={24} />
-                  </Box>
-                </TableCell>
-              </TableRow>
-            )}
-
-            {!loading && paginated.map((row, idx) => (
-              <CustomerRow key={row?.customerId ?? row?.customer?.id ?? `row-${idx}`} row={row} />
-            ))}
-
-            {!loading && paginated.length === 0 && (
-              <TableRow>
-                <TableCell colSpan={8} align="center">Sin datos</TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-
-        <TablePagination
-          component="div"
-          count={filteredSorted.length}
-          page={page}
-          onPageChange={handleChangePage}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={handleChangeRowsPerPage}
-          labelRowsPerPage="Filas por página"
-        />
-      </TableContainer>
+      <Dialog
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        fullWidth
+        maxWidth="lg"
+        scroll="paper"
+      >
+        <DialogTitle sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", pr: 1 }}>
+          Detalle de clientes — ventas y pedidos
+          <IconButton aria-label="Cerrar" onClick={() => setDetailOpen(false)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+            {summary.clientes} clientes · Ventas {money(summary.totalVentas)} · Deuda pendiente {money(summary.totalDeuda)}
+          </Typography>
+          <CustomersDataTable
+            loading={loading}
+            paginated={paginated}
+            filteredCount={filteredSorted.length}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            requestSort={requestSort}
+            page={page}
+            rowsPerPage={rowsPerPage}
+            onPageChange={handleChangePage}
+            onRowsPerPageChange={handleChangeRowsPerPage}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 2, py: 1.5 }}>
+          <Button onClick={() => setDetailOpen(false)}>Cerrar</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

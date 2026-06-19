@@ -10,9 +10,10 @@ import { Income, Expense } from "../../models/Finance.js";
 
 export const getExpensesForChart = async (req, res) => {
   try {
-    const { startDate, endDate, referenceId, category } = req.query;
+    const { startDate, endDate, referenceId, category, insumosOnly } = req.query;
 
     const where = {};
+    const onlyInsumos = insumosOnly === "1" || insumosOnly === "true";
 
     // Filtro de fecha (columna date = DATEONLY)
     if (startDate || endDate) {
@@ -36,14 +37,22 @@ export const getExpensesForChart = async (req, res) => {
       include: [
         {
           model: InventoryProduct,
-          attributes: ["name"],
-          required: false,
+          attributes: ["name", "type", "isGenericIngredient", "genericProductId"],
+          required: onlyInsumos,
+          ...(onlyInsumos
+            ? {
+                where: {
+                  type: { [Op.in]: ["raw", "intermediate"] },
+                },
+              }
+            : {}),
         },
       ],
       order: [["date", "ASC"]],
     });
 
 const shaped = expenses.map((e) => {
+  const product = e.ERP_inventory_product;
   // Base común siempre:
   const item = {
     id: e.id,
@@ -58,7 +67,10 @@ const shaped = expenses.map((e) => {
   if (e.referenceId) {
     item.referenceId = e.referenceId;
     item.referenceType = e.referenceType ?? null;
-    item.productName = e.ERP_inventory_product?.name || `Producto #${e.referenceId}`;
+    item.productName = product?.name || `Producto #${e.referenceId}`;
+    item.productType = product?.type ?? null;
+    item.isGenericIngredient = Boolean(product?.isGenericIngredient);
+    item.genericProductId = product?.genericProductId ?? null;
   }
   return item;
 

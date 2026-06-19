@@ -52,6 +52,21 @@ export const todayISO = () => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
+/** Valor para <input type="datetime-local"> (hora local). */
+export const nowLocalDateTime = () => {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+};
+
+export const toLocalDateTimeInput = (value) => {
+  if (!value) return nowLocalDateTime();
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return nowLocalDateTime();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().slice(0, 16);
+};
+
 export const sum = (arr, fn) =>
   (arr || []).reduce((acc, x) => acc + Number(fn(x) || 0), 0);
 

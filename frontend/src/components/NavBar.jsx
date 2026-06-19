@@ -43,6 +43,7 @@ import LogoutIcon from "@mui/icons-material/Logout";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
 import NotificationsIcon from "@mui/icons-material/Notifications";
 import TerminalIcon from "@mui/icons-material/Terminal";
+import BackupIcon from "@mui/icons-material/Backup";
 import HistoryIcon from "@mui/icons-material/History";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import CardGiftcardIcon from "@mui/icons-material/CardGiftcard";
@@ -58,6 +59,7 @@ import ScienceIcon from "@mui/icons-material/Science";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
 import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
+import HomeWorkIcon from "@mui/icons-material/HomeWork";
 import RequestQuoteIcon from "@mui/icons-material/RequestQuote";
 import FactoryIcon from "@mui/icons-material/Factory";
 import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
@@ -110,6 +112,7 @@ const MENU_GROUPS = [
       { name: "Finanzas", link: "/inventory/finance", icon: <MonetizationOnIcon />, roles: ["Programador", "Administrador"] },
       { name: "Cobranzas", link: "/inventory/collections", icon: <RequestQuoteIcon />, roles: ["Programador", "Administrador"] },
       { name: "Préstamos y deudas", link: "/inventory/prestamos-deudas", icon: <AccountBalanceWalletIcon />, roles: ["Programador", "Administrador"] },
+      { name: "Gastos recurrentes", link: "/inventory/gastos-recurrentes", icon: <HomeWorkIcon />, roles: ["Programador", "Administrador"] },
     ],
   },
   {
@@ -174,6 +177,7 @@ const MENU_GROUPS = [
       // Oculto hasta que exista API backend /notification-programs (ver NotificationProgramsPage)
       // { name: "Programar notificaciones", link: "/notification-programs", icon: <NotificationsIcon />, roles: ["Programador", "Administrador"] },
       { name: "Logs", link: "/logs", icon: <HistoryIcon />, roles: ["Programador"] },
+      { name: "Backups JSON", link: "/backups", icon: <BackupIcon />, roles: ["Programador"] },
       { name: "Comandos", link: "/comandos", icon: <TerminalIcon />, roles: ["Programador"] },
     ],
   },

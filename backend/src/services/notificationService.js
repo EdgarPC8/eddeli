@@ -107,7 +107,7 @@ export async function resolveTargetUserIds(program) {
   return [...new Set(accounts.map((a) => a.userId).filter(Boolean))];
 }
 
-async function resolveAdminUserIds() {
+export async function resolveAdminUserIds() {
   const accounts = await Account.findAll({
     attributes: ["userId"],
     include: [

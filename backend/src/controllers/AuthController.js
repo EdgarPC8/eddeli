@@ -105,7 +105,10 @@ export const changeRole = async (req, res) => {
     };
 
     const token = await createAccessToken({ payload });
-    res.json({ token });
+    res.json({
+      token,
+      message: `Rol cambiado a ${hasRole.name}`,
+    });
   } catch (error) {
     res.status(500).json({ message: "Error al cambiar de rol", error: error.message });
   }

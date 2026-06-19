@@ -91,6 +91,13 @@ export const getCalendarMonthSummaryRequest = async (year, month) => {
   });
 };
 
+/** Resumen anual: totales por mes (pedidos, caja, cobranzas, gastos). */
+export const getCalendarYearSummaryRequest = async (year) =>
+  axios.get("/finance/calendar-year", {
+    params: { year },
+    headers: { Authorization: jwt() },
+  });
+
 /** Detalle de un día para el modal del calendario. */
 export const getCalendarDayDetailRequest = async (date) => {
   return await axios.get("/finance/calendar-day", {
@@ -98,6 +105,13 @@ export const getCalendarDayDetailRequest = async (date) => {
     headers: { Authorization: jwt() },
   });
 };
+
+/** Detalle agregado de un rango (día, semana o mes). */
+export const getCalendarPeriodDetailRequest = async (startDate, endDate) =>
+  axios.get("/finance/calendar-period", {
+    params: { startDate, endDate: endDate ?? startDate },
+    headers: { Authorization: jwt() },
+  });
 export const getOverViewRequest = async () => {
   return await axios.get("/finance/overview", {
     headers: { Authorization: jwt() },
@@ -142,15 +156,37 @@ export const getOrdersForCharts = async () => {
     headers: { Authorization: jwt() },
   });
 };
-export const getExpensesForChart = async ({ startDate, endDate } = {}) => {
+export const getExpensesForChart = async ({ startDate, endDate, insumosOnly = true } = {}) => {
   const params = {};
   if (startDate) params.startDate = startDate;
   if (endDate) params.endDate = endDate;
+  if (insumosOnly) params.insumosOnly = "1";
   return await axios.get("/finance/getExpensesForChart", {
     params,
     headers: { Authorization: jwt() },
   });
 };
+
+export const getCashFlowMirrorRequest = async ({ granularity = "day", startDate, endDate } = {}) => {
+  const params = { granularity };
+  if (startDate) params.startDate = startDate;
+  if (endDate) params.endDate = endDate;
+  return await axios.get("/finance/cash-flow-mirror", {
+    params,
+    headers: { Authorization: jwt() },
+  });
+};
+
+/** Velas japonesas del saldo acumulado (ingresos − gastos). */
+export const getCashFlowCandlesRequest = async ({
+  granularity = "day",
+  limit = 25,
+  offset = 0,
+} = {}) =>
+  axios.get("/finance/cash-flow-candles", {
+    params: { granularity, limit, offset },
+    headers: { Authorization: jwt() },
+  });
 
 // Préstamos y deudas (sin pedido)
 export const getObligationsWorkbenchRequest = async (params = {}) =>
@@ -176,5 +212,42 @@ export const payObligationRequest = async (id, data) =>
 
 export const cancelObligationRequest = async (id) =>
   axios.patch(`/finance/obligations/${id}/cancel`, null, {
+    headers: { Authorization: jwt() },
+  });
+
+// Gastos recurrentes (arriendo, servicios, permisos)
+export const getRecurringWorkbenchRequest = async (params = {}) =>
+  axios.get("/finance/recurring/workbench", {
+    params,
+    headers: { Authorization: jwt() },
+  });
+
+export const createRecurringTemplateRequest = async (data) =>
+  axios.post("/finance/recurring/templates", data, {
+    headers: { Authorization: jwt(), "Content-Type": "application/json" },
+  });
+
+export const updateRecurringTemplateRequest = async (id, data) =>
+  axios.put(`/finance/recurring/templates/${id}`, data, {
+    headers: { Authorization: jwt(), "Content-Type": "application/json" },
+  });
+
+export const updateRecurringOccurrenceRequest = async (id, data) =>
+  axios.patch(`/finance/recurring/occurrences/${id}`, data, {
+    headers: { Authorization: jwt(), "Content-Type": "application/json" },
+  });
+
+export const payRecurringOccurrenceRequest = async (id, data) =>
+  axios.post(`/finance/recurring/occurrences/${id}/pay`, data, {
+    headers: { Authorization: jwt(), "Content-Type": "application/json" },
+  });
+
+export const skipRecurringOccurrenceRequest = async (id, data) =>
+  axios.patch(`/finance/recurring/occurrences/${id}/skip`, data, {
+    headers: { Authorization: jwt(), "Content-Type": "application/json" },
+  });
+
+export const generateRecurringOccurrencesRequest = async () =>
+  axios.post("/finance/recurring/generate", null, {
     headers: { Authorization: jwt() },
   });

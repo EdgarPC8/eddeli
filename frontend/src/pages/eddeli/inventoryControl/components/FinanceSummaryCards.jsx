@@ -14,6 +14,7 @@ import HourglassTopIcon from "@mui/icons-material/HourglassTop";
 import SavingsIcon from "@mui/icons-material/Savings";
 import HandshakeIcon from "@mui/icons-material/Handshake";
 import CreditCardOffIcon from "@mui/icons-material/CreditCardOff";
+import PercentIcon from "@mui/icons-material/Percent";
 import { money } from "../collections/helpers.js";
 
 function SummaryCard({ title, value, subtitle, icon: Icon, color }) {
@@ -76,6 +77,8 @@ export default function FinanceSummaryCards({ summary, pendingTotal, obligations
   const debtsPayable = Number(obligationsSummary?.totalPayable ?? 0);
   const totalReceivable = Number((collectionsPending + loansReceivable).toFixed(2));
   const projectedBalance = Number((balance + totalReceivable - debtsPayable).toFixed(2));
+  const monthMarginPct = Number(summary?.monthMarginPct ?? 0);
+  const monthLabel = summary?.monthLabel || "Mes actual";
 
   const cards = [
     {
@@ -98,6 +101,13 @@ export default function FinanceSummaryCards({ summary, pendingTotal, obligations
       subtitle: "Egresos registrados",
       icon: TrendingDownIcon,
       color: "error",
+    },
+    {
+      title: "Margen mensual",
+      value: `${monthMarginPct.toFixed(1)}%`,
+      subtitle: `Ganancia % · ${monthLabel}`,
+      icon: PercentIcon,
+      color: monthMarginPct >= 0 ? "success" : "error",
     },
     {
       title: "Por cobrar (pedidos)",
@@ -137,8 +147,7 @@ export default function FinanceSummaryCards({ summary, pendingTotal, obligations
           gridTemplateColumns: {
             xs: "1fr",
             sm: "repeat(2, minmax(0, 1fr))",
-            md: "repeat(3, minmax(0, 1fr))",
-            xl: "repeat(4, minmax(0, 1fr))",
+            md: "repeat(4, minmax(0, 1fr))",
           },
           gap: { xs: 1.5, sm: 2 },
         }}
@@ -217,10 +226,6 @@ export default function FinanceSummaryCards({ summary, pendingTotal, obligations
             sx={{ fontWeight: 800, maxWidth: "100%" }}
           />
         </Stack>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 1.5, textAlign: "center" }}>
-          El dinero esperado suma el balance actual, lo pendiente en Cobranzas, los préstamos por cobrar
-          y resta las deudas abiertas del módulo Préstamos y deudas.
-        </Typography>
       </Paper>
     </Box>
   );

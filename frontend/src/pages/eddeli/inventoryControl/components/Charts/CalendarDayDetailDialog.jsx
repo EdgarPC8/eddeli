@@ -34,7 +34,7 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import MoneyOffIcon from '@mui/icons-material/MoneyOff';
 import PointOfSaleIcon from '@mui/icons-material/PointOfSale';
-import { format } from 'date-fns';
+import { format, parseISO, startOfWeek, endOfWeek } from 'date-fns';
 import { es } from 'date-fns/locale';
 
 const TABS = {
@@ -338,6 +338,8 @@ export default function CalendarDayDetailDialog({
   moneyFmt,
   colors,
   viewMode = 'all',
+  periodGranularity = 'day',
+  periodLabel = null,
 }) {
   const theme = useTheme();
   const isIncomeView = viewMode === 'income';
@@ -395,9 +397,60 @@ export default function CalendarDayDetailDialog({
     ]);
   }, [detail, filter]);
 
-  if (!date) return null;
+  const dailyRows = useMemo(() => {
+    if (!detail?.dailyBreakdown || periodGranularity !== 'week') return [];
+    return Object.entries(detail.dailyBreakdown)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, m]) => ({
+        key,
+        label: format(parseISO(key), 'EEE d MMM', { locale: es }),
+        ...m,
+        incomeTotal: Number(m.posSalesAmount ?? 0) + Number(m.collectedAmount ?? 0),
+      }));
+  }, [detail, periodGranularity]);
 
-  const titleDate = format(date, "EEEE d 'de' MMMM yyyy", { locale: es });
+  const weeklyRows = useMemo(() => {
+    if (!detail?.dailyBreakdown || periodGranularity !== 'month') return [];
+    const weekMap = new Map();
+    for (const [dayKey, m] of Object.entries(detail.dailyBreakdown)) {
+      const d = parseISO(dayKey);
+      const ws = startOfWeek(d, { weekStartsOn: 1 });
+      const wk = format(ws, 'yyyy-MM-dd');
+      if (!weekMap.has(wk)) {
+        weekMap.set(wk, {
+          key: wk,
+          label: `Sem. ${format(ws, 'd MMM', { locale: es })} – ${format(endOfWeek(ws, { weekStartsOn: 1 }), 'd MMM', { locale: es })}`,
+          ordersAmount: 0,
+          posSalesAmount: 0,
+          collectedAmount: 0,
+          expensesAmount: 0,
+        });
+      }
+      const row = weekMap.get(wk);
+      row.ordersAmount = Number((row.ordersAmount + Number(m.ordersAmount ?? 0)).toFixed(2));
+      row.posSalesAmount = Number((row.posSalesAmount + Number(m.posSalesAmount ?? 0)).toFixed(2));
+      row.collectedAmount = Number((row.collectedAmount + Number(m.collectedAmount ?? 0)).toFixed(2));
+      row.expensesAmount = Number((row.expensesAmount + Number(m.expensesAmount ?? 0)).toFixed(2));
+    }
+    return [...weekMap.values()].sort((a, b) => a.key.localeCompare(b.key));
+  }, [detail, periodGranularity]);
+
+  if (!date && !periodLabel) return null;
+
+  const titleByGranularity = {
+    day: 'Detalle del día',
+    week: 'Detalle de la semana',
+    month: 'Detalle del mes',
+  };
+  const titleDate = periodLabel
+    || (date ? format(date, "EEEE d 'de' MMMM yyyy", { locale: es }) : '');
+  const loadingMessage =
+    periodGranularity === 'day'
+      ? 'Cargando movimientos del día…'
+      : periodGranularity === 'week'
+        ? 'Cargando movimientos de la semana…'
+        : 'Cargando movimientos del mes…';
+
   const filterPlaceholder =
     tab === TABS.expenses
       ? 'Buscar concepto, categoría o producto…'
@@ -408,7 +461,7 @@ export default function CalendarDayDetailDialog({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle sx={{ pr: 6, pb: 1 }}>
-        Detalle del día
+        {titleByGranularity[periodGranularity] ?? titleByGranularity.day}
         <Typography variant="body2" color="text.secondary" sx={{ textTransform: 'capitalize', mt: 0.25 }}>
           {titleDate}
         </Typography>
@@ -426,7 +479,7 @@ export default function CalendarDayDetailDialog({
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', py: 6, gap: 2 }}>
             <CircularProgress size={36} />
             <Typography variant="body2" color="text.secondary">
-              Cargando movimientos del día…
+              {loadingMessage}
             </Typography>
           </Box>
         ) : !detail ? (
@@ -471,6 +524,60 @@ export default function CalendarDayDetailDialog({
             />
           )}
         </Stack>
+
+        {weeklyRows.length > 0 && (
+          <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, mb: 2 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 700 }}>Semana</TableCell>
+                  {!isIncomeView && <TableCell align="right" sx={{ fontWeight: 700 }}>Pedidos</TableCell>}
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Caja</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Cobranzas</TableCell>
+                  {!isIncomeView && <TableCell align="right" sx={{ fontWeight: 700 }}>Gastos</TableCell>}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {weeklyRows.map((row) => (
+                  <TableRow key={row.key}>
+                    <TableCell>{row.label}</TableCell>
+                    {!isIncomeView && <TableCell align="right">{moneyFmt(row.ordersAmount)}</TableCell>}
+                    <TableCell align="right">{moneyFmt(row.posSalesAmount)}</TableCell>
+                    <TableCell align="right">{moneyFmt(row.collectedAmount)}</TableCell>
+                    {!isIncomeView && <TableCell align="right">{moneyFmt(row.expensesAmount)}</TableCell>}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
+
+        {dailyRows.length > 0 && (
+          <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1, mb: 2 }}>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 700 }}>Día</TableCell>
+                  {!isIncomeView && <TableCell align="right" sx={{ fontWeight: 700 }}>Pedidos</TableCell>}
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Caja</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Cobranzas</TableCell>
+                  {!isIncomeView && <TableCell align="right" sx={{ fontWeight: 700 }}>Gastos</TableCell>}
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {dailyRows.map((row) => (
+                  <TableRow key={row.key}>
+                    <TableCell sx={{ textTransform: 'capitalize' }}>{row.label}</TableCell>
+                    {!isIncomeView && <TableCell align="right">{moneyFmt(row.ordersAmount)}</TableCell>}
+                    <TableCell align="right">{moneyFmt(row.posSalesAmount)}</TableCell>
+                    <TableCell align="right">{moneyFmt(row.collectedAmount)}</TableCell>
+                    {!isIncomeView && <TableCell align="right">{moneyFmt(row.expensesAmount)}</TableCell>}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
 
         <Tabs
           value={tab}

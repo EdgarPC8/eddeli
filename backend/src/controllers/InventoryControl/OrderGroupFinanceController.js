@@ -9,6 +9,7 @@ import { InventoryProduct } from "../../models/Inventory.js"; // ajusta
 
 import { ItemGroup, ItemGroupItem, Payment,Income } from "../../models/Finance.js"; // ajusta
 import { getHeaderToken,verifyJWT} from "../../libs/jwt.js";
+import { toFinanceDateTime } from "../../utils/financeDateTime.js";
 const toNum = (v, def = 0) => {
     const n = Number(v ?? def);
     return Number.isFinite(n) ? n : def;
@@ -406,7 +407,7 @@ const toNum = (v, def = 0) => {
           return { status: 400, body: { message: `Abono excede saldo. Saldo: ${remaining}` } };
         }
   
-        const paymentDate = date ? new Date(date) : new Date();
+        const paymentDate = date ? toFinanceDateTime(date) : new Date();
         const newPaid = roundMoney(alreadyPaid + payAmount);
         const newRemaining = roundMoney(Math.max(0, total - newPaid));
         const isFullSettlement = newRemaining <= EPS;

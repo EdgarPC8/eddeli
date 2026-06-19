@@ -3,7 +3,7 @@ import { DataTypes } from "sequelize";
 import { sequelize } from "../database/connection.js";
 
 import { Account } from "./Account.js";
-import { InventoryProduct } from "./Inventory.js";
+import { InventoryProduct, Store } from "./Inventory.js";
 
 // ✅ Ajusta a tu proyecto real:
 import { OrderItem, Customer } from "./Orders.js";
@@ -74,9 +74,9 @@ export const Payment = sequelize.define("ERP_finance_payments", {
   },
 
   date: {
-    type: DataTypes.DATEONLY,
+    type: DataTypes.DATE,
     allowNull: false,
-    comment: "Fecha del pago/abono",
+    comment: "Fecha y hora del pago/abono",
   },
 
   amount: {
@@ -121,7 +121,7 @@ export const Payment = sequelize.define("ERP_finance_payments", {
 export const Income = sequelize.define("ERP_finance_incomes", {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
 
-  date: { type: DataTypes.DATEONLY, allowNull: false },
+  date: { type: DataTypes.DATE, allowNull: false },
   amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
 
   concept: { type: DataTypes.STRING, allowNull: false },
@@ -147,7 +147,7 @@ export const Income = sequelize.define("ERP_finance_incomes", {
 export const Expense = sequelize.define("ERP_finance_expenses", {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
 
-  date: { type: DataTypes.DATEONLY, allowNull: false },
+  date: { type: DataTypes.DATE, allowNull: false },
   amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
 
   concept: { type: DataTypes.STRING, allowNull: false },
@@ -210,12 +210,12 @@ export const FinancialObligation = sequelize.define("ERP_finance_obligations", {
   },
 
   openDate: {
-    type: DataTypes.DATEONLY,
+    type: DataTypes.DATE,
     allowNull: false,
   },
 
   dueDate: {
-    type: DataTypes.DATEONLY,
+    type: DataTypes.DATE,
     allowNull: true,
   },
 
@@ -261,7 +261,7 @@ export const ObligationPayment = sequelize.define("ERP_finance_obligation_paymen
     onDelete: "CASCADE",
   },
 
-  date: { type: DataTypes.DATEONLY, allowNull: false },
+  date: { type: DataTypes.DATE, allowNull: false },
   amount: { type: DataTypes.DECIMAL(10, 2), allowNull: false },
   method: { type: DataTypes.STRING, allowNull: false, defaultValue: "efectivo" },
   note: { type: DataTypes.STRING(500), allowNull: true },
@@ -290,7 +290,168 @@ export const ObligationPayment = sequelize.define("ERP_finance_obligation_paymen
 });
 
 // =====================================================
-// 6) RELACIONES (continuación)
+// 6) GASTOS RECURRENTES (arriendo, servicios, permisos)
+// Plantilla por local + cuotas generadas por período
+// =====================================================
+export const RecurringExpenseTemplate = sequelize.define("ERP_finance_recurring_templates", {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+
+  storeId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: "Punto de venta / local (null = gasto general)",
+  },
+
+  name: {
+    type: DataTypes.STRING(200),
+    allowNull: false,
+    comment: "Ej: Arriendo Local Centro",
+  },
+
+  category: {
+    type: DataTypes.ENUM("arriendo", "servicios", "permisos", "otros"),
+    allowNull: false,
+    defaultValue: "otros",
+  },
+
+  amountType: {
+    type: DataTypes.ENUM("fixed", "variable"),
+    allowNull: false,
+    defaultValue: "fixed",
+    comment: "fixed=arriendo, variable=luz/agua",
+  },
+
+  frequency: {
+    type: DataTypes.ENUM("monthly", "quarterly", "annual"),
+    allowNull: false,
+    defaultValue: "monthly",
+  },
+
+  baseAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    defaultValue: 0,
+    comment: "Monto fijo o estimado de referencia",
+  },
+
+  dueDayOfMonth: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 5,
+    comment: "Día del mes de vencimiento (1-31)",
+  },
+
+  dueMonth: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: "Mes de vencimiento anual (1-12)",
+  },
+
+  providerName: {
+    type: DataTypes.STRING(150),
+    allowNull: true,
+    comment: "Arrendador, CNEL, ETAPA, municipio, etc.",
+  },
+
+  note: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+  },
+
+  reminderDaysBefore: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 7,
+  },
+
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+  },
+
+  createdBy: { type: DataTypes.INTEGER, allowNull: false },
+}, {
+  timestamps: true,
+  indexes: [
+    { fields: ["storeId"] },
+    { fields: ["isActive"] },
+    { fields: ["frequency"] },
+  ],
+});
+
+export const RecurringExpenseOccurrence = sequelize.define("ERP_finance_recurring_occurrences", {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+
+  templateId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: { model: "ERP_finance_recurring_templates", key: "id" },
+    onDelete: "CASCADE",
+  },
+
+  periodKey: {
+    type: DataTypes.STRING(20),
+    allowNull: false,
+    comment: "2026-06 | 2026-Q2 | 2026",
+  },
+
+  dueDate: {
+    type: DataTypes.DATE,
+    allowNull: false,
+  },
+
+  expectedAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    defaultValue: 0,
+  },
+
+  actualAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: true,
+    comment: "Monto real (variable) al pagar",
+  },
+
+  status: {
+    type: DataTypes.ENUM("pending", "paid", "skipped"),
+    allowNull: false,
+    defaultValue: "pending",
+  },
+
+  expenseId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: "Gasto contable al pagar",
+  },
+
+  paidDate: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+
+  note: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+  },
+
+  lastReminderAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
+
+  createdBy: { type: DataTypes.INTEGER, allowNull: false },
+}, {
+  timestamps: true,
+  indexes: [
+    { unique: true, fields: ["templateId", "periodKey"] },
+    { fields: ["status"] },
+    { fields: ["dueDate"] },
+  ],
+});
+
+// =====================================================
+// 7) RELACIONES (continuación)
 // =====================================================
 
 // Income/Expense -> Account
@@ -332,6 +493,20 @@ ObligationPayment.belongsTo(FinancialObligation, {
 ObligationPayment.belongsTo(Account, { foreignKey: "createdBy" });
 
 FinancialObligation.belongsTo(Customer, { foreignKey: "customerId", as: "customer" });
+
+RecurringExpenseTemplate.belongsTo(Account, { foreignKey: "createdBy" });
+RecurringExpenseTemplate.belongsTo(Store, { foreignKey: "storeId", as: "store" });
+RecurringExpenseTemplate.hasMany(RecurringExpenseOccurrence, {
+  foreignKey: "templateId",
+  as: "occurrences",
+  onDelete: "CASCADE",
+});
+RecurringExpenseOccurrence.belongsTo(RecurringExpenseTemplate, {
+  foreignKey: "templateId",
+  as: "template",
+});
+RecurringExpenseOccurrence.belongsTo(Expense, { foreignKey: "expenseId", as: "expense" });
+RecurringExpenseOccurrence.belongsTo(Account, { foreignKey: "createdBy" });
 
 /*
   ✅ RECOMENDACIONES (migrations):

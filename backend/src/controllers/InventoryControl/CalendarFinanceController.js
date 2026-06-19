@@ -1,6 +1,6 @@
 import { Customer, Order, OrderItem } from "../../models/Orders.js";
 import { Expense, Payment, ItemGroup, ItemGroupItem } from "../../models/Finance.js";
-import { InventoryProduct } from "../../models/Inventory.js";
+import { InventoryProduct, InventoryMovement } from "../../models/Inventory.js";
 import { Op } from "sequelize";
 import {
   startOfMonth,
@@ -13,6 +13,7 @@ import {
 } from "date-fns";
 
 const CAJA_POS_TAG = "[CAJA_POS]";
+const MERMA_REASONS = ["SALIDA_MERMA", "SALIDA_DANIADO", "SALIDA_CADUCADO"];
 const round2 = (n) => Number(Number(n ?? 0).toFixed(2));
 const dayKey = (d) => format(d, "yyyy-MM-dd");
 
@@ -50,7 +51,7 @@ function parseMonthQuery(req) {
     return null;
   }
   const start = startOfMonth(new Date(year, month - 1, 1));
-  const end = endOfMonth(start);
+  const end = endOfDay(endOfMonth(start));
   return {
     start,
     end,
@@ -109,7 +110,7 @@ function addOrdersToDays(daysMap, orders) {
 function addPaymentsToDays(daysMap, payments) {
   for (const p of payments) {
     if (p.status && p.status !== "completed") continue;
-    const d = p.date ? parseISO(String(p.date).slice(0, 10)) : null;
+    const d = p.date ? new Date(p.date) : null;
     if (!d || Number.isNaN(d.getTime())) continue;
     const key = dayKey(d);
     const bucket = ensureDay(daysMap, key);
@@ -147,11 +148,28 @@ function addDirectPaymentsToDays(daysMap, items, groupedItemIds) {
 
 function addExpensesToDays(daysMap, expenses) {
   for (const e of expenses) {
-    const d = e.date ? parseISO(String(e.date).slice(0, 10)) : null;
+    const d = e.date ? new Date(e.date) : null;
     if (!d || Number.isNaN(d.getTime())) continue;
     const key = dayKey(d);
     const bucket = ensureDay(daysMap, key);
     bucket.expensesAmount = round2(bucket.expensesAmount + Number(e.amount ?? 0));
+  }
+}
+
+function mermaMovementCost(m) {
+  const qty = Math.abs(Number(m.quantity ?? 0));
+  const unitCost =
+    Number(m.price) || Number(m.ERP_inventory_product?.supplierPrice) || 0;
+  return round2(qty * unitCost);
+}
+
+function addMermaToDays(daysMap, movements) {
+  for (const m of movements) {
+    const d = m.date ? new Date(m.date) : null;
+    if (!d || Number.isNaN(d.getTime())) continue;
+    const key = dayKey(d);
+    const bucket = ensureDay(daysMap, key);
+    bucket.expensesAmount = round2(bucket.expensesAmount + mermaMovementCost(m));
   }
 }
 
@@ -160,6 +178,48 @@ function sumMonthTotals(daysMap, monthStart, monthEnd) {
   for (const [key, m] of Object.entries(daysMap)) {
     const d = parseISO(key);
     if (d < monthStart || d > monthEnd) continue;
+    totals.orders = round2(totals.orders + m.ordersAmount);
+    totals.posSales = round2(totals.posSales + m.posSalesAmount);
+    totals.collected = round2(totals.collected + m.collectedAmount);
+    totals.expenses = round2(totals.expenses + m.expensesAmount);
+  }
+  return totals;
+}
+
+function emptyMonthMetrics() {
+  return {
+    ordersAmount: 0,
+    ordersCount: 0,
+    posSalesAmount: 0,
+    posSalesCount: 0,
+    collectedAmount: 0,
+    expensesAmount: 0,
+  };
+}
+
+function ensureMonth(map, key) {
+  if (!map[key]) map[key] = emptyMonthMetrics();
+  return map[key];
+}
+
+function aggregateDaysToMonths(daysMap) {
+  const months = {};
+  for (const [key, m] of Object.entries(daysMap)) {
+    const mk = key.slice(0, 7);
+    const bucket = ensureMonth(months, mk);
+    bucket.ordersAmount = round2(bucket.ordersAmount + m.ordersAmount);
+    bucket.ordersCount += m.ordersCount;
+    bucket.posSalesAmount = round2(bucket.posSalesAmount + m.posSalesAmount);
+    bucket.posSalesCount += m.posSalesCount;
+    bucket.collectedAmount = round2(bucket.collectedAmount + m.collectedAmount);
+    bucket.expensesAmount = round2(bucket.expensesAmount + m.expensesAmount);
+  }
+  return months;
+}
+
+function sumYearTotals(monthsMap) {
+  const totals = { orders: 0, posSales: 0, collected: 0, expenses: 0 };
+  for (const m of Object.values(monthsMap)) {
     totals.orders = round2(totals.orders + m.ordersAmount);
     totals.posSales = round2(totals.posSales + m.posSalesAmount);
     totals.collected = round2(totals.collected + m.collectedAmount);
@@ -179,21 +239,44 @@ async function fetchOrdersInRange(start, end) {
   });
 }
 
-async function fetchPaymentsInRange(startStr, endStr) {
+async function fetchPaymentsInRange(start, end) {
   return Payment.findAll({
     where: {
-      date: { [Op.between]: [startStr, endStr] },
+      date: { [Op.between]: [start, end] },
       status: "completed",
     },
     order: [["date", "ASC"]],
   });
 }
 
-async function fetchExpensesInRange(startStr, endStr) {
+async function fetchExpensesInRange(start, end) {
   return Expense.findAll({
-    where: { date: { [Op.between]: [startStr, endStr] } },
+    where: { date: { [Op.between]: [start, end] } },
     include: [
-      { model: InventoryProduct, as: "ERP_inventory_product", attributes: ["name"], required: false },
+      {
+        model: InventoryProduct,
+        as: "ERP_inventory_product",
+        attributes: ["name"],
+        required: false,
+      },
+    ],
+    order: [["date", "ASC"]],
+  });
+}
+
+async function fetchMermaMovementsInRange(start, end) {
+  return InventoryMovement.findAll({
+    where: {
+      type: "salida",
+      reason: { [Op.in]: MERMA_REASONS },
+      date: { [Op.between]: [start, end] },
+    },
+    include: [
+      {
+        model: InventoryProduct,
+        attributes: ["name", "supplierPrice"],
+        required: false,
+      },
     ],
     order: [["date", "ASC"]],
   });
@@ -258,6 +341,57 @@ function shapePosSaleDetail(o) {
 }
 
 /**
+ * GET /finance/calendar-year?year=2026
+ * Totales por mes del año (misma lógica que el calendario diario).
+ */
+export const getCalendarYearSummary = async (req, res) => {
+  try {
+    const year = Number(req.query.year);
+    if (!Number.isFinite(year) || year < 2000 || year > 2100) {
+      return res.status(400).json({ message: "Parámetro year requerido (2000-2100)" });
+    }
+
+    const start = startOfMonth(new Date(year, 0, 1));
+    const end = endOfDay(endOfMonth(new Date(year, 11, 1)));
+
+    const groupedItemIds = await loadGroupedItemIds();
+
+    const [orders, payments, expenses, directItems, mermaMovements] = await Promise.all([
+      fetchOrdersInRange(start, end),
+      fetchPaymentsInRange(start, end),
+      fetchExpensesInRange(start, end),
+      fetchDirectPaidItemsInRange(start, end, groupedItemIds),
+      fetchMermaMovementsInRange(start, end),
+    ]);
+
+    const days = {};
+    addOrdersToDays(days, orders);
+    addPosSalesToDays(days, orders);
+    addPaymentsToDays(days, payments);
+    addDirectPaymentsToDays(days, directItems, groupedItemIds);
+    addExpensesToDays(days, expenses);
+    addMermaToDays(days, mermaMovements);
+
+    const monthsRaw = aggregateDaysToMonths(days);
+
+    const months = {};
+    for (let m = 1; m <= 12; m += 1) {
+      const key = format(new Date(year, m - 1, 1), "yyyy-MM");
+      months[key] = monthsRaw[key] ?? emptyMonthMetrics();
+    }
+
+    return res.json({
+      year,
+      months,
+      totals: sumYearTotals(months),
+    });
+  } catch (error) {
+    console.error("getCalendarYearSummary:", error);
+    return res.status(500).json({ message: "Error al cargar resumen anual" });
+  }
+};
+
+/**
  * GET /finance/calendar-month?year=2026&month=6
  * Totales por día del mes (ligero, para la grilla del calendario).
  */
@@ -270,11 +404,12 @@ export const getCalendarMonthSummary = async (req, res) => {
 
     const groupedItemIds = await loadGroupedItemIds();
 
-    const [orders, payments, expenses, directItems] = await Promise.all([
+    const [orders, payments, expenses, directItems, mermaMovements] = await Promise.all([
       fetchOrdersInRange(range.start, range.end),
-      fetchPaymentsInRange(range.startStr, range.endStr),
-      fetchExpensesInRange(range.startStr, range.endStr),
+      fetchPaymentsInRange(range.start, range.end),
+      fetchExpensesInRange(range.start, range.end),
       fetchDirectPaidItemsInRange(range.start, range.end, groupedItemIds),
+      fetchMermaMovementsInRange(range.start, range.end),
     ]);
 
     const days = {};
@@ -283,6 +418,7 @@ export const getCalendarMonthSummary = async (req, res) => {
     addPaymentsToDays(days, payments);
     addDirectPaymentsToDays(days, directItems, groupedItemIds);
     addExpensesToDays(days, expenses);
+    addMermaToDays(days, mermaMovements);
 
     return res.json({
       days,
@@ -293,6 +429,116 @@ export const getCalendarMonthSummary = async (req, res) => {
     return res.status(500).json({ message: "Error al cargar resumen del calendario" });
   }
 };
+
+function parseRangeQuery(req) {
+  const startRaw = req.query.startDate;
+  const endRaw = req.query.endDate || startRaw;
+  if (!startRaw || !isValidDate(parseISO(String(startRaw).slice(0, 10)))) return null;
+  const startD = parseISO(String(startRaw).slice(0, 10));
+  const endD = parseISO(String(endRaw).slice(0, 10));
+  if (!isValidDate(endD)) return null;
+  const start = startOfDay(startD);
+  const end = endOfDay(endD < startD ? startD : endD);
+  return {
+    start,
+    end,
+    startStr: format(start, "yyyy-MM-dd"),
+    endStr: format(end, "yyyy-MM-dd"),
+  };
+}
+
+async function buildPeriodDetail(range) {
+  const [groupedItemIds, maps] = await Promise.all([
+    loadGroupedItemIds(),
+    loadCustomerAndGroupMaps(),
+  ]);
+
+  const [orders, payments, expenses, directItems, mermaMovements] = await Promise.all([
+    fetchOrdersInRange(range.start, range.end),
+    fetchPaymentsInRange(range.start, range.end),
+    fetchExpensesInRange(range.start, range.end),
+    fetchDirectPaidItemsInRange(range.start, range.end, groupedItemIds),
+    fetchMermaMovementsInRange(range.start, range.end),
+  ]);
+
+  const { customerName, groupConcept } = maps;
+
+  const regularOrders = orders.filter((o) => !isPosOrder(o));
+  const posOrders = orders.filter(isPosOrder);
+  const shapedOrders = regularOrders.map(shapeOrderDetail);
+  const posSales = posOrders.map(shapePosSaleDetail);
+
+  const abonos = payments.map((p) => ({
+    id: p.id,
+    amount: round2(p.amount),
+    customer: customerName.get(p.customerId) || `Cliente #${p.customerId}`,
+    group: groupConcept.get(p.groupId) || `Grupo #${p.groupId}`,
+    method: p.method,
+    note: p.note,
+  }));
+
+  const directPayments = directItems.map((it) => {
+    const order = it.ERP_order;
+    const customer = order?.ERP_customer?.name ?? "Cliente";
+    const qty = Number(it.quantity ?? 0);
+    const price = Number(it.price ?? 0);
+    return {
+      orderId: order?.id ?? it.orderId,
+      itemId: it.id,
+      customer,
+      qty,
+      price,
+      subtotal: round2(qty * price),
+      paidAt: it.paidAt ? format(new Date(it.paidAt), "dd/MM/yyyy HH:mm:ss") : null,
+    };
+  });
+
+  const shapedExpenses = [
+    ...expenses.map((e) => ({
+      id: e.id,
+      concept: e.concept,
+      category: e.category,
+      productName: e.ERP_inventory_product?.name || null,
+      amount: round2(e.amount),
+    })),
+    ...mermaMovements.map((m) => ({
+      id: `merma-${m.id}`,
+      concept: `Merma (${m.reason || "salida"})`,
+      category: "Merma",
+      productName: m.ERP_inventory_product?.name || null,
+      amount: mermaMovementCost(m),
+    })),
+  ];
+
+  const days = {};
+  addOrdersToDays(days, orders);
+  addPosSalesToDays(days, orders);
+  addPaymentsToDays(days, payments);
+  addDirectPaymentsToDays(days, directItems, groupedItemIds);
+  addExpensesToDays(days, expenses);
+  addMermaToDays(days, mermaMovements);
+
+  const totals = emptyDayMetrics();
+  for (const m of Object.values(days)) {
+    totals.ordersAmount = round2(totals.ordersAmount + m.ordersAmount);
+    totals.ordersCount += m.ordersCount;
+    totals.deliveredUnits += m.deliveredUnits;
+    totals.posSalesAmount = round2(totals.posSalesAmount + m.posSalesAmount);
+    totals.posSalesCount += m.posSalesCount;
+    totals.collectedAmount = round2(totals.collectedAmount + m.collectedAmount);
+    totals.expensesAmount = round2(totals.expensesAmount + m.expensesAmount);
+  }
+
+  return {
+    orders: shapedOrders,
+    posSales,
+    abonos,
+    directPayments,
+    expenses: shapedExpenses,
+    totals,
+    dailyBreakdown: days,
+  };
+}
 
 /**
  * GET /finance/calendar-day?date=YYYY-MM-DD
@@ -305,76 +551,35 @@ export const getCalendarDayDetail = async (req, res) => {
       return res.status(400).json({ message: "Parámetro date (YYYY-MM-DD) requerido" });
     }
 
-    const [groupedItemIds, maps] = await Promise.all([
-      loadGroupedItemIds(),
-      loadCustomerAndGroupMaps(),
-    ]);
-
-    const [orders, payments, expenses, directItems] = await Promise.all([
-      fetchOrdersInRange(range.start, range.end),
-      fetchPaymentsInRange(range.startStr, range.endStr),
-      fetchExpensesInRange(range.startStr, range.endStr),
-      fetchDirectPaidItemsInRange(range.start, range.end, groupedItemIds),
-    ]);
-
-    const { customerName, groupConcept } = maps;
-
-    const regularOrders = orders.filter((o) => !isPosOrder(o));
-    const posOrders = orders.filter(isPosOrder);
-    const shapedOrders = regularOrders.map(shapeOrderDetail);
-    const posSales = posOrders.map(shapePosSaleDetail);
-
-    const abonos = payments.map((p) => ({
-      id: p.id,
-      amount: round2(p.amount),
-      customer: customerName.get(p.customerId) || `Cliente #${p.customerId}`,
-      group: groupConcept.get(p.groupId) || `Grupo #${p.groupId}`,
-      method: p.method,
-      note: p.note,
-    }));
-
-    const directPayments = directItems.map((it) => {
-      const order = it.ERP_order;
-      const customer = order?.ERP_customer?.name ?? "Cliente";
-      const qty = Number(it.quantity ?? 0);
-      const price = Number(it.price ?? 0);
-      return {
-        orderId: order?.id ?? it.orderId,
-        itemId: it.id,
-        customer,
-        qty,
-        price,
-        subtotal: round2(qty * price),
-        paidAt: it.paidAt ? format(new Date(it.paidAt), "dd/MM/yyyy HH:mm:ss") : null,
-      };
+    const detail = await buildPeriodDetail({
+      start: range.start,
+      end: range.end,
+      startStr: range.startStr,
+      endStr: range.endStr,
     });
 
-    const dayExpenses = expenses.map((e) => ({
-      id: e.id,
-      concept: e.concept,
-      category: e.category,
-      productName: e.ERP_inventory_product?.name || null,
-      amount: round2(e.amount),
-    }));
-
-    const days = {};
-    addOrdersToDays(days, orders);
-    addPosSalesToDays(days, orders);
-    addPaymentsToDays(days, payments);
-    addDirectPaymentsToDays(days, directItems, groupedItemIds);
-    addExpensesToDays(days, expenses);
-    const totals = days[range.key] || emptyDayMetrics();
-
-    return res.json({
-      orders: shapedOrders,
-      posSales,
-      abonos,
-      directPayments,
-      expenses: dayExpenses,
-      totals,
-    });
+    return res.json(detail);
   } catch (error) {
     console.error("getCalendarDayDetail:", error);
     return res.status(500).json({ message: "Error al cargar detalle del día" });
+  }
+};
+
+/**
+ * GET /finance/calendar-period?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
+ * Detalle agregado de un rango (día, semana o mes).
+ */
+export const getCalendarPeriodDetail = async (req, res) => {
+  try {
+    const range = parseRangeQuery(req);
+    if (!range) {
+      return res.status(400).json({ message: "Parámetros startDate y endDate (YYYY-MM-DD) requeridos" });
+    }
+
+    const detail = await buildPeriodDetail(range);
+    return res.json(detail);
+  } catch (error) {
+    console.error("getCalendarPeriodDetail:", error);
+    return res.status(500).json({ message: "Error al cargar detalle del período" });
   }
 };

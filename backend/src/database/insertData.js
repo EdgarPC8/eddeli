@@ -499,6 +499,106 @@ export const saveBackup = async ({ updateMainBackup = true } = {}) => {
   }
 };
 
+const STORED_BACKUP_NAME = /^backup(?:-eddeli)?-[\w\-:.]+\.json$/i;
+
+/** Valida nombre y devuelve ruta absoluta dentro de src/backups/. */
+export function resolveStoredBackupPath(filename) {
+  const base = String(filename || "").split(/[/\\]/).pop();
+  if (!base || !STORED_BACKUP_NAME.test(base)) {
+    throw new Error("Nombre de archivo de backup no válido");
+  }
+  const full = resolve(backups, base);
+  if (!full.startsWith(backups)) {
+    throw new Error("Ruta de backup no permitida");
+  }
+  return full;
+}
+
+async function summarizeBackupAtPath(filePath) {
+  try {
+    const raw = await fs.readFile(filePath, "utf8");
+    const counts = summarizeBackupData(parseBackupJsonContent(raw));
+    const totalRows = Object.values(counts).reduce((a, n) => a + n, 0);
+    return { counts, totalRows, valid: true };
+  } catch {
+    return { counts: {}, totalRows: 0, valid: false };
+  }
+}
+
+/** Lista copias con fecha en src/backups/ (más recientes primero). */
+export async function listStoredBackups() {
+  await fs.mkdir(backups, { recursive: true });
+  const names = await fs.readdir(backups);
+  const files = [];
+
+  for (const name of names) {
+    if (!name.endsWith(".json") || !STORED_BACKUP_NAME.test(name)) continue;
+    const filePath = resolve(backups, name);
+    let st;
+    try {
+      st = await fs.stat(filePath);
+      if (!st.isFile()) continue;
+    } catch {
+      continue;
+    }
+
+    const { counts, totalRows, valid } = await summarizeBackupAtPath(filePath);
+    files.push({
+      filename: name,
+      sizeBytes: st.size,
+      sizeMB: Number((st.size / 1024 / 1024).toFixed(2)),
+      modifiedAt: st.mtime.toISOString(),
+      counts,
+      totalRows,
+      valid,
+    });
+  }
+
+  files.sort((a, b) => new Date(b.modifiedAt) - new Date(a.modifiedAt));
+  return files;
+}
+
+/** Resumen del backup fijo + listado de copias guardadas. */
+export async function getBackupsWorkbench() {
+  const mainRaw = await readBackupFileSummary();
+  let mainModifiedAt = null;
+  if (mainRaw.exists) {
+    try {
+      const st = await fs.stat(backupFilePath);
+      mainModifiedAt = st.mtime.toISOString();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const main = {
+    ...mainRaw,
+    filename: "backup.json",
+    isMain: true,
+    modifiedAt: mainModifiedAt,
+    valid: mainRaw.exists && mainRaw.totalRows > 0,
+  };
+
+  const stored = await listStoredBackups();
+  return { main, stored };
+}
+
+/** Copia un backup guardado a backup.json (fijo). */
+export async function setMainBackupFromStored(filename) {
+  const filePath = resolveStoredBackupPath(filename);
+  await fs.access(filePath);
+  const raw = await fs.readFile(filePath, "utf8");
+  const normalized = parseBackupJsonContent(raw);
+  return writeBackupToDisk(normalized);
+}
+
+/** Elimina una copia en src/backups/ (no el backup.json fijo). */
+export async function deleteStoredBackup(filename) {
+  const filePath = resolveStoredBackupPath(filename);
+  await fs.unlink(filePath);
+  return { deleted: filePath };
+}
+
 /** Descarga JSON de respaldo EdDeli (GET /eddeliapi/comands/downloadBackup). */
 export const downloadBackup = async (req, res) => {
   try {

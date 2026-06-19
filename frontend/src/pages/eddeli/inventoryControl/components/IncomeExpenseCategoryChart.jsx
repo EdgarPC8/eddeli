@@ -2,7 +2,6 @@ import { useMemo, useState, useCallback } from "react";
 import {
   Box,
   Paper,
-  Typography,
   Stack,
   Button,
   CircularProgress,
@@ -11,10 +10,14 @@ import {
 } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import { PieChart } from "@mui/x-charts/PieChart";
+import ChartBlockHeader from "../../../../components/Charts/ChartBlockHeader";
 import { money } from "../collections/helpers.js";
-import { getChartSeriesColors } from "../../../../theme/chartPalette";
 import { getIncomeExpenseBreakdownDetail } from "../../../../api/financeRequest";
 import IncomeExpenseCategoryDetailDialog from "./IncomeExpenseCategoryDetailDialog";
+import {
+  dashboardTwinPanelSx,
+  DASHBOARD_TWIN_PANEL_BODY_HEIGHT,
+} from "./dashboardTwinPanelLayout.js";
 
 const toNum = (v) => {
   const n = Number(v);
@@ -23,9 +26,10 @@ const toNum = (v) => {
 
 const round2 = (n) => Number(toNum(n).toFixed(2));
 
+const CHART_SIZE = 220;
+
 export default function IncomeExpenseCategoryChart({ data }) {
   const theme = useTheme();
-  const chartColors = useMemo(() => getChartSeriesColors(theme), [theme]);
   const incomeColor = theme.palette.success.main;
   const expenseColor = theme.palette.error.main;
 
@@ -45,46 +49,48 @@ export default function IncomeExpenseCategoryChart({ data }) {
 
   const outerData = useMemo(() => {
     if (!groups) return [];
-    const income = (groups.Ingresos ?? []).map((r) => ({
+    const incomeShades = (groups.Ingresos ?? []).map((r, i) => ({
       id: `i-${r.label}`,
       label: r.label,
       value: round2(r.value),
+      color: alpha(incomeColor, Math.min(0.95, 0.5 + i * 0.08)),
     }));
-    const expense = (groups.Gastos ?? []).map((r) => ({
+    const expenseShades = (groups.Gastos ?? []).map((r, i) => ({
       id: `e-${r.label}`,
       label: r.label,
       value: round2(r.value),
+      color: alpha(expenseColor, Math.min(0.95, 0.5 + i * 0.08)),
     }));
-    return [...income, ...expense];
-  }, [groups]);
-
-  const totalAll = round2(totalIncome + totalExpense);
+    return [...incomeShades, ...expenseShades];
+  }, [groups, incomeColor, expenseColor]);
 
   const series = useMemo(
     () => [
       {
         id: "platforms",
         data: [
-          { id: "ingresos", label: "Ingresos", value: totalIncome },
-          { id: "gastos", label: "Gastos", value: totalExpense },
+          { id: "ingresos", label: "Ingresos", value: totalIncome, color: incomeColor },
+          { id: "gastos", label: "Gastos", value: totalExpense, color: expenseColor },
         ],
         innerRadius: 0,
-        outerRadius: 68,
-        valueFormatter: (item) => (item ? money(item.value) : ""),
-        arcLabel: (d) => d.label,
-        arcLabelMinAngle: 10,
+        outerRadius: 48,
+        paddingAngle: 2,
+        cornerRadius: 4,
+        valueFormatter: (item) => (item ? `${item.label}: ${money(item.value)}` : ""),
+        highlightScope: { fade: "global", highlight: "item" },
       },
       {
         id: "categories",
         data: outerData,
-        innerRadius: 82,
-        outerRadius: 108,
-        valueFormatter: (item) => (item ? money(item.value) : ""),
-        arcLabel: (d) => (d.value > 0 && totalAll > 0 && d.value / totalAll > 0.05 ? d.label : ""),
-        arcLabelMinAngle: 12,
+        innerRadius: 58,
+        outerRadius: 76,
+        paddingAngle: 1.5,
+        cornerRadius: 3,
+        valueFormatter: (item) => (item ? `${item.label}: ${money(item.value)}` : ""),
+        highlightScope: { fade: "global", highlight: "item" },
       },
     ],
-    [totalIncome, totalExpense, outerData, totalAll]
+    [totalIncome, totalExpense, outerData, incomeColor, expenseColor]
   );
 
   const handleOpenDetail = useCallback(async () => {
@@ -107,13 +113,30 @@ export default function IncomeExpenseCategoryChart({ data }) {
     setDetailLoading(false);
   }, []);
 
+  const paperSx = {
+    p: { xs: 1.5, sm: 2 },
+    borderRadius: 2,
+    minWidth: 0,
+    width: "100%",
+    display: "flex",
+    flexDirection: "column",
+    border: "1px solid",
+    borderColor: alpha(theme.palette.divider, 0.6),
+    ...dashboardTwinPanelSx,
+  };
+
   if (!platforms || !groups) {
     return (
-      <Paper sx={{ p: 2, borderRadius: 2, minWidth: 0, width: "100%" }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 800, mb: 1 }}>
-          Ingresos y gastos por categoría
-        </Typography>
-        <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+      <Paper sx={paperSx}>
+        <ChartBlockHeader title="Ingresos y gastos por categoría" sx={{ mb: 1, flexShrink: 0 }} />
+        <Box
+          sx={{
+            height: DASHBOARD_TWIN_PANEL_BODY_HEIGHT,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
           <CircularProgress size={28} />
         </Box>
       </Paper>
@@ -122,48 +145,46 @@ export default function IncomeExpenseCategoryChart({ data }) {
 
   return (
     <>
-      <Paper
-        sx={{
-          p: { xs: 1.5, sm: 2 },
-          borderRadius: 2,
-          minWidth: 0,
-          width: "100%",
-          boxSizing: "border-box",
-          border: "1px solid",
-          borderColor: alpha(theme.palette.divider, 0.6),
-          cursor: "pointer",
-          transition: "border-color 0.15s ease, box-shadow 0.15s ease",
-          "&:hover": { borderColor: "primary.main", boxShadow: 1 },
-        }}
-        onClick={handleOpenDetail}
-      >
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={1} mb={1}>
-          <Box sx={{ minWidth: 0 }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
-              Ingresos y gastos por categoría
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Clic para ver detalle por categoría
-            </Typography>
-          </Box>
+      <Paper sx={paperSx}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="flex-start"
+          spacing={1}
+          sx={{ mb: 1, flexShrink: 0 }}
+        >
+          <ChartBlockHeader title="Ingresos y gastos por categoría" sx={{ mb: 0, flex: 1 }} />
           <Button
             size="small"
+            variant="outlined"
             startIcon={<VisibilityIcon />}
-            onClick={(e) => { e.stopPropagation(); handleOpenDetail(); }}
+            onClick={handleOpenDetail}
             sx={{ flexShrink: 0 }}
           >
             Ver detalle
           </Button>
         </Stack>
 
-        <Box sx={{ width: "100%", display: "flex", justifyContent: "center", minWidth: 0, overflow: "hidden", pointerEvents: "none" }}>
+        <Box
+          sx={{
+            height: DASHBOARD_TWIN_PANEL_BODY_HEIGHT,
+            minHeight: DASHBOARD_TWIN_PANEL_BODY_HEIGHT,
+            maxHeight: DASHBOARD_TWIN_PANEL_BODY_HEIGHT,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            overflow: "hidden",
+          }}
+        >
           <PieChart
             series={series}
-            colors={[incomeColor, expenseColor, ...chartColors]}
-            width={340}
-            height={280}
+            width={CHART_SIZE}
+            height={CHART_SIZE}
             margin={{ top: 4, right: 4, bottom: 4, left: 4 }}
             legend={{ hidden: true }}
+            slotProps={{
+              tooltip: { trigger: "item" },
+            }}
           />
         </Box>
       </Paper>

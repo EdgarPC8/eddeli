@@ -96,14 +96,14 @@ export function AuthProvider({ children }) {
       });
       if (!setToken(data?.token)) {
         logout();
-        enqueueSnackbar(
-          getApiErrorMessage({ message: "Token inválido al cambiar de rol" }),
-          { variant: "error" }
-        );
+        enqueueSnackbar("Token inválido al cambiar de rol", { variant: "error" });
         return;
       }
       await loadUserProfile();
-      enqueueSnackbar(getApiSuccessMessage({ data }), { variant: "success" });
+      const successText = getApiSuccessMessage({ data }, "Rol actualizado correctamente");
+      if (successText) {
+        enqueueSnackbar(successText, { variant: "success" });
+      }
     } catch (error) {
       enqueueSnackbar(getApiErrorMessage(error), { variant: "error" });
     }

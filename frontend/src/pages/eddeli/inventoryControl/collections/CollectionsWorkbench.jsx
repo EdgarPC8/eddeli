@@ -44,6 +44,8 @@ import {
   downloadTextFile,
   money,
   todayISO,
+  nowLocalDateTime,
+  toLocalDateTimeInput,
   sum,
   dayLabel,
   getItemGroupId,
@@ -79,7 +81,7 @@ export default function CollectionsWorkbench() {
   const [groupConcept, setGroupConcept] = useState("");
   const [payOpen, setPayOpen] = useState(false);
   const [payAmount, setPayAmount] = useState("");
-  const [payDate, setPayDate] = useState(todayISO());
+  const [payDate, setPayDate] = useState(nowLocalDateTime());
   const [payNote, setPayNote] = useState("Abono");
   const [payMethod, setPayMethod] = useState("efectivo");
   const [editMode, setEditMode] = useState({});
@@ -94,7 +96,7 @@ export default function CollectionsWorkbench() {
   const [editPaymentOpen, setEditPaymentOpen] = useState(false);
   const [editingPayment, setEditingPayment] = useState(null);
   const [editPaymentAmount, setEditPaymentAmount] = useState("");
-  const [editPaymentDate, setEditPaymentDate] = useState(todayISO());
+  const [editPaymentDate, setEditPaymentDate] = useState(nowLocalDateTime());
   const [editPaymentNote, setEditPaymentNote] = useState("");
   const [editPaymentMethod, setEditPaymentMethod] = useState("efectivo");
 
@@ -491,7 +493,7 @@ export default function CollectionsWorkbench() {
     setUiMsg(null);
     const rem = groupRemaining(selectedGroupId);
     setPayAmount(rem > 0 ? String(rem) : "");
-    setPayDate(todayISO());
+    setPayDate(nowLocalDateTime());
     setPayNote(buildSuggestedPayNote(rem, selectedGroupId));
     setPayMethod("efectivo");
     setPayOpen(true);
@@ -700,7 +702,7 @@ export default function CollectionsWorkbench() {
     if (!isProgrammer) return;
     setEditingPayment(payment);
     setEditPaymentAmount(String(payment.amount ?? ""));
-    setEditPaymentDate(payment.date || todayISO());
+    setEditPaymentDate(payment.date ? toLocalDateTimeInput(payment.date) : nowLocalDateTime());
     setEditPaymentNote(payment.note || "Abono");
     setEditPaymentMethod(payment.method || "efectivo");
     setEditPaymentOpen(true);

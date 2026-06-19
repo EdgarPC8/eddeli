@@ -14,6 +14,7 @@ import AccountBalanceWalletIcon from "@mui/icons-material/AccountBalanceWallet";
 import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import TrendingDownIcon from "@mui/icons-material/TrendingDown";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import ChartBlockHeader from "../../../../components/Charts/ChartBlockHeader";
 import { money } from "../collections/helpers.js";
 
 function MetricCard({ title, value, subtitle, icon: Icon, color }) {
@@ -87,25 +88,19 @@ export default function ObligationsSummaryPanel({ obligations }) {
     >
       <Stack
         direction="row"
-        alignItems="center"
+        alignItems="flex-start"
         justifyContent="space-between"
-        spacing={1}
-        sx={{ mb: 1.5 }}
+        spacing={0.75}
+        sx={{ mb: 1 }}
       >
-        <Box>
-          <Typography variant="subtitle1" fontWeight={700}>
-            Préstamos y deudas
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Obligaciones sin pedido (empleados, clientes, proveedores)
-          </Typography>
-        </Box>
+        <ChartBlockHeader title="Préstamos y deudas" sx={{ mb: 0, flex: 1, minWidth: 0 }} />
         <Button
           component={RouterLink}
           to="/inventory/prestamos-deudas"
+          variant="outlined"
           size="small"
-          endIcon={<OpenInNewIcon fontSize="small" />}
-          sx={{ flexShrink: 0 }}
+          endIcon={<OpenInNewIcon sx={{ fontSize: "0.95rem !important" }} />}
+          sx={{ flexShrink: 0, fontSize: "0.7rem", py: 0.25, px: 0.75 }}
         >
           Ver módulo
         </Button>

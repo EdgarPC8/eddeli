@@ -5,8 +5,11 @@ import { verifyJWT, getHeaderToken } from "../../libs/jwt.js";
 
 // controllers/finance.controller.js
 import { Op, fn, literal } from 'sequelize';
+import { startOfMonth, endOfMonth, format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { OrderItem } from "../../models/Orders.js";
 import { ItemGroup, ItemGroupItem, Payment } from "../../models/Finance.js";
+import { toFinanceDateTime } from "../../utils/financeDateTime.js";
 
 /**
  * Ingresos futuros / por cobrar: alineado con cobranzas por grupos.
@@ -99,6 +102,19 @@ export const getFinanceSummary = async (req, res) => {
     const income = Number(totalIncome || 0);
     const expense = Number(totalExpense || 0);
 
+    const now = new Date();
+    const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
+    const monthEnd = format(endOfMonth(now), "yyyy-MM-dd");
+    const [monthIncomeRaw, monthExpenseRaw] = await Promise.all([
+      Income.sum("amount", { where: { date: { [Op.between]: [monthStart, monthEnd] } } }),
+      Expense.sum("amount", { where: { date: { [Op.between]: [monthStart, monthEnd] } } }),
+    ]);
+    const monthIncome = Number(monthIncomeRaw || 0);
+    const monthExpense = Number(monthExpenseRaw || 0);
+    const monthBalance = Number((monthIncome - monthExpense).toFixed(2));
+    const monthMarginPct =
+      monthIncome > 0 ? Number(((monthBalance / monthIncome) * 100).toFixed(2)) : 0;
+
     const balance = income - expense;
     const projectedBalance = balance + futureIncome;
 
@@ -108,6 +124,11 @@ export const getFinanceSummary = async (req, res) => {
       balance,
       futureIncome,        // << nuevos ingresos esperados (órdenes no pagadas)
       projectedBalance,    // << balance proyectado = balance + futuros ingresos
+      monthIncome,
+      monthExpense,
+      monthBalance,
+      monthMarginPct,
+      monthLabel: format(now, "MMMM yyyy", { locale: es }),
     });
   } catch (error) {
     console.error('Error al obtener resumen financiero:', error);
@@ -125,7 +146,15 @@ export const createIncome = async (req, res) => {
         const token = getHeaderToken(req);
       const user = await verifyJWT(token); // para createdBy
     const createdBy = user.accountId;
-    const income = await Income.create({ date, amount, concept, category, referenceId, referenceType, createdBy });
+    const income = await Income.create({
+      date: toFinanceDateTime(date),
+      amount,
+      concept,
+      category,
+      referenceId,
+      referenceType,
+      createdBy,
+    });
     res.status(201).json(income);
   } catch (error) {
     console.error("Error al crear ingreso:", error);
@@ -141,7 +170,15 @@ export const createExpense = async (req, res) => {
       const user = await verifyJWT(token); // para createdBy
     const createdBy = user.accountId;
 
-    const expense = await Expense.create({ date, amount, concept, category, referenceId, referenceType, createdBy });
+    const expense = await Expense.create({
+      date: toFinanceDateTime(date),
+      amount,
+      concept,
+      category,
+      referenceId,
+      referenceType,
+      createdBy,
+    });
     res.status(201).json(expense);
   } catch (error) {
     console.error("Error al crear gasto:", error);
@@ -192,7 +229,14 @@ export const updateIncome = async (req, res) => {
     const income = await Income.findByPk(id);
     if (!income) return res.status(404).json({ message: "Ingreso no encontrado" });
 
-    await income.update({ date, amount, concept, category, referenceId, referenceType });
+    await income.update({
+      date: toFinanceDateTime(date),
+      amount,
+      concept,
+      category,
+      referenceId,
+      referenceType,
+    });
     res.json(income);
   } catch (error) {
     console.error("Error al editar ingreso:", error);
@@ -208,7 +252,14 @@ export const updateExpense = async (req, res) => {
     const expense = await Expense.findByPk(id);
     if (!expense) return res.status(404).json({ message: "Gasto no encontrado" });
 
-    await expense.update({ date, amount, concept, category, referenceId, referenceType });
+    await expense.update({
+      date: toFinanceDateTime(date),
+      amount,
+      concept,
+      category,
+      referenceId,
+      referenceType,
+    });
     res.json(expense);
   } catch (error) {
     console.error("Error al editar gasto:", error);

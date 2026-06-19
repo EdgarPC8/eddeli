@@ -1,12 +1,19 @@
 import { createLicenseToken } from "../libs/jwt.js";
 import { License } from "../models/License.js";
 import { Logs } from "../models/Logs.js";
+import { promises as fs } from "fs";
 import "../database/registerEdDeliModels.js";
 import {
   parseBackupJsonContent,
   recreateDatabaseFromBackup,
   saveBackup,
   writeBackupToDisk,
+  getBackupsWorkbench,
+  setMainBackupFromStored,
+  deleteStoredBackup,
+  resolveStoredBackupPath,
+  readBackupFileSummary,
+  backupFilePath,
 } from "../database/insertData.js";
 
 export const saveBackupController = async (req, res) => {
@@ -121,6 +128,83 @@ export const getLogs = async (req, res) => {
   } catch (error) {
     console.error("Error al obtener logs:", error);
     res.status(500).json({ message: "Error en el servidor." });
+  }
+};
+
+export const listBackupsController = async (req, res) => {
+  try {
+    const data = await getBackupsWorkbench();
+    res.json(data);
+  } catch (error) {
+    console.error("listBackupsController:", error);
+    res.status(500).json({ message: "Error al listar backups", error: error.message });
+  }
+};
+
+export const setMainBackupController = async (req, res) => {
+  try {
+    const { filename } = req.params;
+    const { path: savedPath, tables } = await setMainBackupFromStored(filename);
+    res.json({
+      ok: true,
+      message: "backup.json actualizado desde la copia seleccionada. Usa «Recargar BD» en Comandos para aplicarlo.",
+      path: savedPath,
+      tables,
+    });
+  } catch (error) {
+    console.error("setMainBackupController:", error);
+    res.status(400).json({
+      ok: false,
+      message: error.message || "No se pudo establecer como backup fijo",
+    });
+  }
+};
+
+export const deleteStoredBackupController = async (req, res) => {
+  try {
+    const { filename } = req.params;
+    await deleteStoredBackup(filename);
+    res.json({ ok: true, message: "Copia de backup eliminada" });
+  } catch (error) {
+    console.error("deleteStoredBackupController:", error);
+    res.status(400).json({
+      ok: false,
+      message: error.message || "No se pudo eliminar el backup",
+    });
+  }
+};
+
+export const downloadStoredBackupController = async (req, res) => {
+  try {
+    const filePath = resolveStoredBackupPath(req.params.filename);
+    await fs.access(filePath);
+    res.download(filePath, req.params.filename, (err) => {
+      if (err) {
+        console.error("downloadStoredBackup:", err);
+        if (!res.headersSent) res.status(500).send("Error al descargar");
+      }
+    });
+  } catch (error) {
+    console.error("downloadStoredBackupController:", error);
+    res.status(404).json({ message: error.message || "Backup no encontrado" });
+  }
+};
+
+export const downloadMainBackupController = async (req, res) => {
+  try {
+    const summary = await readBackupFileSummary();
+    if (!summary.exists) {
+      return res.status(404).json({ message: "No existe backup.json en el servidor" });
+    }
+    res.download(backupFilePath, "backup.json", (err) => {
+      if (err) {
+        console.error("downloadMainBackup:", err);
+        if (!res.headersSent) res.status(500).send("Error al descargar");
+      }
+    });
+  } catch (error) {
+    console.error("downloadMainBackupController:", error);
+    res.status(500).json({ message: "Error al descargar backup.json" });
   }
 };
 
