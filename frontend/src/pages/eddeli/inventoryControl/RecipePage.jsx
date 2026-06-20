@@ -10,8 +10,14 @@ import {
   Stack,
   Paper,
   Divider,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Chip,
 } from "@mui/material";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Edit, Delete, RestaurantMenu } from "@mui/icons-material";
 
 import TablePro from "../../../components/Tables/TablePro";
@@ -28,6 +34,17 @@ import {
 import CostingAccordionTable from "./components/CostingAccordionTable";
 import SearchableSelect from "../../../components/SearchableSelect";
 
+const fmt = (n, d = 2) =>
+  typeof n === "number" && Number.isFinite(n) ? n.toFixed(d) : "—";
+
+const fmtMoney = (n, d = 2) =>
+  typeof n === "number" && Number.isFinite(n) ? `$${n.toFixed(d)}` : "—";
+
+function componentTypeLabel(type) {
+  if (type === "intermediate") return "Intermedio";
+  if (type === "raw") return "Insumo";
+  return type || "—";
+}
 
 function RecipePage() {
   const { toast } = useAuth();
@@ -43,86 +60,21 @@ function RecipePage() {
 
   const [costSummary, setCostSummary] = useState(null);
   const [costTreeData, setCostTreeData] = useState(null);
-
-  // Loading
   const [loadingCost, setLoadingCost] = useState(false);
 
-  // Parámetros UI (porcentajes como enteros)
   const [uiParams, setUiParams] = useState({
     extrasPercent: 20,
     laborPercent: 45,
     producedQty: 0,
   });
 
+  const selectedMeta = useMemo(
+    () => products.find((p) => String(p.id) === String(selectedProduct)),
+    [products, selectedProduct],
+  );
+
   const handleDialog = () => setOpen(!open);
   const handleDialogUser = () => setOpenDialog(!openDialog);
-
-  /** JSON en consola del navegador + petición con debug=1 para log en terminal del backend */
-  const logRecipeAnalysis = useCallback(async () => {
-    if (!selectedProduct) {
-      toast({ message: "Selecciona un producto primero", variant: "warning" });
-      return;
-    }
-
-    const meta = products.find((p) => String(p.id) === String(selectedProduct));
-
-    const pruneCostTree = (node, depth = 0, maxDepth = 6) => {
-      if (!node || depth > maxDepth) return null;
-      return {
-        info: node.info,
-        cost: node.cost,
-        directItemsCount: node.directItems?.length ?? 0,
-        directItemsSample: (node.directItems || []).slice(0, 10),
-        childCount: node.children?.length ?? 0,
-        children: (node.children || []).map((c) => pruneCostTree(c, depth + 1, maxDepth)),
-      };
-    };
-
-    const params = {
-      extrasPercent: Number(uiParams.extrasPercent) || 0,
-      laborPercent: Number(uiParams.laborPercent) || 0,
-      producedQty: Number(uiParams.producedQty) || 0,
-    };
-
-    const payload = {
-      _doc: "EdDeli RecipePage — pegar este JSON en el chat para análisis",
-      ts: new Date().toISOString(),
-      uiParams: params,
-      cabecera: meta
-        ? { id: meta.id, name: meta.name, type: meta.type, unitId: meta.unitId }
-        : { id: Number(selectedProduct) },
-      notaFlujo:
-        meta?.type === "intermediate"
-          ? "Intermedio: recetaDirecta = insumos del intermedio; destinosSiHayMasa = yieldInfo (padres / finales que lo consumen) si producedQty > 0"
-          : "Final: recetaDirecta incluye intermedios e insumos de primer nivel; arbolCostosResumido desglosa todo",
-      recetaDirecta: recipe.map((r) => ({
-        lineId: r.id,
-        productRawId: r.productRawId,
-        rawName: r.rawProduct?.name,
-        quantity: r.quantity,
-        isQuantityInGrams: r.isQuantityInGrams,
-        itemType: r.itemType,
-      })),
-      costeoResumen: costSummary,
-      destinosSiHayMasa_oPadres: costSummary?.yieldInfo ?? null,
-      arbolCostosResumido: costTreeData?.tree ? pruneCostTree(costTreeData.tree) : null,
-      filasPlano_total: costTreeData?.rows?.length ?? 0,
-      filasPlano_muestra: (costTreeData?.rows || []).slice(0, 15),
-    };
-
-    console.log("========== EdDeli RECETA / COSTEO (copiar JSON siguiente) ==========");
-    console.log(JSON.stringify(payload, null, 2));
-    console.log("========== /EdDeli ==========");
-
-    try {
-      await getRecipeCosting(selectedProduct, { ...params, debug: 1 });
-      toast({ message: "Listo: revisa consola del navegador (F12) y la terminal del backend", variant: "success" });
-    } catch {
-      toast("Log en consola del navegador listo; el backend no respondió al debug", {
-        icon: "⚠️",
-      });
-    }
-  }, [selectedProduct, products, recipe, costSummary, costTreeData, uiParams]);
 
   const fetchProducts = async () => {
     const { data } = await getAllProducts();
@@ -146,7 +98,7 @@ function RecipePage() {
       const { data } = await getRecipeCosting(productId, params);
       setCostTreeData(data);
       setCostSummary(data.summary || null);
-    } catch (e) {
+    } catch {
       toast({ message: "Error al calcular el costeo", variant: "error" });
     } finally {
       setLoadingCost(false);
@@ -165,16 +117,35 @@ function RecipePage() {
     });
   };
 
-  // columnas receta (izquierda)
   const columns = [
-    { label: "Insumo", id: "rawProduct", width: 120, render: (row) => row.rawProduct?.name },
+    {
+      label: "Componente",
+      id: "rawProduct",
+      width: 160,
+      render: (row) => (
+        <Box>
+          <Typography variant="body2">{row.rawProduct?.name}</Typography>
+          <Chip
+            size="small"
+            variant="outlined"
+            label={componentTypeLabel(row.rawProduct?.type)}
+            sx={{ mt: 0.5, height: 20, fontSize: "0.7rem" }}
+          />
+        </Box>
+      ),
+    },
     { label: "Cantidad", id: "quantity", width: 80 },
-    { label: "¿En gramos?", id: "isQuantityInGrams", width: 100, render: (row) => (row.isQuantityInGrams ? "Sí" : "No") },
-    { label: "Tipo", id: "itemType", width: 90 },
+    {
+      label: "Unidad",
+      id: "isQuantityInGrams",
+      width: 90,
+      render: (row) => (row.isQuantityInGrams ? "Gramos" : "Unidades"),
+    },
+    { label: "Tipo costo", id: "itemType", width: 90 },
     {
       label: "Acciones",
       id: "actions",
-      width: 140,
+      width: 120,
       render: (params) => (
         <>
           <Tooltip title="Editar">
@@ -182,7 +153,7 @@ function RecipePage() {
               onClick={() => {
                 setDatos(params);
                 setIsEditing(true);
-                settitleUserDialog("Editar Insumo");
+                settitleUserDialog("Editar componente");
                 handleDialogUser();
               }}
             >
@@ -204,16 +175,36 @@ function RecipePage() {
     },
   ];
 
-  // helpers para mostrar números seguros
-  const fmt = (n, d = 2) => (typeof n === "number" && !isNaN(n) ? n.toFixed(d) : "0.00");
   const t = costSummary?.totales || {};
   const acc = costSummary?.acumulados || {};
+  const lote = costSummary?.lote || {};
+  const rent = costSummary?.rentabilidad || {};
+  const yieldInfo = costSummary?.yieldInfo || [];
+
+  const loteHint = useMemo(() => {
+    if (!lote.effectiveProducedQty) return "";
+    if (lote.producedQtyAuto) {
+      if (lote.unidad === "gramos") {
+        const src =
+          lote.rendimientoSource === "productionYieldGrams"
+            ? "override manual"
+            : "suma de insumos";
+        return `Automático: ${fmt(lote.effectiveProducedQty, 0)} g (${src})`;
+      }
+      return "Automático: 1 unidad";
+    }
+    return `Manual: ${fmt(lote.effectiveProducedQty, lote.unidad === "gramos" ? 0 : 2)} ${lote.unidad}`;
+  }, [lote]);
 
   useEffect(() => {
     fetchProducts();
   }, []);
 
-  // ✅ 2) Deja un solo effect para recargar todo cuando cambie el producto o los params
+  useEffect(() => {
+    if (!selectedProduct) return;
+    setUiParams((p) => ({ ...p, producedQty: 0 }));
+  }, [selectedProduct]);
+
   useEffect(() => {
     if (!selectedProduct) return;
     fetchRecipe(selectedProduct);
@@ -223,21 +214,16 @@ function RecipePage() {
 
   return (
     <Container>
-      {/* Diálogos */}
       <SimpleDialog
         open={open}
         onClose={handleDialog}
-        tittle="Eliminar Insumo"
+        tittle="Eliminar componente"
         onClickAccept={deleteData}
       >
-        ¿Está seguro de eliminar este insumo?
+        ¿Está seguro de eliminar este componente de la receta?
       </SimpleDialog>
 
-      <SimpleDialog
-        open={openDialog}
-        onClose={handleDialogUser}
-        tittle={titleUserDialog}
-      >
+      <SimpleDialog open={openDialog} onClose={handleDialogUser} tittle={titleUserDialog}>
         <RecipeForm
           onClose={() => {
             handleDialogUser();
@@ -254,39 +240,52 @@ function RecipePage() {
       <Grid container spacing={2}>
         <Grid item xs={12} mt={2}>
           <SearchableSelect
-            label="Seleccionar Elemento"
+            label="Producto (final o intermedio)"
             items={products}
             value={selectedProduct}
             onChange={(val) => setSelectedProduct(val)}
           />
+          {selectedMeta && (
+            <Stack direction="row" spacing={1} sx={{ mt: 1, flexWrap: "wrap", gap: 0.5 }}>
+              <Chip size="small" label={selectedMeta.type === "intermediate" ? "Intermedio" : "Final"} />
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`Venta: ${fmtMoney(Number(selectedMeta.price || 0))}`}
+              />
+              <Chip
+                size="small"
+                variant="outlined"
+                label={`Distribuidor: ${fmtMoney(Number(selectedMeta.distributorPrice || 0))}`}
+              />
+            </Stack>
+          )}
         </Grid>
 
-        {/* Izquierda: solo receta */}
         <Grid item xs={12} md={6}>
           <Button
             variant="text"
             endIcon={<RestaurantMenu />}
             onClick={() => {
               setIsEditing(false);
-              settitleUserDialog("Agregar Insumo");
+              settitleUserDialog("Agregar componente");
               handleDialogUser();
             }}
             disabled={!selectedProduct}
             sx={{ mb: 1 }}
           >
-            Agregar Insumo
+            Agregar componente
           </Button>
 
           <TablePro
             rows={recipe}
             columns={columns}
             defaultRowsPerPage={10}
-            title="Receta (insumos)"
-            showIndex={true}
+            title="Receta"
+            showIndex
           />
         </Grid>
 
-        {/* Derecha: parámetros, resumen único, yield */}
         <Grid item xs={12} md={6}>
           <Paper
             elevation={0}
@@ -301,7 +300,7 @@ function RecipePage() {
             <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
               Parámetros de costeo
             </Typography>
-            <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: "wrap", rowGap: 1 }}>
+            <Stack direction="row" spacing={1} sx={{ mb: 1, flexWrap: "wrap", rowGap: 1 }}>
               <TextField
                 label="Extras %"
                 type="number"
@@ -325,40 +324,29 @@ function RecipePage() {
                 inputProps={{ min: 0, step: 1 }}
               />
               <TextField
-                label="Cant. producida"
+                label="Cant. lote (0=auto)"
                 type="number"
                 size="small"
                 value={uiParams.producedQty}
                 onChange={(e) =>
                   setUiParams((p) => ({ ...p, producedQty: Number(e.target.value || 0) }))
                 }
-                sx={{ width: 128 }}
-                inputProps={{ min: 0, step: 1 }}
+                sx={{ width: 148 }}
+                inputProps={{ min: 0, step: "any" }}
               />
-              <Button
-                variant="contained"
-                size="small"
-                onClick={() => fetchCostingData(selectedProduct)}
-                disabled={!selectedProduct || loadingCost}
-              >
-                {loadingCost ? "…" : "Calcular"}
-              </Button>
-              <Button
-                variant="outlined"
-                color="secondary"
-                size="small"
-                onClick={() => logRecipeAnalysis()}
-                disabled={!selectedProduct}
-              >
-                Debug
-              </Button>
             </Stack>
+            {loteHint && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                {loteHint}
+                {loadingCost ? " · calculando…" : ""}
+              </Typography>
+            )}
 
             {costSummary && (
               <>
                 <Divider sx={{ my: 1.5 }} />
                 <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                  Resumen de costos
+                  Costo del lote
                 </Typography>
                 <Box
                   sx={{
@@ -369,50 +357,114 @@ function RecipePage() {
                   }}
                 >
                   <Typography variant="body2">
-                    Insumos: <b>{fmt(t.subtotalInsumos)}</b>
+                    Insumos: <b>{fmtMoney(t.subtotalInsumos)}</b>
                   </Typography>
                   <Typography variant="body2">
-                    Materiales: <b>{fmt(t.subtotalMateriales)}</b>
+                    Materiales: <b>{fmtMoney(t.subtotalMateriales)}</b>
                   </Typography>
                   <Typography variant="body2">
-                    Subtotal: <b>{fmt(t.subtotal)}</b>
+                    Extras ({t.extrasPercentInt ?? 0}%): <b>{fmtMoney(t.extras)}</b>
                   </Typography>
                   <Typography variant="body2">
-                    Gramos (ins.): <b>{fmt(acc.totalPesoEnMasaGr, 2)} g</b>
-                  </Typography>
-                  <Typography variant="body2">
-                    Extras ({t.extrasPercentInt ?? 0}%): <b>{fmt(t.extras)}</b>
-                  </Typography>
-                  <Typography variant="body2">
-                    Mano obra ({t.laborPercentInt ?? 0}%): <b>{fmt(t.labor)}</b>
+                    Mano obra ({t.laborPercentInt ?? 0}%): <b>{fmtMoney(t.labor)}</b>
                   </Typography>
                   <Typography variant="body2" sx={{ gridColumn: "1 / -1" }}>
-                    Total lote: <b>{fmt(t.totalLote)}</b>
+                    Total lote: <b>{fmtMoney(t.totalLote)}</b>
                   </Typography>
-                  <Typography variant="body2" sx={{ gridColumn: "1 / -1" }}>
-                    Costo unit. (÷{t.producedQty ?? 0}): <b>{fmt(t.costoUnitario, 4)}</b>
+                  <Typography variant="body2">
+                    Gramos insumos: <b>{fmt(acc.totalPesoEnMasaGr, 0)} g</b>
+                  </Typography>
+                  <Typography variant="body2">
+                    Costo / {lote.unidad === "gramos" ? "g" : "u"}:{" "}
+                    <b>{fmtMoney(t.costoUnitario, 4)}</b>
                   </Typography>
                 </Box>
 
-                {Array.isArray(costSummary.yieldInfo) && costSummary.yieldInfo.length > 0 && (
+                <Divider sx={{ my: 1.5 }} />
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                  Rentabilidad (producto seleccionado)
+                </Typography>
+                <Box
+                  sx={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 0.75,
+                    columnGap: 2,
+                  }}
+                >
+                  <Typography variant="body2">
+                    Costo calc.: <b>{fmtMoney(rent.costoUnitario, 4)}</b>
+                  </Typography>
+                  <Typography variant="body2">
+                    Precio venta: <b>{fmtMoney(rent.precioConsumidor)}</b>
+                  </Typography>
+                  <Typography variant="body2">
+                    Precio distrib.: <b>{fmtMoney(rent.precioDistribuidor)}</b>
+                  </Typography>
+                  <Typography variant="body2">
+                    Ganancia venta:{" "}
+                    <b
+                      style={{
+                        color:
+                          rent.gananciaConsumidor != null && rent.gananciaConsumidor >= 0
+                            ? "#2e7d32"
+                            : "#c62828",
+                      }}
+                    >
+                      {fmtMoney(rent.gananciaConsumidor, 4)}
+                    </b>
+                    {rent.margenConsumidorPct != null ? ` (${rent.margenConsumidorPct}%)` : ""}
+                  </Typography>
+                  <Typography variant="body2" sx={{ gridColumn: "1 / -1" }}>
+                    Ganancia distribuidor:{" "}
+                    <b
+                      style={{
+                        color:
+                          rent.gananciaDistribuidor != null && rent.gananciaDistribuidor >= 0
+                            ? "#2e7d32"
+                            : "#c62828",
+                      }}
+                    >
+                      {fmtMoney(rent.gananciaDistribuidor, 4)}
+                    </b>
+                    {rent.margenDistribuidorPct != null ? ` (${rent.margenDistribuidorPct}%)` : ""}
+                  </Typography>
+                </Box>
+
+                {yieldInfo.length > 0 && (
                   <Box sx={{ mt: 2 }}>
                     <Typography variant="subtitle2" sx={{ mb: 0.75 }}>
-                      Con este lote puedes producir
+                      Rendimiento del lote → productos que salen
                     </Typography>
-                    {costSummary.yieldInfo.map((y) => (
-                      <Typography key={y.parentId} variant="body2" sx={{ mb: 0.25 }}>
-                        •{" "}
-                        <b>
-                          {y.unidad === "unidad"
-                            ? y.unidadesPosiblesParent.toFixed(2)
-                            : `${y.unidadesPosiblesParent.toFixed(2)} g`}
-                        </b>{" "}
-                        — {y.parentName}
-                      </Typography>
-                    ))}
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Producto</TableCell>
+                          <TableCell align="right">Unidades</TableCell>
+                          <TableCell align="right">Costo/u*</TableCell>
+                          <TableCell align="right">P. dist.</TableCell>
+                          <TableCell align="right">Gan. dist.</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {yieldInfo.map((y) => (
+                          <TableRow key={y.parentId}>
+                            <TableCell>{y.parentName}</TableCell>
+                            <TableCell align="right">
+                              {y.unidad === "unidad"
+                                ? fmt(y.unidadesPosiblesParent, 1)
+                                : `${fmt(y.unidadesPosiblesParent, 0)} g`}
+                            </TableCell>
+                            <TableCell align="right">{fmtMoney(y.costoPorUnidadPadre, 4)}</TableCell>
+                            <TableCell align="right">{fmtMoney(y.parentDistributorPrice)}</TableCell>
+                            <TableCell align="right">{fmtMoney(y.gananciaVsDistribuidor, 4)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-                      Base: {costSummary.yieldInfo[0].totalGramosDisponibles.toFixed(2)} g del producto
-                      seleccionado.
+                      * Costo/u = solo este producto (masa/intermedio) por unidad del padre, sin
+                      decoración ni otros insumos del padre.
                     </Typography>
                   </Box>
                 )}
@@ -430,7 +482,6 @@ function RecipePage() {
           </Paper>
         </Grid>
 
-        {/* Árbol de costos: ancho completo debajo */}
         <Grid item xs={12}>
           <Typography variant="subtitle2" sx={{ mb: 1 }}>
             Árbol de costos

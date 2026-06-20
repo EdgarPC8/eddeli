@@ -599,6 +599,27 @@ export async function deleteStoredBackup(filename) {
   return { deleted: filePath };
 }
 
+/**
+ * Borra todas las copias con fecha en src/backups/ y guarda una sola nueva desde la BD.
+ * No modifica backup.json fijo.
+ */
+export async function pruneStoredBackupsAndSaveFresh() {
+  await fs.mkdir(backups, { recursive: true });
+  const names = await fs.readdir(backups);
+
+  let deletedCount = 0;
+  for (const name of names) {
+    if (!name.endsWith(".json") || !STORED_BACKUP_NAME.test(name)) continue;
+    await fs.unlink(resolve(backups, name));
+    deletedCount += 1;
+  }
+
+  const { backupPath, counts } = await saveBackup({ updateMainBackup: false });
+  const filename = backupPath.split(/[/\\]/).pop();
+
+  return { deletedCount, filename, backupPath, counts };
+}
+
 /** Descarga JSON de respaldo EdDeli (GET /eddeliapi/comands/downloadBackup). */
 export const downloadBackup = async (req, res) => {
   try {

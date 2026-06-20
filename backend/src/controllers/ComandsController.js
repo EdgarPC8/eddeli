@@ -11,6 +11,7 @@ import {
   getBackupsWorkbench,
   setMainBackupFromStored,
   deleteStoredBackup,
+  pruneStoredBackupsAndSaveFresh,
   resolveStoredBackupPath,
   readBackupFileSummary,
   backupFilePath,
@@ -170,6 +171,30 @@ export const deleteStoredBackupController = async (req, res) => {
     res.status(400).json({
       ok: false,
       message: error.message || "No se pudo eliminar el backup",
+    });
+  }
+};
+
+export const pruneStoredBackupsController = async (req, res) => {
+  try {
+    const { deletedCount, filename, backupPath, counts } =
+      await pruneStoredBackupsAndSaveFresh();
+    res.json({
+      ok: true,
+      message:
+        deletedCount > 0
+          ? `Se eliminaron ${deletedCount} copia(s) y se guardó «${filename}» desde la BD actual.`
+          : `Se guardó «${filename}» desde la BD actual.`,
+      deletedCount,
+      filename,
+      path: backupPath,
+      tables: counts,
+    });
+  } catch (error) {
+    console.error("pruneStoredBackupsController:", error);
+    res.status(500).json({
+      ok: false,
+      message: error.message || "No se pudieron limpiar las copias guardadas",
     });
   }
 };

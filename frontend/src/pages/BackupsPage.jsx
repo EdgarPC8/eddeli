@@ -17,6 +17,7 @@ import BackupIcon from "@mui/icons-material/Backup";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import DownloadIcon from "@mui/icons-material/Download";
 import DeleteIcon from "@mui/icons-material/Delete";
+import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import StarIcon from "@mui/icons-material/Star";
 import SaveIcon from "@mui/icons-material/Save";
 import RefreshIcon from "@mui/icons-material/Refresh";
@@ -35,6 +36,7 @@ import {
   downloadStoredBackupFile,
   setMainBackupFromStoredRequest,
   deleteStoredBackupRequest,
+  pruneStoredBackupsRequest,
 } from "../api/comandsRequest.js";
 
 function formatSize(mb, bytes) {
@@ -118,6 +120,7 @@ export default function BackupsPage() {
   const [stored, setStored] = useState([]);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [setMainTarget, setSetMainTarget] = useState(null);
+  const [pruneOpen, setPruneOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -213,6 +216,20 @@ export default function BackupsPage() {
         reload: load,
         onClose: () => setDeleteTarget(null),
         successMessage: "Copia eliminada",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const confirmPruneStored = async () => {
+    setSaving(true);
+    try {
+      await runMutationReload(toast, {
+        promise: pruneStoredBackupsRequest(),
+        reload: load,
+        onClose: () => setPruneOpen(false),
+        successMessage: "Copias limpiadas y nueva copia guardada desde la BD",
       });
     } finally {
       setSaving(false);
@@ -353,12 +370,30 @@ export default function BackupsPage() {
 
       <Paper variant="outlined" sx={{ borderRadius: 3, overflow: "hidden" }}>
         <Box sx={{ px: 2, pt: 2, pb: 1 }}>
-          <Typography variant="subtitle1" fontWeight={700}>
-            Copias guardadas ({stored.length})
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            Archivos en <code>backend/src/backups/</code> — puedes descargar, fijar como backup.json o borrar.
-          </Typography>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ xs: "stretch", sm: "center" }}
+            justifyContent="space-between"
+            spacing={1}
+          >
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700}>
+                Copias guardadas ({stored.length})
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Archivos en <code>backend/src/backups/</code> — puedes descargar, fijar como backup.json o borrar.
+              </Typography>
+            </Box>
+            <Button
+              variant="outlined"
+              color="error"
+              startIcon={<DeleteSweepIcon />}
+              onClick={() => setPruneOpen(true)}
+              disabled={saving || loading}
+            >
+              Limpiar copias y guardar una
+            </Button>
+          </Stack>
         </Box>
         <Box sx={{ px: 1, pb: 1 }}>
           <TablePro
@@ -385,6 +420,18 @@ export default function BackupsPage() {
         title="¿Usar como backup fijo?"
         message={`«${setMainTarget}» reemplazará backup.json. Luego puedes recargar la BD desde Comandos.`}
         onClickAccept={confirmSetMain}
+      />
+
+      <SimpleDialog
+        open={pruneOpen}
+        onClose={() => !saving && setPruneOpen(false)}
+        title="¿Limpiar todas las copias guardadas?"
+        message={
+          stored.length > 0
+            ? `Se borrarán permanentemente ${stored.length} archivo(s) en src/backups/ y se creará una sola copia nueva con fecha desde la base de datos actual (como «Guardar desde BD»). El backup.json fijo no se modifica.`
+            : "No hay copias antiguas. Se creará una copia nueva con fecha desde la base de datos actual. El backup.json fijo no se modifica."
+        }
+        onClickAccept={confirmPruneStored}
       />
     </Container>
   );

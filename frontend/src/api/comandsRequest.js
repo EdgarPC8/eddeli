@@ -47,6 +47,12 @@ export const setMainBackupFromStoredRequest = (filename) =>
 export const deleteStoredBackupRequest = (filename) =>
   axios.delete(`/comands/backups/stored/${encodeURIComponent(filename)}`, auth());
 
+export const pruneStoredBackupsRequest = () =>
+  axios.post("/comands/backups/stored/prune-and-save", null, {
+    ...auth(),
+    timeout: 120000,
+  });
+
 const downloadBlob = (response, filename) => {
   const url = window.URL.createObjectURL(new Blob([response.data]));
   const a = document.createElement("a");

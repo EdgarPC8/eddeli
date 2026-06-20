@@ -1,6 +1,92 @@
-import { InventoryRecipe,InventoryProduct } from "../../models/Inventory.js";
-import { simulateFromIntermediate } from "./ProductionManagerController.js";
+import { Op } from "sequelize";
+import { InventoryRecipe, InventoryProduct } from "../../models/Inventory.js";
 
+const safeDiv = (a, b) => (b > 0 ? a / b : 0);
+
+async function wouldCreateCycle(productFinalId, productRawId) {
+  if (Number(productFinalId) === Number(productRawId)) return true;
+
+  const visited = new Set();
+  const stack = [Number(productRawId)];
+
+  while (stack.length) {
+    const id = stack.pop();
+    if (id === Number(productFinalId)) return true;
+    if (visited.has(id)) continue;
+    visited.add(id);
+
+    const lines = await InventoryRecipe.findAll({
+      where: { productFinalId: id },
+      attributes: ["productRawId"],
+    });
+
+    for (const line of lines) {
+      const raw = await InventoryProduct.findByPk(line.productRawId, {
+        attributes: ["id", "type"],
+      });
+      if (raw?.type === "intermediate") stack.push(raw.id);
+    }
+  }
+
+  return false;
+}
+
+async function validateRecipeLine({
+  productFinalId,
+  productRawId,
+  quantity,
+  itemType,
+  excludeId,
+}) {
+  if (!productFinalId || !productRawId) {
+    return "productFinalId y productRawId son requeridos";
+  }
+  if (Number(productFinalId) === Number(productRawId)) {
+    return "Un producto no puede ser componente de sí mismo";
+  }
+  if (!Number.isFinite(Number(quantity)) || Number(quantity) <= 0) {
+    return "La cantidad debe ser mayor a 0";
+  }
+  if (itemType && !["insumo", "material"].includes(itemType)) {
+    return "itemType debe ser insumo o material";
+  }
+
+  const finalProduct = await InventoryProduct.findByPk(productFinalId, {
+    attributes: ["id", "type"],
+  });
+  if (!finalProduct) return "Producto de receta no encontrado";
+  if (!["final", "intermediate"].includes(finalProduct.type)) {
+    return "Solo productos finales o intermedios pueden tener receta";
+  }
+
+  const raw = await InventoryProduct.findByPk(productRawId, {
+    attributes: ["id", "type"],
+  });
+  if (!raw) return "Componente no encontrado";
+  if (raw.type === "final") {
+    const subRecipeCount = await InventoryRecipe.count({
+      where: { productFinalId: productRawId },
+    });
+    if (!subRecipeCount) {
+      return "No se puede usar un producto final como componente";
+    }
+  }
+  if (raw.type === "intermediate" && itemType === "material") {
+    return "Un intermedio no puede registrarse como material";
+  }
+
+  if (await wouldCreateCycle(productFinalId, productRawId)) {
+    return "Referencia circular detectada en la receta";
+  }
+
+  const dupWhere = { productFinalId, productRawId };
+  if (excludeId) dupWhere.id = { [Op.ne]: excludeId };
+
+  const duplicate = await InventoryRecipe.findOne({ where: dupWhere });
+  if (duplicate) return "Este componente ya está en la receta";
+
+  return null;
+}
 
 export const getRecipeCosting = async (req, res) => {
   try {
@@ -9,23 +95,18 @@ export const getRecipeCosting = async (req, res) => {
       return res.status(400).json({ message: "productFinalId inválido" });
     }
 
-    // --- Params / Query ---
-    // Porcentajes sin tope fijo en 100: mano de obra o "extras" pueden superar el 100% del subtotal base.
     const toPctInt = (v) => {
       const n = parseInt(v, 10);
       return Number.isFinite(n) && n >= 0 ? n : 0;
     };
-    const extrasPctInt = toPctInt(req.query.extrasPercent);
-    const laborPctInt  = toPctInt(req.query.laborPercent);
-    const producedQty  = Number.isFinite(Number(req.query.producedQty))
+    const extrasPctInt = toPctInt(req.query.extrasPercent ?? 20);
+    const laborPctInt = toPctInt(req.query.laborPercent ?? 45);
+    const queryProducedQty = Number.isFinite(Number(req.query.producedQty))
       ? Number(req.query.producedQty)
       : 0;
 
     const extrasPercent = extrasPctInt / 100;
-    const laborPercent  = laborPctInt  / 100;
-
-    // --- Helpers ---
-    const safeDiv = (a, b) => (b > 0 ? a / b : 0);
+    const laborPercent = laborPctInt / 100;
 
     const fetchProduct = async (id) => {
       const p = await InventoryProduct.findByPk(id);
@@ -33,75 +114,101 @@ export const getRecipeCosting = async (req, res) => {
       return p;
     };
 
-    const fetchRecipe = async (finalId) => {
-      return InventoryRecipe.findAll({
+    const fetchRecipe = async (finalId) =>
+      InventoryRecipe.findAll({
         where: { productFinalId: finalId },
         order: [["id", "ASC"]],
       });
-    };
 
-    // 🔹 NUEVO: recetas donde este producto aparece como insumo
-    const fetchUsagesOfProduct = async (rawId) => {
-      return InventoryRecipe.findAll({
+    const fetchUsagesOfProduct = async (rawId) =>
+      InventoryRecipe.findAll({
         where: { productRawId: rawId },
         order: [["id", "ASC"]],
       });
+
+    const recipeExistsCache = new Map();
+    const productHasRecipe = async (productId) => {
+      if (recipeExistsCache.has(productId)) return recipeExistsCache.get(productId);
+      const lines = await fetchRecipe(productId);
+      const has = lines.length > 0;
+      recipeExistsCache.set(productId, has);
+      return has;
     };
 
-    // Rendimiento en gramos “base” del producto (para escalar recetas en productos por gramos)
+    /** Intermedio o producto con sub-receta (ej. masapan que aún figure como final). */
+    const isComposedProduct = async (raw) => {
+      if (raw.type === "intermediate") return true;
+      return productHasRecipe(raw.id);
+    };
+
+    const resolveChildMult = async (raw, baseQty, isGr) => {
+      if (raw.unitId === 1) {
+        if (isGr) {
+          const std = Number(raw.standardWeightGrams || 0);
+          if (std > 0) return baseQty / std;
+          const { grams: batchGrams } = await computeProducedGrams(raw.id);
+          if (batchGrams > 0) return baseQty / batchGrams;
+          return baseQty;
+        }
+        return baseQty;
+      }
+      if (isGr) return baseQty;
+      const std = Number(raw.standardWeightGrams || 0);
+      return baseQty * std;
+    };
+
     const computeProducedGrams = async (productId) => {
       const p = await fetchProduct(productId);
-      if (Number(p.productionYieldGrams) > 0) return Number(p.productionYieldGrams);
+      const manualYield = Number(p.productionYieldGrams);
+      if (manualYield > 0) {
+        return { grams: manualYield, source: "productionYieldGrams" };
+      }
 
       const receta = await fetchRecipe(productId);
-      if (!receta.length) return 0;
+      if (!receta.length) return { grams: 0, source: "receta" };
 
       let sumaGramos = 0;
       for (const it of receta) {
         const ins = await fetchProduct(it.productRawId);
-        const qty  = Number(it.quantity) || 0;
+        const qty = Number(it.quantity) || 0;
         const isGr = !!it.isQuantityInGrams;
 
         if (isGr) {
           sumaGramos += qty;
         } else {
           const std = Number(ins.standardWeightGrams || 0);
-          if (ins.unitId === 1) {
-            // insumo unitario con peso estándar
-            sumaGramos += qty * std;
-          } else if (std > 0) {
-            // una “unidad lógica” en receta equivale a std gramos (si existe)
-            sumaGramos += qty * std;
-          }
+          if (std > 0) sumaGramos += qty * std;
         }
       }
-      return sumaGramos;
+      return { grams: sumaGramos, source: "receta" };
     };
 
-    /**
-     * Construye el nodo de costeo (árbol) para productId escalado por "mult":
-     * - Si unitId === 1 → mult = unidades solicitadas.
-     * - Si unitId !== 1 → mult = gramos solicitados.
-     */
     const buildCostNode = async (productId, mult = 1, path = []) => {
       const p = await fetchProduct(productId);
       const unidad = p.unitId === 1 ? "unidad" : "gramos";
 
       const node = {
-        info: { id: p.id, nombre: p.name, type: p.type, unitId: p.unitId, unidad, mult: Number(mult) || 1 },
+        info: {
+          id: p.id,
+          nombre: p.name,
+          type: p.type,
+          unitId: p.unitId,
+          unidad,
+          mult: Number(mult) || 1,
+        },
         children: [],
         cost: {
           subtotalInsumos: 0,
           subtotalMateriales: 0,
-          totalPesoEnMasaGr: 0,        // solo insumos (g)
-          totalUnidadesMaterial: 0,    // solo materiales (u)
-          totalNodo: 0,                // se calcula al final
-          unitCost: 0,                 // se calcula al final
+          totalPesoEnMasaGr: 0,
+          totalUnidadesMaterial: 0,
+          totalNodo: 0,
+          unitCost: 0,
           unitCostLabel: p.unitId === 1 ? "/u" : "/g",
         },
-        rows: [],          // plano acumulado del subárbol
-        directItems: [],   // detalle directo tipo “Excel” del nodo actual
-        directSubtotal: {  // sumatorias solo de directItems (no incluye hijos)
+        rows: [],
+        directItems: [],
+        directSubtotal: {
           totalPesoEnMasaGr: 0,
           totalUnidadesMaterial: 0,
           totalValor: 0,
@@ -111,51 +218,44 @@ export const getRecipeCosting = async (req, res) => {
       const receta = await fetchRecipe(productId);
       if (!receta.length) return finalizeNode(node);
 
-      const producedGrams = p.unitId === 1 ? 1 : (await computeProducedGrams(productId) || 0);
+      const { grams: producedGrams } =
+        p.unitId === 1 ? { grams: 1 } : await computeProducedGrams(productId);
 
       for (const it of receta) {
         const raw = await fetchProduct(it.productRawId);
         const nombre = raw.name;
         const isMaterial = (it.itemType || "insumo") === "material";
-        const qty  = Number(it.quantity) || 0;
+        const qty = Number(it.quantity) || 0;
         const isGr = !!it.isQuantityInGrams;
 
-        // Escala de consumo heredada desde el padre
-        const scale = p.unitId === 1 ? mult : (producedGrams > 0 ? mult / producedGrams : 0);
-        const baseQty = qty * scale; // en unidades o gramos según la receta
+        const scale = p.unitId === 1 ? mult : producedGrams > 0 ? mult / producedGrams : 0;
+        const baseQty = qty * scale;
 
-        // --- Hojas (insumo/material directo) ---
-        if (raw.type !== "intermediate") {
+        if (!(await isComposedProduct(raw))) {
           if (isMaterial) {
-            // Material: costo por unidad
-            const unidadesUsadas     = baseQty;
-            const precioNeto         = Number(raw.price || 0);   // $ por empaque
+            const unidadesUsadas = baseQty;
+            const precioNeto = Number(raw.price || 0);
             const unidadesPorEmpaque = Number(raw.netWeight || 0);
-            const precioPorUnidad    = safeDiv(precioNeto, unidadesPorEmpaque);
-            const valor              = precioPorUnidad * unidadesUsadas;
+            const precioPorUnidad = safeDiv(precioNeto, unidadesPorEmpaque);
+            const valor = precioPorUnidad * unidadesUsadas;
 
-            // Acumular en nodo (totales del subárbol)
-            node.cost.subtotalMateriales    += valor;
+            node.cost.subtotalMateriales += valor;
             node.cost.totalUnidadesMaterial += unidadesUsadas;
-
-            // Acumular “direct subtotal” (solo del nodo actual)
             node.directSubtotal.totalUnidadesMaterial += unidadesUsadas;
-            node.directSubtotal.totalValor            += valor;
+            node.directSubtotal.totalValor += valor;
 
-            // Direct item estilo Excel
             node.directItems.push({
               nombre,
               tipo: "material",
               unidadBase: "unidad",
-              consumo: unidadesUsadas,        // unidades
-              precioNeto,                     // $ empaque
-              pesoNeto: unidadesPorEmpaque,   // u por empaque
-              pesoEnMasa: unidadesUsadas,     // para mantener columna homogénea
+              consumo: unidadesUsadas,
+              precioNeto,
+              pesoNeto: unidadesPorEmpaque,
+              pesoEnMasa: unidadesUsadas,
               precioUnitBase: precioPorUnidad,
               valor: Number(valor.toFixed(6)),
             });
 
-            // Fila plana
             node.rows.push({
               path: [...path, p.name, nombre].join(" > "),
               productoFinalId: p.id,
@@ -170,44 +270,38 @@ export const getRecipeCosting = async (req, res) => {
               notas: "Material: price/netWeight * unidades",
             });
           } else {
-            // Insumo: costo por gramo
             let gramosUsados = 0;
             if (isGr) {
               gramosUsados = baseQty;
             } else {
-              const std = Number(raw.standardWeightGrams || 0); // g/und
-              gramosUsados = baseQty * std; // unidades → gramos
+              const std = Number(raw.standardWeightGrams || 0);
+              gramosUsados = baseQty * std;
             }
 
-            const precioNeto     = Number(raw.price || 0);  // $ por empaque
-            const pesoNetoGramos = Number(raw.netWeight || 0); // g por empaque
+            const precioNeto = Number(raw.price || 0);
+            const pesoNetoGramos = Number(raw.netWeight || 0);
             const precioPorGramo = safeDiv(precioNeto, pesoNetoGramos);
-            const valor          = precioPorGramo * gramosUsados;
+            const valor = precioPorGramo * gramosUsados;
 
-            // Acumular en nodo (totales del subárbol)
-            node.cost.subtotalInsumos   += valor;
+            node.cost.subtotalInsumos += valor;
             node.cost.totalPesoEnMasaGr += gramosUsados;
-
-            // Acumular “direct subtotal”
             node.directSubtotal.totalPesoEnMasaGr += gramosUsados;
-            node.directSubtotal.totalValor        += valor;
+            node.directSubtotal.totalValor += valor;
 
-            // Direct item estilo Excel
             node.directItems.push({
               nombre,
               tipo: "insumo",
               unidadBase: "gramos",
-              consumo: gramosUsados,             // gramos
-              precioNeto,                        // $ empaque
-              pesoNeto: pesoNetoGramos,          // g por empaque
-              pesoEnMasa: gramosUsados,          // lo usado en la receta
-              precioUnitBase: precioPorGramo,    // $/g
+              consumo: gramosUsados,
+              precioNeto,
+              pesoNeto: pesoNetoGramos,
+              pesoEnMasa: gramosUsados,
+              precioUnitBase: precioPorGramo,
               valor: Number(valor.toFixed(6)),
               isQuantityInGrams: isGr,
               standardWeightGrams: Number(raw.standardWeightGrams || 0),
             });
 
-            // Fila plana
             node.rows.push({
               path: [...path, p.name, nombre].join(" > "),
               productoFinalId: p.id,
@@ -227,42 +321,21 @@ export const getRecipeCosting = async (req, res) => {
           continue;
         }
 
-        // --- Intermedio: recursión ---
-        let childMult = 0;
-        if (raw.unitId === 1) {
-          // hijo en unidades
-          if (isGr) {
-            const std = Number(raw.standardWeightGrams || 0);
-            childMult = std > 0 ? baseQty / std : 0; // gramos → unidades
-          } else {
-            childMult = baseQty; // ya unidades
-          }
-        } else {
-          // hijo en gramos
-          if (isGr) {
-            childMult = baseQty; // ya gramos
-          } else {
-            const std = Number(raw.standardWeightGrams || 0);
-            childMult = baseQty * std; // unidades → gramos
-          }
-        }
+        let childMult = await resolveChildMult(raw, baseQty, isGr);
 
         const childNode = await buildCostNode(raw.id, childMult, [...path, p.name]);
         node.children.push(childNode);
 
-        // Acumular costos del hijo al nodo actual
-        node.cost.subtotalInsumos       += childNode.cost.subtotalInsumos;
-        node.cost.subtotalMateriales    += childNode.cost.subtotalMateriales;
-        node.cost.totalPesoEnMasaGr     += childNode.cost.totalPesoEnMasaGr;
+        node.cost.subtotalInsumos += childNode.cost.subtotalInsumos;
+        node.cost.subtotalMateriales += childNode.cost.subtotalMateriales;
+        node.cost.totalPesoEnMasaGr += childNode.cost.totalPesoEnMasaGr;
         node.cost.totalUnidadesMaterial += childNode.cost.totalUnidadesMaterial;
-
         node.rows.push(...childNode.rows);
       }
 
       return finalizeNode(node);
     };
 
-    // Completa totales y unitarios del nodo
     const finalizeNode = (node) => {
       const totalNodo = node.cost.subtotalInsumos + node.cost.subtotalMateriales;
       node.cost.totalNodo = Number(totalNodo.toFixed(6));
@@ -270,51 +343,63 @@ export const getRecipeCosting = async (req, res) => {
       const denom = Number(node.info.mult) || 0;
       node.cost.unitCost = denom > 0 ? Number((totalNodo / denom).toFixed(6)) : 0;
 
-      // Redondeos de subtotales directos
-      node.directSubtotal.totalPesoEnMasaGr     = Number(node.directSubtotal.totalPesoEnMasaGr.toFixed(6));
-      node.directSubtotal.totalUnidadesMaterial = Number(node.directSubtotal.totalUnidadesMaterial.toFixed(6));
-      node.directSubtotal.totalValor            = Number(node.directSubtotal.totalValor.toFixed(6));
+      node.directSubtotal.totalPesoEnMasaGr = Number(
+        node.directSubtotal.totalPesoEnMasaGr.toFixed(6),
+      );
+      node.directSubtotal.totalUnidadesMaterial = Number(
+        node.directSubtotal.totalUnidadesMaterial.toFixed(6),
+      );
+      node.directSubtotal.totalValor = Number(node.directSubtotal.totalValor.toFixed(6));
 
       return node;
     };
 
-    // --- Construcción raíz ---
     const product = await fetchProduct(productFinalId);
-    const rootMult = product.unitId === 1 ? (producedQty || 1) : (producedQty || 0);
-    const tree = await buildCostNode(productFinalId, rootMult || 1, []);
+    const batchYield = await computeProducedGrams(productFinalId);
 
-    // --- Aplanado y totales globales ---
+    let effectiveProducedQty = queryProducedQty;
+    let producedQtyAuto = false;
+
+    if (effectiveProducedQty <= 0) {
+      producedQtyAuto = true;
+      if (product.unitId === 1) {
+        effectiveProducedQty = 1;
+      } else {
+        effectiveProducedQty = batchYield.grams > 0 ? batchYield.grams : 1;
+      }
+    }
+
+    const rootMult = effectiveProducedQty || 1;
+    const tree = await buildCostNode(productFinalId, rootMult, []);
     const rows = tree.rows;
 
-    const subtotalInsumos    = Number(tree.cost.subtotalInsumos.toFixed(2));
+    const subtotalInsumos = Number(tree.cost.subtotalInsumos.toFixed(2));
     const subtotalMateriales = Number(tree.cost.subtotalMateriales.toFixed(2));
-    const subtotalTodos      = Number((subtotalInsumos + subtotalMateriales).toFixed(2));
+    const subtotalTodos = Number((subtotalInsumos + subtotalMateriales).toFixed(2));
 
-    const extras        = subtotalInsumos * extrasPercent;     // sobre INSUMOS
+    const extras = subtotalInsumos * extrasPercent;
     const baseConExtras = subtotalInsumos + extras;
-    const labor         = baseConExtras * laborPercent;        // sobre (INSUMOS + EXTRAS)
-    const totalLote     = baseConExtras + labor;
+    const labor = baseConExtras * laborPercent;
+    const totalLote = baseConExtras + labor;
 
-    const costoUnitario = producedQty > 0 ? Number((totalLote / producedQty).toFixed(4)) : 0;
+    const costoUnitario =
+      effectiveProducedQty > 0
+        ? Number((totalLote / effectiveProducedQty).toFixed(4))
+        : 0;
 
-    // 🔹 NUEVO: calcular cuántos "productos padres" puedo producir con ESTA cantidad de este producto
-    let yieldInfo = [];
+    const yieldInfo = [];
     let totalGramosDisponibles = 0;
 
-    // Cantidad efectiva de ESTE producto en esta simulación
-    const effectiveQty = product.unitId === 1 ? (producedQty || 1) : (producedQty || 0);
+    if (product.unitId === 1) {
+      const { grams: gramosPorUnidad } = await computeProducedGrams(productFinalId);
+      totalGramosDisponibles = gramosPorUnidad * effectiveProducedQty;
+    } else {
+      totalGramosDisponibles = effectiveProducedQty;
+    }
 
-    if (effectiveQty > 0) {
-      if (product.unitId === 1) {
-        // este producto está en unidades → pasar a gramos
-        const gramosPorUnidad = await computeProducedGrams(productFinalId);
-        totalGramosDisponibles = gramosPorUnidad * effectiveQty;
-      } else {
-        // ya viene en gramos
-        totalGramosDisponibles = effectiveQty;
-      }
-
+    if (totalGramosDisponibles > 0) {
       const usages = await fetchUsagesOfProduct(productFinalId);
+
       for (const usage of usages) {
         const parent = await fetchProduct(usage.productFinalId);
         const qty = Number(usage.quantity) || 0;
@@ -322,52 +407,36 @@ export const getRecipeCosting = async (req, res) => {
 
         let gramosRawPorUnidadParent = 0;
         let unidadesPosiblesParent = 0;
-        let notaConsumo = "";
 
         if (parent.unitId === 1) {
-          // El padre se maneja por UNIDAD
           if (isGr) {
-            // La receta dice directamente cuántos gramos de este producto entran por 1 unidad del padre
             gramosRawPorUnidadParent = qty;
+          } else if (product.unitId === 1) {
+            const { grams: gramosPorUnidad } = await computeProducedGrams(productFinalId);
+            gramosRawPorUnidadParent = qty * gramosPorUnidad;
           } else {
-            // La receta dice "unidades" de este producto → pasamos a gramos
-            if (product.unitId === 1) {
-              const gramosPorUnidad = await computeProducedGrams(productFinalId);
-              gramosRawPorUnidadParent = qty * gramosPorUnidad;
-            } else {
-              // caso raro: tratamos "unidad lógica" ≈ gramo
-              gramosRawPorUnidadParent = qty;
-            }
+            gramosRawPorUnidadParent = qty;
           }
-
-          if (gramosRawPorUnidadParent > 0 && totalGramosDisponibles > 0) {
-            unidadesPosiblesParent = totalGramosDisponibles / gramosRawPorUnidadParent;
-          }
-
-          notaConsumo = `${gramosRawPorUnidadParent.toFixed(4)} g de ${product.name} por 1 ${parent.name}`;
+        } else if (isGr) {
+          gramosRawPorUnidadParent = qty;
+        } else if (product.unitId === 1) {
+          const { grams: gramosPorUnidad } = await computeProducedGrams(productFinalId);
+          gramosRawPorUnidadParent = qty * gramosPorUnidad;
         } else {
-          // El padre se maneja por gramos u otra unidad "por peso"
-          // Aquí interpretamos unidadesPosibles como "gramos del padre" que se pueden producir
-          if (isGr) {
-            // qty = gramos de este producto por (lote) del padre
-            // sin info de rendimiento exacto del padre, aproximamos:
-            gramosRawPorUnidadParent = qty; // por "unidad lógica" de padre
-          } else {
-            // qty "unidades" de este producto → gramos
-            if (product.unitId === 1) {
-              const gramosPorUnidad = await computeProducedGrams(productFinalId);
-              gramosRawPorUnidadParent = qty * gramosPorUnidad;
-            } else {
-              gramosRawPorUnidadParent = qty;
-            }
-          }
-
-          if (gramosRawPorUnidadParent > 0 && totalGramosDisponibles > 0) {
-            unidadesPosiblesParent = totalGramosDisponibles / gramosRawPorUnidadParent;
-          }
-
-          notaConsumo = `${gramosRawPorUnidadParent.toFixed(4)} g de ${product.name} por unidad/gr de ${parent.name}`;
+          gramosRawPorUnidadParent = qty;
         }
+
+        if (gramosRawPorUnidadParent > 0 && totalGramosDisponibles > 0) {
+          unidadesPosiblesParent = totalGramosDisponibles / gramosRawPorUnidadParent;
+        }
+
+        const costoPorUnidadPadre =
+          unidadesPosiblesParent > 0
+            ? Number((totalLote / unidadesPosiblesParent).toFixed(4))
+            : 0;
+
+        const parentPrice = Number(parent.price || 0);
+        const parentDistributorPrice = Number(parent.distributorPrice || 0);
 
         yieldInfo.push({
           parentId: parent.id,
@@ -377,83 +446,93 @@ export const getRecipeCosting = async (req, res) => {
           unidad: parent.unitId === 1 ? "unidad" : "gramos",
           quantityPerUnitParent: qty,
           isQuantityInGrams: isGr,
+          gramosPorUnidadParent: Number(gramosRawPorUnidadParent.toFixed(4)),
           totalGramosDisponibles,
-          unidadesPosiblesParent,
-          notaConsumo,
+          unidadesPosiblesParent: Number(unidadesPosiblesParent.toFixed(4)),
+          costoPorUnidadPadre,
+          parentPrice,
+          parentDistributorPrice,
+          gananciaVsDistribuidor:
+            parentDistributorPrice > 0
+              ? Number((parentDistributorPrice - costoPorUnidadPadre).toFixed(4))
+              : null,
+          gananciaVsConsumidor:
+            parentPrice > 0
+              ? Number((parentPrice - costoPorUnidadPadre).toFixed(4))
+              : null,
+          notaConsumo: `${gramosRawPorUnidadParent.toFixed(2)} g de ${product.name} por 1 ${parent.name}`,
+          nota: "Costo por unidad del padre = solo este producto (masa/intermedio), no incluye otros insumos del padre",
         });
       }
     }
 
+    const precioConsumidor = Number(product.price || 0);
+    const precioDistribuidor = Number(product.distributorPrice || 0);
+    const gananciaConsumidor =
+      precioConsumidor > 0 ? Number((precioConsumidor - costoUnitario).toFixed(4)) : null;
+    const gananciaDistribuidor =
+      precioDistribuidor > 0
+        ? Number((precioDistribuidor - costoUnitario).toFixed(4))
+        : null;
+
     const summary = {
+      producto: {
+        id: product.id,
+        name: product.name,
+        type: product.type,
+        unitId: product.unitId,
+        unidad: product.unitId === 1 ? "unidad" : "gramos",
+        price: precioConsumidor,
+        distributorPrice: precioDistribuidor,
+      },
+      lote: {
+        queryProducedQty,
+        effectiveProducedQty,
+        producedQtyAuto,
+        rendimientoGramos: batchYield.grams,
+        rendimientoSource: batchYield.source,
+        unidad: product.unitId === 1 ? "unidad" : "gramos",
+      },
       totales: {
         subtotalInsumos,
         subtotalMateriales,
         subtotal: subtotalTodos,
-
         extrasPercentInt: extrasPctInt,
         extras: Number(extras.toFixed(2)),
         baseConExtras: Number(baseConExtras.toFixed(2)),
-
         laborPercentInt: laborPctInt,
         labor: Number(labor.toFixed(2)),
-
         totalLote: Number(totalLote.toFixed(2)),
-        producedQty: producedQty || 0,
+        producedQty: effectiveProducedQty,
         costoUnitario,
+      },
+      rentabilidad: {
+        costoUnitario,
+        precioConsumidor,
+        precioDistribuidor,
+        gananciaConsumidor,
+        gananciaDistribuidor,
+        margenConsumidorPct:
+          precioConsumidor > 0 && gananciaConsumidor != null
+            ? Number(((gananciaConsumidor / precioConsumidor) * 100).toFixed(1))
+            : null,
+        margenDistribuidorPct:
+          precioDistribuidor > 0 && gananciaDistribuidor != null
+            ? Number(((gananciaDistribuidor / precioDistribuidor) * 100).toFixed(1))
+            : null,
       },
       acumulados: {
         totalPesoEnMasaGr: Number(tree.cost.totalPesoEnMasaGr.toFixed(2)),
         totalUnidadesMaterial: Number(tree.cost.totalUnidadesMaterial.toFixed(2)),
       },
-      // 🔹 Aquí está lo que pediste:
-      // "cuántos productos finales salen con esa cantidad de masa o lo que sea"
       yieldInfo,
-      notas: "Extras = % de INSUMOS; Mano de obra = % de (INSUMOS + EXTRAS). Materiales no entran en la base.",
+      notas:
+        "Extras = % de INSUMOS; Mano de obra = % de (INSUMOS + EXTRAS). Materiales no entran en esa base. Cant. lote en 0 = automático (1 u. o suma de insumos en gramos).",
     };
-
-    const debugRequested =
-      String(req.query.debug) === "1" || String(req.query.debug).toLowerCase() === "true";
-    if (debugRequested) {
-      const pruneCostTree = (node, depth = 0, maxDepth = 6) => {
-        if (!node || depth > maxDepth) return null;
-        return {
-          info: node.info,
-          cost: node.cost,
-          directItemsCount: node.directItems?.length ?? 0,
-          childCount: node.children?.length ?? 0,
-          children: (node.children || []).map((c) => pruneCostTree(c, depth + 1, maxDepth)),
-        };
-      };
-      console.log(
-        "[EdDeli getRecipeCosting DEBUG — copiar para análisis]",
-        JSON.stringify(
-          {
-            productFinalId,
-            query: {
-              extrasPercent: extrasPctInt,
-              laborPercent: laborPctInt,
-              producedQty: producedQty || 0,
-            },
-            cabecera: {
-              id: product.id,
-              name: product.name,
-              type: product.type,
-              unitId: product.unitId,
-            },
-            summaryTotales: summary.totales,
-            yieldInfo: summary.yieldInfo,
-            rowsCount: rows.length,
-            treePruned: pruneCostTree(tree),
-          },
-          null,
-          2
-        )
-      );
-    }
 
     return res.json({ tree, rows, summary });
   } catch (error) {
-    console.error("getRecipeCostingTree error:", error);
+    console.error("getRecipeCosting error:", error);
     return res.status(500).json({
       message: "Error al calcular costeo en árbol",
       detail: String(error?.message || error),
@@ -461,56 +540,78 @@ export const getRecipeCosting = async (req, res) => {
   }
 };
 
-
-
-
-
-// controllers/RecipeController.js
-// Obtener la receta completa de un producto final
 export const getRecipe = async (req, res) => {
   try {
     const { productFinalId } = req.params;
     const recipe = await InventoryRecipe.findAll({
       where: { productFinalId },
       include: [
-        { model: InventoryProduct, as: 'rawProduct', attributes: ['id', 'name', 'unitId','price'] }
-      ]
+        {
+          model: InventoryProduct,
+          as: "rawProduct",
+          attributes: ["id", "name", "unitId", "price", "type", "distributorPrice"],
+        },
+      ],
+      order: [["id", "ASC"]],
     });
     res.json(recipe);
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener receta', error });
+    res.status(500).json({ message: "Error al obtener receta", error });
   }
 };
 
-// Crear una receta (varios ingredientes a la vez)
 export const createRecipe = async (req, res) => {
   try {
-    const data = req.body; // arreglo de objetos [{productFinalId, productRawId, quantity}]
+    const data = Array.isArray(req.body) ? req.body : [req.body];
+    if (!data.length) {
+      return res.status(400).json({ message: "Se requiere al menos una línea de receta" });
+    }
+
+    for (const line of data) {
+      const error = await validateRecipeLine(line);
+      if (error) return res.status(400).json({ message: error });
+    }
+
     const created = await InventoryRecipe.bulkCreate(data);
-    res.status(201).json("created");
+    res.status(201).json(created);
   } catch (error) {
-    res.status(500).json({ message: 'Error al crear receta', error });
+    res.status(500).json({ message: "Error al crear receta", error });
   }
 };
 
-// Actualizar un insumo en la receta
 export const updateRecipe = async (req, res) => {
   try {
     const { id } = req.params;
-    const updated = await InventoryRecipe.update(req.body, { where: { id } });
-    res.json({ message: 'Ingrediente actualizado', updated });
+    const existing = await InventoryRecipe.findByPk(id);
+    if (!existing) return res.status(404).json({ message: "Línea de receta no encontrada" });
+
+    const payload = {
+      productFinalId: req.body.productFinalId ?? existing.productFinalId,
+      productRawId: req.body.productRawId ?? existing.productRawId,
+      quantity: req.body.quantity ?? existing.quantity,
+      isQuantityInGrams: req.body.isQuantityInGrams ?? existing.isQuantityInGrams,
+      itemType: req.body.itemType ?? existing.itemType,
+    };
+
+    const error = await validateRecipeLine({ ...payload, excludeId: id });
+    if (error) return res.status(400).json({ message: error });
+
+    await existing.update(payload);
+    res.json(existing);
   } catch (error) {
-    res.status(500).json({ message: 'Error al actualizar receta', error });
+    res.status(500).json({ message: "Error al actualizar receta", error });
   }
 };
 
-// Eliminar un insumo de la receta
 export const deleteRecipe = async (req, res) => {
   try {
     const { id } = req.params;
-    await InventoryRecipe.destroy({ where: { id } });
-    res.json({ message: 'Ingrediente eliminado de la receta' });
+    const existing = await InventoryRecipe.findByPk(id);
+    if (!existing) return res.status(404).json({ message: "Línea de receta no encontrada" });
+
+    await existing.destroy();
+    res.json({ message: "Ingrediente eliminado de la receta" });
   } catch (error) {
-    res.status(500).json({ message: 'Error al eliminar receta', error });
+    res.status(500).json({ message: "Error al eliminar receta", error });
   }
 };

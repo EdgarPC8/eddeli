@@ -230,7 +230,7 @@ router.post("/registerProductionFinalFromPayload", isAuthenticated,registerProdu
 
 // Obtener receta de un producto final
 router.get('/recipes/:productFinalId', isAuthenticated, getRecipe);
-router.get('/recipes/getRecipeCosting/:productFinalId', getRecipeCosting);
+router.get('/recipes/getRecipeCosting/:productFinalId', isAuthenticated, getRecipeCosting);
 
 // Crear receta completa (uno o varios insumos)
 router.post('/recipes', isAuthenticated, createRecipe);

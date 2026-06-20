@@ -9,9 +9,10 @@ import {
   RadioGroup,
   FormControlLabel,
   Radio,
+  Typography,
 } from "@mui/material";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../../../context/AuthContext";
 import {
   getAllProducts,
@@ -22,39 +23,71 @@ import {
 import { useForm, Controller } from "react-hook-form";
 import SearchableSelect from "../../../../components/SearchableSelect";
 
+function buildComponentOptions(products, productFinalId) {
+  const others = products.filter((p) => String(p.id) !== String(productFinalId));
 
+  const generics = others.filter(
+    (p) => p.type === "raw" && p.isGenericIngredient && !p.genericProductId,
+  );
+  const genericFallback = others.filter(
+    (p) => p.type === "raw" && !p.genericProductId,
+  );
+  const rawOptions = generics.length > 0 ? generics : genericFallback;
 
+  const intermediates = others.filter((p) => p.type === "intermediate");
+
+  return [
+    ...intermediates.map((p) => ({
+      ...p,
+      optionLabel: `${p.name} (intermedio)`,
+      componentKind: "intermediate",
+    })),
+    ...rawOptions.map((p) => ({
+      ...p,
+      optionLabel: `${p.name} (insumo genérico)`,
+      componentKind: "raw",
+    })),
+  ];
+}
 
 function RecipeForm({ isEditing = false, datos = [], onClose, reload, productFinalId }) {
-  const { handleSubmit, register, reset, setValue, watch,control } = useForm({
+  const { handleSubmit, register, reset, setValue, watch, control } = useForm({
     defaultValues: {
       productRawId: "",
       quantity: "",
-      isQuantityInGrams: "false",
-      itemType: "insumo",   // valor por defecto
+      isQuantityInGrams: "true",
+      itemType: "insumo",
     },
-    
   });
 
   const idData = datos?.id;
   const { toast: toastAuth } = useAuth();
-  const [rawOptions, setRawOptions] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
+
+  const componentOptions = useMemo(
+    () => buildComponentOptions(allProducts, productFinalId),
+    [allProducts, productFinalId],
+  );
+
+  const selectedRawId = watch("productRawId");
+  const selectedComponent = componentOptions.find(
+    (p) => String(p.id) === String(selectedRawId),
+  );
+  const isIntermediate = selectedComponent?.componentKind === "intermediate";
 
   const resetForm = () => {
     reset({
       productRawId: "",
       quantity: "",
-      isQuantityInGrams: "false",
+      isQuantityInGrams: "true",
       itemType: "insumo",
     });
-    
   };
 
   const submitForm = async (formData) => {
     const body = { ...formData, productFinalId };
-
-    // asegurar que isQuantityInGrams sea boolean
     body.isQuantityInGrams = formData.isQuantityInGrams === "true";
+    if (isIntermediate) body.itemType = "insumo";
 
     if (isEditing) {
       toastAuth({
@@ -65,7 +98,7 @@ function RecipeForm({ isEditing = false, datos = [], onClose, reload, productFin
           resetForm();
           return {
             title: "Receta",
-            description: "Insumo actualizado correctamente",
+            description: "Componente actualizado correctamente",
           };
         },
       });
@@ -74,7 +107,7 @@ function RecipeForm({ isEditing = false, datos = [], onClose, reload, productFin
 
     toastAuth({
       promise: createRecipeRequest([body]),
-      successMessage: "Insumo agregado a la receta con éxito",
+      successMessage: "Componente agregado a la receta",
       onSuccess: () => {
         if (onClose) onClose();
         if (reload) reload();
@@ -85,48 +118,38 @@ function RecipeForm({ isEditing = false, datos = [], onClose, reload, productFin
 
   const loadData = async () => {
     const { data } = await getAllProducts();
-    const options = data.filter(
-      (p) =>
-        p.id !== productFinalId &&
-        p.type === "raw" &&
-        p.isGenericIngredient &&
-        !p.genericProductId
-    );
-    // Compatibilidad: si aún no hay flags, mostrar raw sin padre genérico
-    setRawOptions(
-      options.length > 0
-        ? options
-        : data.filter(
-            (p) => p.id !== productFinalId && p.type === "raw" && !p.genericProductId
-          )
-    );
+    setAllProducts(data);
+
     if (isEditing && datos) {
       setValue("productRawId", datos.productRawId);
       setValue("quantity", datos.quantity);
       setValue("isQuantityInGrams", datos.isQuantityInGrams ? "true" : "false");
-      setValue("itemType", datos.itemType || "insumo"); // por si no está definido
+      setValue("itemType", datos.itemType || "insumo");
     }
-    
   };
 
   useEffect(() => {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (isIntermediate) setValue("itemType", "insumo");
+  }, [isIntermediate, setValue]);
+
   return (
     <Box component="form" sx={{ mt: 1 }} onSubmit={handleSubmit(submitForm)}>
       <Grid container spacing={2}>
-      <Grid item xs={12}>
-  <SearchableSelect
-    label="Insumo genérico (receta)"
-    items={rawOptions}
-    value={watch("productRawId")}
-    onChange={(val) => {
-      // val debe ser el ID (igual que en RecipePage)
-      setValue("productRawId", val, { shouldValidate: true, shouldDirty: true });
-    }}
-  />
-</Grid>
+        <Grid item xs={12}>
+          <SearchableSelect
+            label="Componente de receta"
+            items={componentOptions}
+            value={watch("productRawId")}
+            getOptionLabel={(item) => item.optionLabel || item.name}
+            onChange={(val) => {
+              setValue("productRawId", val, { shouldValidate: true, shouldDirty: true });
+            }}
+          />
+        </Grid>
 
         <Grid item xs={12}>
           <TextField
@@ -136,44 +159,51 @@ function RecipeForm({ isEditing = false, datos = [], onClose, reload, productFin
             variant="standard"
             inputProps={{ step: "any", min: 0 }}
             value={watch("quantity")}
-            {...register("quantity", { required: true })}
+            {...register("quantity", { required: true, min: 0.0001 })}
             InputLabelProps={idData ? { shrink: true } : {}}
           />
         </Grid>
 
-<Grid item xs={12}>
-  <FormControl component="fieldset">
-    <FormLabel component="legend">¿Cantidad en gramos?</FormLabel>
-    <Controller
-      name="isQuantityInGrams"
-      control={control}
-      defaultValue="false"
-      render={({ field }) => (
-        <RadioGroup row {...field}>
-          <FormControlLabel value="true" control={<Radio />} label="Sí" />
-          <FormControlLabel value="false" control={<Radio />} label="No" />
-        </RadioGroup>
-      )}
-    />
-  </FormControl>
-</Grid>
-<Grid item xs={12}>
-  <TextField
-    label="Tipo de Item"
-    select
-    fullWidth
-    variant="standard"
-    value={watch("itemType")}
-    {...register("itemType", { required: true })}
-    InputLabelProps={idData ? { shrink: true } : {}}
-  >
-    <MenuItem value="insumo">Insumo</MenuItem>
-    <MenuItem value="material">Material</MenuItem>
-  </TextField>
-</Grid>
+        <Grid item xs={12}>
+          <FormControl component="fieldset">
+            <FormLabel component="legend">¿Cantidad en gramos?</FormLabel>
+            <Controller
+              name="isQuantityInGrams"
+              control={control}
+              render={({ field }) => (
+                <RadioGroup row {...field}>
+                  <FormControlLabel value="true" control={<Radio />} label="Sí" />
+                  <FormControlLabel value="false" control={<Radio />} label="No (unidades)" />
+                </RadioGroup>
+              )}
+            />
+          </FormControl>
+        </Grid>
 
+        {!isIntermediate && (
+          <Grid item xs={12}>
+            <TextField
+              label="Tipo de ítem"
+              select
+              fullWidth
+              variant="standard"
+              value={watch("itemType")}
+              {...register("itemType", { required: true })}
+              InputLabelProps={idData ? { shrink: true } : {}}
+            >
+              <MenuItem value="insumo">Insumo (costo por gramo)</MenuItem>
+              <MenuItem value="material">Material (costo por unidad de empaque)</MenuItem>
+            </TextField>
+          </Grid>
+        )}
 
-
+        {isIntermediate && (
+          <Grid item xs={12}>
+            <Typography variant="caption" color="text.secondary">
+              Los productos intermedios (masas) se registran como insumo en la cadena de costos.
+            </Typography>
+          </Grid>
+        )}
 
         <Grid item xs={4}>
           <Button variant="contained" fullWidth type="submit">

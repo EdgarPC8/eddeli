@@ -8,6 +8,7 @@ import {
   listBackupsController,
   setMainBackupController,
   deleteStoredBackupController,
+  pruneStoredBackupsController,
   downloadStoredBackupController,
   downloadMainBackupController,
 } from "../controllers/ComandsController.js";
@@ -36,6 +37,12 @@ router.get("/backups/main/download", isAuthenticated, requireProgrammer, downloa
 router.get("/backups/stored/:filename/download", isAuthenticated, requireProgrammer, downloadStoredBackupController);
 router.post("/backups/stored/:filename/set-main", isAuthenticated, requireProgrammer, setMainBackupController);
 router.delete("/backups/stored/:filename", isAuthenticated, requireProgrammer, deleteStoredBackupController);
+router.post(
+  "/backups/stored/prune-and-save",
+  isAuthenticated,
+  requireProgrammer,
+  pruneStoredBackupsController,
+);
 router.get("/reloadBD", isAuthenticated, requireProgrammer, reloadBdController);
 router.post(
   "/upload-backup",
