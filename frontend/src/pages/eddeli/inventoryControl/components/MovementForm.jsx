@@ -94,7 +94,7 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
   const isProgrammer = user?.loginRol === "Programador";
   const isEdit = Boolean(movementToEdit?.id);
 
-  const { handleSubmit, register, reset, setValue, watch } = useForm({
+  const { handleSubmit, register, reset, setValue, watch, getValues } = useForm({
     defaultValues: {
       productId: "",
       type: "entrada",
@@ -347,6 +347,27 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
     setCart((prev) => prev.filter((line) => line.id !== id));
   };
 
+  const handleAddLineToCart = (e) => {
+    e.preventDefault();
+    if (!canSubmit) {
+      toastAuth({
+        message: "Completa producto, cantidad y precio (si aplica) antes de añadir.",
+        variant: "warning",
+      });
+      return;
+    }
+    addCurrentLineToCart(getValues());
+  };
+
+  const handleFormSubmit = (e) => {
+    e.preventDefault();
+    if (isBatchType && cart.length > 0) {
+      void submitForm(getValues());
+      return;
+    }
+    void handleSubmit(submitForm)(e);
+  };
+
   const submitForm = async (formData) => {
     const dateApi = isProgrammer ? movementDateForApi(movementDate) : undefined;
 
@@ -402,7 +423,17 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
         return line;
       };
 
-      const itemsToSave = cart.map(({ id, productName, unitAbbr, typeLabel, reasonLabel, priceDisplay, ...line }) => line);
+      const itemsToSave = cart.map(
+        ({ id, productName, unitAbbr, typeLabel, reasonLabel, priceDisplay, ...line }) => line,
+      );
+
+      if (itemsToSave.length === 0 && !canSubmit) {
+        toastAuth({
+          message: "Completa los campos del movimiento o añade líneas a la lista.",
+          variant: "warning",
+        });
+        return;
+      }
 
       const isCompraFlow =
         itemsToSave.length > 0
@@ -626,7 +657,7 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
   return (
     <Box
       component="form"
-      onSubmit={handleSubmit(submitForm)}
+      onSubmit={handleFormSubmit}
       sx={{ display: "flex", flexDirection: "column", minHeight: 0, flex: 1 }}
     >
       <Box sx={{ flex: 1, minHeight: 0, overflowY: "auto", overflowX: "hidden", pr: 0.5 }}>
@@ -785,7 +816,7 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
                     size="small"
                     variant="outlined"
                     value={selectedReason || ""}
-                    {...register("reason", { required: true })}
+                    {...register("reason", { required: !isBatchType })}
                     onChange={(e) => setValue("reason", e.target.value, { shouldDirty: true })}
                   >
                     {(REASON_OPTIONS[selectedType] || []).map((opt) => (
@@ -838,7 +869,7 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
                         variant="outlined"
                         inputProps={{ step: "any", min: 0 }}
                         value={watch("quantity") || ""}
-                        {...register("quantity", { required: !isApertura })}
+                        {...register("quantity", { required: !isApertura && !isBatchType })}
                         onChange={(e) => setValue("quantity", e.target.value, { shouldDirty: true })}
                         helperText={quantityHelper}
                       />
@@ -859,7 +890,7 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
                           fullWidth
                           size="small"
                           variant="outlined"
-                          required={priceRequired}
+                          required={priceRequired && !isBatchType}
                           inputProps={{ step: "any", min: 0 }}
                           value={watch("price") || ""}
                           {...register("price")}
@@ -905,7 +936,12 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
                         Lista ({cart.length})
                       </Typography>
                       {cart.length > 0 && (
-                        <Button size="small" color="inherit" onClick={() => setCart([])}>
+                        <Button
+                          type="button"
+                          size="small"
+                          color="inherit"
+                          onClick={() => setCart([])}
+                        >
                           Vaciar
                         </Button>
                       )}
@@ -921,6 +957,7 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
                             key={line.id}
                             secondaryAction={
                               <IconButton
+                                type="button"
                                 edge="end"
                                 size="small"
                                 aria-label="Quitar"
@@ -1011,7 +1048,8 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
               size="large"
               startIcon={<AddIcon />}
               disabled={!canSubmit}
-              onClick={handleSubmit(addCurrentLineToCart)}
+              type="button"
+              onClick={handleAddLineToCart}
               sx={{ flex: 1 }}
             >
               Añadir a la lista
