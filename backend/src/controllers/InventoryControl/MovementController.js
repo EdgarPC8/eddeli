@@ -31,6 +31,9 @@ const endOfDay = (d) => {
 };
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
+/** Agrupa movimientos en lote; debe caber en MySQL INT signed (Date.now() en ms no cabe). */
+const createBatchReferenceId = () => Math.floor(Date.now() / 1000);
+
 const PROGRAMMER_ONLY_MSG =
   "Solo el rol Programador puede editar, eliminar movimientos o usar fecha personalizada";
 
@@ -833,7 +836,7 @@ export const openPresentationMovement = async (req, res) => {
         `Apertura: ${packs} × ${presLabel} → ${generic.name} (+${totalGrams} g)`;
 
       const movementDate = resolveMovementDate(movementDateInput, user);
-      const batchRef = Date.now();
+      const batchRef = createBatchReferenceId();
 
       const salida = await createInventoryMovementRow(
         {
@@ -1071,7 +1074,7 @@ export const registerMovementsBatch = async (req, res) => {
     }
 
     const batchKey = randomUUID();
-    const batchRef = Date.now();
+    const batchRef = createBatchReferenceId();
 
     const result = await sequelize.transaction(async (t) => {
       const movementIds = [];
