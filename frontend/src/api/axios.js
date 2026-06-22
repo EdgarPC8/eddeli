@@ -5,7 +5,7 @@ import axios from "axios";
 import { io } from "socket.io-client";
 
 /** 'local' = proxy Vite en dev; 'server' = IP:3001; 'production' = dominio institucional */
-const API_ENV = import.meta.env.DEV ? "local" : "server";
+const API_ENV = import.meta.env.DEV ? "local" : "production";
 const API_PATH = "eddeliapi";
 const API_PORT = 3001;
 const SERVER_HOST = "192.168.3.40";
