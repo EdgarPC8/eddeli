@@ -160,3 +160,212 @@ export function findEddeliProductByCode(products, rawCode) {
     null
   );
 }
+
+export function getProductCategory(product) {
+  return product?.ERP_inventory_category || product?.category || null;
+}
+
+export function getProductCategoryId(product) {
+  const cat = getProductCategory(product);
+  const id = cat?.id ?? product?.categoryId;
+  return id != null && id !== "" ? Number(id) : null;
+}
+
+export function getCategoryPackageTiers(category) {
+  return normalizePackageTiers(category?.packageTiers);
+}
+
+export function hasCategoryPackageTiers(category) {
+  return getCategoryPackageTiers(category).length > 0;
+}
+
+export function getCategoryMixMatchProductIds(category) {
+  let raw = category?.mixMatchProductIds;
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(raw)) return [];
+  return raw.map((id) => Number(id)).filter((n) => Number.isFinite(n) && n > 0);
+}
+
+export function getCategoryMixMatchLabel(category) {
+  const label = String(category?.mixMatchLabel ?? "").trim();
+  if (label) return label;
+  if (String(category?.name ?? "").toLowerCase() === "panes") return "Pan surtido";
+  return category?.name ? `Surtido ${category.name}` : "Surtido";
+}
+
+export function productParticipatesInCategoryMix(product, category) {
+  if (!category || !hasCategoryPackageTiers(category)) return false;
+  const allowed = getCategoryMixMatchProductIds(category);
+  if (!allowed.length) {
+    return getProductCategoryId(product) === Number(category.id);
+  }
+  return allowed.includes(Number(product.id));
+}
+
+/** Categorías con canasta surtido configurada (tramos + productos seleccionados). */
+export function findSurtidoCategoriesFromProducts(products) {
+  const map = new Map();
+  for (const p of products || []) {
+    const cat = getProductCategory(p);
+    if (!cat?.id || !hasCategoryPackageTiers(cat)) continue;
+    const ids = getCategoryMixMatchProductIds(cat);
+    if (!ids.length) continue;
+    map.set(Number(cat.id), cat);
+  }
+  return [...map.values()];
+}
+
+export function getSurtidoProductsForCategory(products, category) {
+  const allowed = new Set(getCategoryMixMatchProductIds(category));
+  return (products || []).filter((p) => {
+    if (!allowed.has(Number(p.id))) return false;
+    if (p.type && p.type !== "final") return false;
+    if (p.isActive === 0 || p.isActive === false) return false;
+    return true;
+  });
+}
+
+/** Siguiente tramo al que falta llegar (para avisos en caja). */
+export function getCategoryMixMatchHint(packageTiers, currentQty) {
+  const qty = Math.max(0, Math.floor(Number(currentQty || 0)));
+  const packs = getCategoryPackageTiers({ packageTiers }).filter((p) => p.qty > qty);
+  if (!packs.length) return null;
+  const next = packs[0];
+  return {
+    remaining: next.qty - qty,
+    nextQty: next.qty,
+    nextTotal: next.totalPrice,
+  };
+}
+
+/**
+ * Reparte el total de un grupo entre líneas según cantidad.
+ */
+function allocateGroupTotalToLines(indices, rows, groupTotal) {
+  const totalQty = indices.reduce(
+    (sum, i) => sum + Math.max(0, Math.floor(Number(rows[i].quantity) || 0)),
+    0,
+  );
+  if (totalQty <= 0) return;
+
+  let assigned = 0;
+  indices.forEach((i, pos) => {
+    const qty = Math.max(0, Math.floor(Number(rows[i].quantity) || 0));
+    if (qty <= 0) return;
+    const isLast = pos === indices.length - 1;
+    const lineTotal = isLast
+      ? to2(groupTotal - assigned)
+      : to2(groupTotal * (qty / totalQty));
+    if (!isLast) assigned = to2(assigned + lineTotal);
+    rows[i] = {
+      ...rows[i],
+      price: qty > 0 ? to2(lineTotal / qty) : 0,
+      lineTotal,
+      pricingMode: "category_package",
+    };
+  });
+}
+
+/**
+ * Aplica tramos por categoría (mix-and-match): suma unidades de la misma categoría
+ * y reparte el mejor precio entre las líneas del carrito.
+ */
+export function applyCategoryMixMatchPricing(cartRows, products) {
+  if (!Array.isArray(cartRows) || !cartRows.length) return [];
+
+  const productById = new Map((products || []).map((p) => [Number(p.id), p]));
+  const rows = cartRows.map((row) => ({ ...row }));
+
+  const groups = new Map();
+
+  rows.forEach((row, idx) => {
+    if (row.pricingMode === "manual") return;
+    const product = productById.get(Number(row.productId));
+    if (!product) return;
+    const cat = getProductCategory(product);
+    if (!productParticipatesInCategoryMix(product, cat)) return;
+    const catId = getProductCategoryId(product);
+    if (!catId) return;
+    if (!groups.has(catId)) {
+      groups.set(catId, { cat, indices: [] });
+    }
+    groups.get(catId).indices.push(idx);
+  });
+
+  for (const { cat, indices } of groups.values()) {
+    const tiers = getCategoryPackageTiers(cat);
+    const mixLabel = getCategoryMixMatchLabel(cat);
+    const totalQty = indices.reduce(
+      (sum, i) => sum + Math.max(0, Math.floor(Number(rows[i].quantity) || 0)),
+      0,
+    );
+    if (totalQty <= 0) continue;
+
+    const refProduct = productById.get(Number(rows[indices[0]].productId));
+    const groupTotal = resolvePackageTierTotal(
+      { packageTiers: tiers, price: refProduct?.price ?? 0 },
+      totalQty,
+    );
+
+    indices.forEach((i) => {
+      rows[i] = {
+        ...rows[i],
+        categoryId: cat.id,
+        categoryName: cat.name,
+        mixGroupLabel: rows[i].mixGroupLabel || mixLabel,
+      };
+    });
+    allocateGroupTotalToLines(indices, rows, groupTotal);
+  }
+
+  rows.forEach((row, idx) => {
+    if (row.pricingMode === "manual" || row.pricingMode === "category_package") return;
+    const product = productById.get(Number(row.productId));
+    if (!product) return;
+    const pricing = resolveEddeliLinePricing(product, row.quantity);
+    rows[idx] = {
+      ...row,
+      price: pricing.unitPrice,
+      lineTotal: pricing.lineTotal,
+      pricingMode: pricing.mode,
+      categoryId: undefined,
+      categoryName: undefined,
+    };
+  });
+
+  return rows;
+}
+
+/** Totales y avisos por categoría con tramos (para UI de caja). */
+export function summarizeCategoryMixMatchGroups(pricedCart) {
+  const map = new Map();
+  for (const row of pricedCart || []) {
+    if (!row.categoryId) continue;
+    const key = Number(row.categoryId);
+    const prev = map.get(key) || {
+      categoryId: key,
+      categoryName: row.mixGroupLabel || row.categoryName || "Categoría",
+      quantity: 0,
+      total: 0,
+    };
+    prev.quantity += Math.max(0, Math.floor(Number(row.quantity) || 0));
+    prev.total = to2(prev.total + Number(lineRowTotal(row)));
+    map.set(key, prev);
+  }
+  return [...map.values()];
+}
+
+function lineRowTotal(row) {
+  const qty = Number(row.quantity || 0);
+  const unitPrice = Number(row.price || 0);
+  if (row.lineTotal != null && (row.pricingMode === "package" || row.pricingMode === "category_package")) {
+    return to2(Number(row.lineTotal));
+  }
+  return to2(qty * unitPrice);
+}

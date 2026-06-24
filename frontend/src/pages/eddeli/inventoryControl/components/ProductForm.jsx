@@ -1,5 +1,9 @@
 // ProductForm.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import ImageIcon from "@mui/icons-material/Image";
+import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import QrCodeScannerIcon from "@mui/icons-material/QrCodeScanner";
 import {
   Grid,
   TextField,
@@ -15,13 +19,15 @@ import {
   Slider,
   IconButton,
   Tooltip,
+  InputAdornment,
 } from "@mui/material";
-import ImageIcon from "@mui/icons-material/Image";
-import PhotoCameraIcon from "@mui/icons-material/PhotoCamera";
-import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import Cropper from "react-easy-crop";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../../../../context/AuthContext";
+import {
+  getRootCategories,
+  getChildCategories,
+} from "../../../../utils/categoryUtils.js";
 import {
   createProduct as apiCreateProduct,
   updateProduct as apiUpdateProduct,
@@ -29,6 +35,8 @@ import {
   getUnits,
 } from "../../../../api/inventoryControlRequest.js";
 import { pathImg } from "../../../../api/axios";
+import { useBarcodeScanner } from "../../../../hooks/useBarcodeScanner.js";
+import { normalizeProductBarcode } from "../../../../utils/productLookup.js";
 
 /* ============ Helpers de imagen ============ */
 const ALLOWED_IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -206,6 +214,7 @@ function CropperDialog({
 function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
   const { handleSubmit, register, reset, setValue, watch } = useForm();
   const { toast: toastAuth } = useAuth();
+  const [usbScanMode, setUsbScanMode] = useState(false);
 
   const [categories, setCategories] = useState([]);
   const [units, setUnits] = useState([]);
@@ -347,6 +356,7 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
     setValue("stock", datos.stock || 0);
     setValue("netWeight", datos.netWeight || 0);
     setValue("standardWeightGrams", datos.standardWeightGrams || 0);
+    setValue("barcode", normalizeProductBarcode(datos.barcode || ""));
 
     try {
       if (Array.isArray(datos.wholesaleRules)) {
@@ -405,8 +415,23 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
   useEffect(() => {
     loadData();
     fetchOptions();
+    if (!isEditing && datos?.barcode) {
+      setValue("barcode", normalizeProductBarcode(datos.barcode));
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useBarcodeScanner({
+    enabled: usbScanMode,
+    onScan: (rawCode) => {
+      const code = normalizeProductBarcode(rawCode);
+      if (!code) return;
+      setValue("barcode", code, { shouldDirty: true });
+      setUsbScanMode(false);
+      toastAuth({ message: "Código de barras capturado.", variant: "success" });
+    },
+    ignoreWhenTypingInInputs: !usbScanMode,
+  });
 
   // ------- submit -------
   const submitForm = async (data) => {
@@ -424,6 +449,9 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
   
     // ✅ campos
     fd.append("name", data.name?.trim() || "");
+    const barcode = normalizeProductBarcode(data.barcode);
+    if (barcode) fd.append("barcode", barcode);
+    else if (isEditing) fd.append("barcode", "");
     if (data.desc) fd.append("desc", data.desc);
     fd.append("type", data.type || "raw");
     fd.append("unitId", String(data.unitId || ""));
@@ -605,6 +633,50 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
           />
         </Grid>
 
+        <Grid item xs={12} sm={6}>
+          <TextField
+            label="Código de barras"
+            fullWidth
+            variant="standard"
+            value={watch("barcode") || ""}
+            inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+            helperText={
+              usbScanMode ? "Lector USB activo: escanea el código ahora." : "Opcional. Solo dígitos."
+            }
+            onChange={(e) =>
+              setValue("barcode", normalizeProductBarcode(e.target.value), { shouldDirty: true })
+            }
+            InputProps={{
+              endAdornment: (
+                <InputAdornment position="end">
+                  <Tooltip title="Activar lector USB en este campo">
+                    <IconButton
+                      edge="end"
+                      size="small"
+                      aria-label="Activar lector USB"
+                      color={usbScanMode ? "primary" : "default"}
+                      onClick={() => {
+                        setUsbScanMode((active) => {
+                          const next = !active;
+                          toastAuth({
+                            message: next
+                              ? "Lector USB activo: escanea el código de barras."
+                              : "Lector USB desactivado.",
+                            variant: "info",
+                          });
+                          return next;
+                        });
+                      }}
+                    >
+                      <QrCodeScannerIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                </InputAdornment>
+              ),
+            }}
+          />
+        </Grid>
+
         <Grid item xs={12} sm={4}>
           <TextField
             label="Tipo"
@@ -647,12 +719,21 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
             value={watch("categoryId") || ""}
             {...register("categoryId", { required: true })}
           >
-            {Array.isArray(categories) &&
-              categories.map((c) => (
-                <MenuItem key={c.id} value={c.id}>
-                  {c.name}
-                </MenuItem>
-              ))}
+            {getRootCategories(categories).flatMap((root) => {
+              const children = getChildCategories(categories, root.id);
+              if (children.length > 0) {
+                return children.map((child) => (
+                  <MenuItem key={child.id} value={child.id}>
+                    {root.name} › {child.name}
+                  </MenuItem>
+                ));
+              }
+              return [
+                <MenuItem key={root.id} value={root.id}>
+                  {root.name}
+                </MenuItem>,
+              ];
+            })}
           </TextField>
         </Grid>
 
@@ -743,8 +824,9 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
             </Button>
           </Stack>
           <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-            Opcional. Solo para productos como pan: 1=$0.15, 2=$0.25, 4=$0.50… Caja combina
-            tramos automáticamente. Si configuras tramos, tienen prioridad sobre mayoreo.
+            Opcional por producto. En caja, si la categoría tiene tramos, se mezclan variedades de
+            esa categoría (ej. 4 panes distintos = tramo de 4). Sin tramos en categoría, aplica
+            solo el producto.
           </Typography>
         </Grid>
 

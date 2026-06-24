@@ -15,6 +15,49 @@ import {
 import fileDirName from "../../libs/file-dirname.js";
 import { normalizePackageTiersStrict } from "../../utils/productPricingUtils.js";
 
+const PRODUCT_CATEGORY_INCLUDE = {
+  model: InventoryCategory,
+  attributes: [
+    "id",
+    "name",
+    "parentId",
+    "packageTiers",
+    "mixMatchLabel",
+    "mixMatchProductIds",
+  ],
+  include: [
+    {
+      model: InventoryCategory,
+      as: "parent",
+      attributes: ["id", "name"],
+      required: false,
+    },
+  ],
+};
+
+function normalizeProductBarcodeField(raw) {
+  const code = String(raw ?? "").replace(/\D/g, "").trim();
+  return code || null;
+}
+
+function applyBarcodeFields(payload) {
+  if ("barcode" in payload) {
+    const normalized = normalizeProductBarcodeField(payload.barcode);
+    payload.barcode = normalized;
+  }
+  if ("sku" in payload) {
+    const sku = String(payload.sku ?? "").trim();
+    payload.sku = sku || null;
+  }
+}
+
+function productUniqueErrorMessage(error) {
+  const field = error?.errors?.[0]?.path;
+  if (field === "barcode") return "Ese código de barras ya está registrado en otro producto.";
+  if (field === "sku") return "Ese SKU ya está registrado en otro producto.";
+  return null;
+}
+
 
 // controllers/ProductController.js (solo createProduct)
 // ✅ Copia y pega tal cual
@@ -55,6 +98,7 @@ export const updateProduct = async (req, res) => {
     const oldRel = normalize(row.primaryImageUrl || "");
     const incomingRel = normalize(req.body.primaryImageUrl || "");
     const updates = { ...req.body };
+    applyBarcodeFields(updates);
 
     let moved = false;
 
@@ -123,6 +167,8 @@ export const updateProduct = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
+    const uniqueMsg = productUniqueErrorMessage(error);
+    if (uniqueMsg) return res.status(409).json({ message: uniqueMsg });
     if (error?.message && /(wholesaleRules|packageTiers)/.test(error.message)) {
       return res.status(400).json({ message: error.message });
     }
@@ -137,6 +183,7 @@ export const createProduct = async (req, res) => {
   let tempRelPath = null; // ✅ para rollback si falla
   try {
     const payload = { ...req.body };
+    applyBarcodeFields(payload);
 
     // --- normalizaciones numéricas ---
     [
@@ -228,6 +275,8 @@ export const createProduct = async (req, res) => {
     // ✅ rollback: si subió imagen y falló el create, borra el archivo subido
     if (tempRelPath) safeUnlink(imagePath(tempRelPath));
 
+    const uniqueMsg = productUniqueErrorMessage(error);
+    if (uniqueMsg) return res.status(409).json({ message: uniqueMsg });
     if (error?.message && /(wholesaleRules|packageTiers)/.test(error.message)) {
       return res.status(400).json({ message: error.message });
     }
@@ -331,7 +380,7 @@ export const getAllProducts = async (req, res) => {
   try {
     const products = await InventoryProduct.findAll({
       include: [
-        { model: InventoryCategory, attributes: ["id", "name"] },
+        PRODUCT_CATEGORY_INCLUDE,
         { model: InventoryUnit, attributes: ["id", "name", "abbreviation"] },
       ],
     });
@@ -362,7 +411,7 @@ export const getProductById = async (req, res) => {
   try {
     const row = await InventoryProduct.findByPk(req.params.id, {
       include: [
-        { model: InventoryCategory, attributes: ["id", "name"] },
+        PRODUCT_CATEGORY_INCLUDE,
         { model: InventoryUnit, attributes: ["id", "name", "abbreviation"] },
       ],
     });

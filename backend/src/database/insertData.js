@@ -38,6 +38,8 @@ import {
   Payment,
   FinancialObligation,
   ObligationPayment,
+  RecurringExpenseTemplate,
+  RecurringExpenseOccurrence,
 } from "../models/Finance.js";
 import {
   EditorTemplate,
@@ -56,6 +58,12 @@ import {
   PublicidadPlaylistItem,
   PublicidadDevice,
 } from "../models/Publicidad.js";
+import { MediaAsset } from "../models/MediaAsset.js";
+import { DocumentAttachment } from "../models/DocumentAttachment.js";
+import {
+  NotificationProgram,
+  NotificationDispatchLog,
+} from "../models/NotificationProgram.js";
 import { License } from "../models/License.js";
 import { Logs } from "../models/Logs.js";
 import { UserData } from "../models/UserData.js";
@@ -66,6 +74,7 @@ export const backups = resolve(__dirname, "..", "backups");
 /**
  * Tablas EdDeli incluidas en backup.json (guardar / recargar BD).
  * Excluidas a propósito (módulos SoftEd compartidos): quiz_*, form_*, alumni_*, cv_*.
+ * Incluye comprobantes, gastos recurrentes, programas de notificación y medios.
  */
 export const BACKUP_TABLE_ENTRIES = [
   { key: "Roles", model: Roles },
@@ -74,7 +83,9 @@ export const BACKUP_TABLE_ENTRIES = [
   { key: "AccountRoles", model: AccountRoles },
   { key: "UserData", model: UserData },
   { key: "Notifications", model: Notifications },
-  { key: "InventoryCategory", model: InventoryCategory },
+  { key: "NotificationProgram", model: NotificationProgram, sanitize: "NotificationProgram" },
+  { key: "NotificationDispatchLog", model: NotificationDispatchLog },
+  { key: "InventoryCategory", model: InventoryCategory, sanitize: "InventoryCategory" },
   { key: "InventoryUnit", model: InventoryUnit },
   { key: "InventoryProduct", model: InventoryProduct, sanitize: "InventoryProduct" },
   { key: "InventoryRecipe", model: InventoryRecipe },
@@ -92,9 +103,12 @@ export const BACKUP_TABLE_ENTRIES = [
   { key: "PublicidadCampaign", model: PublicidadCampaign },
   { key: "PublicidadPlaylistItem", model: PublicidadPlaylistItem },
   { key: "PublicidadDevice", model: PublicidadDevice },
+  { key: "MediaAsset", model: MediaAsset, sanitize: "MediaAsset" },
   { key: "Expense", model: Expense },
   { key: "Income", model: Income },
   { key: "Store", model: Store },
+  { key: "RecurringExpenseTemplate", model: RecurringExpenseTemplate },
+  { key: "RecurringExpenseOccurrence", model: RecurringExpenseOccurrence },
   { key: "HomeProduct", model: HomeProduct },
   { key: "Catalog", model: Catalog },
   { key: "ProductCompareGroup", model: ProductCompareGroup },
@@ -103,6 +117,7 @@ export const BACKUP_TABLE_ENTRIES = [
   { key: "ItemGroup", model: ItemGroup },
   { key: "ItemGroupItem", model: ItemGroupItem },
   { key: "Payment", model: Payment },
+  { key: "DocumentAttachment", model: DocumentAttachment },
   { key: "FinancialObligation", model: FinancialObligation },
   { key: "ObligationPayment", model: ObligationPayment },
   { key: "EditorTemplate", model: EditorTemplate },
@@ -248,11 +263,20 @@ const sanitizeRows = (rows, config = {}) => {
 };
 
 const SANITIZE_CONFIG = {
+  InventoryCategory: {
+    jsonStringFields: ["packageTiers", "mixMatchProductIds"],
+  },
   InventoryProduct: {
     jsonStringFields: ["wholesaleRules", "packageTiers"],
   },
   CashShift: {
     jsonStringFields: ["openingCashCounts", "closingCashCounts"],
+  },
+  NotificationProgram: {
+    jsonStringFields: ["targetRoleIds"],
+  },
+  MediaAsset: {
+    jsonStringFields: ["metadata"],
   },
 };
 
@@ -325,6 +349,10 @@ export async function requireValidBackupFile() {
 export function prepareBackupForRestore(jsonData) {
   const data = { ...jsonData };
 
+  data.InventoryCategory = sanitizeRows(
+    data.InventoryCategory,
+    SANITIZE_CONFIG.InventoryCategory,
+  );
   data.InventoryProduct = sanitizeRows(
     data.InventoryProduct,
     SANITIZE_CONFIG.InventoryProduct,

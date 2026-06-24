@@ -9,6 +9,9 @@
     "dev": "nodemon index.js",
     "start": "node index.js",
     "db:sync": "DB_SYNC_ALTER=1 node scripts/sync-schema.js",
+    "db:sync:categories": "node scripts/sync-category-schema.js",
+    "db:migrate:categories": "node scripts/migrate-category-hierarchy.js",
+    "db:seed:panes-group": "node scripts/seed-panes-pricing-group.js",
     "db:reset": "node scripts/reset-database.js",
     "db:check-backup": "node scripts/check-backup.js"
   },

@@ -14,12 +14,16 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ViewModuleIcon from "@mui/icons-material/ViewModule";
 import TableRowsIcon from "@mui/icons-material/TableRows";
 import SearchIcon from "@mui/icons-material/Search";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { Edit, Delete, Inventory } from "@mui/icons-material";
 import toast from "react-hot-toast";
@@ -29,9 +33,20 @@ import ProductsGridView from "./components/ProductsGridView";
 import {
   getAllProducts,
   deleteProduct,
+  getCategories,
 } from "../../../api/inventoryControlRequest";
 import { pathImg } from "../../../api/axios";
 import TablePro from "../../../components/Tables/TablePro";
+import { useBarcodeScanner } from "../../../hooks/useBarcodeScanner.js";
+import {
+  findEddeliProductByCode,
+  normalizeProductBarcode,
+} from "../../../utils/productLookup.js";
+import {
+  buildCategoryFilterOptions,
+  formatProductCategoryName,
+  productMatchesCategoryFilter,
+} from "../../../utils/categoryUtils.js";
 
 function ProductsPage() {
   const [data, setData] = useState([]);
@@ -43,11 +58,27 @@ function ProductsPage() {
   const [titleUserDialog, settitleUserDialog] = useState("");
   const [viewMode, setViewMode] = useState("cards");
   const [cardSearch, setCardSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
+  const [allCategories, setAllCategories] = useState([]);
 
   const fecthData = async () => {
-    const { data } = await getAllProducts();
+    const [{ data }, { data: cats }] = await Promise.all([
+      getAllProducts(),
+      getCategories(),
+    ]);
     setData(data || []);
+    setAllCategories(cats || []);
   };
+
+  const categoryFilterOptions = useMemo(
+    () => buildCategoryFilterOptions(allCategories),
+    [allCategories],
+  );
+
+  const filteredTableData = useMemo(() => {
+    if (!categoryFilter) return data;
+    return data.filter((p) => productMatchesCategoryFilter(p, categoryFilter));
+  }, [data, categoryFilter]);
 
   const handleDialog = () => setOpen(!open);
 
@@ -77,6 +108,37 @@ function ProductsPage() {
     settitleUserDialog("Editar Producto");
     setOpenDialog(true);
   };
+
+  const openNewProductWithBarcode = useCallback((rawCode) => {
+    const code = normalizeProductBarcode(rawCode);
+    setDatos({ barcode: code });
+    setIsEditing(false);
+    settitleUserDialog("Agregar Producto");
+    setOpenDialog(true);
+  }, []);
+
+  const handleCatalogBarcodeScan = useCallback(
+    (rawCode) => {
+      const code = normalizeProductBarcode(rawCode);
+      if (!code) return;
+      const found = findEddeliProductByCode(data, code);
+      setCardSearch(code);
+      if (found) {
+        toast.success(`Encontrado: ${found.name}`);
+        openEditProduct(found);
+        return;
+      }
+      openNewProductWithBarcode(code);
+      toast("Código no registrado. Completa el nuevo producto.", { icon: "ℹ️" });
+    },
+    [data, openNewProductWithBarcode],
+  );
+
+  useBarcodeScanner({
+    enabled: !openDialog && data.length > 0,
+    onScan: handleCatalogBarcodeScan,
+    ignoreWhenTypingInInputs: true,
+  });
 
   const columns = [
     {
@@ -116,6 +178,12 @@ function ProductsPage() {
       width: 180,
     },
     {
+      label: "Código",
+      id: "barcode",
+      width: 120,
+      render: (row) => row.barcode || row.sku || "—",
+    },
+    {
       label: "Tipo",
       id: "type",
       width: 100,
@@ -132,7 +200,7 @@ function ProductsPage() {
       label: "Categoría",
       id: "category",
       width: 100,
-      render: (params) => params.ERP_inventory_category?.name,
+      render: (params) => formatProductCategoryName(params),
     },
     {
       label: "P. proveedor",
@@ -246,7 +314,7 @@ function ProductsPage() {
             }}
           >
             <ProductForm
-              key={isEditing ? datos?.id ?? "edit" : "new"}
+              key={isEditing ? datos?.id ?? "edit" : datos?.barcode ?? "new"}
               onClose={closeProductDialog}
               isEditing={isEditing}
               datos={datos}
@@ -306,6 +374,23 @@ function ProductsPage() {
           Crear Producto
         </Button>
         <Box sx={{ flexGrow: 1 }} />
+        <FormControl size="small" sx={{ minWidth: 220 }}>
+          <InputLabel>Categoría</InputLabel>
+          <Select
+            value={categoryFilter}
+            label="Categoría"
+            onChange={(e) => setCategoryFilter(e.target.value)}
+          >
+            <MenuItem value="">
+              <em>Todas</em>
+            </MenuItem>
+            {categoryFilterOptions.map((opt) => (
+              <MenuItem key={opt.value} value={opt.value}>
+                {opt.label}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
         <ToggleButtonGroup
           size="small"
           value={viewMode}
@@ -340,9 +425,15 @@ function ProductsPage() {
             </Typography>
             <TextField
               size="small"
-              placeholder="Buscar por nombre, categoría o tipo…"
+              placeholder="Buscar o escanear código de barras…"
               value={cardSearch}
               onChange={(e) => setCardSearch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && cardSearch.trim()) {
+                  e.preventDefault();
+                  handleCatalogBarcodeScan(cardSearch);
+                }
+              }}
               sx={{ minWidth: 260, flex: 1 }}
               InputProps={{
                 startAdornment: (
@@ -356,13 +447,14 @@ function ProductsPage() {
           <ProductsGridView
             products={data}
             search={cardSearch}
+            categoryFilter={categoryFilter}
             onEdit={openEditProduct}
             onReload={fecthData}
           />
         </Paper>
       ) : (
         <TablePro
-          rows={data}
+          rows={filteredTableData}
           columns={columns}
           defaultRowsPerPage={10}
           title="PRODUCTOS"

@@ -18,11 +18,20 @@ import {
 import BakeryDiningIcon from "@mui/icons-material/BakeryDining";
 import CloseIcon from "@mui/icons-material/Close";
 import ShoppingCartIcon from "@mui/icons-material/ShoppingCart";
+import ShoppingBasketIcon from "@mui/icons-material/ShoppingBasket";
+import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import {
   hasPackageTiers,
   normalizePackageTiers,
   resolveEddeliLinePricing,
+  resolvePackageTierTotal,
+  getProductCategory,
+  hasCategoryPackageTiers,
+  getCategoryMixMatchLabel,
+  getCategoryPackageTiers,
+  getSurtidoProductsForCategory,
 } from "../../utils/productLookup.js";
+import { getRootCategoryFromProduct } from "../../utils/categoryUtils.js";
 
 const to2 = (n) => Number(Number(n || 0).toFixed(2));
 const QUICK_QTY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -35,7 +44,10 @@ function formatPrice(product) {
 }
 
 function formatTierHints(product) {
-  const tiers = normalizePackageTiers(product?.packageTiers);
+  const cat = getProductCategory(product);
+  const tiers = hasCategoryPackageTiers(cat)
+    ? normalizePackageTiers(cat?.packageTiers)
+    : normalizePackageTiers(product?.packageTiers);
   if (!tiers.length) return null;
   return tiers.map((t) => `${t.qty}=$${t.totalPrice.toFixed(2)}`).join(" · ");
 }
@@ -45,10 +57,15 @@ function lineTotalFor(product, qty) {
 }
 
 function isPanaderiaProduct(product) {
-  const catName = String(
-    product?.ERP_inventory_category?.name || product?.category?.name || "",
-  ).toLowerCase();
-  return catName.includes("panader") || Number(product?.categoryId) === 3;
+  const cat = getProductCategory(product);
+  const root = getRootCategoryFromProduct(product);
+  const rootName = String(root?.name || cat?.name || "").toLowerCase();
+  const catName = String(cat?.name || "").toLowerCase();
+  return (
+    rootName.includes("panader") ||
+    catName === "panes" ||
+    catName.includes("panader")
+  );
 }
 
 export function filterPanaderiaInStock(products) {
@@ -60,29 +77,96 @@ export function filterPanaderiaInStock(products) {
       return Number(p.stock || 0) > 0;
     })
     .sort((a, b) => {
-      const aTiered = hasPackageTiers(a) ? 1 : 0;
-      const bTiered = hasPackageTiers(b) ? 1 : 0;
+      const aTiered =
+        hasCategoryPackageTiers(getProductCategory(a)) || hasPackageTiers(a) ? 1 : 0;
+      const bTiered =
+        hasCategoryPackageTiers(getProductCategory(b)) || hasPackageTiers(b) ? 1 : 0;
       if (bTiered !== aTiered) return bTiered - aTiered;
       return Number(b.stock || 0) - Number(a.stock || 0);
     });
 }
 
-export default function CajaQuickProductsDialog({ open, onClose, products, onAdd }) {
+function filterSurtidoInStock(products, category) {
+  return getSurtidoProductsForCategory(products, category)
+    .filter((p) => Number(p.stock || 0) > 0)
+    .sort((a, b) => Number(b.stock || 0) - Number(a.stock || 0));
+}
+
+export default function CajaQuickProductsDialog({
+  open,
+  onClose,
+  products,
+  onAdd,
+  onAddSurtido,
+  surtidoCategories = [],
+}) {
   const theme = useTheme();
   const [selectedQty, setSelectedQty] = useState(1);
   const [hoveredProduct, setHoveredProduct] = useState(null);
+  const [surtidoCategory, setSurtidoCategory] = useState(null);
+  const [basketQtyById, setBasketQtyById] = useState({});
+
   const items = filterPanaderiaInStock(products);
+  const surtidoMode = Boolean(surtidoCategory);
+  const surtidoLabel = surtidoCategory ? getCategoryMixMatchLabel(surtidoCategory) : "";
+  const surtidoItems = useMemo(
+    () => (surtidoCategory ? filterSurtidoInStock(products, surtidoCategory) : []),
+    [products, surtidoCategory],
+  );
+  const surtidoTiers = useMemo(
+    () =>
+      surtidoCategory
+        ? normalizePackageTiers(getCategoryPackageTiers(surtidoCategory))
+        : [],
+    [surtidoCategory],
+  );
+
+  const resetSurtidoBasket = useCallback(() => {
+    setBasketQtyById({});
+  }, []);
+
+  const exitSurtidoMode = useCallback(() => {
+    setSurtidoCategory(null);
+    resetSurtidoBasket();
+  }, [resetSurtidoBasket]);
 
   useEffect(() => {
     if (open) {
       setSelectedQty(1);
       setHoveredProduct(null);
+      setSurtidoCategory(null);
+      resetSurtidoBasket();
     }
-  }, [open]);
+  }, [open, resetSurtidoBasket]);
 
   const bumpQty = useCallback((delta) => {
     setSelectedQty((prev) => clampQty(prev + delta));
   }, []);
+
+  const basketLines = useMemo(
+    () =>
+      surtidoItems
+        .map((p) => ({
+          product: p,
+          quantity: Math.floor(Number(basketQtyById[Number(p.id)] || 0)),
+        }))
+        .filter((l) => l.quantity > 0),
+    [surtidoItems, basketQtyById],
+  );
+
+  const basketTotalUnits = useMemo(
+    () => basketLines.reduce((sum, l) => sum + l.quantity, 0),
+    [basketLines],
+  );
+
+  const basketEstimatedTotal = useMemo(() => {
+    if (!surtidoCategory || basketTotalUnits <= 0) return 0;
+    const ref = surtidoItems[0];
+    return resolvePackageTierTotal(
+      { packageTiers: surtidoTiers, price: ref?.price ?? 0.15 },
+      basketTotalUnits,
+    );
+  }, [surtidoCategory, basketTotalUnits, surtidoTiers, surtidoItems]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -90,6 +174,10 @@ export default function CajaQuickProductsDialog({ open, onClose, products, onAdd
     const onKeyDown = (e) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        if (surtidoMode) {
+          exitSurtidoMode();
+          return;
+        }
         onClose();
         return;
       }
@@ -113,23 +201,61 @@ export default function CajaQuickProductsDialog({ open, onClose, products, onAdd
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose, bumpQty]);
+  }, [open, onClose, bumpQty, surtidoMode, exitSurtidoMode]);
 
   const previewProduct = hoveredProduct;
-  const previewTotal = previewProduct ? lineTotalFor(previewProduct, selectedQty) : null;
+  const previewTotal = previewProduct && !surtidoMode ? lineTotalFor(previewProduct, selectedQty) : null;
 
   const indicatorText = useMemo(() => {
+    if (surtidoMode) {
+      if (basketTotalUnits > 0) {
+        return `${surtidoLabel}: ${basketTotalUnits} u. en canasta`;
+      }
+      return `Clic en pan suma ${selectedQty} a la canasta`;
+    }
     if (!previewProduct) {
       return `Clic suma ${selectedQty} u. al carrito`;
     }
-    const name = previewProduct.name || "Producto";
-    return `${name} · +${selectedQty}`;
-  }, [previewProduct, selectedQty]);
+    return `${previewProduct.name || "Producto"} · +${selectedQty}`;
+  }, [surtidoMode, surtidoLabel, basketTotalUnits, previewProduct, selectedQty]);
 
-  const handleAdd = (product) => {
+  const enterSurtidoMode = (cat) => {
+    setSurtidoCategory(cat);
+    resetSurtidoBasket();
+    setHoveredProduct(null);
+  };
+
+  const addToBasket = (product) => {
+    const id = Number(product.id);
+    const stock = Number(product.stock || 0);
+    setBasketQtyById((prev) => {
+      const current = Math.floor(Number(prev[id] || 0));
+      const next = stock > 0 ? Math.min(current + selectedQty, stock) : current + selectedQty;
+      if (next <= current) return prev;
+      return { ...prev, [id]: next };
+    });
+  };
+
+  const handleProductClick = (product) => {
+    if (surtidoMode) {
+      addToBasket(product);
+      return;
+    }
     onAdd(product, selectedQty);
     onClose();
   };
+
+  const handleConfirmSurtido = () => {
+    if (!surtidoCategory || !basketLines.length) return;
+    onAddSurtido?.({
+      lines: basketLines,
+      label: surtidoLabel,
+      category: surtidoCategory,
+    });
+    onClose();
+  };
+
+  const gridProducts = surtidoMode ? surtidoItems : items;
 
   return (
     <Dialog
@@ -166,18 +292,24 @@ export default function CajaQuickProductsDialog({ open, onClose, products, onAdd
           py: 1.25,
           borderBottom: 1,
           borderColor: "divider",
-          bgcolor: "background.paper",
+          bgcolor: surtidoMode ? alpha(theme.palette.secondary.main, 0.08) : "background.paper",
           flexShrink: 0,
         }}
       >
         <Stack direction="row" alignItems="center" spacing={1.25}>
-          <BakeryDiningIcon color="primary" />
+          {surtidoMode ? (
+            <ShoppingBasketIcon color="secondary" />
+          ) : (
+            <BakeryDiningIcon color="primary" />
+          )}
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="h6" fontWeight={800} lineHeight={1.2}>
-              Accesos rápidos
+              {surtidoMode ? `Canasta — ${surtidoLabel}` : "Accesos rápidos"}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Teclado 1-9 o ↑↓ · clic en producto agrega
+              {surtidoMode
+                ? "Teclado 1-9 · clic suma a la canasta · confirmar abajo para el carrito"
+                : "Teclado 1-9 o ↑↓ · clic en producto agrega"}
             </Typography>
           </Box>
           <IconButton onClick={onClose} aria-label="Cerrar" size="small">
@@ -249,20 +381,47 @@ export default function CajaQuickProductsDialog({ open, onClose, products, onAdd
               p: 1.25,
               borderRadius: 1.5,
               border: 1,
-              borderColor: previewProduct ? "primary.main" : "divider",
+              borderColor: surtidoMode
+                ? basketTotalUnits > 0
+                  ? "secondary.main"
+                  : "divider"
+                : previewProduct
+                  ? "primary.main"
+                  : "divider",
               bgcolor:
                 theme.palette.mode === "dark"
-                  ? alpha(theme.palette.primary.main, previewProduct ? 0.1 : 0)
-                  : alpha(theme.palette.primary.main, previewProduct ? 0.06 : 0),
+                  ? alpha(
+                      surtidoMode ? theme.palette.secondary.main : theme.palette.primary.main,
+                      surtidoMode ? (basketTotalUnits > 0 ? 0.12 : 0) : previewProduct ? 0.1 : 0,
+                    )
+                  : alpha(
+                      surtidoMode ? theme.palette.secondary.main : theme.palette.primary.main,
+                      surtidoMode ? (basketTotalUnits > 0 ? 0.08 : 0) : previewProduct ? 0.06 : 0,
+                    ),
             }}
           >
             <Stack direction="row" spacing={1} alignItems="center">
-              <ShoppingCartIcon color="primary" fontSize="small" />
+              {surtidoMode ? (
+                <ShoppingBasketIcon color="secondary" fontSize="small" />
+              ) : (
+                <ShoppingCartIcon color="primary" fontSize="small" />
+              )}
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="body2" fontWeight={700} noWrap>
+                <Typography variant="body2" fontWeight={700} noWrap={!surtidoMode}>
                   {indicatorText}
                 </Typography>
-                {previewProduct && previewTotal != null ? (
+                {surtidoMode && basketLines.length > 0 ? (
+                  <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+                    {basketLines.map(({ product, quantity }) => (
+                      <Chip
+                        key={product.id}
+                        size="small"
+                        label={`${product.name} ×${quantity}`}
+                        variant="outlined"
+                      />
+                    ))}
+                  </Stack>
+                ) : previewProduct && previewTotal != null && !surtidoMode ? (
                   <Typography variant="caption" color="text.secondary" noWrap display="block">
                     {hasPackageTiers(previewProduct)
                       ? formatTierHints(previewProduct)
@@ -270,13 +429,23 @@ export default function CajaQuickProductsDialog({ open, onClose, products, onAdd
                   </Typography>
                 ) : null}
               </Box>
-              {previewTotal != null ? (
+              {surtidoMode && basketTotalUnits > 0 ? (
+                <Typography variant="h6" fontWeight={900} color="secondary.main">
+                  ${to2(basketEstimatedTotal).toFixed(2)}
+                </Typography>
+              ) : previewTotal != null ? (
                 <Typography variant="h6" fontWeight={900} color="primary.main">
                   ${previewTotal.toFixed(2)}
                 </Typography>
               ) : null}
             </Stack>
           </Paper>
+
+          {surtidoMode && basketTotalUnits > 0 ? (
+            <Button size="small" color="inherit" startIcon={<DeleteSweepIcon />} onClick={resetSurtidoBasket}>
+              Vaciar
+            </Button>
+          ) : null}
         </Stack>
       </Box>
 
@@ -289,16 +458,66 @@ export default function CajaQuickProductsDialog({ open, onClose, products, onAdd
           bgcolor: "background.default",
         }}
       >
-        {items.length === 0 ? (
+        {!surtidoMode && surtidoCategories.length > 0 && (
+          <Box sx={{ mb: 1.5 }}>
+            <Grid container spacing={1.5}>
+              {surtidoCategories.map((cat) => {
+                const label = getCategoryMixMatchLabel(cat);
+                const tiers = normalizePackageTiers(getCategoryPackageTiers(cat));
+                const tierHints = tiers.map((t) => `${t.qty}=$${t.totalPrice.toFixed(2)}`).join(" · ");
+                return (
+                  <Grid item xs={12} sm={6} md={4} key={cat.id}>
+                    <Card
+                      variant="outlined"
+                      sx={{
+                        borderColor: "secondary.main",
+                        bgcolor:
+                          theme.palette.mode === "dark"
+                            ? alpha(theme.palette.secondary.main, 0.08)
+                            : alpha(theme.palette.secondary.main, 0.04),
+                      }}
+                    >
+                      <CardActionArea onClick={() => enterSurtidoMode(cat)}>
+                        <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
+                          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                            <ShoppingBasketIcon color="secondary" fontSize="small" />
+                            <Typography variant="subtitle2" fontWeight={800}>
+                              Canasta {label}
+                            </Typography>
+                          </Stack>
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            Clic para armar canasta · {tierHints}
+                          </Typography>
+                        </CardContent>
+                      </CardActionArea>
+                    </Card>
+                  </Grid>
+                );
+              })}
+            </Grid>
+          </Box>
+        )}
+
+        {gridProducts.length === 0 ? (
           <Typography color="text.secondary" sx={{ py: 6, textAlign: "center" }}>
-            No hay productos de panadería con stock disponible.
+            {surtidoMode
+              ? "No hay panes disponibles en esta canasta."
+              : "No hay productos de panadería con stock disponible."}
           </Typography>
         ) : (
           <Grid container spacing={1.5}>
-            {items.map((product) => {
-              const tiered = hasPackageTiers(product);
+            {gridProducts.map((product) => {
+              const tiered = hasPackageTiers(product) || hasCategoryPackageTiers(getProductCategory(product));
               const tierHints = formatTierHints(product);
-              const cardTotal = lineTotalFor(product, selectedQty);
+              const inBasket = surtidoMode
+                ? Math.floor(Number(basketQtyById[Number(product.id)] || 0))
+                : 0;
+              const stock = Number(product.stock || 0);
+              const atStockLimit = surtidoMode && stock > 0 && inBasket >= stock;
+              const cardTotal = surtidoMode
+                ? null
+                : lineTotalFor(product, selectedQty);
+
               return (
                 <Grid item xs={6} sm={4} md={3} lg={2} key={product.id}>
                   <Card
@@ -307,18 +526,23 @@ export default function CajaQuickProductsDialog({ open, onClose, products, onAdd
                     onMouseLeave={() => setHoveredProduct(null)}
                     sx={{
                       height: "100%",
-                      borderColor: "divider",
+                      borderColor: inBasket > 0 ? "secondary.main" : "divider",
                       bgcolor: "background.paper",
-                      borderWidth: 1,
+                      borderWidth: inBasket > 0 ? 2 : 1,
+                      opacity: atStockLimit ? 0.55 : 1,
                       transition: "border-color 0.15s, transform 0.15s",
                       "&:hover": {
-                        borderColor: "primary.main",
-                        transform: "translateY(-1px)",
-                        boxShadow: theme.shadows[4],
+                        borderColor: surtidoMode ? "secondary.main" : "primary.main",
+                        transform: atStockLimit ? "none" : "translateY(-1px)",
+                        boxShadow: atStockLimit ? "none" : theme.shadows[4],
                       },
                     }}
                   >
-                    <CardActionArea onClick={() => handleAdd(product)} sx={{ height: "100%" }}>
+                    <CardActionArea
+                      onClick={() => handleProductClick(product)}
+                      disabled={atStockLimit}
+                      sx={{ height: "100%" }}
+                    >
                       <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
                         <Typography
                           variant="subtitle2"
@@ -357,19 +581,32 @@ export default function CajaQuickProductsDialog({ open, onClose, products, onAdd
                             px: 0.75,
                             borderRadius: 1,
                             bgcolor:
-                              theme.palette.mode === "dark"
-                                ? alpha(theme.palette.success.main, 0.16)
-                                : alpha(theme.palette.success.main, 0.1),
+                              surtidoMode && inBasket > 0
+                                ? alpha(theme.palette.secondary.main, 0.12)
+                                : theme.palette.mode === "dark"
+                                  ? alpha(theme.palette.success.main, 0.16)
+                                  : alpha(theme.palette.success.main, 0.1),
                             border: 1,
-                            borderColor: alpha(theme.palette.success.main, 0.35),
+                            borderColor:
+                              surtidoMode && inBasket > 0
+                                ? alpha(theme.palette.secondary.main, 0.35)
+                                : alpha(theme.palette.success.main, 0.35),
                           }}
                         >
-                          <Typography variant="body2" fontWeight={700} color="success.main">
-                            +{selectedQty} → ${cardTotal.toFixed(2)}
+                          <Typography
+                            variant="body2"
+                            fontWeight={700}
+                            color={surtidoMode && inBasket > 0 ? "secondary.main" : "success.main"}
+                          >
+                            {surtidoMode
+                              ? inBasket > 0
+                                ? `En canasta: ${inBasket}`
+                                : `+${selectedQty} al clic`
+                              : `+${selectedQty} → $${cardTotal.toFixed(2)}`}
                           </Typography>
                         </Box>
                         <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                          Stock: {Number(product.stock || 0)}
+                          Stock: {stock}
                         </Typography>
                       </CardContent>
                     </CardActionArea>
@@ -380,6 +617,44 @@ export default function CajaQuickProductsDialog({ open, onClose, products, onAdd
           </Grid>
         )}
       </Box>
+
+      {surtidoMode ? (
+        <Box
+          sx={{
+            px: 2,
+            py: 1.5,
+            borderTop: 1,
+            borderColor: "divider",
+            bgcolor: "background.paper",
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
+            flexWrap: "wrap",
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            {basketTotalUnits > 0
+              ? `${basketTotalUnits} u. listas · estimado $${to2(basketEstimatedTotal).toFixed(2)}`
+              : "Arma la canasta con los panes de arriba"}
+          </Typography>
+          <Stack direction="row" spacing={1}>
+            <Button size="small" onClick={exitSurtidoMode}>
+              Salir de canasta
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              color="secondary"
+              disabled={basketTotalUnits <= 0}
+              onClick={handleConfirmSurtido}
+            >
+              Agregar canasta al carrito
+            </Button>
+          </Stack>
+        </Box>
+      ) : null}
     </Dialog>
   );
 }

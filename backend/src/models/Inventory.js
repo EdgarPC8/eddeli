@@ -82,6 +82,18 @@ export const InventoryCategory = sequelize.define("ERP_inventory_categories", {
     type: DataTypes.BOOLEAN,
     defaultValue: true,
   },
+  /** Tramos compartidos en caja: ej. 4 panes (cualquier variedad) = $0.50 */
+  packageTiers: { type: DataTypes.JSON, allowNull: true },
+  /** Etiqueta en caja para la canasta surtido (ej. "Pan surtido") */
+  mixMatchLabel: { type: DataTypes.STRING(120), allowNull: true },
+  /** IDs de productos que entran en el surtido/tramo (JSON array) */
+  mixMatchProductIds: { type: DataTypes.JSON, allowNull: true },
+  /** Categoría padre (null = categoría principal) */
+  parentId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: { model: "ERP_inventory_categories", key: "id" },
+  },
 
 }, {
   timestamps: false
@@ -364,6 +376,15 @@ InventoryCategory.hasMany(InventoryProduct, {
 });
 InventoryProduct.belongsTo(InventoryCategory, {
   foreignKey: "categoryId"
+});
+
+InventoryCategory.belongsTo(InventoryCategory, {
+  as: "parent",
+  foreignKey: "parentId",
+});
+InventoryCategory.hasMany(InventoryCategory, {
+  as: "children",
+  foreignKey: "parentId",
 });
 
 

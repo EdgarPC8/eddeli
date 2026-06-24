@@ -6,11 +6,7 @@ import {
   CardContent,
   CardMedia,
   Chip,
-  FormControl,
   Grid,
-  InputLabel,
-  MenuItem,
-  Select,
   TablePagination,
   TextField,
   Typography,
@@ -33,6 +29,10 @@ import {
 import { pathImg } from "../../../../api/axios";
 import toast from "react-hot-toast";
 import { useAuth } from "../../../../context/AuthContext";
+import {
+  formatProductCategoryName,
+  productMatchesCategoryFilter,
+} from "../../../../utils/categoryUtils.js";
 
 const typeLabels = {
   raw: "Materia Prima",
@@ -59,7 +59,7 @@ function ProductCard({ product, onEdit, onDuplicate, onStockAdjusted, pathImgBas
   const imgSrc = product?.primaryImageUrl
     ? `${pathImgBase}${product.primaryImageUrl}`
     : null;
-  const categoryName = product?.ERP_inventory_category?.name || "—";
+  const categoryName = formatProductCategoryName(product);
   const current = stockNum(product);
   const abbr = unitAbbrOf(product);
   const [draft, setDraft] = useState(() => String(current));
@@ -170,6 +170,7 @@ function ProductCard({ product, onEdit, onDuplicate, onStockAdjusted, pathImgBas
         </Typography>
         <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
           {categoryName}
+          {product?.barcode ? ` · Cód. ${product.barcode}` : ""}
         </Typography>
         <Box sx={{ mt: 1, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <Typography variant="body2" fontWeight={600}>
@@ -333,11 +334,11 @@ function DuplicateDialog({ open, product, onClose, onSuccess }) {
 export default function ProductsGridView({
   products = [],
   search = "",
+  categoryFilter = "",
   onEdit,
   onReload,
   pathImgBase = pathImg,
 }) {
-  const [categoryFilter, setCategoryFilter] = useState("");
   const [duplicateProduct, setDuplicateProduct] = useState(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(24);
@@ -346,21 +347,10 @@ export default function ProductsGridView({
     setPage(0);
   }, [search, categoryFilter]);
 
-  const categories = useMemo(() => {
-    const set = new Set();
-    products.forEach((p) => {
-      const c = p?.ERP_inventory_category;
-      if (c?.id) set.add(JSON.stringify({ id: c.id, name: c.name }));
-    });
-    return Array.from(set).map((s) => JSON.parse(s));
-  }, [products]);
-
   const filteredProducts = useMemo(() => {
     let list = products;
     if (categoryFilter) {
-      list = list.filter(
-        (p) => String(p?.categoryId ?? p?.ERP_inventory_category?.id) === String(categoryFilter)
-      );
+      list = list.filter((p) => productMatchesCategoryFilter(p, categoryFilter));
     }
     const q = search.trim().toLowerCase();
     if (q) {
@@ -369,6 +359,8 @@ export default function ProductsGridView({
           p.name,
           p.desc,
           p.description,
+          p.barcode,
+          p.sku,
           p?.ERP_inventory_category?.name,
           typeLabels[p.type],
           p.type,
@@ -392,26 +384,6 @@ export default function ProductsGridView({
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Ordenadas por stock (mayor a menor). Puede ajustar stock con movimiento de ajuste.
       </Typography>
-      <FormControl size="small" sx={{ minWidth: 200, mb: 2 }}>
-        <InputLabel>Categoría</InputLabel>
-        <Select
-          value={categoryFilter}
-          label="Categoría"
-          onChange={(e) => {
-            setCategoryFilter(e.target.value);
-            setPage(0);
-          }}
-        >
-          <MenuItem value="">
-            <em>Todas</em>
-          </MenuItem>
-          {categories.map((c) => (
-            <MenuItem key={c.id} value={String(c.id)}>
-              {c.name}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
       <Grid container spacing={2}>
         {paginatedProducts.map((p) => (
           <Grid item xs={6} sm={4} md={3} lg={2} key={p.id}>

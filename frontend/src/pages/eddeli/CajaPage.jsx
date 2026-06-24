@@ -5,6 +5,7 @@ import {
   Box,
   Button,
   Checkbox,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -50,13 +51,21 @@ import { buildCajaOrderNotes } from "../../utils/eddeliPosOrderUtils.js";
 import { buildCustomerDisplayName, formatCustomerDocument } from "./cajaCustomerUtils.js";
 import { formatMoney } from "../../utils/turnoCashUtils.js";
 import { useBarcodeScanner } from "../../hooks/useBarcodeScanner.js";
-import { resolveEddeliLinePricing } from "../../utils/productLookup.js";
+import { resolveEddeliLinePricing, findEddeliProductByCode, applyCategoryMixMatchPricing, summarizeCategoryMixMatchGroups, getCategoryMixMatchHint, getCategoryPackageTiers, getProductCategory, findSurtidoCategoriesFromProducts, getCategoryMixMatchLabel } from "../../utils/productLookup.js";
 import {
   buildReceiptFromCheckout,
   resolveStoredDocumentType,
 } from "../../utils/saleReceiptUtils.js";
 
 const to2 = (n) => Number(Number(n || 0).toFixed(2));
+
+const cartRowKey = (row) =>
+  row?.mixGroupId ? `${row.mixGroupId}:${row.productId}` : String(row.productId);
+
+const newMixGroupId = () =>
+  typeof crypto !== "undefined" && crypto.randomUUID
+    ? `surtido-${crypto.randomUUID()}`
+    : `surtido-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
 const openCajaInNewTab = () => {
   const url = new URL(`${import.meta.env.BASE_URL}caja`, window.location.origin);
@@ -135,7 +144,8 @@ const lineBreakdown = (row) => {
   const qty = Number(row.quantity || 0);
   const unitPrice = Number(row.price || 0);
   const total =
-    row.lineTotal != null && row.pricingMode === "package"
+    row.lineTotal != null &&
+    (row.pricingMode === "package" || row.pricingMode === "category_package")
       ? to2(Number(row.lineTotal))
       : to2(qty * unitPrice);
   const taxType = String(row.taxType || "gravado");
@@ -234,11 +244,17 @@ export default function CajaPage() {
     return map;
   }, [products]);
 
+  const surtidoCategories = useMemo(
+    () => findSurtidoCategoriesFromProducts(products),
+    [products],
+  );
+
   const addToCart = (product, qtyToAdd = 1) => {
     const addQty = Math.max(1, Math.floor(Number(qtyToAdd) || 1));
     setCart((prev) => {
       const id = Number(product.id);
-      const exists = prev.find((row) => Number(row.productId) === id);
+      const key = String(id);
+      const exists = prev.find((row) => cartRowKey(row) === key);
       const quantity = exists ? Number(exists.quantity) + addQty : addQty;
       const pricing = resolveEddeliLinePricing(product, quantity);
       const line = {
@@ -253,8 +269,37 @@ export default function CajaPage() {
         taxType: product.taxType || "gravado",
         taxRate: Number(product.taxRate ?? 15),
       };
-      const rest = prev.filter((row) => Number(row.productId) !== id);
+      const rest = prev.filter((row) => cartRowKey(row) !== key);
       return [...rest, line];
+    });
+  };
+
+  const addSurtidoBatch = ({ lines, label, category }) => {
+    const mixGroupId = newMixGroupId();
+    const mixGroupLabel = label || getCategoryMixMatchLabel(category);
+    setCart((prev) => {
+      const next = [...prev];
+      for (const { product, quantity } of lines) {
+        const id = Number(product.id);
+        const qty = Math.max(1, Math.floor(Number(quantity) || 1));
+        const pricing = resolveEddeliLinePricing(product, qty);
+        next.push({
+          productId: id,
+          name: product.name,
+          quantity: qty,
+          price: pricing.unitPrice,
+          lineTotal: pricing.lineTotal,
+          pricingMode: pricing.mode,
+          stock: Number(product.stock || 0),
+          barcode: product.barcode || "",
+          taxType: product.taxType || "gravado",
+          taxRate: Number(product.taxRate ?? 15),
+          mixGroupId,
+          mixGroupLabel,
+          categoryId: category?.id,
+        });
+      }
+      return next;
     });
   };
 
@@ -273,7 +318,7 @@ export default function CajaPage() {
 
   const handleBarcodeCode = useCallback(
     (code) => {
-      const found = findProductByQuery(code);
+      const found = findEddeliProductByCode(products, code);
       if (found) {
         addToCart(found);
         setSelectedProductId("");
@@ -284,7 +329,6 @@ export default function CajaPage() {
         variant: "warning",
       });
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- findProductByQuery usa products
     [products, toast]
   );
 
@@ -294,13 +338,13 @@ export default function CajaPage() {
     ignoreWhenTypingInInputs: true,
   });
 
-  const updateCartRow = (productId, key, value) => {
+  const updateCartRow = (rowKey, key, value) => {
     setCart((prev) =>
       prev.map((row) => {
-        if (Number(row.productId) !== Number(productId)) return row;
+        if (cartRowKey(row) !== String(rowKey)) return row;
         const next = { ...row, [key]: value };
         if (key === "quantity") {
-          const product = products.find((p) => Number(p.id) === Number(productId));
+          const product = products.find((p) => Number(p.id) === Number(row.productId));
           if (product) {
             const pricing = resolveEddeliLinePricing(product, next.quantity);
             next.price = pricing.unitPrice;
@@ -317,12 +361,52 @@ export default function CajaPage() {
     );
   };
 
-  const removeRow = (productId) => {
-    setCart((prev) => prev.filter((row) => Number(row.productId) !== Number(productId)));
+  const removeRow = (rowKey) => {
+    setCart((prev) => prev.filter((row) => cartRowKey(row) !== String(rowKey)));
   };
 
+  const removeMixGroup = (mixGroupId) => {
+    setCart((prev) => prev.filter((row) => row.mixGroupId !== mixGroupId));
+  };
+
+  const pricedCart = useMemo(
+    () => applyCategoryMixMatchPricing(cart, products),
+    [cart, products],
+  );
+
+  const cartDisplayGroups = useMemo(() => {
+    const groups = [];
+    const mixSeen = new Set();
+    for (const row of pricedCart) {
+      if (!row.mixGroupId) {
+        groups.push({ type: "single", row });
+        continue;
+      }
+      if (mixSeen.has(row.mixGroupId)) continue;
+      mixSeen.add(row.mixGroupId);
+      const rows = pricedCart.filter((r) => r.mixGroupId === row.mixGroupId);
+      const groupTotal = rows.reduce((sum, r) => sum + lineBreakdown(r).total, 0);
+      groups.push({
+        type: "mix",
+        mixGroupId: row.mixGroupId,
+        label: row.mixGroupLabel || "Pan surtido",
+        rows,
+        groupTotal,
+      });
+    }
+    return groups;
+  }, [pricedCart]);
+
+  const categoryMixSummaries = useMemo(() => {
+    return summarizeCategoryMixMatchGroups(pricedCart).map((g) => {
+      const sample = products.find((p) => Number(getProductCategory(p)?.id) === g.categoryId);
+      const tiers = getCategoryPackageTiers(getProductCategory(sample));
+      return { ...g, hint: getCategoryMixMatchHint(tiers, g.quantity) };
+    });
+  }, [pricedCart, products]);
+
   const summary = useMemo(() => {
-    return cart.reduce(
+    return pricedCart.reduce(
       (acc, row) => {
         const { base, iva, total } = lineBreakdown(row);
         acc.subtotal += base;
@@ -332,7 +416,7 @@ export default function CajaPage() {
       },
       { subtotal: 0, iva: 0, total: 0 }
     );
-  }, [cart]);
+  }, [pricedCart]);
   const subtotal = to2(summary.subtotal);
   const iva = to2(summary.iva);
   const total = to2(summary.total);
@@ -397,7 +481,7 @@ export default function CajaPage() {
       documentType === "factura"
         ? "factura"
         : resolveStoredDocumentType(documentType, useCustomerData || isInvoice);
-    const cartSnapshot = cart.map((row) => ({ ...row }));
+    const cartSnapshot = pricedCart.map((row) => ({ ...row }));
     const customer = customers.find((c) => String(c.id) === String(resolvedCustomerId));
     const { data } = await posCheckoutRequest({
       customerId: Number(resolvedCustomerId),
@@ -409,7 +493,8 @@ export default function CajaPage() {
         productId: Number(row.productId),
         quantity: Number(row.quantity),
         price:
-          row.pricingMode === "package" && row.lineTotal != null
+          (row.pricingMode === "package" || row.pricingMode === "category_package") &&
+          row.lineTotal != null
             ? Number(row.lineTotal) / Number(row.quantity || 1)
             : Number(row.price || 0),
       })),
@@ -795,6 +880,24 @@ export default function CajaPage() {
               </Stack>
             </Stack>
 
+            {categoryMixSummaries.length > 0 && (
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
+                {categoryMixSummaries.map((g) => (
+                  <Chip
+                    key={g.categoryId}
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                    label={
+                      g.hint
+                        ? `${g.categoryName}: ${g.quantity} u. · $${g.total.toFixed(2)} — falta ${g.hint.remaining} para ${g.hint.nextQty}=$${g.hint.nextTotal.toFixed(2)}`
+                        : `${g.categoryName}: ${g.quantity} u. · $${g.total.toFixed(2)}`
+                    }
+                  />
+                ))}
+              </Stack>
+            )}
+
             <TableContainer sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
               <Table size="small">
                 <TableHead>
@@ -812,67 +915,171 @@ export default function CajaPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {cart.map((row) => {
-                    const stockQty =
-                      stockByProductId.get(Number(row.productId)) ?? Number(row.stock || 0);
+                  {cartDisplayGroups.map((group) => {
+                    if (group.type === "single") {
+                      const row = group.row;
+                      const rowKey = cartRowKey(row);
+                      const stockQty =
+                        stockByProductId.get(Number(row.productId)) ?? Number(row.stock || 0);
+                      return (
+                        <TableRow key={rowKey}>
+                          <TableCell>{row.barcode || "—"}</TableCell>
+                          <TableCell>
+                            {row.name}
+                            {row.pricingMode === "category_package" && row.categoryName ? (
+                              <Typography variant="caption" color="primary" display="block">
+                                Tramo {row.categoryName}
+                              </Typography>
+                            ) : null}
+                          </TableCell>
+                          {showCartStock ? (
+                            <TableCell align="center">{stockQty}</TableCell>
+                          ) : null}
+                          <TableCell align="center" sx={{ minWidth: 105 }}>
+                            <TextField
+                              type="number"
+                              size="small"
+                              value={row.quantity}
+                              onChange={(e) =>
+                                updateCartRow(rowKey, "quantity", Number(e.target.value || 0))
+                              }
+                              inputProps={{ min: 0, step: "1" }}
+                            />
+                          </TableCell>
+                          <TableCell align="right" sx={{ minWidth: 120 }}>
+                            <TextField
+                              type="number"
+                              size="small"
+                              value={row.price}
+                              onChange={(e) =>
+                                updateCartRow(rowKey, "price", Number(e.target.value || 0))
+                              }
+                              InputProps={{
+                                startAdornment: (
+                                  <InputAdornment position="start">$</InputAdornment>
+                                ),
+                              }}
+                              inputProps={{ min: 0, step: "0.01" }}
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            ${lineBreakdown(row).iva.toFixed(2)}
+                          </TableCell>
+                          <TableCell align="right">
+                            ${lineBreakdown(row).total.toFixed(2)}
+                          </TableCell>
+                          <TableCell align="center">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => removeRow(rowKey)}
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }
+
+                    const colSpan = showCartStock ? 8 : 7;
                     return (
-                    <TableRow key={row.productId}>
-                      <TableCell>{row.barcode || "—"}</TableCell>
-                      <TableCell>{row.name}</TableCell>
-                      {showCartStock ? (
-                        <TableCell align="center">{stockQty}</TableCell>
-                      ) : null}
-                      <TableCell align="center" sx={{ minWidth: 105 }}>
-                        <TextField
-                          type="number"
-                          size="small"
-                          value={row.quantity}
-                          onChange={(e) =>
-                            updateCartRow(
-                              row.productId,
-                              "quantity",
-                              Number(e.target.value || 0)
-                            )
-                          }
-                          inputProps={{ min: 0, step: "1" }}
-                        />
-                      </TableCell>
-                      <TableCell align="right" sx={{ minWidth: 120 }}>
-                        <TextField
-                          type="number"
-                          size="small"
-                          value={row.price}
-                          onChange={(e) =>
-                            updateCartRow(
-                              row.productId,
-                              "price",
-                              Number(e.target.value || 0)
-                            )
-                          }
-                          InputProps={{
-                            startAdornment: (
-                              <InputAdornment position="start">$</InputAdornment>
-                            ),
-                          }}
-                          inputProps={{ min: 0, step: "0.01" }}
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        ${lineBreakdown(row).iva.toFixed(2)}
-                      </TableCell>
-                      <TableCell align="right">
-                        ${lineBreakdown(row).total.toFixed(2)}
-                      </TableCell>
-                      <TableCell align="center">
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => removeRow(row.productId)}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
+                      <React.Fragment key={group.mixGroupId}>
+                        <TableRow sx={{ bgcolor: "action.hover" }}>
+                          <TableCell colSpan={colSpan - 2}>
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                              <Typography variant="subtitle2" fontWeight={800}>
+                                {group.label}
+                              </Typography>
+                              <Chip
+                                size="small"
+                                label={`${group.rows.reduce((s, r) => s + Number(r.quantity || 0), 0)} u.`}
+                                color="primary"
+                                variant="outlined"
+                              />
+                            </Stack>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="subtitle2" fontWeight={700}>
+                              ${to2(group.groupTotal).toFixed(2)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <IconButton
+                              size="small"
+                              color="error"
+                              onClick={() => removeMixGroup(group.mixGroupId)}
+                              title="Quitar canasta"
+                            >
+                              <DeleteIcon fontSize="small" />
+                            </IconButton>
+                          </TableCell>
+                        </TableRow>
+                        {group.rows.map((row) => {
+                          const rowKey = cartRowKey(row);
+                          const stockQty =
+                            stockByProductId.get(Number(row.productId)) ?? Number(row.stock || 0);
+                          return (
+                            <TableRow key={rowKey}>
+                              <TableCell sx={{ pl: 3 }}>{row.barcode || "—"}</TableCell>
+                              <TableCell sx={{ pl: 3 }}>
+                                <Typography variant="body2">{row.name}</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  dentro de {group.label}
+                                </Typography>
+                              </TableCell>
+                              {showCartStock ? (
+                                <TableCell align="center">{stockQty}</TableCell>
+                              ) : null}
+                              <TableCell align="center" sx={{ minWidth: 105 }}>
+                                <TextField
+                                  type="number"
+                                  size="small"
+                                  value={row.quantity}
+                                  onChange={(e) =>
+                                    updateCartRow(
+                                      rowKey,
+                                      "quantity",
+                                      Number(e.target.value || 0),
+                                    )
+                                  }
+                                  inputProps={{ min: 0, step: "1" }}
+                                />
+                              </TableCell>
+                              <TableCell align="right" sx={{ minWidth: 120 }}>
+                                <TextField
+                                  type="number"
+                                  size="small"
+                                  value={row.price}
+                                  onChange={(e) =>
+                                    updateCartRow(rowKey, "price", Number(e.target.value || 0))
+                                  }
+                                  InputProps={{
+                                    startAdornment: (
+                                      <InputAdornment position="start">$</InputAdornment>
+                                    ),
+                                  }}
+                                  inputProps={{ min: 0, step: "0.01" }}
+                                />
+                              </TableCell>
+                              <TableCell align="right">
+                                ${lineBreakdown(row).iva.toFixed(2)}
+                              </TableCell>
+                              <TableCell align="right">
+                                ${lineBreakdown(row).total.toFixed(2)}
+                              </TableCell>
+                              <TableCell align="center">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() => removeRow(rowKey)}
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </React.Fragment>
                     );
                   })}
                   {cart.length === 0 && (
@@ -1194,7 +1401,9 @@ export default function CajaPage() {
         open={quickProductsOpen}
         onClose={() => setQuickProductsOpen(false)}
         products={products}
+        surtidoCategories={surtidoCategories}
         onAdd={(product, qty) => addToCart(product, qty)}
+        onAddSurtido={addSurtidoBatch}
       />
 
       <CajaCustomerFormDialog
