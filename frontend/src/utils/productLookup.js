@@ -5,6 +5,21 @@ export function normalizeProductBarcode(raw) {
 
 const to2 = (n) => Number(Number(n || 0).toFixed(2));
 
+function unwrapPackageTiersValue(val, depth = 0) {
+  if (val == null || val === "") return [];
+  if (Array.isArray(val)) return val;
+  if (typeof val === "string" && depth < 8) {
+    const s = val.trim();
+    if (!s) return [];
+    try {
+      return unwrapPackageTiersValue(JSON.parse(s), depth + 1);
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
 /** Acepta array, string JSON (incluso doble codificado) u objeto { tiers }. */
 export function normalizeWholesaleRules(val) {
   if (val == null || val === "") return [];
@@ -26,16 +41,9 @@ export function normalizeWholesaleRules(val) {
 
 /** Tramos de paquete: [{ qty, totalPrice }, ...] */
 export function normalizePackageTiers(val) {
-  if (val == null || val === "") return [];
-  if (typeof val === "string") {
-    try {
-      return normalizePackageTiers(JSON.parse(val));
-    } catch {
-      return [];
-    }
-  }
-  if (!Array.isArray(val)) return [];
-  return val
+  const parsed = unwrapPackageTiersValue(val);
+  if (!Array.isArray(parsed)) return [];
+  return parsed
     .map((t) => {
       if (!t || typeof t !== "object") return null;
       const qty = Number(t.qty);

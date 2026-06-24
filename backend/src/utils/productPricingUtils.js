@@ -1,16 +1,10 @@
 /** Normaliza tramos de paquete: [{ qty, totalPrice }, ...] */
+import { repairJsonFieldValue } from "./jsonFieldUtils.js";
+
 export function normalizePackageTiersStrict(input) {
   if (input == null || input === "" || input === "[]") return null;
 
-  let val = input;
-  if (typeof val === "string") {
-    try {
-      val = JSON.parse(val);
-    } catch {
-      throw new Error("packageTiers debe ser JSON válido.");
-    }
-  }
-
+  const val = repairJsonFieldValue(input, { emptyArrayToNull: false });
   if (!Array.isArray(val)) {
     throw new Error("packageTiers debe ser un array de { qty, totalPrice }.");
   }

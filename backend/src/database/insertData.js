@@ -7,6 +7,7 @@ import { Roles } from "../models/Roles.js";
 import { Users } from "../models/Users.js";
 import { Account, AccountRoles } from "../models/Account.js";
 import { sequelize } from "./connection.js";
+import { repairJsonFieldValue, deserializeJsonFields } from "../utils/jsonFieldUtils.js";
 import { Notifications } from "../models/Notifications.js";
 
 import {
@@ -220,45 +221,18 @@ export async function writeBackupToDisk(jsonData) {
   return { path: backupFilePath, tables: summarizeBackupData(normalized) };
 }
 
-const unwrapJsonString = (value, maxDepth = 12) => {
-  let v = value;
-  for (let i = 0; i < maxDepth; i++) {
-    if (typeof v !== "string") break;
-    const s = v.trim();
-    const looksJson =
-      (s.startsWith("{") && s.endsWith("}")) ||
-      (s.startsWith("[") && s.endsWith("]")) ||
-      (s.startsWith('"') && s.endsWith('"'));
-    if (!looksJson) break;
-    try {
-      v = JSON.parse(s);
-    } catch {
-      break;
-    }
-  }
-  return v;
-};
-
-const normalizeJsonFieldToString = (value) => {
-  const v = unwrapJsonString(value);
-  if (v === null || v === undefined) return null;
-  if (typeof v === "string") return v;
-  try {
-    return JSON.stringify(v);
-  } catch {
-    return null;
-  }
-};
-
 const sanitizeRows = (rows, config = {}) => {
   if (!Array.isArray(rows)) return rows;
   const jsonStringFields = config.jsonStringFields || [];
   return rows.map((row) => {
     if (!row || typeof row !== "object") return row;
+    const next = { ...row };
     for (const field of jsonStringFields) {
-      if (field in row) row[field] = normalizeJsonFieldToString(row[field]);
+      if (field in next) {
+        next[field] = repairJsonFieldValue(next[field]);
+      }
     }
-    return row;
+    return next;
   });
 };
 
@@ -457,7 +431,10 @@ export const insertData = async () => {
     const opt = { ...BULK_OPT, transaction: t };
 
     for (const entry of BACKUP_TABLE_ENTRIES) {
-      const rows = jsonData[entry.key];
+      let rows = jsonData[entry.key];
+      if (entry.sanitize && SANITIZE_CONFIG[entry.sanitize]) {
+        rows = deserializeJsonFields(rows, SANITIZE_CONFIG[entry.sanitize]);
+      }
       try {
         await bulkCreateRows(entry.model, rows, opt);
       } catch (err) {

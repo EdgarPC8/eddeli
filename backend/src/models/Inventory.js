@@ -1,6 +1,20 @@
 import { DataTypes } from 'sequelize';
 import { sequelize } from '../database/connection.js';
 import { Account } from './Account.js';
+import { repairJsonFieldValue } from '../utils/jsonFieldUtils.js';
+
+function defineJsonField(fieldName) {
+  return {
+    type: DataTypes.JSON,
+    allowNull: true,
+    get() {
+      return repairJsonFieldValue(this.getDataValue(fieldName));
+    },
+    set(value) {
+      this.setDataValue(fieldName, repairJsonFieldValue(value));
+    },
+  };
+}
 
 // models/Catalog.js
 
@@ -83,11 +97,11 @@ export const InventoryCategory = sequelize.define("ERP_inventory_categories", {
     defaultValue: true,
   },
   /** Tramos compartidos en caja: ej. 4 panes (cualquier variedad) = $0.50 */
-  packageTiers: { type: DataTypes.JSON, allowNull: true },
+  packageTiers: defineJsonField("packageTiers"),
   /** Etiqueta en caja para la canasta surtido (ej. "Pan surtido") */
   mixMatchLabel: { type: DataTypes.STRING(120), allowNull: true },
   /** IDs de productos que entran en el surtido/tramo (JSON array) */
-  mixMatchProductIds: { type: DataTypes.JSON, allowNull: true },
+  mixMatchProductIds: defineJsonField("mixMatchProductIds"),
   /** Categoría padre (null = categoría principal) */
   parentId: {
     type: DataTypes.INTEGER,
@@ -141,9 +155,9 @@ export const InventoryProduct = sequelize.define('ERP_inventory_products', {
   price: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
   /** Precio al que el proveedor vende a la panadería. */
   supplierPrice: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
-  wholesaleRules: { type: DataTypes.JSON, allowNull: true },
+  wholesaleRules: defineJsonField("wholesaleRules"),
   /** Tramos opcionales: [{ qty, totalPrice }] — ej. 2 pans = $0.25 */
-  packageTiers: { type: DataTypes.JSON, allowNull: true },
+  packageTiers: defineJsonField("packageTiers"),
   /** Precio para que distribuidores revendan. */
   distributorPrice: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
   taxRate: { type: DataTypes.DECIMAL(5,2), defaultValue: 0 }, // % IVA

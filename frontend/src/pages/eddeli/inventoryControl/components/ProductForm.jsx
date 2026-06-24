@@ -36,7 +36,7 @@ import {
 } from "../../../../api/inventoryControlRequest.js";
 import { pathImg } from "../../../../api/axios";
 import { useBarcodeScanner } from "../../../../hooks/useBarcodeScanner.js";
-import { normalizeProductBarcode } from "../../../../utils/productLookup.js";
+import { normalizeProductBarcode, normalizePackageTiers } from "../../../../utils/productLookup.js";
 
 /* ============ Helpers de imagen ============ */
 const ALLOWED_IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -233,18 +233,9 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
     }
   });
 
-  const [packageTiers, setPackageTiers] = useState(() => {
-    try {
-      if (Array.isArray(datos?.packageTiers)) return datos.packageTiers;
-      if (typeof datos?.packageTiers === "string") {
-        const parsed = JSON.parse(datos.packageTiers);
-        return Array.isArray(parsed) ? parsed : [];
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  });
+  const [packageTiers, setPackageTiers] = useState(() =>
+    normalizePackageTiers(datos?.packageTiers),
+  );
 
   const addPackageTier = () =>
     setPackageTiers((prev) => [...prev, { qty: 1, totalPrice: 0 }]);
@@ -375,22 +366,7 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
       setWholesaleRules([]);
     }
 
-    try {
-      if (Array.isArray(datos.packageTiers)) {
-        setPackageTiers(datos.packageTiers);
-      } else if (
-        typeof datos.packageTiers === "string" &&
-        datos.packageTiers.trim() !== ""
-      ) {
-        const parsed = JSON.parse(datos.packageTiers);
-        setPackageTiers(Array.isArray(parsed) ? parsed : []);
-      } else {
-        setPackageTiers([]);
-      }
-    } catch (err) {
-      console.warn("Error parsing packageTiers:", err);
-      setPackageTiers([]);
-    }
+    setPackageTiers(normalizePackageTiers(datos?.packageTiers));
 
     // ✅ sugerir la carpeta a partir de la ruta guardada
     // primaryImageUrl: "EdDeli/products/dona.png" => input "EdDeli/products"
