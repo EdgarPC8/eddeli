@@ -27,7 +27,9 @@ import {
   TextField,
   Typography,
   Tooltip,
+  useTheme,
 } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import DeleteIcon from "@mui/icons-material/Delete";
 import PersonAddIcon from "@mui/icons-material/PersonAdd";
 import PointOfSaleIcon from "@mui/icons-material/PointOfSale";
@@ -56,11 +58,11 @@ import {
   resolveEddeliLinePricing,
   findEddeliProductByCode,
   applyTierGroupPricing,
-  summarizeTierGroups,
-  getTierGroupMixMatchHint,
-  getTierGroupPackageTiers,
+  buildEffectiveTierGroups,
+  getCartRowTierVisualKind,
+  getProductTierVisualKind,
   getTierGroupLabel,
-  findActiveTierGroups,
+  isPanTierGroup,
 } from "../../utils/productLookup.js";
 import {
   buildReceiptFromCheckout,
@@ -91,34 +93,24 @@ const formatProductSearchLabel = (item) => {
 
 const formatProductSalePrice = (item) => `$${to2(item?.price ?? 0).toFixed(2)}`;
 
-const renderCajaProductOption = (props, item) => (
-  <li {...props} key={props.key}>
-    <Box
-      component="span"
-      sx={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 2,
-        width: "100%",
-        py: 0.25,
-      }}
-    >
-      <Box component="span" sx={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}>
-        {formatProductSearchLabel(item)}
-      </Box>
-      <Typography
-        component="span"
-        variant="body2"
-        fontWeight={700}
-        color="primary.main"
-        sx={{ flexShrink: 0, ml: "auto", textAlign: "right" }}
-      >
-        {formatProductSalePrice(item)}
-      </Typography>
-    </Box>
-  </li>
-);
+function getTierVisualRowSx(kind, theme) {
+  if (kind === "pan-group") {
+    return {
+      bgcolor: alpha(theme.palette.warning.main, theme.palette.mode === "dark" ? 0.2 : 0.28),
+    };
+  }
+  if (kind === "other-group") {
+    return {
+      bgcolor: alpha(theme.palette.info.main, theme.palette.mode === "dark" ? 0.16 : 0.18),
+    };
+  }
+  if (kind === "product-tier") {
+    return {
+      bgcolor: alpha(theme.palette.success.main, theme.palette.mode === "dark" ? 0.12 : 0.14),
+    };
+  }
+  return {};
+}
 
 const aggregateRequestedByProduct = (cart) => {
   const m = new Map();
@@ -153,11 +145,12 @@ const buildStockIssues = (cart, productList) => {
 const lineBreakdown = (row) => {
   const qty = Number(row.quantity || 0);
   const unitPrice = Number(row.price || 0);
-  const total =
+  const usesLineTotal =
     row.lineTotal != null &&
-    (row.pricingMode === "package" || row.pricingMode === "category_package")
-      ? to2(Number(row.lineTotal))
-      : to2(qty * unitPrice);
+    (row.pricingMode === "package" ||
+      row.pricingMode === "category_package" ||
+      row.pricingMode === "tier_group_package");
+  const total = usesLineTotal ? to2(Number(row.lineTotal)) : to2(qty * unitPrice);
   const taxType = String(row.taxType || "gravado");
   const taxRate = Number(row.taxRate || 0);
   if (taxType !== "gravado" || taxRate <= 0) {
@@ -170,6 +163,7 @@ const lineBreakdown = (row) => {
 
 export default function CajaPage() {
   const { toast } = useAuth();
+  const theme = useTheme();
   const [products, setProducts] = useState([]);
   const [tierGroups, setTierGroups] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -203,17 +197,27 @@ export default function CajaPage() {
 
   const loadData = async () => {
     const [productsRes, customersRes, shiftRes, tierGroupsRes] = await Promise.allSettled([
-      getAllProducts(),
+      getAllProducts({ withTierGroups: "true" }),
       getAllCustomersRequest(),
       getActiveShift(),
       getTierGroups({ active: "true" }),
     ]);
-    const nextProducts =
-      productsRes.status === "fulfilled" ? productsRes.value.data || [] : [];
+    let nextProducts = [];
+    let nextTierGroups = [];
+    if (productsRes.status === "fulfilled") {
+      const body = productsRes.value.data;
+      if (body?.products && Array.isArray(body.products)) {
+        nextProducts = body.products;
+        nextTierGroups = Array.isArray(body.tierGroups) ? body.tierGroups : [];
+      } else if (Array.isArray(body)) {
+        nextProducts = body;
+      }
+    }
+    if (!nextTierGroups.length && tierGroupsRes.status === "fulfilled") {
+      nextTierGroups = tierGroupsRes.value.data || [];
+    }
     const nextCustomers =
       customersRes.status === "fulfilled" ? customersRes.value.data || [] : [];
-    const nextTierGroups =
-      tierGroupsRes.status === "fulfilled" ? tierGroupsRes.value.data || [] : [];
     setProducts(nextProducts);
     setCustomers(nextCustomers);
     setTierGroups(nextTierGroups);
@@ -259,9 +263,57 @@ export default function CajaPage() {
     return map;
   }, [products]);
 
-  const activeTierGroups = useMemo(
-    () => findActiveTierGroups(tierGroups),
-    [tierGroups],
+  const effectiveTierGroups = useMemo(
+    () => buildEffectiveTierGroups(tierGroups, products),
+    [tierGroups, products],
+  );
+
+  const renderCajaProductOption = useCallback(
+    (props, item) => {
+      const tierKind = getProductTierVisualKind(item, effectiveTierGroups);
+      return (
+        <li {...props} key={props.key}>
+          <Box
+            component="span"
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 2,
+              width: "100%",
+              py: 0.25,
+              pl: tierKind ? 1 : 0,
+              borderLeft: tierKind ? 3 : 0,
+              borderColor:
+                tierKind === "pan-group"
+                  ? "warning.main"
+                  : tierKind === "other-group"
+                    ? "info.main"
+                    : tierKind === "product-tier"
+                      ? "success.main"
+                      : "transparent",
+            }}
+          >
+            <Box
+              component="span"
+              sx={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis" }}
+            >
+              {formatProductSearchLabel(item)}
+            </Box>
+            <Typography
+              component="span"
+              variant="body2"
+              fontWeight={700}
+              color="primary.main"
+              sx={{ flexShrink: 0, ml: "auto", textAlign: "right" }}
+            >
+              {formatProductSalePrice(item)}
+            </Typography>
+          </Box>
+        </li>
+      );
+    },
+    [effectiveTierGroups],
   );
 
   const addToCart = (product, qtyToAdd = 1) => {
@@ -271,7 +323,7 @@ export default function CajaPage() {
       const key = String(id);
       const exists = prev.find((row) => cartRowKey(row) === key);
       const quantity = exists ? Number(exists.quantity) + addQty : addQty;
-      const pricing = resolveEddeliLinePricing(product, quantity);
+      const pricing = resolveEddeliLinePricing(product, quantity, effectiveTierGroups);
       const line = {
         productId: id,
         name: product.name,
@@ -297,7 +349,7 @@ export default function CajaPage() {
       for (const { product, quantity } of lines) {
         const id = Number(product.id);
         const qty = Math.max(1, Math.floor(Number(quantity) || 1));
-        const pricing = resolveEddeliLinePricing(product, qty);
+        const pricing = resolveEddeliLinePricing(product, qty, effectiveTierGroups);
         next.push({
           productId: id,
           name: product.name,
@@ -375,7 +427,7 @@ export default function CajaPage() {
         if (key === "quantity") {
           const product = products.find((p) => Number(p.id) === Number(row.productId));
           if (product) {
-            const pricing = resolveEddeliLinePricing(product, next.quantity);
+            const pricing = resolveEddeliLinePricing(product, next.quantity, effectiveTierGroups);
             next.price = pricing.unitPrice;
             next.lineTotal = pricing.lineTotal;
             next.pricingMode = pricing.mode;
@@ -399,8 +451,8 @@ export default function CajaPage() {
   };
 
   const pricedCart = useMemo(
-    () => applyTierGroupPricing(cart, products, tierGroups),
-    [cart, products, tierGroups],
+    () => applyTierGroupPricing(cart, products, effectiveTierGroups),
+    [cart, products, effectiveTierGroups],
   );
 
   const cartDisplayGroups = useMemo(() => {
@@ -425,14 +477,6 @@ export default function CajaPage() {
     }
     return groups;
   }, [pricedCart]);
-
-  const tierGroupSummaries = useMemo(() => {
-    return summarizeTierGroups(pricedCart).map((g) => {
-      const group = tierGroups.find((t) => Number(t.id) === g.tierGroupId);
-      const tiers = getTierGroupPackageTiers(group);
-      return { ...g, hint: getTierGroupMixMatchHint(tiers, g.quantity) };
-    });
-  }, [pricedCart, tierGroups]);
 
   const summary = useMemo(() => {
     return pricedCart.reduce(
@@ -522,7 +566,9 @@ export default function CajaPage() {
         productId: Number(row.productId),
         quantity: Number(row.quantity),
         price:
-          (row.pricingMode === "package" || row.pricingMode === "category_package") &&
+          (row.pricingMode === "package" ||
+            row.pricingMode === "category_package" ||
+            row.pricingMode === "tier_group_package") &&
           row.lineTotal != null
             ? Number(row.lineTotal) / Number(row.quantity || 1)
             : Number(row.price || 0),
@@ -909,24 +955,6 @@ export default function CajaPage() {
               </Stack>
             </Stack>
 
-            {tierGroupSummaries.length > 0 && (
-              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
-                {tierGroupSummaries.map((g) => (
-                  <Chip
-                    key={g.tierGroupId}
-                    size="small"
-                    color="primary"
-                    variant="outlined"
-                    label={
-                      g.hint
-                        ? `${g.groupName}: ${g.quantity} u. · $${g.total.toFixed(2)} — falta ${g.hint.remaining} para ${g.hint.nextQty}=$${g.hint.nextTotal.toFixed(2)}`
-                        : `${g.groupName}: ${g.quantity} u. · $${g.total.toFixed(2)}`
-                    }
-                  />
-                ))}
-              </Stack>
-            )}
-
             <TableContainer sx={{ border: "1px solid", borderColor: "divider", borderRadius: 1 }}>
               <Table size="small">
                 <TableHead>
@@ -950,17 +978,11 @@ export default function CajaPage() {
                       const rowKey = cartRowKey(row);
                       const stockQty =
                         stockByProductId.get(Number(row.productId)) ?? Number(row.stock || 0);
+                      const tierKind = getCartRowTierVisualKind(row, products, effectiveTierGroups);
                       return (
-                        <TableRow key={rowKey}>
+                        <TableRow key={rowKey} sx={getTierVisualRowSx(tierKind, theme)}>
                           <TableCell>{row.barcode || "—"}</TableCell>
-                          <TableCell>
-                            {row.name}
-                            {row.pricingMode === "category_package" && row.categoryName ? (
-                              <Typography variant="caption" color="primary" display="block">
-                                Tramo {row.categoryName}
-                              </Typography>
-                            ) : null}
-                          </TableCell>
+                          <TableCell>{row.name}</TableCell>
                           {showCartStock ? (
                             <TableCell align="center">{stockQty}</TableCell>
                           ) : null}
@@ -1011,9 +1033,10 @@ export default function CajaPage() {
                     }
 
                     const colSpan = showCartStock ? 8 : 7;
+                    const mixTierKind = isPanTierGroup({ name: group.label }) ? "pan-group" : "other-group";
                     return (
                       <React.Fragment key={group.mixGroupId}>
-                        <TableRow sx={{ bgcolor: "action.hover" }}>
+                        <TableRow sx={getTierVisualRowSx(mixTierKind, theme)}>
                           <TableCell colSpan={colSpan - 2}>
                             <Stack direction="row" alignItems="center" spacing={1}>
                               <Typography variant="subtitle2" fontWeight={800}>
@@ -1048,13 +1071,13 @@ export default function CajaPage() {
                           const stockQty =
                             stockByProductId.get(Number(row.productId)) ?? Number(row.stock || 0);
                           return (
-                            <TableRow key={rowKey}>
+                            <TableRow
+                              key={rowKey}
+                              sx={getTierVisualRowSx(mixTierKind, theme)}
+                            >
                               <TableCell sx={{ pl: 3 }}>{row.barcode || "—"}</TableCell>
                               <TableCell sx={{ pl: 3 }}>
                                 <Typography variant="body2">{row.name}</Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                  dentro de {group.label}
-                                </Typography>
                               </TableCell>
                               {showCartStock ? (
                                 <TableCell align="center">{stockQty}</TableCell>
@@ -1430,7 +1453,7 @@ export default function CajaPage() {
         open={quickProductsOpen}
         onClose={() => setQuickProductsOpen(false)}
         products={products}
-        tierGroups={activeTierGroups}
+        tierGroups={effectiveTierGroups}
         onAdd={(product, qty) => addToCart(product, qty)}
         onAddSurtido={addSurtidoBatch}
       />

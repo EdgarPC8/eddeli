@@ -131,15 +131,18 @@ export function resolveEddeliUnitPrice(product, quantity) {
 
 /**
  * Precio de línea en Caja.
- * Prioridad: tramos/paquetes → mayoreo → precio base.
+ * Prioridad: tramos/paquetes del producto (si NO está en grupo surtido) → mayoreo → base.
+ * Los tramos de grupo se aplican después en applyTierGroupPricing.
  */
-export function resolveEddeliLinePricing(product, quantity) {
+export function resolveEddeliLinePricing(product, quantity, tierGroups) {
   const qty = Number(quantity || 0);
   if (qty <= 0) {
     return { total: 0, unitPrice: 0, mode: "base", lineTotal: null };
   }
 
-  if (hasPackageTiers(product)) {
+  const inGroup = findTierGroupForProduct(product?.id, tierGroups);
+
+  if (hasPackageTiers(product) && !inGroup) {
     const total = resolvePackageTierTotal(product, qty);
     return {
       total,
@@ -153,7 +156,7 @@ export function resolveEddeliLinePricing(product, quantity) {
   return {
     total: to2(unitPrice * qty),
     unitPrice,
-    mode: "wholesale",
+    mode: inGroup ? "tier_group_pending" : "wholesale",
     lineTotal: null,
   };
 }
@@ -213,14 +216,153 @@ export function productParticipatesInTierGroup(product, group) {
   return getTierGroupProductIds(group).includes(Number(product.id));
 }
 
+export function isTierGroupActive(group) {
+  if (!group) return false;
+  const v = group.isActive;
+  return v !== false && v !== 0 && v !== "0";
+}
+
 /** Grupos de tramos activos listos para caja. */
 export function findActiveTierGroups(tierGroups) {
   return (tierGroups || []).filter(
     (g) =>
-      g.isActive !== false &&
+      isTierGroupActive(g) &&
       hasTierGroupPackageTiers(g) &&
       getTierGroupProductIds(g).length > 0,
   );
+}
+
+export function findTierGroupForProduct(productId, tierGroups) {
+  const pid = Number(productId);
+  if (!Number.isFinite(pid)) return null;
+  for (const group of findActiveTierGroups(tierGroups)) {
+    if (getTierGroupProductIds(group).includes(pid)) return group;
+  }
+  return null;
+}
+
+export function findTierGroupById(tierGroupId, tierGroups = []) {
+  if (tierGroupId == null || tierGroupId === "") return null;
+  return tierGroups.find((g) => String(g.id) === String(tierGroupId)) ?? null;
+}
+
+export function isPanTierGroup(group) {
+  if (!group) return false;
+  const name = String(group.name ?? "").toLowerCase();
+  const catName = String(group?.category?.name ?? "").toLowerCase();
+  return (
+    name.includes("pan") ||
+    name.includes("panader") ||
+    catName === "panes" ||
+    catName.includes("panader")
+  );
+}
+
+export function isPanaderiaProduct(product) {
+  const cat = getProductCategory(product);
+  const catName = String(cat?.name ?? "").toLowerCase();
+  return catName === "panes" || catName.includes("panader") || catName.includes("pan");
+}
+
+/** Indicador visual en caja: panes en grupo, otro grupo, o tramo solo del producto. */
+export function getProductTierVisualKind(product, tierGroups = []) {
+  const group = findTierGroupForProduct(product?.id, tierGroups);
+  if (group) return isPanTierGroup(group) ? "pan-group" : "other-group";
+  if (hasPackageTiers(product)) return "product-tier";
+  return null;
+}
+
+export function getCartRowTierVisualKind(row, products = [], tierGroups = []) {
+  if (row.pricingMode === "tier_group_package" || row.tierGroupId != null) {
+    const group =
+      findTierGroupById(row.tierGroupId, tierGroups) ??
+      findTierGroupForProduct(row.productId, tierGroups);
+    if (group) return isPanTierGroup(group) ? "pan-group" : "other-group";
+  }
+  if (row.mixGroupId || row.mixGroupLabel) {
+    const label = String(row.mixGroupLabel ?? "").toLowerCase();
+    if (label.includes("pan")) return "pan-group";
+    const product = products.find((p) => Number(p.id) === Number(row.productId));
+    if (product && isPanaderiaProduct(product)) return "pan-group";
+    return "other-group";
+  }
+  if (row.pricingMode === "package") return "product-tier";
+  return null;
+}
+
+export function formatProductTierPricesOnly(product, tierGroups = []) {
+  const hints = formatProductTierHints(product, tierGroups);
+  return hints?.text ?? null;
+}
+
+/** API tramos + respaldo desde categorías con canasta (datos legacy). */
+export function buildEffectiveTierGroups(tierGroups, products) {
+  const apiGroups = findActiveTierGroups(tierGroups || []);
+  if (apiGroups.length) return apiGroups;
+
+  const map = new Map();
+  for (const product of products || []) {
+    const cat = getProductCategory(product);
+    if (!cat?.id || !hasCategoryPackageTiers(cat)) continue;
+    const ids = getCategoryMixMatchProductIds(cat);
+    if (!ids.length) continue;
+    const catKey = String(cat.id);
+    if (!map.has(catKey)) {
+      map.set(catKey, {
+        id: `legacy-cat-${cat.id}`,
+        name: getCategoryMixMatchLabel(cat),
+        packageTiers: cat.packageTiers,
+        productIds: ids,
+        isActive: true,
+      });
+    }
+  }
+  return [...map.values()];
+}
+
+/** Texto de tramos para UI: distingue producto vs grupo surtido. */
+export function formatProductTierHints(product, tierGroups = []) {
+  const group = findTierGroupForProduct(product?.id, tierGroups);
+  if (group) {
+    const tiers = getTierGroupPackageTiers(group);
+    if (tiers.length) {
+      const tierText = tiers.map((t) => `${t.qty}=$${t.totalPrice.toFixed(2)}`).join(" · ");
+      return {
+        scope: "group",
+        label: `Grupo ${getTierGroupLabel(group)}`,
+        text: tierText,
+      };
+    }
+  }
+  const productTiers = normalizePackageTiers(product?.packageTiers);
+  if (productTiers.length) {
+    return {
+      scope: "product",
+      label: "Tramo producto",
+      text: productTiers.map((t) => `${t.qty}=$${t.totalPrice.toFixed(2)}`).join(" · "),
+    };
+  }
+  return null;
+}
+
+/** Total de línea para vista rápida (accesos rápidos), incluyendo tramos de grupo. */
+export function resolveEddeliQuickLineTotal(product, quantity, tierGroups = []) {
+  const qty = Number(quantity || 0);
+  if (qty <= 0) return 0;
+
+  const pricing = resolveEddeliLinePricing(product, qty, tierGroups);
+  if (pricing.mode === "tier_group_pending") {
+    const group = findTierGroupForProduct(product?.id, tierGroups);
+    if (group) {
+      const tiers = getTierGroupPackageTiers(group);
+      const total = resolvePackageTierTotal(
+        { packageTiers: tiers, price: product?.price ?? 0 },
+        qty,
+      );
+      if (total != null) return total;
+    }
+  }
+  return pricing.total;
 }
 
 export function getSurtidoProductsForTierGroup(products, group) {
@@ -336,7 +478,7 @@ function allocateGroupTotalToLines(indices, rows, groupTotal, pricingMode = "cat
 export function applyTierGroupPricing(cartRows, products, tierGroups = []) {
   if (!Array.isArray(cartRows) || !cartRows.length) return [];
 
-  const activeGroups = findActiveTierGroups(tierGroups);
+  const activeGroups = buildEffectiveTierGroups(tierGroups, products);
   const groupByProductId = new Map();
   for (const g of activeGroups) {
     for (const pid of getTierGroupProductIds(g)) {
@@ -355,11 +497,11 @@ export function applyTierGroupPricing(cartRows, products, tierGroups = []) {
     if (!product) return;
     const group = groupByProductId.get(Number(product.id));
     if (!group) return;
-    const groupId = Number(group.id);
-    if (!groups.has(groupId)) {
-      groups.set(groupId, { group, indices: [] });
+    const groupKey = String(group.id);
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, { group, indices: [] });
     }
-    groups.get(groupId).indices.push(idx);
+    groups.get(groupKey).indices.push(idx);
   });
 
   for (const { group, indices } of groups.values()) {
@@ -397,7 +539,7 @@ export function applyTierGroupPricing(cartRows, products, tierGroups = []) {
     }
     const product = productById.get(Number(row.productId));
     if (!product) return;
-    const pricing = resolveEddeliLinePricing(product, row.quantity);
+    const pricing = resolveEddeliLinePricing(product, row.quantity, activeGroups);
     rows[idx] = {
       ...row,
       price: pricing.unitPrice,
@@ -419,10 +561,10 @@ export function applyCategoryMixMatchPricing(cartRows, products, tierGroups = []
 export function summarizeTierGroups(pricedCart) {
   const map = new Map();
   for (const row of pricedCart || []) {
-    if (!row.tierGroupId) continue;
-    const key = Number(row.tierGroupId);
+    if (row.tierGroupId == null || row.tierGroupId === "") continue;
+    const key = String(row.tierGroupId);
     const prev = map.get(key) || {
-      tierGroupId: key,
+      tierGroupId: row.tierGroupId,
       groupName: row.mixGroupLabel || "Grupo",
       quantity: 0,
       total: 0,

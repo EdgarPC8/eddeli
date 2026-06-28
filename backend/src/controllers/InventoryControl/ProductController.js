@@ -8,6 +8,7 @@ import {
   InventoryProduct,
   InventoryCategory,
   InventoryUnit,
+  PricingTierGroup,
   // Si también usas HomeProduct o ProductPlacement y guardan archivos, puedes chequearlos acá
   // HomeProduct,
   // ProductPlacement,
@@ -432,6 +433,17 @@ export const getAllProducts = async (req, res) => {
 
     // 👉 Orden final: Finales → Intermedios → Materia prima
     const orderedProducts = [...finals, ...intermediates, ...raws];
+
+    if (req.query.withTierGroups === "true") {
+      const tierGroups = await PricingTierGroup.findAll({
+        where: { isActive: true },
+        order: [
+          ["position", "ASC"],
+          ["name", "ASC"],
+        ],
+      });
+      return res.json({ products: orderedProducts, tierGroups });
+    }
 
     res.json(orderedProducts);
 

@@ -183,8 +183,9 @@ export const unlinkPresentationRequest = async (productId) =>
 // 🟢 PRODUCTOS
 
 // Obtener todos los productos con categoría y unidad asociadas
-export const getAllProducts = async () =>
-  await axios.get('/inventory/products', {
+export const getAllProducts = async (params = {}) =>
+  await axios.get("/inventory/products", {
+    params,
     headers: { Authorization: jwt() },
   });
 

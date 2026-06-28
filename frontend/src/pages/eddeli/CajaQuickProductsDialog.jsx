@@ -23,13 +23,17 @@ import DeleteSweepIcon from "@mui/icons-material/DeleteSweep";
 import {
   hasPackageTiers,
   normalizePackageTiers,
-  resolveEddeliLinePricing,
+  resolveEddeliQuickLineTotal,
   resolvePackageTierTotal,
   getProductCategory,
   getTierGroupLabel,
   getTierGroupPackageTiers,
   getSurtidoProductsForTierGroup,
   productParticipatesInTierGroup,
+  formatProductTierPricesOnly,
+  getProductTierVisualKind,
+  isPanTierGroup,
+  findActiveTierGroups,
 } from "../../utils/productLookup.js";
 import { getRootCategoryFromProduct } from "../../utils/categoryUtils.js";
 
@@ -43,24 +47,30 @@ function formatPrice(product) {
   return `$${to2(product?.price ?? 0).toFixed(2)}`;
 }
 
-function formatTierHints(product, tierGroups = []) {
-  const tiers = normalizePackageTiers(product?.packageTiers);
-  if (tiers.length) {
-    return tiers.map((t) => `${t.qty}=$${t.totalPrice.toFixed(2)}`).join(" · ");
+function tierCardAccent(tierKind, theme, { selected = false } = {}) {
+  if (tierKind === "pan-group") {
+    return {
+      borderColor: selected ? "warning.dark" : "warning.main",
+      bgcolor: alpha(theme.palette.warning.main, theme.palette.mode === "dark" ? 0.16 : 0.22),
+    };
   }
-  for (const group of tierGroups) {
-    if (productParticipatesInTierGroup(product, group)) {
-      const groupTiers = normalizePackageTiers(getTierGroupPackageTiers(group));
-      if (groupTiers.length) {
-        return groupTiers.map((t) => `${t.qty}=$${t.totalPrice.toFixed(2)}`).join(" · ");
-      }
-    }
+  if (tierKind === "other-group") {
+    return {
+      borderColor: selected ? "info.dark" : "info.main",
+      bgcolor: alpha(theme.palette.info.main, theme.palette.mode === "dark" ? 0.12 : 0.14),
+    };
   }
-  return null;
+  if (tierKind === "product-tier") {
+    return {
+      borderColor: selected ? "success.dark" : "success.main",
+      bgcolor: alpha(theme.palette.success.main, theme.palette.mode === "dark" ? 0.1 : 0.12),
+    };
+  }
+  return {};
 }
 
-function lineTotalFor(product, qty) {
-  return resolveEddeliLinePricing(product, qty).total;
+function lineTotalFor(product, qty, tierGroups = []) {
+  return resolveEddeliQuickLineTotal(product, qty, tierGroups);
 }
 
 function isPanaderiaProduct(product) {
@@ -114,6 +124,7 @@ export default function CajaQuickProductsDialog({
   const [basketQtyById, setBasketQtyById] = useState({});
 
   const items = filterPanaderiaInStock(products, tierGroups);
+  const activeGroups = useMemo(() => findActiveTierGroups(tierGroups), [tierGroups]);
   const surtidoMode = Boolean(selectedTierGroup);
   const surtidoLabel = selectedTierGroup ? getTierGroupLabel(selectedTierGroup) : "";
   const surtidoItems = useMemo(
@@ -211,7 +222,8 @@ export default function CajaQuickProductsDialog({
   }, [open, onClose, bumpQty, surtidoMode, exitSurtidoMode]);
 
   const previewProduct = hoveredProduct;
-  const previewTotal = previewProduct && !surtidoMode ? lineTotalFor(previewProduct, selectedQty) : null;
+  const previewTotal =
+    previewProduct && !surtidoMode ? lineTotalFor(previewProduct, selectedQty, tierGroups) : null;
 
   const indicatorText = useMemo(() => {
     if (surtidoMode) {
@@ -422,11 +434,9 @@ export default function CajaQuickProductsDialog({
                       />
                     ))}
                   </Stack>
-                ) : previewProduct && previewTotal != null && !surtidoMode ? (
+                ) : previewProduct && !surtidoMode ? (
                   <Typography variant="caption" color="text.secondary" noWrap display="block">
-                    {hasPackageTiers(previewProduct)
-                      ? formatTierHints(previewProduct)
-                      : formatPrice(previewProduct)}
+                    {formatProductTierPricesOnly(previewProduct, tierGroups) || formatPrice(previewProduct)}
                   </Typography>
                 ) : null}
               </Box>
@@ -459,36 +469,35 @@ export default function CajaQuickProductsDialog({
           bgcolor: "background.default",
         }}
       >
-        {!surtidoMode && tierGroups.length > 0 && (
+        {!surtidoMode && activeGroups.length > 0 && (
           <Box sx={{ mb: 1.5 }}>
             <Grid container spacing={1.5}>
-              {tierGroups.map((group) => {
+              {activeGroups.map((group) => {
                 const label = getTierGroupLabel(group);
                 const tiers = normalizePackageTiers(getTierGroupPackageTiers(group));
-                const tierHints = tiers.map((t) => `${t.qty}=$${t.totalPrice.toFixed(2)}`).join(" · ");
+                const tierPrices = tiers.map((t) => `${t.qty}=$${t.totalPrice.toFixed(2)}`).join(" · ");
+                const panGroup = isPanTierGroup(group);
                 return (
                   <Grid item xs={12} sm={6} md={4} key={group.id}>
                     <Card
                       variant="outlined"
                       sx={{
-                        borderColor: "secondary.main",
-                        bgcolor:
-                          theme.palette.mode === "dark"
-                            ? alpha(theme.palette.secondary.main, 0.08)
-                            : alpha(theme.palette.secondary.main, 0.04),
+                        ...tierCardAccent(panGroup ? "pan-group" : "other-group", theme),
                       }}
                     >
                       <CardActionArea onClick={() => setSelectedTierGroup(group)}>
                         <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
                           <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
-                            <ShoppingBasketIcon color="secondary" fontSize="small" />
+                            <ShoppingBasketIcon color={panGroup ? "warning" : "info"} fontSize="small" />
                             <Typography variant="subtitle2" fontWeight={800}>
                               Canasta {label}
                             </Typography>
                           </Stack>
-                          <Typography variant="caption" color="text.secondary" display="block">
-                            Clic para armar canasta · {tierHints}
-                          </Typography>
+                          {tierPrices ? (
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              {tierPrices}
+                            </Typography>
+                          ) : null}
                         </CardContent>
                       </CardActionArea>
                     </Card>
@@ -508,10 +517,8 @@ export default function CajaQuickProductsDialog({
         ) : (
           <Grid container spacing={1.5}>
             {gridProducts.map((product) => {
-              const tiered =
-                hasPackageTiers(product) ||
-                tierGroups.some((g) => productParticipatesInTierGroup(product, g));
-              const tierHints = formatTierHints(product, tierGroups);
+              const tierKind = getProductTierVisualKind(product, tierGroups);
+              const tierPrices = formatProductTierPricesOnly(product, tierGroups);
               const inBasket = surtidoMode
                 ? Math.floor(Number(basketQtyById[Number(product.id)] || 0))
                 : 0;
@@ -519,7 +526,7 @@ export default function CajaQuickProductsDialog({
               const atStockLimit = surtidoMode && stock > 0 && inBasket >= stock;
               const cardTotal = surtidoMode
                 ? null
-                : lineTotalFor(product, selectedQty);
+                : lineTotalFor(product, selectedQty, tierGroups);
 
               return (
                 <Grid item xs={6} sm={4} md={3} lg={2} key={product.id}>
@@ -529,13 +536,23 @@ export default function CajaQuickProductsDialog({
                     onMouseLeave={() => setHoveredProduct(null)}
                     sx={{
                       height: "100%",
-                      borderColor: inBasket > 0 ? "secondary.main" : "divider",
-                      bgcolor: "background.paper",
-                      borderWidth: inBasket > 0 ? 2 : 1,
+                      borderWidth: inBasket > 0 || tierKind ? 2 : 1,
                       opacity: atStockLimit ? 0.55 : 1,
                       transition: "border-color 0.15s, transform 0.15s",
+                      ...(tierKind
+                        ? tierCardAccent(tierKind, theme, { selected: inBasket > 0 })
+                        : {
+                            borderColor: inBasket > 0 ? "secondary.main" : "divider",
+                            bgcolor: "background.paper",
+                          }),
                       "&:hover": {
-                        borderColor: surtidoMode ? "secondary.main" : "primary.main",
+                        borderColor: surtidoMode
+                          ? "secondary.main"
+                          : tierKind === "pan-group"
+                            ? "warning.dark"
+                            : tierKind === "other-group"
+                              ? "info.dark"
+                              : "primary.main",
                         transform: atStockLimit ? "none" : "translateY(-1px)",
                         boxShadow: atStockLimit ? "none" : theme.shadows[4],
                       },
@@ -565,16 +582,15 @@ export default function CajaQuickProductsDialog({
                           <Typography variant="body1" color="primary.main" fontWeight={800}>
                             {formatPrice(product)}
                           </Typography>
-                          {tiered ? <Chip label="Tramo" size="small" color="secondary" /> : null}
                         </Stack>
-                        {tierHints ? (
+                        {tierPrices ? (
                           <Typography
                             variant="caption"
                             color="text.secondary"
                             display="block"
                             sx={{ mt: 0.5, lineHeight: 1.3 }}
                           >
-                            {tierHints}
+                            {tierPrices}
                           </Typography>
                         ) : null}
                         <Box
