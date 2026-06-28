@@ -18,7 +18,6 @@ import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import PaymentsIcon from "@mui/icons-material/Payments";
 import AddIcon from "@mui/icons-material/Add";
-import PostAddIcon from "@mui/icons-material/PostAdd";
 import {
   addSupplierOrderItemRequest,
   deleteSupplierOrderRequest,
@@ -29,7 +28,12 @@ import SimpleDialog from "../../../../components/Dialogs/SimpleDialog";
 import SearchableSelect from "../../../../components/SearchableSelect";
 import { formatDateTime } from "../../../../helpers/functions.js";
 import DocumentAttachmentIcon from "./DocumentAttachmentIcon";
-import ProductPriceReference, { getDefaultDistributorPrice } from "./ProductPriceReference";
+import ProductPriceReference, {
+  getDefaultDistributorPrice,
+  getProductUnitLabel,
+  formatOrderLineTotal,
+  formatProductPrice,
+} from "./ProductPriceReference";
 import { useState } from "react";
 
 function supplierTotal(order) {
@@ -64,7 +68,6 @@ export default function SupplierOrderAccordion({
   onReload,
   onRemove,
   onEdit,
-  onAddAnother,
   products = [],
 }) {
   const theme = useTheme();
@@ -198,12 +201,22 @@ export default function SupplierOrderAccordion({
             </Typography>
           </Box>
 
-          {(order.ERP_supplier_order_items || []).map((item) => (
-            <Typography key={item.id} variant="body2">
-              • {item.ERP_inventory_product?.name || "Producto"} — {item.quantity} × $
-              {Number(item.unitPrice).toFixed(2)}
+          {(order.ERP_supplier_order_items || []).map((item) => {
+            const unit = getProductUnitLabel(item.ERP_inventory_product);
+            const lineTotal = formatOrderLineTotal(item.quantity, item.unitPrice);
+            return (
+              <Typography key={item.id} variant="body2">
+                • {item.ERP_inventory_product?.name || "Producto"} — {item.quantity} {unit} ×{" "}
+                {formatProductPrice(item.unitPrice)} = {formatProductPrice(lineTotal)}
+              </Typography>
+            );
+          })}
+
+          {(order.ERP_supplier_order_items || []).length > 0 && (
+            <Typography variant="body2" fontWeight={700} sx={{ mt: 1 }}>
+              Total pedido: {formatProductPrice(supplierTotal(order))}
             </Typography>
-          ))}
+          )}
 
           {order.notes && (
             <>
@@ -259,18 +272,6 @@ export default function SupplierOrderAccordion({
                   Editar
                 </Button>
               )}
-              {onAddAnother && (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="secondary"
-                  startIcon={<PostAddIcon />}
-                  disabled={busy}
-                  onClick={() => onAddAnother(order)}
-                >
-                  Otro pedido a este proveedor
-                </Button>
-              )}
             </Box>
           )}
 
@@ -312,7 +313,14 @@ export default function SupplierOrderAccordion({
                     const p = addDraft.productId
                       ? products.find((x) => String(x.id) === String(addDraft.productId))
                       : null;
-                    return p ? <ProductPriceReference product={p} compact /> : null;
+                    return p ? (
+                      <ProductPriceReference
+                        product={p}
+                        compact
+                        quantity={addDraft.quantity}
+                        unitPrice={addDraft.unitPrice}
+                      />
+                    ) : null;
                   })()}
                 </Grid>
                 <Grid item xs={6} sm={3}>
@@ -338,16 +346,16 @@ export default function SupplierOrderAccordion({
                   />
                 </Grid>
                 <Grid item xs={12} sm={1}>
-                  <Button
-                    variant="contained"
-                    size="small"
-                    fullWidth
-                    startIcon={<AddIcon />}
-                    disabled={busy}
-                    onClick={() => void handleAddProduct()}
-                  >
-                    Agregar
-                  </Button>
+                  <Tooltip title="Agregar producto">
+                    <IconButton
+                      color="primary"
+                      disabled={busy}
+                      onClick={() => void handleAddProduct()}
+                      sx={{ border: 1, borderColor: "primary.main", borderRadius: 1 }}
+                    >
+                      <AddIcon />
+                    </IconButton>
+                  </Tooltip>
                 </Grid>
               </Grid>
             </Box>

@@ -8,6 +8,7 @@ import HomeLogout from "./pages/eddeli/inventoryControl/HomeLogout.jsx";
 import DashBoardPage from "./pages/eddeli/inventoryControl/DashBoardPage.jsx";
 import ProductsPage from "./pages/eddeli/inventoryControl/ProductsPage.jsx";
 import CategoryPage from "./pages/eddeli/inventoryControl/CategoryPage.jsx";
+import TramosPage from "./pages/eddeli/inventoryControl/TramosPage.jsx";
 import UnitPage from "./pages/eddeli/inventoryControl/UnitPage.jsx";
 import MovementPage from "./pages/eddeli/inventoryControl/MovementPage.jsx";
 import RecipePage from "./pages/eddeli/inventoryControl/RecipePage.jsx";
@@ -141,6 +142,7 @@ export default function App() {
             <Route path="/templates" element={<Navigate to="/diseno-promocional/plantillas" replace />} />
             <Route path="/inventory/products" element={<ProductsPage />} />
             <Route path="/inventory/categories" element={<CategoryPage />} />
+            <Route path="/inventory/tramos" element={<TramosPage />} />
             <Route path="/inventory/units" element={<UnitPage />} />
             <Route path="/inventory/movement" element={<MovementPage />} />
             <Route path="/inventory/recipes" element={<RecipePage />} />

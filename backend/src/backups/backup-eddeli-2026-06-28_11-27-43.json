@@ -67,12 +67,12 @@
       "roleId": 2
     },
     {
-      "accountId": 1,
-      "roleId": 4
-    },
-    {
       "accountId": 248,
       "roleId": 2
+    },
+    {
+      "accountId": 1,
+      "roleId": 4
     }
   ],
   "UserData": [],
@@ -2794,9 +2794,9 @@
       ],
       "handlerType": "stock_min",
       "active": 1,
-      "lastRunAt": "2026-06-28T15:35:49.000Z",
+      "lastRunAt": "2026-06-28T15:36:28.000Z",
       "createdAt": "2026-06-24T16:33:10.000Z",
-      "updatedAt": "2026-06-28T15:35:49.000Z"
+      "updatedAt": "2026-06-28T15:36:28.000Z"
     }
   ],
   "NotificationDispatchLog": [
@@ -3225,53 +3225,9 @@
       "name": "Panes",
       "description": "Panes de mostrador — tramos y canasta surtido en caja",
       "isPublic": 1,
-      "packageTiers": [
-        {
-          "qty": 2,
-          "totalPrice": 0.25
-        },
-        {
-          "qty": 4,
-          "totalPrice": 0.5
-        },
-        {
-          "qty": 8,
-          "totalPrice": 1
-        }
-      ],
-      "mixMatchLabel": "Pan surtido",
-      "mixMatchProductIds": [
-        118,
-        120,
-        70,
-        64,
-        189,
-        35,
-        50,
-        39,
-        112,
-        78,
-        44,
-        57,
-        122,
-        119,
-        67,
-        143,
-        123,
-        71,
-        125,
-        103,
-        146,
-        117,
-        169,
-        49,
-        168,
-        121,
-        76,
-        124,
-        66,
-        65
-      ],
+      "packageTiers": null,
+      "mixMatchLabel": null,
+      "mixMatchProductIds": null,
       "parentId": 3
     },
     {
@@ -5431,7 +5387,7 @@
       "categoryId": 26,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 35,
+      "stock": 55,
       "minStock": 0,
       "price": "0.15",
       "supplierPrice": "0.00",
@@ -5460,7 +5416,7 @@
       "genericProductId": null,
       "purchasePresentation": null,
       "createdAt": "2025-12-05T16:25:33.000Z",
-      "updatedAt": "2026-06-28T16:23:02.000Z"
+      "updatedAt": "2026-06-28T15:06:23.000Z"
     },
     {
       "id": 72,
@@ -6308,7 +6264,7 @@
       "categoryId": 26,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 24,
+      "stock": 28,
       "minStock": 0,
       "price": "0.15",
       "supplierPrice": "0.00",
@@ -6337,7 +6293,7 @@
       "genericProductId": null,
       "purchasePresentation": null,
       "createdAt": "2026-03-20T20:33:31.000Z",
-      "updatedAt": "2026-06-28T15:20:28.000Z"
+      "updatedAt": "2026-06-28T14:40:52.000Z"
     },
     {
       "id": 104,
@@ -6805,7 +6761,7 @@
       "categoryId": 26,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 22,
+      "stock": 24,
       "minStock": 0,
       "price": "0.25",
       "supplierPrice": "0.00",
@@ -6821,7 +6777,7 @@
       "genericProductId": null,
       "purchasePresentation": null,
       "createdAt": "2026-06-09T17:17:54.000Z",
-      "updatedAt": "2026-06-28T15:20:28.000Z"
+      "updatedAt": "2026-06-28T14:32:36.000Z"
     },
     {
       "id": 120,
@@ -6913,7 +6869,7 @@
       "categoryId": 26,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 24,
+      "stock": 32,
       "minStock": 0,
       "price": "0.15",
       "supplierPrice": "0.00",
@@ -6934,7 +6890,7 @@
       "genericProductId": null,
       "purchasePresentation": null,
       "createdAt": "2026-06-10T19:43:58.000Z",
-      "updatedAt": "2026-06-28T15:37:36.000Z"
+      "updatedAt": "2026-06-28T14:47:14.000Z"
     },
     {
       "id": 124,
@@ -7187,7 +7143,7 @@
       "categoryId": 33,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 9,
+      "stock": 1,
       "minStock": 0,
       "price": "0.50",
       "supplierPrice": "0.00",
@@ -7203,7 +7159,7 @@
       "genericProductId": null,
       "purchasePresentation": null,
       "createdAt": "2026-06-10T20:17:03.000Z",
-      "updatedAt": "2026-06-28T16:08:07.000Z"
+      "updatedAt": "2026-06-28T14:32:35.000Z"
     },
     {
       "id": 133,
@@ -98882,122 +98838,17 @@
     {
       "id": 5931,
       "productId": 71,
-      "quantity": 4,
-      "description": "Venta POS · pedido #1166",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 1166,
-      "date": "2026-06-28T15:20:28.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-28T15:20:28.000Z",
-      "updatedAt": "2026-06-28T15:20:28.000Z"
-    },
-    {
-      "id": 5932,
-      "productId": 103,
-      "quantity": 4,
-      "description": "Venta POS · pedido #1166",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 1166,
-      "date": "2026-06-28T15:20:28.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-28T15:20:28.000Z",
-      "updatedAt": "2026-06-28T15:20:28.000Z"
-    },
-    {
-      "id": 5933,
-      "productId": 119,
-      "quantity": 2,
-      "description": "Venta POS · pedido #1166",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 1166,
-      "date": "2026-06-28T15:20:28.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-28T15:20:28.000Z",
-      "updatedAt": "2026-06-28T15:20:28.000Z"
-    },
-    {
-      "id": 5934,
-      "productId": 123,
       "quantity": 8,
-      "description": "Venta POS · pedido #1167",
+      "description": "Venta POS · pedido #1166",
       "price": null,
       "type": "salida",
       "reason": "SALIDA_VENTA",
       "referenceType": "order",
-      "referenceId": 1167,
-      "date": "2026-06-28T15:37:36.000Z",
+      "referenceId": 1166,
+      "date": "2026-06-28T15:06:23.000Z",
       "createdBy": 1,
-      "createdAt": "2026-06-28T15:37:36.000Z",
-      "updatedAt": "2026-06-28T15:37:36.000Z"
-    },
-    {
-      "id": 5935,
-      "productId": 132,
-      "quantity": 12,
-      "description": "Entrada desde caja (ajuste de stock)",
-      "price": null,
-      "type": "entrada",
-      "reason": "ENTRADA_OTRA",
-      "referenceType": "caja_stock_adjust",
-      "referenceId": null,
-      "date": "2026-06-28T16:00:49.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-28T16:00:49.000Z",
-      "updatedAt": "2026-06-28T16:00:49.000Z"
-    },
-    {
-      "id": 5936,
-      "productId": 132,
-      "quantity": 2,
-      "description": "Venta POS · pedido #1168",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 1168,
-      "date": "2026-06-28T16:00:49.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-28T16:00:49.000Z",
-      "updatedAt": "2026-06-28T16:00:49.000Z"
-    },
-    {
-      "id": 5937,
-      "productId": 132,
-      "quantity": 2,
-      "description": "Venta POS · pedido #1169",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 1169,
-      "date": "2026-06-28T16:08:07.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-28T16:08:07.000Z",
-      "updatedAt": "2026-06-28T16:08:07.000Z"
-    },
-    {
-      "id": 5938,
-      "productId": 71,
-      "quantity": 24,
-      "description": "Venta POS · pedido #1170",
-      "price": null,
-      "type": "salida",
-      "reason": "SALIDA_VENTA",
-      "referenceType": "order",
-      "referenceId": 1170,
-      "date": "2026-06-28T16:23:02.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-06-28T16:23:02.000Z",
-      "updatedAt": "2026-06-28T16:23:02.000Z"
+      "createdAt": "2026-06-28T15:06:23.000Z",
+      "updatedAt": "2026-06-28T15:06:23.000Z"
     }
   ],
   "CashShift": [
@@ -116709,68 +116560,12 @@
       "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
       "shiftId": 21,
       "paymentMethod": "efectivo",
-      "paidAt": "2026-06-28T15:20:28.000Z",
+      "paidAt": "2026-06-28T15:06:23.000Z",
       "documentType": "consumidor_final",
-      "date": "2026-06-28T15:20:28.000Z",
+      "date": "2026-06-28T15:06:23.000Z",
       "financeIncomeId": null,
-      "createdAt": "2026-06-28T15:20:28.000Z",
-      "updatedAt": "2026-06-28T15:20:28.000Z"
-    },
-    {
-      "id": 1167,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 21,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-28T15:37:36.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-28T15:37:36.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-28T15:37:36.000Z",
-      "updatedAt": "2026-06-28T15:37:36.000Z"
-    },
-    {
-      "id": 1168,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 21,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-28T16:00:49.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-28T16:00:49.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-28T16:00:49.000Z",
-      "updatedAt": "2026-06-28T16:00:49.000Z"
-    },
-    {
-      "id": 1169,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 21,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-28T16:08:07.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-28T16:08:07.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-28T16:08:07.000Z",
-      "updatedAt": "2026-06-28T16:08:07.000Z"
-    },
-    {
-      "id": 1170,
-      "customerId": 1,
-      "status": "pagado",
-      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
-      "shiftId": 21,
-      "paymentMethod": "efectivo",
-      "paidAt": "2026-06-28T16:23:02.000Z",
-      "documentType": "consumidor_final",
-      "date": "2026-06-28T16:23:02.000Z",
-      "financeIncomeId": null,
-      "createdAt": "2026-06-28T16:23:02.000Z",
-      "updatedAt": "2026-06-28T16:23:02.000Z"
+      "createdAt": "2026-06-28T15:06:23.000Z",
+      "updatedAt": "2026-06-28T15:06:23.000Z"
     }
   ],
   "OrderItem": [
@@ -140529,92 +140324,14 @@
       "id": 1863,
       "orderId": 1166,
       "productId": 71,
-      "quantity": 4,
-      "price": 0.125,
-      "soldQty": 4,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-28T15:20:28.000Z",
-      "paidAt": "2026-06-28T15:20:28.000Z"
-    },
-    {
-      "id": 1864,
-      "orderId": 1166,
-      "productId": 103,
-      "quantity": 4,
-      "price": 0.125,
-      "soldQty": 4,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-28T15:20:28.000Z",
-      "paidAt": "2026-06-28T15:20:28.000Z"
-    },
-    {
-      "id": 1865,
-      "orderId": 1166,
-      "productId": 119,
-      "quantity": 2,
-      "price": 0.25,
-      "soldQty": 2,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-28T15:20:28.000Z",
-      "paidAt": "2026-06-28T15:20:28.000Z"
-    },
-    {
-      "id": 1866,
-      "orderId": 1167,
-      "productId": 123,
       "quantity": 8,
       "price": 0.125,
       "soldQty": 8,
       "damagedQty": 0,
       "giftQty": 0,
       "replacedQty": 0,
-      "deliveredAt": "2026-06-28T15:37:36.000Z",
-      "paidAt": "2026-06-28T15:37:36.000Z"
-    },
-    {
-      "id": 1867,
-      "orderId": 1168,
-      "productId": 132,
-      "quantity": 2,
-      "price": 0.5,
-      "soldQty": 2,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-28T16:00:49.000Z",
-      "paidAt": "2026-06-28T16:00:49.000Z"
-    },
-    {
-      "id": 1868,
-      "orderId": 1169,
-      "productId": 132,
-      "quantity": 2,
-      "price": 0.5,
-      "soldQty": 2,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-28T16:08:07.000Z",
-      "paidAt": "2026-06-28T16:08:07.000Z"
-    },
-    {
-      "id": 1869,
-      "orderId": 1170,
-      "productId": 71,
-      "quantity": 24,
-      "price": 0.125,
-      "soldQty": 24,
-      "damagedQty": 0,
-      "giftQty": 0,
-      "replacedQty": 0,
-      "deliveredAt": "2026-06-28T16:23:02.000Z",
-      "paidAt": "2026-06-28T16:23:02.000Z"
+      "deliveredAt": "2026-06-28T15:06:23.000Z",
+      "paidAt": "2026-06-28T15:06:23.000Z"
     }
   ],
   "Supplier": [
@@ -141261,11 +140978,11 @@
       "deviceId": "tv1",
       "label": null,
       "status": "approved",
-      "lastSeenAt": "2026-06-28T16:25:01.000Z",
+      "lastSeenAt": "2026-06-28T14:18:38.000Z",
       "notes": null,
       "campaignId": 6,
       "createdAt": "2026-06-12T20:58:07.000Z",
-      "updatedAt": "2026-06-28T16:25:01.000Z"
+      "updatedAt": "2026-06-28T14:18:38.000Z"
     }
   ],
   "MediaAsset": [],
@@ -174090,101 +173807,17 @@
     },
     {
       "id": 1754,
-      "date": "2026-06-28T15:20:28.000Z",
-      "amount": "0.50",
-      "concept": "Venta POS Pan de Dulce x4 (Ord #1166)",
+      "date": "2026-06-28T15:06:23.000Z",
+      "amount": "1.00",
+      "concept": "Venta POS Pan de Dulce x8 (Ord #1166)",
       "category": "Venta",
       "referenceId": 1863,
       "referenceType": "order_item",
       "status": "paid",
       "counterpartyName": null,
       "createdBy": 1,
-      "createdAt": "2026-06-28T15:20:28.000Z",
-      "updatedAt": "2026-06-28T15:20:28.000Z"
-    },
-    {
-      "id": 1755,
-      "date": "2026-06-28T15:20:28.000Z",
-      "amount": "0.50",
-      "concept": "Venta POS Pan de Sal x4 (Ord #1166)",
-      "category": "Venta",
-      "referenceId": 1864,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-28T15:20:28.000Z",
-      "updatedAt": "2026-06-28T15:20:28.000Z"
-    },
-    {
-      "id": 1756,
-      "date": "2026-06-28T15:20:28.000Z",
-      "amount": "0.50",
-      "concept": "Venta POS Orejitas x2 (Ord #1166)",
-      "category": "Venta",
-      "referenceId": 1865,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-28T15:20:28.000Z",
-      "updatedAt": "2026-06-28T15:20:28.000Z"
-    },
-    {
-      "id": 1757,
-      "date": "2026-06-28T15:37:36.000Z",
-      "amount": "1.00",
-      "concept": "Venta POS Pan de Chocolate x8 (Ord #1167)",
-      "category": "Venta",
-      "referenceId": 1866,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-28T15:37:36.000Z",
-      "updatedAt": "2026-06-28T15:37:36.000Z"
-    },
-    {
-      "id": 1758,
-      "date": "2026-06-28T16:00:49.000Z",
-      "amount": "1.00",
-      "concept": "Venta POS Porcion de Pastel x2 (Ord #1168)",
-      "category": "Venta",
-      "referenceId": 1867,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-28T16:00:49.000Z",
-      "updatedAt": "2026-06-28T16:00:49.000Z"
-    },
-    {
-      "id": 1759,
-      "date": "2026-06-28T16:08:07.000Z",
-      "amount": "1.00",
-      "concept": "Venta POS Porcion de Pastel x2 (Ord #1169)",
-      "category": "Venta",
-      "referenceId": 1868,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-28T16:08:07.000Z",
-      "updatedAt": "2026-06-28T16:08:07.000Z"
-    },
-    {
-      "id": 1760,
-      "date": "2026-06-28T16:23:02.000Z",
-      "amount": "3.00",
-      "concept": "Venta POS Pan de Dulce x24 (Ord #1170)",
-      "category": "Venta",
-      "referenceId": 1869,
-      "referenceType": "order_item",
-      "status": "paid",
-      "counterpartyName": null,
-      "createdBy": 1,
-      "createdAt": "2026-06-28T16:23:02.000Z",
-      "updatedAt": "2026-06-28T16:23:02.000Z"
+      "createdAt": "2026-06-28T15:06:23.000Z",
+      "updatedAt": "2026-06-28T15:06:23.000Z"
     }
   ],
   "Store": [
@@ -175559,6 +175192,20 @@
   ],
   "ProductCompareGroup": [],
   "ProductCompareGroupItem": [],
+  "PricingTierGroup": [
+    {
+      "id": 1,
+      "name": "Pan surtido",
+      "description": "Panes de mostrador — tramos y canasta surtido en caja",
+      "categoryId": 26,
+      "packageTiers": "[{\"qty\":2,\"totalPrice\":0.25},{\"qty\":4,\"totalPrice\":0.5},{\"qty\":8,\"totalPrice\":1}]",
+      "productIds": "[118,143,123,71,125,103,146,117,169,168]",
+      "isActive": 1,
+      "position": 0,
+      "createdAt": "2026-06-28T15:43:29.000Z",
+      "updatedAt": "2026-06-28T16:06:24.000Z"
+    }
+  ],
   "StoreProduct": [
     {
       "id": 1,
@@ -190386,53 +190033,43 @@
       "endPoint": "/eddeliapi/orders/pos/checkout",
       "description": "EL Programador Edgar Torres realizó una acción",
       "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-28T15:20:28.000Z"
+      "date": "2026-06-28T15:06:23.000Z"
     },
     {
       "id": 1361,
-      "httpMethod": "POST",
+      "httpMethod": "PUT",
       "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
+      "endPoint": "/eddeliapi/inventory/tier-groups/1",
       "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Mobile Safari/537.36",
-      "date": "2026-06-28T15:37:36.000Z"
+      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+      "date": "2026-06-28T16:04:55.000Z"
     },
     {
       "id": 1362,
-      "httpMethod": "POST",
+      "httpMethod": "PUT",
       "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/inventory/movements",
+      "endPoint": "/eddeliapi/inventory/tier-groups/1",
       "description": "EL Programador Edgar Torres realizó una acción",
       "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-28T16:00:49.000Z"
+      "date": "2026-06-28T16:05:22.000Z"
     },
     {
       "id": 1363,
-      "httpMethod": "POST",
+      "httpMethod": "PUT",
       "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
+      "endPoint": "/eddeliapi/inventory/tier-groups/1",
       "description": "EL Programador Edgar Torres realizó una acción",
       "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-28T16:00:49.000Z"
+      "date": "2026-06-28T16:06:24.000Z"
     },
     {
       "id": 1364,
       "httpMethod": "POST",
       "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
+      "endPoint": "/eddeliapi/comands/upload-backup",
       "description": "EL Programador Edgar Torres realizó una acción",
       "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-28T16:08:07.000Z"
-    },
-    {
-      "id": 1365,
-      "httpMethod": "POST",
-      "action": "Acción desconocida",
-      "endPoint": "/eddeliapi/orders/pos/checkout",
-      "description": "EL Programador Edgar Torres realizó una acción",
-      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
-      "date": "2026-06-28T16:23:02.000Z"
+      "date": "2026-06-28T16:27:38.000Z"
     }
-  ],
-  "PricingTierGroup": []
+  ]
 }

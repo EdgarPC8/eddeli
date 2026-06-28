@@ -201,18 +201,6 @@ function CategoryPage() {
       render: (row) => (row.isPublic ? "Sí" : "No"),
     },
     {
-      id: "packageTiers",
-      label: "Tramos caja",
-      render: (row) => {
-        const tiers = Array.isArray(row.packageTiers) ? row.packageTiers : [];
-        return tiers.length ? (
-          <Chip size="small" label={`${tiers.length} tramo(s)`} variant="outlined" />
-        ) : (
-          "—"
-        );
-      },
-    },
-    {
       id: "actions",
       label: "Acciones",
       stopRowClick: true,

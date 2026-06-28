@@ -183,6 +183,68 @@ export function getCategoryPackageTiers(category) {
   return normalizePackageTiers(category?.packageTiers);
 }
 
+export function getTierGroupPackageTiers(group) {
+  return normalizePackageTiers(group?.packageTiers);
+}
+
+export function getTierGroupProductIds(group) {
+  let raw = group?.productIds;
+  if (typeof raw === "string" && raw.trim()) {
+    try {
+      raw = JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  }
+  if (!Array.isArray(raw)) return [];
+  return raw.map((id) => Number(id)).filter((n) => Number.isFinite(n) && n > 0);
+}
+
+export function getTierGroupLabel(group) {
+  return String(group?.name ?? "").trim() || "Surtido";
+}
+
+export function hasTierGroupPackageTiers(group) {
+  return getTierGroupPackageTiers(group).length > 0;
+}
+
+export function productParticipatesInTierGroup(product, group) {
+  if (!group || !hasTierGroupPackageTiers(group)) return false;
+  return getTierGroupProductIds(group).includes(Number(product.id));
+}
+
+/** Grupos de tramos activos listos para caja. */
+export function findActiveTierGroups(tierGroups) {
+  return (tierGroups || []).filter(
+    (g) =>
+      g.isActive !== false &&
+      hasTierGroupPackageTiers(g) &&
+      getTierGroupProductIds(g).length > 0,
+  );
+}
+
+export function getSurtidoProductsForTierGroup(products, group) {
+  const allowed = new Set(getTierGroupProductIds(group));
+  return (products || []).filter((p) => {
+    if (!allowed.has(Number(p.id))) return false;
+    if (p.type && p.type !== "final") return false;
+    if (p.isActive === 0 || p.isActive === false) return false;
+    return true;
+  });
+}
+
+export function getTierGroupMixMatchHint(packageTiers, currentQty) {
+  const qty = Math.max(0, Math.floor(Number(currentQty || 0)));
+  const packs = normalizePackageTiers(packageTiers).filter((p) => p.qty > qty);
+  if (!packs.length) return null;
+  const next = packs[0];
+  return {
+    remaining: next.qty - qty,
+    nextQty: next.qty,
+    nextTotal: next.totalPrice,
+  };
+}
+
 export function hasCategoryPackageTiers(category) {
   return getCategoryPackageTiers(category).length > 0;
 }
@@ -216,21 +278,16 @@ export function productParticipatesInCategoryMix(product, category) {
   return allowed.includes(Number(product.id));
 }
 
-/** Categorías con canasta surtido configurada (tramos + productos seleccionados). */
-export function findSurtidoCategoriesFromProducts(products) {
-  const map = new Map();
-  for (const p of products || []) {
-    const cat = getProductCategory(p);
-    if (!cat?.id || !hasCategoryPackageTiers(cat)) continue;
-    const ids = getCategoryMixMatchProductIds(cat);
-    if (!ids.length) continue;
-    map.set(Number(cat.id), cat);
-  }
-  return [...map.values()];
+/** @deprecated Usar findActiveTierGroups */
+export function findSurtidoCategoriesFromProducts(products, tierGroups = []) {
+  return findActiveTierGroups(tierGroups);
 }
 
-export function getSurtidoProductsForCategory(products, category) {
-  const allowed = new Set(getCategoryMixMatchProductIds(category));
+export function getSurtidoProductsForCategory(products, groupOrCategory) {
+  if (groupOrCategory?.productIds != null) {
+    return getSurtidoProductsForTierGroup(products, groupOrCategory);
+  }
+  const allowed = new Set(getCategoryMixMatchProductIds(groupOrCategory));
   return (products || []).filter((p) => {
     if (!allowed.has(Number(p.id))) return false;
     if (p.type && p.type !== "final") return false;
@@ -241,21 +298,13 @@ export function getSurtidoProductsForCategory(products, category) {
 
 /** Siguiente tramo al que falta llegar (para avisos en caja). */
 export function getCategoryMixMatchHint(packageTiers, currentQty) {
-  const qty = Math.max(0, Math.floor(Number(currentQty || 0)));
-  const packs = getCategoryPackageTiers({ packageTiers }).filter((p) => p.qty > qty);
-  if (!packs.length) return null;
-  const next = packs[0];
-  return {
-    remaining: next.qty - qty,
-    nextQty: next.qty,
-    nextTotal: next.totalPrice,
-  };
+  return getTierGroupMixMatchHint(packageTiers, currentQty);
 }
 
 /**
  * Reparte el total de un grupo entre líneas según cantidad.
  */
-function allocateGroupTotalToLines(indices, rows, groupTotal) {
+function allocateGroupTotalToLines(indices, rows, groupTotal, pricingMode = "category_package") {
   const totalQty = indices.reduce(
     (sum, i) => sum + Math.max(0, Math.floor(Number(rows[i].quantity) || 0)),
     0,
@@ -275,17 +324,25 @@ function allocateGroupTotalToLines(indices, rows, groupTotal) {
       ...rows[i],
       price: qty > 0 ? to2(lineTotal / qty) : 0,
       lineTotal,
-      pricingMode: "category_package",
+      pricingMode,
     };
   });
 }
 
 /**
- * Aplica tramos por categoría (mix-and-match): suma unidades de la misma categoría
+ * Aplica tramos por grupo (mix-and-match): suma unidades de productos del mismo grupo
  * y reparte el mejor precio entre las líneas del carrito.
  */
-export function applyCategoryMixMatchPricing(cartRows, products) {
+export function applyTierGroupPricing(cartRows, products, tierGroups = []) {
   if (!Array.isArray(cartRows) || !cartRows.length) return [];
+
+  const activeGroups = findActiveTierGroups(tierGroups);
+  const groupByProductId = new Map();
+  for (const g of activeGroups) {
+    for (const pid of getTierGroupProductIds(g)) {
+      groupByProductId.set(pid, g);
+    }
+  }
 
   const productById = new Map((products || []).map((p) => [Number(p.id), p]));
   const rows = cartRows.map((row) => ({ ...row }));
@@ -296,19 +353,18 @@ export function applyCategoryMixMatchPricing(cartRows, products) {
     if (row.pricingMode === "manual") return;
     const product = productById.get(Number(row.productId));
     if (!product) return;
-    const cat = getProductCategory(product);
-    if (!productParticipatesInCategoryMix(product, cat)) return;
-    const catId = getProductCategoryId(product);
-    if (!catId) return;
-    if (!groups.has(catId)) {
-      groups.set(catId, { cat, indices: [] });
+    const group = groupByProductId.get(Number(product.id));
+    if (!group) return;
+    const groupId = Number(group.id);
+    if (!groups.has(groupId)) {
+      groups.set(groupId, { group, indices: [] });
     }
-    groups.get(catId).indices.push(idx);
+    groups.get(groupId).indices.push(idx);
   });
 
-  for (const { cat, indices } of groups.values()) {
-    const tiers = getCategoryPackageTiers(cat);
-    const mixLabel = getCategoryMixMatchLabel(cat);
+  for (const { group, indices } of groups.values()) {
+    const tiers = getTierGroupPackageTiers(group);
+    const mixLabel = getTierGroupLabel(group);
     const totalQty = indices.reduce(
       (sum, i) => sum + Math.max(0, Math.floor(Number(rows[i].quantity) || 0)),
       0,
@@ -324,16 +380,21 @@ export function applyCategoryMixMatchPricing(cartRows, products) {
     indices.forEach((i) => {
       rows[i] = {
         ...rows[i],
-        categoryId: cat.id,
-        categoryName: cat.name,
+        tierGroupId: group.id,
         mixGroupLabel: rows[i].mixGroupLabel || mixLabel,
       };
     });
-    allocateGroupTotalToLines(indices, rows, groupTotal);
+    allocateGroupTotalToLines(indices, rows, groupTotal, "tier_group_package");
   }
 
   rows.forEach((row, idx) => {
-    if (row.pricingMode === "manual" || row.pricingMode === "category_package") return;
+    if (
+      row.pricingMode === "manual" ||
+      row.pricingMode === "category_package" ||
+      row.pricingMode === "tier_group_package"
+    ) {
+      return;
+    }
     const product = productById.get(Number(row.productId));
     if (!product) return;
     const pricing = resolveEddeliLinePricing(product, row.quantity);
@@ -342,23 +403,27 @@ export function applyCategoryMixMatchPricing(cartRows, products) {
       price: pricing.unitPrice,
       lineTotal: pricing.lineTotal,
       pricingMode: pricing.mode,
-      categoryId: undefined,
-      categoryName: undefined,
+      tierGroupId: undefined,
     };
   });
 
   return rows;
 }
 
-/** Totales y avisos por categoría con tramos (para UI de caja). */
-export function summarizeCategoryMixMatchGroups(pricedCart) {
+/** @deprecated Usar applyTierGroupPricing */
+export function applyCategoryMixMatchPricing(cartRows, products, tierGroups = []) {
+  return applyTierGroupPricing(cartRows, products, tierGroups);
+}
+
+/** Totales y avisos por grupo de tramos (para UI de caja). */
+export function summarizeTierGroups(pricedCart) {
   const map = new Map();
   for (const row of pricedCart || []) {
-    if (!row.categoryId) continue;
-    const key = Number(row.categoryId);
+    if (!row.tierGroupId) continue;
+    const key = Number(row.tierGroupId);
     const prev = map.get(key) || {
-      categoryId: key,
-      categoryName: row.mixGroupLabel || row.categoryName || "Categoría",
+      tierGroupId: key,
+      groupName: row.mixGroupLabel || "Grupo",
       quantity: 0,
       total: 0,
     };
@@ -369,10 +434,20 @@ export function summarizeCategoryMixMatchGroups(pricedCart) {
   return [...map.values()];
 }
 
+/** @deprecated Usar summarizeTierGroups */
+export function summarizeCategoryMixMatchGroups(pricedCart) {
+  return summarizeTierGroups(pricedCart).map((g) => ({
+    categoryId: g.tierGroupId,
+    categoryName: g.groupName,
+    quantity: g.quantity,
+    total: g.total,
+  }));
+}
+
 function lineRowTotal(row) {
   const qty = Number(row.quantity || 0);
   const unitPrice = Number(row.price || 0);
-  if (row.lineTotal != null && (row.pricingMode === "package" || row.pricingMode === "category_package")) {
+  if (row.lineTotal != null && (row.pricingMode === "package" || row.pricingMode === "category_package" || row.pricingMode === "tier_group_package")) {
     return to2(Number(row.lineTotal));
   }
   return to2(qty * unitPrice);

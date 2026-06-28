@@ -23,6 +23,7 @@ import {
   StoreProduct,
   ProductCompareGroup,
   ProductCompareGroupItem,
+  PricingTierGroup,
 } from "../models/Inventory.js";
 import {
   Customer,
@@ -115,6 +116,7 @@ export const BACKUP_TABLE_ENTRIES = [
   { key: "Catalog", model: Catalog },
   { key: "ProductCompareGroup", model: ProductCompareGroup },
   { key: "ProductCompareGroupItem", model: ProductCompareGroupItem },
+  { key: "PricingTierGroup", model: PricingTierGroup, sanitize: "PricingTierGroup" },
   { key: "StoreProduct", model: StoreProduct },
   { key: "ItemGroup", model: ItemGroup },
   { key: "ItemGroupItem", model: ItemGroupItem },
@@ -255,6 +257,9 @@ const SANITIZE_CONFIG = {
   },
   InventoryProduct: {
     jsonStringFields: ["wholesaleRules", "packageTiers"],
+  },
+  PricingTierGroup: {
+    jsonStringFields: ["packageTiers", "productIds"],
   },
   CashShift: {
     jsonStringFields: ["openingCashCounts", "closingCashCounts"],

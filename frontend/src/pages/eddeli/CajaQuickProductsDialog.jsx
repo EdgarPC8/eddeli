@@ -26,10 +26,10 @@ import {
   resolveEddeliLinePricing,
   resolvePackageTierTotal,
   getProductCategory,
-  hasCategoryPackageTiers,
-  getCategoryMixMatchLabel,
-  getCategoryPackageTiers,
-  getSurtidoProductsForCategory,
+  getTierGroupLabel,
+  getTierGroupPackageTiers,
+  getSurtidoProductsForTierGroup,
+  productParticipatesInTierGroup,
 } from "../../utils/productLookup.js";
 import { getRootCategoryFromProduct } from "../../utils/categoryUtils.js";
 
@@ -43,13 +43,20 @@ function formatPrice(product) {
   return `$${to2(product?.price ?? 0).toFixed(2)}`;
 }
 
-function formatTierHints(product) {
-  const cat = getProductCategory(product);
-  const tiers = hasCategoryPackageTiers(cat)
-    ? normalizePackageTiers(cat?.packageTiers)
-    : normalizePackageTiers(product?.packageTiers);
-  if (!tiers.length) return null;
-  return tiers.map((t) => `${t.qty}=$${t.totalPrice.toFixed(2)}`).join(" · ");
+function formatTierHints(product, tierGroups = []) {
+  const tiers = normalizePackageTiers(product?.packageTiers);
+  if (tiers.length) {
+    return tiers.map((t) => `${t.qty}=$${t.totalPrice.toFixed(2)}`).join(" · ");
+  }
+  for (const group of tierGroups) {
+    if (productParticipatesInTierGroup(product, group)) {
+      const groupTiers = normalizePackageTiers(getTierGroupPackageTiers(group));
+      if (groupTiers.length) {
+        return groupTiers.map((t) => `${t.qty}=$${t.totalPrice.toFixed(2)}`).join(" · ");
+      }
+    }
+  }
+  return null;
 }
 
 function lineTotalFor(product, qty) {
@@ -68,7 +75,7 @@ function isPanaderiaProduct(product) {
   );
 }
 
-export function filterPanaderiaInStock(products) {
+export function filterPanaderiaInStock(products, tierGroups = []) {
   return (products || [])
     .filter((p) => {
       if (!isPanaderiaProduct(p)) return false;
@@ -78,16 +85,16 @@ export function filterPanaderiaInStock(products) {
     })
     .sort((a, b) => {
       const aTiered =
-        hasCategoryPackageTiers(getProductCategory(a)) || hasPackageTiers(a) ? 1 : 0;
+        hasPackageTiers(a) || tierGroups.some((g) => productParticipatesInTierGroup(a, g)) ? 1 : 0;
       const bTiered =
-        hasCategoryPackageTiers(getProductCategory(b)) || hasPackageTiers(b) ? 1 : 0;
+        hasPackageTiers(b) || tierGroups.some((g) => productParticipatesInTierGroup(b, g)) ? 1 : 0;
       if (bTiered !== aTiered) return bTiered - aTiered;
       return Number(b.stock || 0) - Number(a.stock || 0);
     });
 }
 
-function filterSurtidoInStock(products, category) {
-  return getSurtidoProductsForCategory(products, category)
+function filterSurtidoInStock(products, tierGroup) {
+  return getSurtidoProductsForTierGroup(products, tierGroup)
     .filter((p) => Number(p.stock || 0) > 0)
     .sort((a, b) => Number(b.stock || 0) - Number(a.stock || 0));
 }
@@ -98,27 +105,27 @@ export default function CajaQuickProductsDialog({
   products,
   onAdd,
   onAddSurtido,
-  surtidoCategories = [],
+  tierGroups = [],
 }) {
   const theme = useTheme();
   const [selectedQty, setSelectedQty] = useState(1);
   const [hoveredProduct, setHoveredProduct] = useState(null);
-  const [surtidoCategory, setSurtidoCategory] = useState(null);
+  const [selectedTierGroup, setSelectedTierGroup] = useState(null);
   const [basketQtyById, setBasketQtyById] = useState({});
 
-  const items = filterPanaderiaInStock(products);
-  const surtidoMode = Boolean(surtidoCategory);
-  const surtidoLabel = surtidoCategory ? getCategoryMixMatchLabel(surtidoCategory) : "";
+  const items = filterPanaderiaInStock(products, tierGroups);
+  const surtidoMode = Boolean(selectedTierGroup);
+  const surtidoLabel = selectedTierGroup ? getTierGroupLabel(selectedTierGroup) : "";
   const surtidoItems = useMemo(
-    () => (surtidoCategory ? filterSurtidoInStock(products, surtidoCategory) : []),
-    [products, surtidoCategory],
+    () => (selectedTierGroup ? filterSurtidoInStock(products, selectedTierGroup) : []),
+    [products, selectedTierGroup],
   );
   const surtidoTiers = useMemo(
     () =>
-      surtidoCategory
-        ? normalizePackageTiers(getCategoryPackageTiers(surtidoCategory))
+      selectedTierGroup
+        ? normalizePackageTiers(getTierGroupPackageTiers(selectedTierGroup))
         : [],
-    [surtidoCategory],
+    [selectedTierGroup],
   );
 
   const resetSurtidoBasket = useCallback(() => {
@@ -126,7 +133,7 @@ export default function CajaQuickProductsDialog({
   }, []);
 
   const exitSurtidoMode = useCallback(() => {
-    setSurtidoCategory(null);
+    setSelectedTierGroup(null);
     resetSurtidoBasket();
   }, [resetSurtidoBasket]);
 
@@ -134,7 +141,7 @@ export default function CajaQuickProductsDialog({
     if (open) {
       setSelectedQty(1);
       setHoveredProduct(null);
-      setSurtidoCategory(null);
+      setSelectedTierGroup(null);
       resetSurtidoBasket();
     }
   }, [open, resetSurtidoBasket]);
@@ -160,13 +167,13 @@ export default function CajaQuickProductsDialog({
   );
 
   const basketEstimatedTotal = useMemo(() => {
-    if (!surtidoCategory || basketTotalUnits <= 0) return 0;
+    if (!selectedTierGroup || basketTotalUnits <= 0) return 0;
     const ref = surtidoItems[0];
     return resolvePackageTierTotal(
       { packageTiers: surtidoTiers, price: ref?.price ?? 0.15 },
       basketTotalUnits,
     );
-  }, [surtidoCategory, basketTotalUnits, surtidoTiers, surtidoItems]);
+  }, [selectedTierGroup, basketTotalUnits, surtidoTiers, surtidoItems]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -219,12 +226,6 @@ export default function CajaQuickProductsDialog({
     return `${previewProduct.name || "Producto"} · +${selectedQty}`;
   }, [surtidoMode, surtidoLabel, basketTotalUnits, previewProduct, selectedQty]);
 
-  const enterSurtidoMode = (cat) => {
-    setSurtidoCategory(cat);
-    resetSurtidoBasket();
-    setHoveredProduct(null);
-  };
-
   const addToBasket = (product) => {
     const id = Number(product.id);
     const stock = Number(product.stock || 0);
@@ -246,11 +247,11 @@ export default function CajaQuickProductsDialog({
   };
 
   const handleConfirmSurtido = () => {
-    if (!surtidoCategory || !basketLines.length) return;
+    if (!selectedTierGroup || !basketLines.length) return;
     onAddSurtido?.({
       lines: basketLines,
       label: surtidoLabel,
-      category: surtidoCategory,
+      tierGroup: selectedTierGroup,
     });
     onClose();
   };
@@ -458,15 +459,15 @@ export default function CajaQuickProductsDialog({
           bgcolor: "background.default",
         }}
       >
-        {!surtidoMode && surtidoCategories.length > 0 && (
+        {!surtidoMode && tierGroups.length > 0 && (
           <Box sx={{ mb: 1.5 }}>
             <Grid container spacing={1.5}>
-              {surtidoCategories.map((cat) => {
-                const label = getCategoryMixMatchLabel(cat);
-                const tiers = normalizePackageTiers(getCategoryPackageTiers(cat));
+              {tierGroups.map((group) => {
+                const label = getTierGroupLabel(group);
+                const tiers = normalizePackageTiers(getTierGroupPackageTiers(group));
                 const tierHints = tiers.map((t) => `${t.qty}=$${t.totalPrice.toFixed(2)}`).join(" · ");
                 return (
-                  <Grid item xs={12} sm={6} md={4} key={cat.id}>
+                  <Grid item xs={12} sm={6} md={4} key={group.id}>
                     <Card
                       variant="outlined"
                       sx={{
@@ -477,7 +478,7 @@ export default function CajaQuickProductsDialog({
                             : alpha(theme.palette.secondary.main, 0.04),
                       }}
                     >
-                      <CardActionArea onClick={() => enterSurtidoMode(cat)}>
+                      <CardActionArea onClick={() => setSelectedTierGroup(group)}>
                         <CardContent sx={{ p: 1.5, "&:last-child": { pb: 1.5 } }}>
                           <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
                             <ShoppingBasketIcon color="secondary" fontSize="small" />
@@ -507,8 +508,10 @@ export default function CajaQuickProductsDialog({
         ) : (
           <Grid container spacing={1.5}>
             {gridProducts.map((product) => {
-              const tiered = hasPackageTiers(product) || hasCategoryPackageTiers(getProductCategory(product));
-              const tierHints = formatTierHints(product);
+              const tiered =
+                hasPackageTiers(product) ||
+                tierGroups.some((g) => productParticipatesInTierGroup(product, g));
+              const tierHints = formatTierHints(product, tierGroups);
               const inBasket = surtidoMode
                 ? Math.floor(Number(basketQtyById[Number(product.id)] || 0))
                 : 0;

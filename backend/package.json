@@ -16,6 +16,7 @@
     "db:audit:json-fields": "node scripts/audit-json-fields.js --backup",
     "db:verify:backup-json": "node scripts/verify-backup-json.js",
     "db:seed:panes-group": "node scripts/seed-panes-pricing-group.js",
+    "db:migrate:tramos": "node scripts/migrate-tramos-from-categories.js",
     "db:reset": "node scripts/reset-database.js",
     "db:check-backup": "node scripts/check-backup.js"
   },

@@ -122,6 +122,7 @@ const MENU_GROUPS = [
       { name: "Productos", link: "/inventory/products", icon: <Inventory2Icon />, roles: ["Programador", "Administrador"] },
       { name: "Movimientos", link: "/inventory/movement", icon: <CompareArrowsIcon />, roles: ["Programador", "Administrador"] },
       { name: "Categorías", link: "/inventory/categories", icon: <CategoryIcon />, roles: ["Programador", "Administrador"] },
+      { name: "Tramos", link: "/inventory/tramos", icon: <ViewModuleIcon />, roles: ["Programador", "Administrador"] },
       { name: "Unidades", link: "/inventory/units", icon: <StraightenIcon />, roles: ["Programador", "Administrador"] },
       { name: "Insumos y marcas", link: "/inventory/insumos", icon: <ScienceIcon />, roles: ["Programador", "Administrador"] },
       { name: "Recetas", link: "/inventory/recipes", icon: <ReceiptLongIcon />, roles: ["Programador", "Administrador"] },

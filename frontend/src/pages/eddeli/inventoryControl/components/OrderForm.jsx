@@ -1,4 +1,5 @@
-import { Grid, TextField, Box, Button, IconButton, Tooltip } from "@mui/material";
+import { Grid, TextField, Box, Button, IconButton, Tooltip, Typography } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
 import PrintIcon from "@mui/icons-material/Print";
 import { useForm } from "react-hook-form";
 import { useEffect, useMemo, useState } from "react";
@@ -13,6 +14,9 @@ import { useAuth } from "../../../../context/AuthContext";
 import SearchableSelect from "../../../../components/SearchableSelect";
 import ProductPriceReference, {
   getDefaultDistributorPrice,
+  getProductUnitLabel,
+  formatOrderLineTotal,
+  formatProductPrice,
 } from "./ProductPriceReference";
 import PrintFormatDialog from "../../../../components/saleReceipt/PrintFormatDialog.jsx";
 import { buildReceiptFromCustomerOrder } from "../../../../utils/saleReceiptUtils.js";
@@ -86,6 +90,8 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
   const { toast } = useAuth();
 
   const selectedProductId = watch("productId");
+  const watchQuantity = watch("quantity");
+  const watchPrice = watch("price");
 
   const currentProduct = useMemo(() => {
     if (!selectedProductId) return null;
@@ -139,7 +145,13 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
 
     setItems((prev) => [
       ...prev,
-      { productId, quantity, price, name: product?.name || "" },
+      {
+        productId,
+        quantity,
+        price,
+        name: product?.name || "",
+        unitLabel: getProductUnitLabel(product),
+      },
     ]);
 
     setValue("productId", "");
@@ -228,12 +240,18 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
             ? item.price
             : 0,
         name: item.ERP_inventory_product?.name || "",
+        unitLabel: getProductUnitLabel(item.ERP_inventory_product),
       }));
 
       setItems(loadedItems);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datos]);
+
+  const itemsTotal = useMemo(
+    () => items.reduce((acc, it) => acc + formatOrderLineTotal(it.quantity, it.price), 0),
+    [items],
+  );
 
   return (
     <Box component="form" sx={{ mt: 1 }} onSubmit={handleSubmit(submitOrder)}>
@@ -265,7 +283,11 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
 
         {currentProduct && (
           <Grid item xs={12}>
-            <ProductPriceReference product={currentProduct} />
+            <ProductPriceReference
+              product={currentProduct}
+              quantity={watchQuantity}
+              unitPrice={watchPrice}
+            />
           </Grid>
         )}
 
@@ -297,29 +319,45 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
           />
         </Grid>
 
-        <Grid item xs={12} sm={4} sx={{ display: "flex", alignItems: "flex-end" }}>
-          <Button onClick={addItem} variant="outlined" fullWidth>
-            Agregar
-          </Button>
+        <Grid item xs={12} sm={4} sx={{ display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <Tooltip title="Agregar producto">
+            <IconButton color="primary" onClick={addItem} sx={{ border: 1, borderColor: "primary.main" }}>
+              <AddIcon />
+            </IconButton>
+          </Tooltip>
         </Grid>
 
         <Grid item xs={12}>
-          <ul style={{ margin: 0, paddingLeft: 18 }}>
-            {items.map((item, index) => (
-              <li key={`${item.productId}-${index}`}>
-                {item.name} - {item.quantity} × $
-                {Number(item.price || 0).toFixed(2)}
-                <Button
-                  color="error"
-                  size="small"
-                  onClick={() => removeItem(index, item)}
-                  sx={{ ml: 1 }}
-                >
-                  Quitar
-                </Button>
-              </li>
-            ))}
-          </ul>
+          {items.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              Sin productos en el pedido.
+            </Typography>
+          ) : (
+            <Box component="ul" sx={{ m: 0, pl: 2.5 }}>
+              {items.map((item, index) => (
+                <Box component="li" key={`${item.productId}-${index}`} sx={{ mb: 0.75 }}>
+                  <Typography variant="body2" component="span">
+                    {item.name} — {item.quantity} {item.unitLabel || "u."} ×{" "}
+                    {formatProductPrice(item.price)} ={" "}
+                    {formatProductPrice(formatOrderLineTotal(item.quantity, item.price))}
+                  </Typography>
+                  <Button
+                    color="error"
+                    size="small"
+                    onClick={() => removeItem(index, item)}
+                    sx={{ ml: 1, minWidth: 0, py: 0 }}
+                  >
+                    Quitar
+                  </Button>
+                </Box>
+              ))}
+            </Box>
+          )}
+          {items.length > 0 && (
+            <Typography variant="subtitle1" fontWeight={700} align="right" sx={{ mt: 1 }}>
+              Total: {formatProductPrice(itemsTotal)}
+            </Typography>
+          )}
         </Grid>
 
         <Grid item xs={6}>

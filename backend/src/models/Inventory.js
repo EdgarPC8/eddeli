@@ -515,4 +515,39 @@ InventoryProduct.hasMany(ProductCompareGroupItem, {
   as: "compareGroupItems",
 });
 
+/** Grupos de tramos en caja: vincula categoría + productos + precios por cantidad (canasta surtido). */
+export const PricingTierGroup = sequelize.define("ERP_pricing_tier_groups", {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  name: { type: DataTypes.STRING(150), allowNull: false },
+  description: { type: DataTypes.TEXT, allowNull: true },
+  /** Subcategoría de referencia para filtrar productos en el formulario */
+  categoryId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: { model: "ERP_inventory_categories", key: "id" },
+    onUpdate: "CASCADE",
+    onDelete: "SET NULL",
+  },
+  packageTiers: defineJsonField("packageTiers"),
+  productIds: defineJsonField("productIds"),
+  isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+  position: { type: DataTypes.INTEGER, defaultValue: 0 },
+}, {
+  timestamps: true,
+  indexes: [
+    { fields: ["categoryId"] },
+    { fields: ["isActive"] },
+    { fields: ["position"] },
+  ],
+});
+
+PricingTierGroup.belongsTo(InventoryCategory, {
+  foreignKey: "categoryId",
+  as: "category",
+});
+InventoryCategory.hasMany(PricingTierGroup, {
+  foreignKey: "categoryId",
+  as: "pricingTierGroups",
+});
+
 

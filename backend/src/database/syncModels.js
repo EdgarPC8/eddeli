@@ -1,6 +1,6 @@
 import { CashShift } from "../models/CashShift.js";
 import { CashShiftMovement } from "../models/CashShiftMovement.js";
-import { InventoryProduct, InventoryMovement, InventoryCategory, ProductCompareGroup, ProductCompareGroupItem } from "../models/Inventory.js";
+import { InventoryProduct, InventoryMovement, InventoryCategory, ProductCompareGroup, ProductCompareGroupItem, PricingTierGroup } from "../models/Inventory.js";
 import { Order, Supplier, SupplierOrder, SupplierOrderItem } from "../models/Orders.js";
 import { TaskPlan, TaskItem } from "../models/Tasks.js";
 import { PublicidadCampaign, PublicidadPlaylistItem, PublicidadDevice } from "../models/Publicidad.js";
@@ -16,6 +16,7 @@ const MODELS_TO_SYNC = [
   InventoryCategory,
   ProductCompareGroup,
   ProductCompareGroupItem,
+  PricingTierGroup,
   CashShift,
   CashShiftMovement,
   Order,

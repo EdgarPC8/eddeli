@@ -1,5 +1,4 @@
 import { InventoryCategory } from "../../models/Inventory.js";
-import { normalizePackageTiersStrict } from "../../utils/productPricingUtils.js";
 
 const CATEGORY_INCLUDE_PARENT = {
   model: InventoryCategory,
@@ -7,21 +6,6 @@ const CATEGORY_INCLUDE_PARENT = {
   attributes: ["id", "name"],
   required: false,
 };
-
-function normalizeMixMatchProductIds(raw) {
-  if (raw == null || raw === "") return null;
-  let val = raw;
-  if (typeof val === "string") {
-    try {
-      val = JSON.parse(val);
-    } catch {
-      return null;
-    }
-  }
-  if (!Array.isArray(val)) return null;
-  const ids = [...new Set(val.map((id) => Number(id)).filter((n) => Number.isFinite(n) && n > 0))];
-  return ids.length ? ids : null;
-}
 
 async function validateParentId(parentId, categoryId = null) {
   if (parentId == null || parentId === "") return null;
@@ -44,16 +28,9 @@ async function validateParentId(parentId, categoryId = null) {
 
 async function applyCategoryPayload(body, categoryId = null) {
   const payload = { ...body };
-  if ("packageTiers" in payload) {
-    payload.packageTiers = normalizePackageTiersStrict(payload.packageTiers);
-  }
-  if ("mixMatchProductIds" in payload) {
-    payload.mixMatchProductIds = normalizeMixMatchProductIds(payload.mixMatchProductIds);
-  }
-  if ("mixMatchLabel" in payload) {
-    const label = String(payload.mixMatchLabel ?? "").trim();
-    payload.mixMatchLabel = label || null;
-  }
+  delete payload.packageTiers;
+  delete payload.mixMatchProductIds;
+  delete payload.mixMatchLabel;
   if ("parentId" in payload) {
     payload.parentId = await validateParentId(payload.parentId, categoryId);
   }

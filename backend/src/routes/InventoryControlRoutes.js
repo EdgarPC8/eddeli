@@ -108,6 +108,14 @@ import {
   deleteCompareGroup,
   bootstrapPastelesCompareGroup,
 } from "../controllers/InventoryControl/ProductCompareGroupController.js";
+import {
+  getAllTierGroups,
+  getTierGroupById,
+  createTierGroup,
+  updateTierGroup,
+  deleteTierGroup,
+  migrateTierGroupsFromCategories,
+} from "../controllers/InventoryControl/PricingTierGroupController.js";
 
 import {
   getProductsByStore,
@@ -155,6 +163,14 @@ router.post("/compare-groups", isAuthenticated, createCompareGroup);
 router.post("/compare-groups/bootstrap-pasteles", isAuthenticated, bootstrapPastelesCompareGroup);
 router.put("/compare-groups/:id", isAuthenticated, updateCompareGroup);
 router.delete("/compare-groups/:id", isAuthenticated, deleteCompareGroup);
+
+// Tramos (grupos categoría + productos + precios por cantidad en caja)
+router.get("/tier-groups", isAuthenticated, getAllTierGroups);
+router.get("/tier-groups/:id", isAuthenticated, getTierGroupById);
+router.post("/tier-groups", isAuthenticated, createTierGroup);
+router.post("/tier-groups/migrate-from-categories", isAuthenticated, migrateTierGroupsFromCategories);
+router.put("/tier-groups/:id", isAuthenticated, updateTierGroup);
+router.delete("/tier-groups/:id", isAuthenticated, deleteTierGroup);
 
 
 

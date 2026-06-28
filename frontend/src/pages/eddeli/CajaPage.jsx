@@ -40,6 +40,7 @@ import PrintFormatDialog from "../../components/saleReceipt/PrintFormatDialog.js
 import {
   getAllProducts,
   registerMovement,
+  getTierGroups,
 } from "../../api/inventoryControlRequest.js";
 import { getAllCustomersRequest, posCheckoutRequest } from "../../api/ordersRequest.js";
 import { getActiveShift } from "../../api/shiftRequest.js";
@@ -51,7 +52,16 @@ import { buildCajaOrderNotes } from "../../utils/eddeliPosOrderUtils.js";
 import { buildCustomerDisplayName, formatCustomerDocument } from "./cajaCustomerUtils.js";
 import { formatMoney } from "../../utils/turnoCashUtils.js";
 import { useBarcodeScanner } from "../../hooks/useBarcodeScanner.js";
-import { resolveEddeliLinePricing, findEddeliProductByCode, applyCategoryMixMatchPricing, summarizeCategoryMixMatchGroups, getCategoryMixMatchHint, getCategoryPackageTiers, getProductCategory, findSurtidoCategoriesFromProducts, getCategoryMixMatchLabel } from "../../utils/productLookup.js";
+import {
+  resolveEddeliLinePricing,
+  findEddeliProductByCode,
+  applyTierGroupPricing,
+  summarizeTierGroups,
+  getTierGroupMixMatchHint,
+  getTierGroupPackageTiers,
+  getTierGroupLabel,
+  findActiveTierGroups,
+} from "../../utils/productLookup.js";
 import {
   buildReceiptFromCheckout,
   resolveStoredDocumentType,
@@ -161,6 +171,7 @@ const lineBreakdown = (row) => {
 export default function CajaPage() {
   const { toast } = useAuth();
   const [products, setProducts] = useState([]);
+  const [tierGroups, setTierGroups] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [customerId, setCustomerId] = useState("");
   const [selectedProductId, setSelectedProductId] = useState("");
@@ -191,17 +202,21 @@ export default function CajaPage() {
   const [quickProductsOpen, setQuickProductsOpen] = useState(false);
 
   const loadData = async () => {
-    const [productsRes, customersRes, shiftRes] = await Promise.allSettled([
+    const [productsRes, customersRes, shiftRes, tierGroupsRes] = await Promise.allSettled([
       getAllProducts(),
       getAllCustomersRequest(),
       getActiveShift(),
+      getTierGroups({ active: "true" }),
     ]);
     const nextProducts =
       productsRes.status === "fulfilled" ? productsRes.value.data || [] : [];
     const nextCustomers =
       customersRes.status === "fulfilled" ? customersRes.value.data || [] : [];
+    const nextTierGroups =
+      tierGroupsRes.status === "fulfilled" ? tierGroupsRes.value.data || [] : [];
     setProducts(nextProducts);
     setCustomers(nextCustomers);
+    setTierGroups(nextTierGroups);
     setActiveShift(shiftRes.status === "fulfilled" ? shiftRes.value.data : null);
     if (!customerId && nextCustomers.length > 0) {
       setCustomerId(String(nextCustomers[0].id));
@@ -244,9 +259,9 @@ export default function CajaPage() {
     return map;
   }, [products]);
 
-  const surtidoCategories = useMemo(
-    () => findSurtidoCategoriesFromProducts(products),
-    [products],
+  const activeTierGroups = useMemo(
+    () => findActiveTierGroups(tierGroups),
+    [tierGroups],
   );
 
   const addToCart = (product, qtyToAdd = 1) => {
@@ -274,9 +289,9 @@ export default function CajaPage() {
     });
   };
 
-  const addSurtidoBatch = ({ lines, label, category }) => {
+  const addSurtidoBatch = ({ lines, label, tierGroup }) => {
     const mixGroupId = newMixGroupId();
-    const mixGroupLabel = label || getCategoryMixMatchLabel(category);
+    const mixGroupLabel = label || getTierGroupLabel(tierGroup);
     setCart((prev) => {
       const next = [...prev];
       for (const { product, quantity } of lines) {
@@ -296,7 +311,7 @@ export default function CajaPage() {
           taxRate: Number(product.taxRate ?? 15),
           mixGroupId,
           mixGroupLabel,
-          categoryId: category?.id,
+          tierGroupId: tierGroup?.id,
         });
       }
       return next;
@@ -384,8 +399,8 @@ export default function CajaPage() {
   };
 
   const pricedCart = useMemo(
-    () => applyCategoryMixMatchPricing(cart, products),
-    [cart, products],
+    () => applyTierGroupPricing(cart, products, tierGroups),
+    [cart, products, tierGroups],
   );
 
   const cartDisplayGroups = useMemo(() => {
@@ -411,13 +426,13 @@ export default function CajaPage() {
     return groups;
   }, [pricedCart]);
 
-  const categoryMixSummaries = useMemo(() => {
-    return summarizeCategoryMixMatchGroups(pricedCart).map((g) => {
-      const sample = products.find((p) => Number(getProductCategory(p)?.id) === g.categoryId);
-      const tiers = getCategoryPackageTiers(getProductCategory(sample));
-      return { ...g, hint: getCategoryMixMatchHint(tiers, g.quantity) };
+  const tierGroupSummaries = useMemo(() => {
+    return summarizeTierGroups(pricedCart).map((g) => {
+      const group = tierGroups.find((t) => Number(t.id) === g.tierGroupId);
+      const tiers = getTierGroupPackageTiers(group);
+      return { ...g, hint: getTierGroupMixMatchHint(tiers, g.quantity) };
     });
-  }, [pricedCart, products]);
+  }, [pricedCart, tierGroups]);
 
   const summary = useMemo(() => {
     return pricedCart.reduce(
@@ -894,18 +909,18 @@ export default function CajaPage() {
               </Stack>
             </Stack>
 
-            {categoryMixSummaries.length > 0 && (
+            {tierGroupSummaries.length > 0 && (
               <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 1 }}>
-                {categoryMixSummaries.map((g) => (
+                {tierGroupSummaries.map((g) => (
                   <Chip
-                    key={g.categoryId}
+                    key={g.tierGroupId}
                     size="small"
                     color="primary"
                     variant="outlined"
                     label={
                       g.hint
-                        ? `${g.categoryName}: ${g.quantity} u. · $${g.total.toFixed(2)} — falta ${g.hint.remaining} para ${g.hint.nextQty}=$${g.hint.nextTotal.toFixed(2)}`
-                        : `${g.categoryName}: ${g.quantity} u. · $${g.total.toFixed(2)}`
+                        ? `${g.groupName}: ${g.quantity} u. · $${g.total.toFixed(2)} — falta ${g.hint.remaining} para ${g.hint.nextQty}=$${g.hint.nextTotal.toFixed(2)}`
+                        : `${g.groupName}: ${g.quantity} u. · $${g.total.toFixed(2)}`
                     }
                   />
                 ))}
@@ -1415,7 +1430,7 @@ export default function CajaPage() {
         open={quickProductsOpen}
         onClose={() => setQuickProductsOpen(false)}
         products={products}
-        surtidoCategories={surtidoCategories}
+        tierGroups={activeTierGroups}
         onAdd={(product, qty) => addToCart(product, qty)}
         onAddSurtido={addSurtidoBatch}
       />

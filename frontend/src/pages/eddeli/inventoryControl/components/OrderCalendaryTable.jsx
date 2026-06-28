@@ -22,6 +22,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import CloseIcon from '@mui/icons-material/Close';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import AddIcon from '@mui/icons-material/Add';
 import PrintIcon from '@mui/icons-material/Print';
 
 import {
@@ -40,6 +41,9 @@ import SimpleDialog from '../../../../components/Dialogs/SimpleDialog';
 import SearchableSelect from '../../../../components/SearchableSelect';
 import ProductPriceReference, {
   getDefaultDistributorPrice,
+  getProductUnitLabel,
+  formatOrderLineTotal,
+  formatProductPrice,
 } from './ProductPriceReference';
 import DocumentAttachmentIcon from './DocumentAttachmentIcon';
 import PrintFormatDialog from '../../../../components/saleReceipt/PrintFormatDialog.jsx';
@@ -144,7 +148,6 @@ export default function OrderCalendarView({
   onRemoveOrderItem,
   onEdit,
   onEditSupplier,
-  onAddSupplierOrder,
 }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
@@ -614,7 +617,6 @@ export default function OrderCalendarView({
                         onReload={onReload}
                         onRemove={(id) => onRemoveOrder?.(id, 'supplier')}
                         onEdit={onEditSupplier}
-                        onAddAnother={onAddSupplierOrder}
                       />
                     );
                   }
@@ -873,7 +875,10 @@ export default function OrderCalendarView({
                                     <Typography variant="body2"><strong>{item.ERP_inventory_product?.name}</strong></Typography>
                                     {!isEditing && (
                                       <Typography variant="caption">
-                                        Cantidad: {item.quantity} × ${item.price.toFixed(2)} = {(item.quantity * item.price).toFixed(2)}
+                                        {item.quantity}{' '}
+                                        {getProductUnitLabel(item.ERP_inventory_product)} ×{' '}
+                                        {formatProductPrice(item.price)} ={' '}
+                                        {formatProductPrice(formatOrderLineTotal(item.quantity, item.price))}
                                       </Typography>
                                     )}
                                   </Box>
@@ -1033,6 +1038,18 @@ export default function OrderCalendarView({
                             );
                           })}
 
+                          {orderItems.length > 0 && (
+                            <Typography variant="body2" fontWeight={700} sx={{ mt: 1, mb: 1 }}>
+                              Total pedido:{' '}
+                              {formatProductPrice(
+                                orderItems.reduce(
+                                  (acc, i) => acc + formatOrderLineTotal(i.quantity, i.price),
+                                  0,
+                                ),
+                              )}
+                            </Typography>
+                          )}
+
                           {canManageOrders && (
                             <Box
                               sx={{
@@ -1076,7 +1093,14 @@ export default function OrderCalendarView({
                                     const p = draftPid
                                       ? products.find((x) => String(x.id) === String(draftPid))
                                       : null;
-                                    return p ? <ProductPriceReference product={p} compact /> : null;
+                                    return p ? (
+                                      <ProductPriceReference
+                                        product={p}
+                                        compact
+                                        quantity={addLineDraft[order.id]?.quantity}
+                                        unitPrice={addLineDraft[order.id]?.price}
+                                      />
+                                    ) : null;
                                   })()}
                                 </Grid>
                                 <Grid item xs={6} sm={3}>
@@ -1112,14 +1136,15 @@ export default function OrderCalendarView({
                                   />
                                 </Grid>
                                 <Grid item xs={12} sm={1}>
-                                  <Button
-                                    variant="contained"
-                                    size="small"
-                                    fullWidth
-                                    onClick={() => handleAddOrderLine(order.id)}
-                                  >
-                                    Agregar
-                                  </Button>
+                                  <Tooltip title="Agregar producto">
+                                    <IconButton
+                                      color="primary"
+                                      onClick={() => handleAddOrderLine(order.id)}
+                                      sx={{ border: 1, borderColor: 'primary.main', borderRadius: 1 }}
+                                    >
+                                      <AddIcon />
+                                    </IconButton>
+                                  </Tooltip>
                                 </Grid>
                               </Grid>
                             </Box>

@@ -1,6 +1,7 @@
-import { Grid, TextField, Box, Button } from "@mui/material";
+import { Grid, TextField, Box, Button, IconButton, Tooltip, Typography } from "@mui/material";
+import AddIcon from "@mui/icons-material/Add";
 import { useForm } from "react-hook-form";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   createSupplierOrderRequest,
   updateSupplierOrderRequest,
@@ -11,6 +12,11 @@ import { getAllProducts } from "../../../../api/inventoryControlRequest";
 import { useAuth } from "../../../../context/AuthContext";
 import SearchableSelect from "../../../../components/SearchableSelect";
 import AttachmentField from "./AttachmentField.jsx";
+import ProductPriceReference, {
+  getProductUnitLabel,
+  formatOrderLineTotal,
+  formatProductPrice,
+} from "./ProductPriceReference";
 import { uploadSupplierOrderVoucher } from "../../../../api/documentRequest.js";
 
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -66,6 +72,13 @@ export default function SupplierOrderForm({
   const { toast } = useAuth();
 
   const selectedProductId = watch("productId");
+  const watchQuantity = watch("quantity");
+  const watchUnitPrice = watch("unitPrice");
+
+  const currentProduct = useMemo(() => {
+    if (!selectedProductId) return null;
+    return products.find((p) => p.id === Number(selectedProductId)) || null;
+  }, [selectedProductId, products]);
 
   useEffect(() => {
     if (!selectedProductId) return;
@@ -92,7 +105,13 @@ export default function SupplierOrderForm({
     const product = products.find((p) => p.id === productId);
     setItems((prev) => [
       ...prev,
-      { productId, quantity, unitPrice, name: product?.name || "" },
+      {
+        productId,
+        quantity,
+        unitPrice,
+        name: product?.name || "",
+        unitLabel: getProductUnitLabel(product),
+      },
     ]);
     setValue("productId", "");
     setSelectedProduct("");
@@ -201,6 +220,7 @@ export default function SupplierOrderForm({
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         name: item.ERP_inventory_product?.name || "",
+        unitLabel: getProductUnitLabel(item.ERP_inventory_product),
       }));
       setItems(loaded);
       return;
@@ -213,6 +233,11 @@ export default function SupplierOrderForm({
     setSelectedSupplier(prefillSupplierId ? String(prefillSupplierId) : "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datos, isEditing, prefillSupplierId, prefillDate]);
+
+  const itemsTotal = useMemo(
+    () => items.reduce((acc, it) => acc + formatOrderLineTotal(it.quantity, it.unitPrice), 0),
+    [items],
+  );
 
   return (
     <Box component="form" sx={{ mt: 1 }} onSubmit={handleSubmit(submitOrder)}>
@@ -257,6 +282,15 @@ export default function SupplierOrderForm({
             }}
           />
         </Grid>
+        {currentProduct && (
+          <Grid item xs={12}>
+            <ProductPriceReference
+              product={currentProduct}
+              quantity={watchQuantity}
+              unitPrice={watchUnitPrice}
+            />
+          </Grid>
+        )}
         <Grid item xs={6}>
           <TextField
             fullWidth
@@ -275,24 +309,36 @@ export default function SupplierOrderForm({
             {...register("unitPrice")}
           />
         </Grid>
-        <Grid item xs={12}>
-          <Button variant="outlined" onClick={addItem}>
-            Agregar producto
-          </Button>
+        <Grid item xs={12} sx={{ display: "flex", justifyContent: "flex-start" }}>
+          <Tooltip title="Agregar producto">
+            <IconButton color="primary" onClick={addItem} sx={{ border: 1, borderColor: "primary.main" }}>
+              <AddIcon />
+            </IconButton>
+          </Tooltip>
         </Grid>
 
         {items.map((item, index) => (
           <Grid item xs={12} key={`${item.productId}-${index}`}>
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <TypographyLike>
-                {item.name} — {item.quantity} × ${Number(item.unitPrice).toFixed(2)}
-              </TypographyLike>
+            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1 }}>
+              <Typography variant="body2">
+                {item.name} — {item.quantity} {item.unitLabel || "u."} ×{" "}
+                {formatProductPrice(item.unitPrice)} ={" "}
+                {formatProductPrice(formatOrderLineTotal(item.quantity, item.unitPrice))}
+              </Typography>
               <Button color="error" size="small" onClick={() => removeItem(index)}>
                 Quitar
               </Button>
             </Box>
           </Grid>
         ))}
+
+        {items.length > 0 && (
+          <Grid item xs={12}>
+            <Typography variant="subtitle1" fontWeight={700} align="right">
+              Total: {formatProductPrice(itemsTotal)}
+            </Typography>
+          </Grid>
+        )}
 
         <Grid item xs={12}>
           <TextField fullWidth label="Fecha del pedido" type="date" {...register("date")} />
@@ -319,18 +365,10 @@ export default function SupplierOrderForm({
         </Grid>
         <Grid item xs={12}>
           <Button type="submit" variant="contained" fullWidth>
-            {isEditing
-              ? "Guardar pedido a proveedor"
-              : lockSupplier
-                ? "Registrar otro pedido a este proveedor"
-                : "Registrar pedido a proveedor"}
+            {isEditing ? "Guardar pedido a proveedor" : "Registrar pedido a proveedor"}
           </Button>
         </Grid>
       </Grid>
     </Box>
   );
-}
-
-function TypographyLike({ children }) {
-  return <Box component="span" sx={{ typography: "body2" }}>{children}</Box>;
 }

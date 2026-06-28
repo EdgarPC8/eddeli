@@ -113,6 +113,38 @@ export const bootstrapPastelesCompareGroup = () =>
     headers: { Authorization: jwt() },
   });
 
+// Tramos (grupos categoría + productos + precios en caja)
+export const getTierGroups = (params = {}) =>
+  axios.get("/inventory/tier-groups", {
+    params,
+    headers: { Authorization: jwt() },
+  });
+
+export const getTierGroupById = (id) =>
+  axios.get(`/inventory/tier-groups/${id}`, {
+    headers: { Authorization: jwt() },
+  });
+
+export const createTierGroup = (payload) =>
+  axios.post("/inventory/tier-groups", payload, {
+    headers: { Authorization: jwt(), "Content-Type": "application/json" },
+  });
+
+export const updateTierGroup = (id, payload) =>
+  axios.put(`/inventory/tier-groups/${id}`, payload, {
+    headers: { Authorization: jwt(), "Content-Type": "application/json" },
+  });
+
+export const deleteTierGroup = (id) =>
+  axios.delete(`/inventory/tier-groups/${id}`, {
+    headers: { Authorization: jwt() },
+  });
+
+export const migrateTierGroupsFromCategories = () =>
+  axios.post("/inventory/tier-groups/migrate-from-categories", null, {
+    headers: { Authorization: jwt() },
+  });
+
 
 
 

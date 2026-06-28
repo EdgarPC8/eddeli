@@ -5,7 +5,6 @@ import {
   Box,
 } from "@mui/material";
 import { useCallback, useRef, useState } from "react";
-import { parse, format } from "date-fns";
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
 import OrderForm from "./components/OrderForm";
 import SupplierOrderForm from "./components/SupplierOrderForm";
@@ -106,26 +105,6 @@ function OrderPage() {
     setOpenSupplierDialog(false);
     await refreshCurrentRange();
   }, [refreshCurrentRange]);
-
-  const openAddSupplierOrder = useCallback((order) => {
-    setIsEditingSupplier(false);
-    setSupplierOrderToEdit(null);
-    let dateStr = format(new Date(), "yyyy-MM-dd");
-    if (order?.date) {
-      try {
-        const d = parse(order.date, "dd/MM/yyyy HH:mm:ss", new Date());
-        if (!Number.isNaN(d.getTime())) dateStr = format(d, "yyyy-MM-dd");
-      } catch {
-        /* fecha por defecto */
-      }
-    }
-    setSupplierPrefill({
-      supplierId: order.supplierId || order.ERP_supplier?.id,
-      supplierName: order.ERP_supplier?.name || "",
-      date: dateStr,
-    });
-    setOpenSupplierDialog(true);
-  }, []);
 
   return (
     <Container>
@@ -234,7 +213,6 @@ function OrderPage() {
           setSupplierPrefill(null);
           setOpenSupplierDialog(true);
         }}
-        onAddSupplierOrder={openAddSupplierOrder}
       />
     </Container>
   );
