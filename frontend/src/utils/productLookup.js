@@ -84,32 +84,92 @@ function unitPriceFromRule(basePrice, rule) {
   return null;
 }
 
+/** Mejor combinación de tramos + unidades sueltas al precio base (mínimo costo). */
+function resolvePackageTierBreakdown(packs, quantity, basePrice) {
+  const targetQty = Math.max(0, Math.floor(Number(quantity || 0)));
+  const base = to2(Number(basePrice || 0));
+  if (targetQty === 0) {
+    return { total: 0, tierUnits: 0, tierCost: 0, singleUnits: 0, singleCost: 0, base };
+  }
+
+  const normalizedPacks = normalizePackageTiers(packs);
+  if (!normalizedPacks.length) {
+    if (base <= 0) return null;
+    return {
+      total: to2(base * targetQty),
+      tierUnits: 0,
+      tierCost: 0,
+      singleUnits: targetQty,
+      singleCost: to2(base * targetQty),
+      base,
+    };
+  }
+
+  const dp = new Array(targetQty + 1).fill(Infinity);
+  const prev = new Array(targetQty + 1).fill(null);
+
+  dp[0] = 0;
+
+  for (let i = 1; i <= targetQty; i += 1) {
+    if (base >= 0 && dp[i - 1] !== Infinity) {
+      const cost = dp[i - 1] + base;
+      if (cost < dp[i]) {
+        dp[i] = cost;
+        prev[i] = "single";
+      }
+    }
+    for (const pack of normalizedPacks) {
+      if (pack.qty <= i && dp[i - pack.qty] !== Infinity) {
+        const cost = dp[i - pack.qty] + pack.totalPrice;
+        if (cost < dp[i]) {
+          dp[i] = cost;
+          prev[i] = pack;
+        }
+      }
+    }
+  }
+
+  if (dp[targetQty] === Infinity) return null;
+
+  let tierUnits = 0;
+  let tierCost = 0;
+  let singleUnits = 0;
+  let rem = targetQty;
+  while (rem > 0) {
+    const step = prev[rem];
+    if (step === "single") {
+      singleUnits += 1;
+      rem -= 1;
+    } else if (step && typeof step === "object" && step.qty) {
+      tierUnits += step.qty;
+      tierCost = to2(tierCost + step.totalPrice);
+      rem -= step.qty;
+    } else {
+      return null;
+    }
+  }
+
+  return {
+    total: to2(dp[targetQty]),
+    tierUnits,
+    tierCost: to2(tierCost),
+    singleUnits,
+    singleCost: to2(singleUnits * base),
+    base,
+  };
+}
+
 /** Mejor combinación de tramos para una cantidad exacta (mínimo costo). */
 export function resolvePackageTierTotal(product, quantity) {
   const targetQty = Math.max(0, Math.floor(Number(quantity || 0)));
   if (targetQty === 0) return 0;
 
   const packs = normalizePackageTiers(product?.packageTiers);
-  if (!packs.length) return null;
-
-  const dp = new Array(targetQty + 1).fill(Infinity);
-  dp[0] = 0;
-
-  for (let i = 1; i <= targetQty; i += 1) {
-    for (const pack of packs) {
-      if (pack.qty <= i && dp[i - pack.qty] !== Infinity) {
-        dp[i] = Math.min(dp[i], dp[i - pack.qty] + pack.totalPrice);
-      }
-    }
-  }
-
-  if (dp[targetQty] !== Infinity) return to2(dp[targetQty]);
-
-  const single = packs.find((p) => p.qty === 1);
-  if (single) return to2(single.totalPrice * targetQty);
-
   const base = to2(Number(product?.price || 0));
-  return to2(base * targetQty);
+  if (!packs.length) return base > 0 ? to2(base * targetQty) : null;
+
+  const breakdown = resolvePackageTierBreakdown(packs, targetQty, base);
+  return breakdown?.total ?? null;
 }
 
 /** Precio unitario según cantidad (mayoreo clásico; sin tramos). */
@@ -444,31 +504,57 @@ export function getCategoryMixMatchHint(packageTiers, currentQty) {
 }
 
 /**
- * Reparte el total de un grupo entre líneas según cantidad.
+ * Reparte el total del grupo: unidades en tramo vs sueltas a precio base,
+ * priorizando líneas con más cantidad para el tramo (ej. 8 dulce = $1 + 1 cacho = $0.15).
  */
-function allocateGroupTotalToLines(indices, rows, groupTotal, pricingMode = "category_package") {
-  const totalQty = indices.reduce(
-    (sum, i) => sum + Math.max(0, Math.floor(Number(rows[i].quantity) || 0)),
-    0,
-  );
-  if (totalQty <= 0) return;
+function allocateGroupTotalToLines(indices, rows, breakdown, pricingMode = "category_package") {
+  const { tierUnits, tierCost, base } = breakdown;
+  let tierUnitsLeft = tierUnits;
 
-  let assigned = 0;
-  indices.forEach((i, pos) => {
+  const sortedIndices = [...indices].sort(
+    (a, b) =>
+      Math.max(0, Math.floor(Number(rows[b].quantity) || 0)) -
+      Math.max(0, Math.floor(Number(rows[a].quantity) || 0)),
+  );
+
+  const lineTotals = new Map();
+  let tierCostAssigned = 0;
+
+  for (let pos = 0; pos < sortedIndices.length; pos += 1) {
+    const i = sortedIndices[pos];
     const qty = Math.max(0, Math.floor(Number(rows[i].quantity) || 0));
-    if (qty <= 0) return;
-    const isLast = pos === indices.length - 1;
-    const lineTotal = isLast
-      ? to2(groupTotal - assigned)
-      : to2(groupTotal * (qty / totalQty));
-    if (!isLast) assigned = to2(assigned + lineTotal);
+    if (qty <= 0) continue;
+
+    const tierAssign = Math.min(qty, tierUnitsLeft);
+    const singleAssign = qty - tierAssign;
+    const isLastTierLine = pos === sortedIndices.length - 1;
+
+    let lineTotal = 0;
+    if (tierAssign > 0 && tierUnits > 0) {
+      const tierShare = isLastTierLine
+        ? to2(tierCost - tierCostAssigned)
+        : to2(tierCost * (tierAssign / tierUnits));
+      lineTotal = to2(lineTotal + tierShare);
+      tierCostAssigned = to2(tierCostAssigned + tierShare);
+      tierUnitsLeft -= tierAssign;
+    }
+    if (singleAssign > 0) {
+      lineTotal = to2(lineTotal + singleAssign * base);
+    }
+
+    lineTotals.set(i, lineTotal);
+  }
+
+  for (const i of indices) {
+    const qty = Math.max(0, Math.floor(Number(rows[i].quantity) || 0));
+    const lineTotal = lineTotals.get(i) ?? 0;
     rows[i] = {
       ...rows[i],
       price: qty > 0 ? to2(lineTotal / qty) : 0,
       lineTotal,
       pricingMode,
     };
-  });
+  }
 }
 
 /**
@@ -497,11 +583,17 @@ export function applyTierGroupPricing(cartRows, products, tierGroups = []) {
     if (!product) return;
     const group = groupByProductId.get(Number(product.id));
     if (!group) return;
-    const groupKey = String(group.id);
-    if (!groups.has(groupKey)) {
-      groups.set(groupKey, { group, indices: [] });
+
+    // Canasta surtido (acceso rápido): mezcla líneas del mismo mixGroupId.
+    // Agregado normal: cada línea se trama solo con su cantidad, sin mezclar con otras.
+    const poolKey = row.mixGroupId
+      ? `mix:${String(row.mixGroupId)}:${String(group.id)}`
+      : `line:${idx}:${String(group.id)}`;
+
+    if (!groups.has(poolKey)) {
+      groups.set(poolKey, { group, indices: [] });
     }
-    groups.get(groupKey).indices.push(idx);
+    groups.get(poolKey).indices.push(idx);
   });
 
   for (const { group, indices } of groups.values()) {
@@ -514,10 +606,9 @@ export function applyTierGroupPricing(cartRows, products, tierGroups = []) {
     if (totalQty <= 0) continue;
 
     const refProduct = productById.get(Number(rows[indices[0]].productId));
-    const groupTotal = resolvePackageTierTotal(
-      { packageTiers: tiers, price: refProduct?.price ?? 0 },
-      totalQty,
-    );
+    const base = to2(Number(refProduct?.price ?? 0));
+    const breakdown = resolvePackageTierBreakdown(tiers, totalQty, base);
+    if (!breakdown) continue;
 
     indices.forEach((i) => {
       rows[i] = {
@@ -526,7 +617,7 @@ export function applyTierGroupPricing(cartRows, products, tierGroups = []) {
         mixGroupLabel: rows[i].mixGroupLabel || mixLabel,
       };
     });
-    allocateGroupTotalToLines(indices, rows, groupTotal, "tier_group_package");
+    allocateGroupTotalToLines(indices, rows, breakdown, "tier_group_package");
   }
 
   rows.forEach((row, idx) => {

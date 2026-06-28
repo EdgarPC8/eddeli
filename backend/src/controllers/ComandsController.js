@@ -2,13 +2,19 @@ import { createLicenseToken } from "../libs/jwt.js";
 import { License } from "../models/License.js";
 import { Logs } from "../models/Logs.js";
 import { promises as fs } from "fs";
+import { Op } from "sequelize";
 import "../database/registerEdDeliModels.js";
+import { Users } from "../models/Users.js";
+import { Account } from "../models/Account.js";
+import { InventoryProduct, InventoryCategory } from "../models/Inventory.js";
+import { Customer, Supplier } from "../models/Orders.js";
 import {
   parseBackupJsonContent,
   recreateDatabaseFromBackup,
   saveBackup,
   writeBackupToDisk,
   getBackupsWorkbench,
+  getPanelBackupSummary,
   setMainBackupFromStored,
   deleteStoredBackup,
   pruneStoredBackupsAndSaveFresh,
@@ -248,6 +254,51 @@ export const downloadMainBackupController = async (req, res) => {
   } catch (error) {
     console.error("downloadMainBackupController:", error);
     res.status(500).json({ message: "Error al descargar backup.json" });
+  }
+};
+
+export const getPanelStatsController = async (_req, res) => {
+  try {
+    const [
+      customers,
+      suppliers,
+      products,
+      categories,
+      subcategories,
+      users,
+      accounts,
+      backup,
+    ] = await Promise.all([
+      Customer.count(),
+      Supplier.count(),
+      InventoryProduct.count(),
+      InventoryCategory.count({ where: { parentId: null } }),
+      InventoryCategory.count({ where: { parentId: { [Op.ne]: null } } }),
+      Users.count(),
+      Account.count(),
+      getPanelBackupSummary(),
+    ]);
+
+    res.json({
+      ok: true,
+      stats: {
+        customers,
+        suppliers,
+        products,
+        categories,
+        subcategories,
+        users,
+        accounts,
+      },
+      backup,
+    });
+  } catch (error) {
+    console.error("Error en getPanelStatsController:", error);
+    res.status(500).json({
+      ok: false,
+      message: "Error al obtener estadísticas del sistema",
+      error: error.message,
+    });
   }
 };
 

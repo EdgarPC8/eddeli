@@ -894,6 +894,7 @@ export default function CajaPage() {
                 items={productsByStockDesc}
                 value={selectedProductId}
                 onChange={handleProductPick}
+                clearInputOnSelect
                 getOptionLabel={formatProductSearchLabel}
                 getOptionValue={(item) => String(item.id)}
                 getSearchText={(item) =>

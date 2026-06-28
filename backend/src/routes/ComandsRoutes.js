@@ -11,9 +11,14 @@ import {
   pruneStoredBackupsController,
   downloadStoredBackupController,
   downloadMainBackupController,
+  getPanelStatsController,
 } from "../controllers/ComandsController.js";
 import { downloadBackup } from "../database/insertData.js";
-import { isAuthenticated, requireProgrammer } from "../middlewares/authMiddelware.js";
+import {
+  isAuthenticated,
+  requireProgrammer,
+  requireAdminOrProgrammer,
+} from "../middlewares/authMiddelware.js";
 import multer from "multer";
 
 const router = Router();
@@ -30,7 +35,8 @@ const upload = multer({
  */
 router.get("/createLicense", isAuthenticated, requireProgrammer, createLicense);
 router.get("/getLogs", isAuthenticated, requireProgrammer, getLogs);
-router.get("/saveBackup", isAuthenticated, requireProgrammer, saveBackupController);
+router.get("/panel-stats", isAuthenticated, requireAdminOrProgrammer, getPanelStatsController);
+router.get("/saveBackup", isAuthenticated, requireAdminOrProgrammer, saveBackupController);
 router.get("/downloadBackup", isAuthenticated, requireProgrammer, downloadBackup);
 router.get("/backups", isAuthenticated, requireProgrammer, listBackupsController);
 router.get("/backups/main/download", isAuthenticated, requireProgrammer, downloadMainBackupController);

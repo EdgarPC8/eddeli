@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Box, TextField, Autocomplete, CircularProgress } from "@mui/material";
 
 const EMPTY_MARKER = "__searchableSelect_empty__";
@@ -19,8 +19,18 @@ export default function SearchableSelect({
   /** Texto extra para filtrar (nombre, código de barras, SKU, etc.). */
   getSearchText,
   disabled = false,
+  /** Tras elegir una opción, vacía el campo (útil en caja: agregar y seguir buscando). */
+  clearInputOnSelect = false,
 }) {
   const [inputLen, setInputLen] = useState(0);
+  const [inputValue, setInputValue] = useState("");
+
+  useEffect(() => {
+    if (value === "" || value == null) {
+      setInputValue("");
+      setInputLen(0);
+    }
+  }, [value]);
 
   const emptyOption = useMemo(
     () => (emptyOptionLabel ? { [EMPTY_MARKER]: true } : null),
@@ -56,6 +66,7 @@ export default function SearchableSelect({
         options={options}
         loading={loading}
         value={selectedOption}
+        inputValue={inputValue}
         onChange={(_event, newValue) => {
           if (!onChange) return;
           if (!newValue || newValue[EMPTY_MARKER]) {
@@ -63,8 +74,13 @@ export default function SearchableSelect({
             return;
           }
           onChange(getOptionValue(newValue));
+          if (clearInputOnSelect) {
+            setInputValue("");
+            setInputLen(0);
+          }
         }}
         onInputChange={(_event, newInput, reason) => {
+          setInputValue(newInput);
           if (reason === "input") {
             setInputLen(newInput.length);
             onSearchChange?.(newInput);
@@ -129,6 +145,10 @@ export default function SearchableSelect({
                   e.preventDefault();
                   e.stopPropagation();
                   onEnterWithInput(val);
+                  if (clearInputOnSelect) {
+                    setInputValue("");
+                    setInputLen(0);
+                  }
                 }
               }
             }}

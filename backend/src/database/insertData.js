@@ -317,8 +317,55 @@ export async function readBackupFileSummary() {
     path: backupFilePath,
     sizeBytes: st.size,
     sizeMB: Number((st.size / 1024 / 1024).toFixed(2)),
+    modifiedAt: st.mtime.toISOString(),
     counts,
     totalRows,
+  };
+}
+
+/** Resumen de la última copia guardada (panel de control). */
+export async function getPanelBackupSummary() {
+  const mainRaw = await readBackupFileSummary();
+  const main = mainRaw.exists
+    ? {
+        filename: "backup.json",
+        modifiedAt: mainRaw.modifiedAt ?? null,
+        sizeBytes: mainRaw.sizeBytes,
+        totalRows: mainRaw.totalRows,
+      }
+    : null;
+
+  const stored = await listStoredBackups();
+  const latestStored = stored[0] ?? null;
+
+  let lastBackup = null;
+  const candidates = [];
+  if (main?.modifiedAt) candidates.push({ ...main, kind: "main" });
+  if (latestStored) {
+    candidates.push({
+      filename: latestStored.filename,
+      modifiedAt: latestStored.modifiedAt,
+      sizeBytes: latestStored.sizeBytes,
+      totalRows: latestStored.totalRows,
+      kind: "stored",
+    });
+  }
+  if (candidates.length) {
+    candidates.sort((a, b) => new Date(b.modifiedAt) - new Date(a.modifiedAt));
+    const pick = candidates[0];
+    lastBackup = {
+      filename: pick.filename,
+      modifiedAt: pick.modifiedAt,
+      sizeBytes: pick.sizeBytes,
+      totalRows: pick.totalRows,
+      isMainFile: pick.kind === "main",
+    };
+  }
+
+  return {
+    hasBackup: Boolean(lastBackup),
+    lastBackup,
+    mainBackup: main,
   };
 }
 

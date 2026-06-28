@@ -39,4 +39,18 @@ const requireProgrammer = (req, res, next) => {
   next();
 };
 
-export { isAuthenticated, requireProgrammer };
+/**
+ * Admin o Programador (panel de control, guardar backup en servidor).
+ * Debe usarse DESPUÉS de isAuthenticated.
+ */
+const requireAdminOrProgrammer = (req, res, next) => {
+  const rol = req.user?.loginRol;
+  if (rol !== "Programador" && rol !== "Administrador") {
+    return res.status(403).json({
+      message: "Solo Administrador o Programador pueden ejecutar esta acción",
+    });
+  }
+  next();
+};
+
+export { isAuthenticated, requireProgrammer, requireAdminOrProgrammer };

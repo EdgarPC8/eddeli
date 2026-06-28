@@ -11,6 +11,8 @@ export const reloadBD = () =>
 export const saveBackup = () =>
   axios.get("/comands/saveBackup", { ...auth(), timeout: 60000 });
 
+export const getPanelStats = () => axios.get("/comands/panel-stats", auth());
+
 export const getLogs = () => axios.get("/comands/getLogs", auth());
 
 export const downloadBackup = async () => {
