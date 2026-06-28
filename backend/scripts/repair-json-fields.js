@@ -4,7 +4,7 @@
  */
 import "dotenv/config";
 import { sequelize } from "../src/database/connection.js";
-import { InventoryCategory, InventoryProduct } from "../src/models/Inventory.js";
+import { InventoryCategory, InventoryProduct, PricingTierGroup } from "../src/models/Inventory.js";
 import {
   PublicidadCampaign,
   PublicidadPlaylistItem,
@@ -13,6 +13,7 @@ import { repairJsonFieldValue } from "../src/utils/jsonFieldUtils.js";
 
 const PRODUCT_JSON_FIELDS = ["packageTiers", "wholesaleRules"];
 const CATEGORY_JSON_FIELDS = ["packageTiers", "mixMatchProductIds"];
+const TIER_GROUP_JSON_FIELDS = ["packageTiers", "productIds"];
 const CAMPAIGN_JSON_FIELDS = ["screenIds", "musicTracks"];
 const PLAYLIST_JSON_FIELDS = ["menuItems"];
 
@@ -51,14 +52,15 @@ async function repairModel(Model, fields, label, { emptyArrayToNull = true } = {
 
 try {
   await sequelize.authenticate();
-  console.log("🔧 Reparando campos JSON (categorías, productos, publicidad)…");
+  console.log("🔧 Reparando campos JSON (categorías, productos, tramos, publicidad)…");
   const a = await repairModel(InventoryCategory, CATEGORY_JSON_FIELDS, "Categorías");
   const b = await repairModel(InventoryProduct, PRODUCT_JSON_FIELDS, "Productos");
+  const t = await repairModel(PricingTierGroup, TIER_GROUP_JSON_FIELDS, "Tramos");
   const c = await repairModel(PublicidadCampaign, CAMPAIGN_JSON_FIELDS, "Publicidad campañas", {
     emptyArrayToNull: false,
   });
   const d = await repairModel(PublicidadPlaylistItem, PLAYLIST_JSON_FIELDS, "Publicidad playlist");
-  console.log(`✅ Listo (${a + b + c + d} registros actualizados).`);
+  console.log(`✅ Listo (${a + b + t + c + d} registros actualizados).`);
   await sequelize.close();
   process.exit(0);
 } catch (error) {

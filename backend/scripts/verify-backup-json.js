@@ -26,6 +26,7 @@ function checkJsonFieldsInBackup(data) {
   const checks = [
     ["InventoryCategory", ["packageTiers", "mixMatchProductIds"]],
     ["InventoryProduct", ["packageTiers", "wholesaleRules"]],
+    ["PricingTierGroup", ["packageTiers", "productIds"]],
     ["PublicidadCampaign", ["screenIds", "musicTracks"]],
     ["PublicidadPlaylistItem", ["menuItems"]],
   ];

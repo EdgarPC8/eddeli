@@ -7,7 +7,7 @@ import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { sequelize } from "../src/database/connection.js";
-import { InventoryCategory, InventoryProduct } from "../src/models/Inventory.js";
+import { InventoryCategory, InventoryProduct, PricingTierGroup } from "../src/models/Inventory.js";
 import { repairJsonFieldValue } from "../src/utils/jsonFieldUtils.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -15,6 +15,7 @@ const scanBackup = process.argv.includes("--backup");
 
 const JSON_FIELDS_CAT = ["packageTiers", "mixMatchProductIds"];
 const JSON_FIELDS_PROD = ["packageTiers", "wholesaleRules"];
+const JSON_FIELDS_TIER_GROUP = ["packageTiers", "productIds"];
 const PUBLICIDAD_JSON_FIELDS = ["screenIds", "musicTracks", "schedule", "contentItems"];
 
 function countSlashes(s) {
@@ -76,6 +77,16 @@ async function auditDb() {
       if (p) problems.push(p);
     }
   }
+  try {
+    for (const row of await PricingTierGroup.findAll({ raw: true })) {
+      for (const f of JSON_FIELDS_TIER_GROUP) {
+        const p = analyzeValue("tierGroup", row.id, row.name, f, row[f]);
+        if (p) problems.push(p);
+      }
+    }
+  } catch {
+    /* tabla puede no existir aún */
+  }
 
   try {
     const [pubRows] = await sequelize.query(
@@ -108,6 +119,7 @@ function auditBackupFile() {
   const tables = [
     ["InventoryCategory", JSON_FIELDS_CAT],
     ["InventoryProduct", JSON_FIELDS_PROD],
+    ["PricingTierGroup", JSON_FIELDS_TIER_GROUP],
     ["PublicidadCampaign", ["screenIds", "musicTracks"]],
     ["PublicidadPlaylistItem", ["menuItems"]],
   ];
