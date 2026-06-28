@@ -43,3 +43,40 @@ export function computeCashTotal(counts) {
 export function formatMoney(amount) {
   return `$${Number(amount || 0).toFixed(2)}`;
 }
+
+/** Convierte conteos guardados en BD a strings para los inputs del arqueo. */
+export function countsToFormState(counts) {
+  const base = emptyCashCounts();
+  if (!counts || typeof counts !== "object") return base;
+  for (const d of CASH_DENOMINATIONS) {
+    const raw = counts[d.key];
+    base[d.key] = raw != null && Number(raw) > 0 ? String(Math.floor(Number(raw))) : "";
+  }
+  return base;
+}
+
+/** Si el arqueo está vacío pero hay total, devuelve el total para el campo simple. */
+export function inferSimpleCashTotal(counts, storedTotal) {
+  const fromCounts = computeCashTotal(countsToFormState(counts));
+  if (fromCounts > 0) return fromCounts;
+  return Number(storedTotal || 0);
+}
+
+export function isoToDatetimeLocal(iso) {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch {
+    return "";
+  }
+}
+
+export function datetimeLocalForApi(local) {
+  if (!local) return undefined;
+  const dt = new Date(local);
+  if (Number.isNaN(dt.getTime())) return undefined;
+  return dt.toISOString();
+}

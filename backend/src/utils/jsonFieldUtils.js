@@ -1,5 +1,5 @@
 /** Desenvuelve strings JSON anidados (p. ej. doble codificación tras restore). */
-export function unwrapJsonString(value, maxDepth = 12) {
+export function unwrapJsonString(value, maxDepth = 40) {
   let v = value;
   for (let i = 0; i < maxDepth; i += 1) {
     if (typeof v !== "string") break;
@@ -11,7 +11,9 @@ export function unwrapJsonString(value, maxDepth = 12) {
       (s.startsWith('"') && s.endsWith('"'));
     if (!looksJson) break;
     try {
-      v = JSON.parse(s);
+      const next = JSON.parse(s);
+      if (next === v) break;
+      v = next;
     } catch {
       break;
     }
@@ -32,12 +34,13 @@ export function repairJsonFieldValue(value, { emptyArrayToNull = true } = {}) {
 export function deserializeJsonFields(rows, config = {}) {
   if (!Array.isArray(rows)) return rows;
   const fields = config.jsonStringFields || [];
+  const emptyArrayToNull = config.emptyArrayToNull !== false;
   return rows.map((row) => {
     if (!row || typeof row !== "object") return row;
     const next = { ...row };
     for (const field of fields) {
       if (field in next) {
-        next[field] = repairJsonFieldValue(next[field]);
+        next[field] = repairJsonFieldValue(next[field], { emptyArrayToNull });
       }
     }
     return next;

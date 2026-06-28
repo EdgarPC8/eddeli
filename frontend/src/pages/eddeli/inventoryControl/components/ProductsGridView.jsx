@@ -248,14 +248,7 @@ function DuplicateDialog({ open, product, onClose, onSuccess }) {
     const categoryId = p.categoryId ?? p.ERP_inventory_category?.id ?? "";
     const unitId = p.unitId ?? p.ERP_inventory_unit?.id ?? "";
 
-    let subfolder = "EdDeli/products";
-    if (p?.primaryImageUrl?.startsWith("EdDeli/")) {
-      const parts = p.primaryImageUrl.split("/");
-      parts.pop();
-      subfolder = parts.join("/") || "EdDeli";
-    }
-
-    fd.append("subfolder", subfolder);
+    fd.append("subfolder", "EdDeli/products");
     fd.append("name", String(name || p?.name || "").trim());
     if (p?.desc) fd.append("desc", p.desc);
     fd.append("type", p?.type || "raw");

@@ -89,7 +89,16 @@ export const uploadBackupController = async (req, res) => {
 
 export const reloadBdController = async (req, res) => {
   try {
-    console.log("🔄 Reiniciando base de datos (EdDeli)...");
+    const forceFull =
+      req.query.forceFull === "1" ||
+      req.query.forceFull === "true" ||
+      String(process.env.DB_RESET_FORCE || "").trim() === "1";
+
+    console.log(
+      forceFull
+        ? "🔄 Reiniciando base de datos (EdDeli) — recarga completa forzada…"
+        : "🔄 Reiniciando base de datos (EdDeli) — comparando esquema…",
+    );
 
     // Copia de seguridad del estado ACTUAL en src/backups/ — NO tocar backup.json
     // (el usuario pudo haber subido un JSON distinto que debe usarse en la recarga).
@@ -102,12 +111,21 @@ export const reloadBdController = async (req, res) => {
       console.warn("⚠️ No se pudo guardar copia previa; se continúa con backup.json:", backupErr.message);
     }
 
-    const insertResult = await recreateDatabaseFromBackup();
-    console.log("✅ Datos EdDeli insertados desde backup.json", insertResult.tables);
+    const insertResult = await recreateDatabaseFromBackup({ forceFull });
+    const modeLabel =
+      insertResult.resetMode === "fast"
+        ? "recarga rápida (solo datos, esquema igual)"
+        : insertResult.resetMode === "mixed"
+          ? `recarga mixta (${insertResult.tablesRecreated?.length || 0} tablas recreadas)`
+          : "recarga completa (esquema recreado)";
+    console.log(`✅ Datos EdDeli insertados — ${modeLabel}`, insertResult.tables);
 
     return res.json({
       ok: true,
-      message: "Base de datos reiniciada e inicializada desde backup.json (EdDeli)",
+      message: `Base de datos restaurada desde backup.json (${modeLabel})`,
+      resetMode: insertResult.resetMode,
+      tablesRecreated: insertResult.tablesRecreated,
+      tablesTruncated: insertResult.tablesTruncated,
       safetyBackup: safetyBackupPath,
       tables: insertResult.tables,
     });

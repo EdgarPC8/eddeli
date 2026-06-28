@@ -23,7 +23,10 @@ try {
   console.warn("   Por tabla:", summary.counts);
 
   const result = await recreateDatabaseFromBackup();
-  console.log("✅ BD reseteada.", result.tables);
+  console.log(`✅ BD reseteada (modo: ${result.resetMode}).`, result.tables);
+  if (result.tablesRecreated?.length) {
+    console.log("   Tablas recreadas:", result.tablesRecreated.join(", "));
+  }
   process.exit(0);
 } catch (error) {
   console.error("❌ Error reseteando BD:", error?.message || error);

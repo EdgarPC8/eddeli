@@ -38,6 +38,52 @@ import { pathImg } from "../../../../api/axios";
 import { useBarcodeScanner } from "../../../../hooks/useBarcodeScanner.js";
 import { normalizeProductBarcode, normalizePackageTiers } from "../../../../utils/productLookup.js";
 
+const PRODUCT_IMAGE_SUBFOLDER = "EdDeli/products";
+
+const PRODUCT_NUMERIC_FIELDS = [
+  "price",
+  "supplierPrice",
+  "distributorPrice",
+  "netWeight",
+  "minStock",
+  "stock",
+  "standardWeightGrams",
+];
+
+const PRODUCT_FORM_DEFAULTS = {
+  name: "",
+  desc: "",
+  type: "raw",
+  unitId: "",
+  categoryId: "",
+  barcode: "",
+  price: "",
+  supplierPrice: "",
+  distributorPrice: "",
+  netWeight: "",
+  minStock: "",
+  stock: "",
+  standardWeightGrams: "",
+};
+
+function toNumOrZero(value) {
+  if (value === "" || value == null) return 0;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function pickDefaultUnitId(units) {
+  if (!Array.isArray(units) || !units.length) return "";
+  const byAbbr = units.find(
+    (u) => String(u.abbreviation || "").toLowerCase() === "un",
+  );
+  if (byAbbr) return byAbbr.id;
+  const byName = units.find((u) =>
+    String(u.name || "").toLowerCase().includes("unidad"),
+  );
+  return (byName || units[0]).id;
+}
+
 /* ============ Helpers de imagen ============ */
 const ALLOWED_IMAGE_MIMES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
@@ -212,7 +258,9 @@ function CropperDialog({
 
 /* ===================== FORM DE PRODUCTO ===================== */
 function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
-  const { handleSubmit, register, reset, setValue, watch } = useForm();
+  const { handleSubmit, register, reset, setValue, watch } = useForm({
+    defaultValues: PRODUCT_FORM_DEFAULTS,
+  });
   const { toast: toastAuth } = useAuth();
   const [usbScanMode, setUsbScanMode] = useState(false);
 
@@ -264,10 +312,6 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
   const [lastMeta, setLastMeta] = useState(null);
   const fileRef = useRef(null);
   const cameraRef = useRef(null);
-
-  // ✅ Input manual: el usuario puede escribir "EdDeli", "EdDeli/products", "EdDeli/products/donas"
-  // El submit lo normaliza para mandar "subfolder" correcto al middleware.
-  const [imageSubfolder, setImageSubfolder] = useState("EdDeli/products");
 
   const currentImage = useMemo(() => {
     if (previewUrl) return previewUrl;
@@ -367,18 +411,6 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
     }
 
     setPackageTiers(normalizePackageTiers(datos?.packageTiers));
-
-    // ✅ sugerir la carpeta a partir de la ruta guardada
-    // primaryImageUrl: "EdDeli/products/dona.png" => input "EdDeli/products"
-    if (datos?.primaryImageUrl?.startsWith("EdDeli/")) {
-      const parts = datos.primaryImageUrl.split("/");
-      parts.pop(); // quita el archivo
-      const folderFull = parts.join("/") || "EdDeli";
-      setImageSubfolder(folderFull);
-    } else {
-      // default si no hay imagen previa
-      setImageSubfolder("EdDeli/products");
-    }
   };
 
   const fetchOptions = async () => {
@@ -386,6 +418,10 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
     const { data: unitData } = await getUnits();
     setCategories(catData);
     setUnits(unitData);
+    if (!isEditing) {
+      const defaultUnitId = pickDefaultUnitId(unitData);
+      if (defaultUnitId) setValue("unitId", defaultUnitId);
+    }
   };
 
   useEffect(() => {
@@ -411,36 +447,37 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
 
   // ------- submit -------
   const submitForm = async (data) => {
+    const name = data.name?.trim() || "";
+    if (!name) {
+      toastAuth({ message: "El nombre es obligatorio.", variant: "error" });
+      return;
+    }
+
+    const unitId = data.unitId || pickDefaultUnitId(units);
+    if (!unitId) {
+      toastAuth({
+        message: "No hay unidades configuradas en el sistema.",
+        variant: "error",
+      });
+      return;
+    }
+
     const fd = new FormData();
-  
-    // ✅ normaliza subfolder
-    const subfolder = String(imageSubfolder || "")
-      .trim()
-      .replace(/\\/g, "/")
-      .replace(/^\/+/, "")
-      .replace(/\/+$/, "")
-      .replace(/\/{2,}/g, "/");
-  
-    fd.append("subfolder", subfolder);
-  
-    // ✅ campos
-    fd.append("name", data.name?.trim() || "");
+
+    fd.append("subfolder", PRODUCT_IMAGE_SUBFOLDER);
+
+    fd.append("name", name);
     const barcode = normalizeProductBarcode(data.barcode);
     if (barcode) fd.append("barcode", barcode);
     else if (isEditing) fd.append("barcode", "");
-    if (data.desc) fd.append("desc", data.desc);
+    if (data.desc?.trim()) fd.append("desc", data.desc.trim());
     fd.append("type", data.type || "raw");
-    fd.append("unitId", String(data.unitId || ""));
+    fd.append("unitId", String(unitId));
     if (data.categoryId) fd.append("categoryId", String(data.categoryId));
-    if (data.price != null) fd.append("price", String(data.price));
-    if (data.supplierPrice != null) fd.append("supplierPrice", String(data.supplierPrice));
-    if (data.distributorPrice != null)
-      fd.append("distributorPrice", String(data.distributorPrice));
-    if (data.netWeight != null) fd.append("netWeight", String(data.netWeight));
-    if (data.minStock != null) fd.append("minStock", String(data.minStock));
-    if (data.stock != null) fd.append("stock", String(data.stock));
-    if (data.standardWeightGrams != null)
-      fd.append("standardWeightGrams", String(data.standardWeightGrams));
+
+    PRODUCT_NUMERIC_FIELDS.forEach((field) => {
+      fd.append(field, String(toNumOrZero(data[field])));
+    });
   
     fd.append("wholesaleRules", JSON.stringify(wholesaleRules || []));
     fd.append("packageTiers", JSON.stringify(packageTiers || []));
@@ -452,27 +489,7 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
     if (selectedFile) {
       fd.append("image", selectedFile, selectedFile.name);
     }
-  
-    /**
-     * ✅ CLAVE: si NO subiste imagen nueva pero cambiaste la carpeta,
-     * manda primaryImageUrl y moveImage=1 para que backend mueva el archivo.
-     */
-    if (isEditing && !selectedFile) {
-      const oldRel = String(datos?.primaryImageUrl || "").replace(/\\/g, "/").trim();
-  
-      // saca filename de la imagen actual
-      const fileName = oldRel.split("/").pop(); // "old.jpg"
-  
-      // construye la nueva ruta completa en BD: "<subfolder>/<filename>"
-      const newRel = subfolder ? `${subfolder}/${fileName}` : fileName;
-  
-      // solo si realmente cambió
-      if (oldRel && newRel && newRel !== oldRel) {
-        fd.append("moveImage", "1");
-        fd.append("primaryImageUrl", newRel); // ✅ lo que el backend usará para mover + guardar
-      }
-    }
-  
+
     const promise = isEditing
       ? apiUpdateProduct(datos.id, fd)
       : apiCreateProduct(fd);
@@ -507,139 +524,48 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
       sx={{ mt: 0 }}
       onSubmit={handleSubmit(submitForm)}
     >
-      <Grid container spacing={2}>
-        {/* Campos principales */}
-        <Grid item xs={12}>
-          <Stack direction="row" spacing={1} alignItems="flex-start">
-            <TextField
-              label="Nombre"
-              fullWidth
-              variant="standard"
-              sx={{ flex: 1 }}
-              {...register("name", { required: true })}
-            />
-            <Stack direction="row" spacing={0.25} sx={{ pt: 0.25, flexShrink: 0 }}>
-              <Tooltip title="Elegir imagen de la galería y recortar">
-                <IconButton
-                  component="label"
-                  size="small"
-                  color={selectedFile || currentImage ? "primary" : "default"}
-                  aria-label="Elegir imagen"
-                >
-                  <ImageIcon />
-                  <input
-                    ref={fileRef}
-                    hidden
-                    type="file"
-                    accept="image/*"
-                    onChange={handlePickImage}
-                  />
-                </IconButton>
-              </Tooltip>
-              <Tooltip title="Tomar foto con la cámara del dispositivo">
-                <IconButton
-                  component="label"
-                  size="small"
-                  color={selectedFile || currentImage ? "primary" : "default"}
-                  aria-label="Tomar foto"
-                >
-                  <PhotoCameraIcon />
-                  <input
-                    ref={cameraRef}
-                    hidden
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    onChange={handlePickImage}
-                  />
-                </IconButton>
-              </Tooltip>
-              {(selectedFile || currentImage) && (
-                <Tooltip title="Quitar imagen seleccionada">
-                  <IconButton
-                    size="small"
-                    color="error"
-                    aria-label="Quitar imagen"
-                    onClick={clearPreview}
-                  >
-                    <DeleteOutlineIcon fontSize="small" />
-                  </IconButton>
-                </Tooltip>
-              )}
-            </Stack>
-          </Stack>
-          {currentImage ? (
-            <Box sx={{ mt: 1.5, display: "flex", alignItems: "center", gap: 1.5 }}>
-              <Box
-                component="img"
-                src={currentImage}
-                alt="Vista previa"
-                sx={{
-                  width: 72,
-                  height: 72,
-                  objectFit: "cover",
-                  borderRadius: 1.5,
-                  border: 1,
-                  borderColor: "divider",
-                }}
-              />
-              <Box>
-                <Typography variant="caption" color="text.secondary" display="block">
-                  {selectedFile ? "Nueva imagen (se sube al guardar)" : "Imagen actual del producto"}
-                </Typography>
-                {lastMeta ? (
-                  <Typography variant="caption" color="text.secondary" display="block">
-                    {lastMeta.width}×{lastMeta.height}px ·{" "}
-                    {((lastMeta.sizeBytes || 0) / (1024 * 1024)).toFixed(2)} MB
-                  </Typography>
-                ) : null}
-              </Box>
-            </Box>
-          ) : null}
-        </Grid>
-
-        <Grid item xs={12}>
+      <Grid container spacing={1} columnSpacing={1.5}>
+        {/* Fila 1: nombre, código, imagen */}
+        <Grid item xs={12} md={5}>
           <TextField
-            multiline
-            rows={3}
-            label="Descripción"
+            label="Nombre"
+            size="small"
             fullWidth
             variant="standard"
-            {...register("desc")}
+            margin="dense"
+            {...register("name")}
           />
         </Grid>
-
-        <Grid item xs={12} sm={6}>
+        <Grid item xs={12} sm={6} md={4}>
           <TextField
             label="Código de barras"
+            size="small"
             fullWidth
             variant="standard"
+            margin="dense"
             value={watch("barcode") || ""}
             inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
-            helperText={
-              usbScanMode ? "Lector USB activo: escanea el código ahora." : "Opcional. Solo dígitos."
-            }
+            placeholder="Opcional"
             onChange={(e) =>
               setValue("barcode", normalizeProductBarcode(e.target.value), { shouldDirty: true })
             }
             InputProps={{
               endAdornment: (
                 <InputAdornment position="end">
-                  <Tooltip title="Activar lector USB en este campo">
+                  <Tooltip title={usbScanMode ? "Lector activo — escanea" : "Activar lector USB"}>
                     <IconButton
                       edge="end"
                       size="small"
-                      aria-label="Activar lector USB"
                       color={usbScanMode ? "primary" : "default"}
                       onClick={() => {
                         setUsbScanMode((active) => {
                           const next = !active;
-                          toastAuth({
-                            message: next
-                              ? "Lector USB activo: escanea el código de barras."
-                              : "Lector USB desactivado.",
-                            variant: "info",
-                          });
+                          if (next) {
+                            toastAuth({
+                              message: "Lector USB activo: escanea el código.",
+                              variant: "info",
+                            });
+                          }
                           return next;
                         });
                       }}
@@ -652,30 +578,75 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
             }}
           />
         </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Stack direction="row" alignItems="center" spacing={0.5} sx={{ height: "100%", pt: 0.5 }}>
+            <Tooltip title="Galería">
+              <IconButton component="label" size="small" color={selectedFile || currentImage ? "primary" : "default"}>
+                <ImageIcon fontSize="small" />
+                <input ref={fileRef} hidden type="file" accept="image/*" onChange={handlePickImage} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Cámara">
+              <IconButton component="label" size="small" color={selectedFile || currentImage ? "primary" : "default"}>
+                <PhotoCameraIcon fontSize="small" />
+                <input ref={cameraRef} hidden type="file" accept="image/*" capture="environment" onChange={handlePickImage} />
+              </IconButton>
+            </Tooltip>
+            {(selectedFile || currentImage) && (
+              <Tooltip title="Quitar imagen">
+                <IconButton size="small" color="error" onClick={clearPreview}>
+                  <DeleteOutlineIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            {currentImage ? (
+              <Box
+                component="img"
+                src={currentImage}
+                alt=""
+                sx={{ width: 40, height: 40, objectFit: "cover", borderRadius: 1, border: 1, borderColor: "divider", ml: 0.5 }}
+              />
+            ) : null}
+          </Stack>
+        </Grid>
 
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={12}>
+          <TextField
+            label="Descripción"
+            size="small"
+            fullWidth
+            variant="standard"
+            margin="dense"
+            {...register("desc")}
+          />
+        </Grid>
+
+        <Grid item xs={6} sm={3}>
           <TextField
             label="Tipo"
             select
+            size="small"
             fullWidth
             variant="standard"
+            margin="dense"
             value={watch("type") ?? "raw"}
-            {...register("type", { required: true })}
+            {...register("type")}
           >
-            <MenuItem value="raw">Materia Prima</MenuItem>
-            <MenuItem value="intermediate">Producto Intermedio</MenuItem>
-            <MenuItem value="final">Producto Final</MenuItem>
+            <MenuItem value="raw">Materia prima</MenuItem>
+            <MenuItem value="intermediate">Intermedio</MenuItem>
+            <MenuItem value="final">Final</MenuItem>
           </TextField>
         </Grid>
-
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={6} sm={3}>
           <TextField
             label="Unidad"
             select
+            size="small"
             fullWidth
             variant="standard"
+            margin="dense"
             value={watch("unitId") || ""}
-            {...register("unitId", { required: true })}
+            {...register("unitId")}
           >
             {Array.isArray(units) &&
               units.map((u) => (
@@ -685,16 +656,18 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
               ))}
           </TextField>
         </Grid>
-
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={12} sm={6}>
           <TextField
             label="Categoría"
             select
+            size="small"
             fullWidth
             variant="standard"
+            margin="dense"
             value={watch("categoryId") || ""}
-            {...register("categoryId", { required: true })}
+            {...register("categoryId")}
           >
+            <MenuItem value="">Sin categoría</MenuItem>
             {getRootCategories(categories).flatMap((root) => {
               const children = getChildCategories(categories, root.id);
               if (children.length > 0) {
@@ -713,224 +686,220 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
           </TextField>
         </Grid>
 
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={6} sm={3}>
           <TextField
-            label="Precio proveedor"
+            label="P. proveedor"
             type="number"
+            size="small"
             fullWidth
             variant="standard"
+            margin="dense"
             inputProps={{ step: "any", min: 0 }}
-            helperText="Lo que te cobra el proveedor"
-            {...register("supplierPrice", { required: true })}
+            placeholder="0"
+            {...register("supplierPrice")}
           />
         </Grid>
-
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={6} sm={3}>
           <TextField
-            label="Precio distribuidor"
+            label="P. distribuidor"
             type="number"
+            size="small"
             fullWidth
             variant="standard"
+            margin="dense"
             inputProps={{ step: "any", min: 0 }}
-            helperText="Precio para que lo revendan"
-            {...register("distributorPrice", { required: true })}
+            placeholder="0"
+            {...register("distributorPrice")}
           />
         </Grid>
-
-        <Grid item xs={12} sm={4}>
+        <Grid item xs={6} sm={3}>
           <TextField
-            label="Precio venta"
+            label="P. venta"
             type="number"
+            size="small"
             fullWidth
             variant="standard"
+            margin="dense"
             inputProps={{ step: "any", min: 0 }}
-            helperText="Precio normal al público"
-            {...register("price", { required: true })}
+            placeholder="0"
+            {...register("price")}
           />
         </Grid>
-
-        <Grid item xs={12} sm={3}>
+        <Grid item xs={6} sm={3}>
           <TextField
-            label="Peso Neto"
+            label="Peso neto"
             type="number"
+            size="small"
             fullWidth
             variant="standard"
-            inputProps={{ step: "any" }}
-            {...register("netWeight", { required: true })}
+            margin="dense"
+            inputProps={{ step: "any", min: 0 }}
+            placeholder="0"
+            {...register("netWeight")}
           />
         </Grid>
 
-        <Grid item xs={12} sm={3}>
+        <Grid item xs={4} sm={3}>
           <TextField
-            label="Stock mínimo"
+            label="Stock mín."
             type="number"
+            size="small"
             fullWidth
             variant="standard"
-            {...register("minStock", { required: true })}
+            margin="dense"
+            inputProps={{ min: 0 }}
+            placeholder="0"
+            {...register("minStock")}
           />
         </Grid>
-
-        <Grid item xs={12} sm={3}>
+        <Grid item xs={4} sm={3}>
           <TextField
             label="Stock actual"
             type="number"
+            size="small"
             fullWidth
             variant="standard"
-            {...register("stock", { required: true })}
+            margin="dense"
+            inputProps={{ min: 0 }}
+            placeholder="0"
+            {...register("stock")}
           />
         </Grid>
-
-        <Grid item xs={12} sm={6}>
+        <Grid item xs={4} sm={3}>
           <TextField
-            label="Peso promedio por unidad (g)"
+            label="Peso prom. (g)"
             type="number"
+            size="small"
             fullWidth
             variant="standard"
+            margin="dense"
             inputProps={{ step: "any", min: 0 }}
-            {...register("standardWeightGrams", { required: true })}
+            placeholder="0"
+            {...register("standardWeightGrams")}
           />
         </Grid>
-
-        {/* Precios por tramo / paquete (opcional) */}
-        <Grid item xs={12}>
-          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap">
-            <Typography variant="subtitle2">Precios por tramo (paquetes)</Typography>
-            <Button variant="outlined" size="small" onClick={addPackageTier}>
-              Añadir tramo
-            </Button>
-          </Stack>
-          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-            Opcional por producto. En caja, si la categoría tiene tramos, se mezclan variedades de
-            esa categoría (ej. 4 panes distintos = tramo de 4). Sin tramos en categoría, aplica
-            solo el producto.
-          </Typography>
+        <Grid item xs={6} sm={3}>
+          <TextField
+            label="Recorte"
+            select
+            size="small"
+            fullWidth
+            variant="standard"
+            margin="dense"
+            value={aspectKey}
+            onChange={(e) => setAspectKey(e.target.value)}
+          >
+            <MenuItem value="free">Libre</MenuItem>
+            <MenuItem value="1:1">1:1</MenuItem>
+            <MenuItem value="4:3">4:3</MenuItem>
+            <MenuItem value="16:9">16:9</MenuItem>
+          </TextField>
         </Grid>
 
-        {packageTiers.map((tier, idx) => (
-          <Grid key={`pkg-${idx}`} item xs={12} sm={6} md={4}>
-            <Stack
-              spacing={1}
-              sx={{
-                border: "1px solid",
-                borderColor: "divider",
-                p: 1.5,
-                borderRadius: 1,
-              }}
-            >
-              <TextField
-                label="Cantidad"
-                type="number"
-                size="small"
-                value={tier.qty}
-                onChange={(e) =>
-                  updatePackageTier(idx, "qty", Math.max(1, Number(e.target.value || 1)))
-                }
-              />
-              <TextField
-                label="Total a cobrar ($)"
-                type="number"
-                size="small"
-                value={tier.totalPrice}
-                onChange={(e) =>
-                  updatePackageTier(
-                    idx,
-                    "totalPrice",
-                    Math.max(0, Number(e.target.value || 0))
-                  )
-                }
-                inputProps={{ step: "0.01", min: 0 }}
-              />
-              <Button color="error" size="small" onClick={() => removePackageTier(idx)}>
-                Quitar
-              </Button>
-            </Stack>
-          </Grid>
-        ))}
-
-        {/* Reglas Mayoristas */}
+        {/* Tramos paquete — fila compacta */}
         <Grid item xs={12}>
-          <Stack direction="row" alignItems="center" spacing={1}>
-            <Typography variant="subtitle2">Reglas Mayoristas</Typography>
-            <Button variant="outlined" size="small" onClick={addTier}>
-              Añadir tramo
+          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+            <Typography variant="caption" fontWeight={700} color="text.secondary">
+              Tramos paquete
+            </Typography>
+            <Button variant="text" size="small" sx={{ minWidth: 0, py: 0 }} onClick={addPackageTier}>
+              + tramo
             </Button>
-          </Stack>
-        </Grid>
-
-        {wholesaleRules.map((tier, idx) => (
-          <Grid key={idx} item xs={12} sm={6} md={4}>
-            <Stack
-              spacing={1}
-              sx={{
-                border: "1px solid",
-                borderColor: "divider",
-                p: 1.5,
-                borderRadius: 1,
-              }}
-            >
-              <TextField
-                label="Cantidad mínima"
-                type="number"
-                size="small"
-                value={tier.minQty}
-                onChange={(e) =>
-                  updateTier(
-                    idx,
-                    "minQty",
-                    Math.max(1, Number(e.target.value || 1))
-                  )
-                }
-              />
-              <TextField
-                label="Descuento %"
-                type="number"
-                size="small"
-                value={tier.discountPercent}
-                onChange={(e) =>
-                  updateTier(
-                    idx,
-                    "discountPercent",
-                    Math.max(0, Number(e.target.value || 0))
-                  )
-                }
-              />
-              <Button
-                color="error"
-                size="small"
-                onClick={() => removeTier(idx)}
+            {packageTiers.map((tier, idx) => (
+              <Stack
+                key={`pkg-${idx}`}
+                direction="row"
+                spacing={0.5}
+                alignItems="center"
+                sx={{
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 1,
+                  px: 0.75,
+                  py: 0.25,
+                }}
               >
-                Quitar
-              </Button>
-            </Stack>
-          </Grid>
-        ))}
+                <TextField
+                  label="Cant."
+                  type="number"
+                  size="small"
+                  variant="standard"
+                  value={tier.qty}
+                  onChange={(e) =>
+                    updatePackageTier(idx, "qty", Math.max(1, Number(e.target.value || 1)))
+                  }
+                  sx={{ width: 56, "& .MuiInputBase-root": { fontSize: "0.8rem" } }}
+                />
+                <TextField
+                  label="$ total"
+                  type="number"
+                  size="small"
+                  variant="standard"
+                  value={tier.totalPrice}
+                  onChange={(e) =>
+                    updatePackageTier(idx, "totalPrice", Math.max(0, Number(e.target.value || 0)))
+                  }
+                  inputProps={{ step: "0.01", min: 0 }}
+                  sx={{ width: 72, "& .MuiInputBase-root": { fontSize: "0.8rem" } }}
+                />
+                <IconButton size="small" color="error" onClick={() => removePackageTier(idx)} sx={{ p: 0.25 }}>
+                  <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Stack>
+            ))}
+          </Stack>
+        </Grid>
 
-        {/* Imagen — carpeta destino y proporción de recorte */}
+        {/* Mayorista — fila compacta */}
         <Grid item xs={12}>
-          <Stack spacing={1}>
-            <TextField
-              label='Carpeta destino (ej: "EdDeli/products")'
-              size="small"
-              fullWidth
-              variant="standard"
-              value={imageSubfolder}
-              onChange={(e) => setImageSubfolder(e.target.value)}
-              placeholder="EdDeli/products"
-              helperText="Ruta donde se guardará la imagen en el servidor."
-            />
-            <TextField
-              label="Relación de aspecto al recortar"
-              value={aspectKey}
-              onChange={(e) => setAspectKey(e.target.value)}
-              select
-              size="small"
-              sx={{ maxWidth: 220 }}
-            >
-              <MenuItem value="free">Libre</MenuItem>
-              <MenuItem value="1:1">1:1</MenuItem>
-              <MenuItem value="4:3">4:3</MenuItem>
-              <MenuItem value="16:9">16:9</MenuItem>
-            </TextField>
+          <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
+            <Typography variant="caption" fontWeight={700} color="text.secondary">
+              Mayorista
+            </Typography>
+            <Button variant="text" size="small" sx={{ minWidth: 0, py: 0 }} onClick={addTier}>
+              + tramo
+            </Button>
+            {wholesaleRules.map((tier, idx) => (
+              <Stack
+                key={`ws-${idx}`}
+                direction="row"
+                spacing={0.5}
+                alignItems="center"
+                sx={{
+                  border: "1px solid",
+                  borderColor: "divider",
+                  borderRadius: 1,
+                  px: 0.75,
+                  py: 0.25,
+                }}
+              >
+                <TextField
+                  label="Mín."
+                  type="number"
+                  size="small"
+                  variant="standard"
+                  value={tier.minQty}
+                  onChange={(e) =>
+                    updateTier(idx, "minQty", Math.max(1, Number(e.target.value || 1)))
+                  }
+                  sx={{ width: 56, "& .MuiInputBase-root": { fontSize: "0.8rem" } }}
+                />
+                <TextField
+                  label="% desc."
+                  type="number"
+                  size="small"
+                  variant="standard"
+                  value={tier.discountPercent}
+                  onChange={(e) =>
+                    updateTier(idx, "discountPercent", Math.max(0, Number(e.target.value || 0)))
+                  }
+                  sx={{ width: 64, "& .MuiInputBase-root": { fontSize: "0.8rem" } }}
+                />
+                <IconButton size="small" color="error" onClick={() => removeTier(idx)} sx={{ p: 0.25 }}>
+                  <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                </IconButton>
+              </Stack>
+            ))}
           </Stack>
         </Grid>
       </Grid>

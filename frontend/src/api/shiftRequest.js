@@ -22,6 +22,14 @@ export const getShiftMovements = (shiftId) =>
 export const createShiftMovement = (shiftId, payload) =>
   axios.post(`/shifts/${shiftId}/movements`, payload, auth());
 
+export const updateShift = (id, payload) => axios.patch(`/shifts/${id}`, payload, auth());
+
+export const updateShiftMovement = (shiftId, movementId, payload) =>
+  axios.patch(`/shifts/${shiftId}/movements/${movementId}`, payload, auth());
+
+export const deleteShiftMovement = (shiftId, movementId) =>
+  axios.delete(`/shifts/${shiftId}/movements/${movementId}`, auth());
+
 export const getWeeklyShiftReport = (params = {}) => {
   const qs = new URLSearchParams(params).toString();
   return axios.get(`/shifts/reports/weekly${qs ? `?${qs}` : ""}`, auth());

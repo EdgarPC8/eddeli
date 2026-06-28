@@ -58,8 +58,8 @@ const OPERATION_CONFIG = {
   reload: {
     title: "Recargando base de datos",
     steps: [
-      { until: 25, label: "Preparando recarga de la base de datos…" },
-      { until: 50, label: "Eliminando tablas existentes…" },
+      { until: 25, label: "Comparando esquema de tablas…" },
+      { until: 50, label: "Vaciando o recreando solo lo necesario…" },
       { until: 80, label: "Importando backup.json…" },
       { until: 95, label: "Insertando catálogo, clientes y pedidos…" },
     ],
@@ -82,12 +82,18 @@ function stepLabel(steps, progress) {
   return step?.label || "Finalizando…";
 }
 
-function formatBackupTablesSummary(tables) {
+function formatBackupTablesSummary(tables, resetMode) {
   if (!tables || typeof tables !== "object") return "";
   const shift = tables.CashShift ?? 0;
   const movements = tables.CashShiftMovement ?? 0;
   const orders = tables.Order ?? 0;
-  return ` Turnos: ${shift}, mov. caja: ${movements}, pedidos: ${orders}.`;
+  const modeHint =
+    resetMode === "fast"
+      ? " Modo rápido (esquema sin cambios)."
+      : resetMode === "mixed"
+        ? " Modo mixto (algunas tablas recreadas)."
+        : "";
+  return ` Turnos: ${shift}, mov. caja: ${movements}, pedidos: ${orders}.${modeHint}`;
 }
 
 export default function ComandosPage() {
@@ -154,7 +160,7 @@ export default function ComandosPage() {
       const baseMessage = getApiSuccessMessage(res, config.successMessage);
       const tablesSummary =
         operationKey === "save" || operationKey === "upload" || operationKey === "reload"
-          ? formatBackupTablesSummary(res?.data?.tables)
+          ? formatBackupTablesSummary(res?.data?.tables, res?.data?.resetMode)
           : "";
       toast({
         message: `${baseMessage}${tablesSummary}`,
@@ -211,7 +217,7 @@ export default function ComandosPage() {
     {
       key: "reload",
       name: "Recargar BD",
-      info: "Borra y vuelve a crear tablas desde backup.json",
+      info: "Restaura backup.json; si el esquema no cambió, solo vacía tablas (más rápido)",
       icon: RefreshIcon,
       run: () => setConfirmReloadOpen(true),
     },
@@ -236,7 +242,9 @@ export default function ComandosPage() {
         Comandos — Programador
       </Typography>
       <Alert severity="warning" sx={{ mb: 2 }}>
-        Recargar BD elimina todos los datos actuales y los restaura desde <strong>backup.json</strong>.
+        Recargar BD restaura todos los datos desde <strong>backup.json</strong>.
+        Si las tablas tienen el mismo esquema que los modelos, solo se vacían y se vuelven a llenar (más rápido).
+        Si cambiaste modelos sin <code>npm run db:sync</code>, solo se recrean las tablas que difieren.
         El backup incluye inventario, pedidos, finanzas, turnos de caja y movimientos. Úsalo con precaución.
       </Alert>
 

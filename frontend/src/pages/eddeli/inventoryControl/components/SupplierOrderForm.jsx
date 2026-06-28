@@ -46,7 +46,15 @@ const normalizeToYYYYMMDD = (datos) => {
   return localISODate();
 };
 
-export default function SupplierOrderForm({ onClose, reload, isEditing = false, datos = null }) {
+export default function SupplierOrderForm({
+  onClose,
+  reload,
+  isEditing = false,
+  datos = null,
+  prefillSupplierId = null,
+  prefillDate = null,
+  lockSupplier = false,
+}) {
   const { handleSubmit, register, reset, setValue, watch } = useForm();
   const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -183,7 +191,6 @@ export default function SupplierOrderForm({ onClose, reload, isEditing = false, 
 
   useEffect(() => {
     fetchCatalog();
-    setValue("date", localISODate());
 
     if (isEditing && datos) {
       setSelectedSupplier(String(datos.supplierId || ""));
@@ -196,9 +203,16 @@ export default function SupplierOrderForm({ onClose, reload, isEditing = false, 
         name: item.ERP_inventory_product?.name || "",
       }));
       setItems(loaded);
+      return;
     }
+
+    setItems([]);
+    setPendingVoucherFile(null);
+    setValue("notes", "");
+    setValue("date", prefillDate || localISODate());
+    setSelectedSupplier(prefillSupplierId ? String(prefillSupplierId) : "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [datos]);
+  }, [datos, isEditing, prefillSupplierId, prefillDate]);
 
   return (
     <Box component="form" sx={{ mt: 1 }} onSubmit={handleSubmit(submitOrder)}>
@@ -209,8 +223,11 @@ export default function SupplierOrderForm({ onClose, reload, isEditing = false, 
             items={suppliers}
             value={selectedSupplier}
             onChange={(val) => setSelectedSupplier(val != null ? String(val) : "")}
+            disabled={lockSupplier}
           />
         </Grid>
+        {!lockSupplier && (
+          <>
         <Grid item xs={12} sm={8}>
           <TextField
             fullWidth
@@ -225,6 +242,8 @@ export default function SupplierOrderForm({ onClose, reload, isEditing = false, 
             Crear proveedor
           </Button>
         </Grid>
+          </>
+        )}
 
         <Grid item xs={12}>
           <input type="hidden" {...register("productId")} />
@@ -300,7 +319,11 @@ export default function SupplierOrderForm({ onClose, reload, isEditing = false, 
         </Grid>
         <Grid item xs={12}>
           <Button type="submit" variant="contained" fullWidth>
-            {isEditing ? "Guardar pedido a proveedor" : "Registrar pedido a proveedor"}
+            {isEditing
+              ? "Guardar pedido a proveedor"
+              : lockSupplier
+                ? "Registrar otro pedido a este proveedor"
+                : "Registrar pedido a proveedor"}
           </Button>
         </Grid>
       </Grid>

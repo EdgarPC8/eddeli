@@ -135,6 +135,11 @@ export const createSupplierOrderRequest = async (data) =>
 export const updateSupplierOrderRequest = async (id, data) =>
   await axios.put(`/orders/supplier-orders/${id}`, data, { headers: { Authorization: jwt() } });
 
+export const addSupplierOrderItemRequest = async (orderId, data) =>
+  await axios.post(`/orders/supplier-orders/${orderId}/items`, data, {
+    headers: { Authorization: jwt() },
+  });
+
 export const deleteSupplierOrderRequest = async (id) =>
   await axios.delete(`/orders/supplier-orders/${id}`, { headers: { Authorization: jwt() } });
 

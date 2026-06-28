@@ -6,11 +6,17 @@ import { Order, OrderItem, Customer } from "../../models/Orders.js";
 import { Users } from "../../models/Users.js";
 import { InventoryProduct, InventoryMovement } from "../../models/Inventory.js";
 import { Expense } from "../../models/Finance.js";
-import { computeCashTotal, normalizeCashCounts } from "../../utils/shiftCashUtils.js";
+import {
+  computeCashTotal,
+  emptyCashCounts,
+  normalizeCashCounts,
+  resolveCashFromBody,
+} from "../../utils/shiftCashUtils.js";
 
 const CAJA_POS_TAG = "[CAJA_POS]";
 const to2 = (n) => Number(Number(n || 0).toFixed(2));
 const ADMIN_ROLES = new Set(["Administrador", "Programador"]);
+const PROGRAMMER_ROLE = "Programador";
 const USER_LIST_ATTRS = ["id", "firstName", "firstLastName", "ci"];
 
 const OUT_CATEGORIES = new Set(["gasto_operativo", "compra_mercancia", "retiro", "otro"]);
@@ -107,6 +113,47 @@ function computeExpectedCash(opening, salesCash, cashOut, cashIn) {
   return to2(opening + salesCash - cashOut + cashIn);
 }
 
+function requireProgrammerRole(req, res) {
+  if (req.user?.loginRol !== PROGRAMMER_ROLE) {
+    res.status(403).json({ message: "Solo el rol Programador puede ejecutar esta acción." });
+    return false;
+  }
+  return true;
+}
+
+function parseOptionalIsoDate(value) {
+  if (value == null || value === "") return null;
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return undefined;
+  return dt;
+}
+
+async function recalculateClosedShiftFinancials(shift, transaction) {
+  const orders = await getShiftPosOrders(shift.id);
+  const sales = await sumOrderTotals(orders);
+  const { cashOut, cashIn } = await getShiftMovementsSummary(shift.id);
+  const opening = Number(shift.openingCashTotal || 0);
+  const expectedCashTotal = computeExpectedCash(opening, sales.salesCash, cashOut, cashIn);
+  const closing = Number(shift.closingCashTotal || 0);
+  const cashDifference = shift.closingCashTotal != null ? to2(closing - expectedCashTotal) : null;
+
+  await shift.update(
+    {
+      expectedCashTotal: shift.status === "closed" ? expectedCashTotal : shift.expectedCashTotal,
+      cashDifference: shift.status === "closed" ? cashDifference : shift.cashDifference,
+      salesCashTotal: sales.salesCash,
+      salesTransferTotal: sales.salesTransfer,
+      salesCardTotal: sales.salesCard,
+      salesTotal: sales.salesTotal,
+      cashOutTotal: cashOut,
+      cashInTotal: cashIn,
+    },
+    { transaction },
+  );
+
+  return { sales, cashOut, cashIn, expectedCashTotal, cashDifference };
+}
+
 function validateMovementPayload({ direction, category, amount, concept, productId, quantity }) {
   if (!direction || !["out", "in"].includes(direction)) {
     return "Indica si es salida o entrada de efectivo.";
@@ -164,12 +211,21 @@ async function registerInventoryPurchase({ productId, quantity, amount, concept,
   return invMovement;
 }
 
-async function registerExpenseForMovement({ category, amount, concept, accountId, referenceId, referenceType, transaction }) {
+async function registerExpenseForMovement({
+  category,
+  amount,
+  concept,
+  accountId,
+  referenceId,
+  referenceType,
+  transaction,
+  date,
+}) {
   if (!EXPENSE_CATEGORIES.has(category)) return null;
 
   return Expense.create(
     {
-      date: new Date(),
+      date: date || new Date(),
       amount,
       concept,
       category: CATEGORY_EXPENSE_LABEL[category] || "Gastos",
@@ -325,10 +381,11 @@ export async function createShiftMovement(req, res) {
 
     const shift = await CashShift.findByPk(id);
     if (!shift) return res.status(404).json({ message: "Turno no encontrado." });
-    if (shift.accountId !== accountId) {
+    const isProgrammer = req.user.loginRol === PROGRAMMER_ROLE;
+    if (!isProgrammer && shift.accountId !== accountId) {
       return res.status(403).json({ message: "Solo puedes registrar movimientos en tu turno." });
     }
-    if (shift.status !== "open") {
+    if (!isProgrammer && shift.status !== "open") {
       return res.status(400).json({ message: "El turno está cerrado; no se pueden agregar movimientos." });
     }
 
@@ -344,13 +401,22 @@ export async function createShiftMovement(req, res) {
 
     const amt = to2(amount);
     const conceptTrim = String(concept).trim();
+    const { createdAt: createdAtBody } = req.body;
+    let movementCreatedAt = new Date();
+    if (isProgrammer && createdAtBody) {
+      const parsed = parseOptionalIsoDate(createdAtBody);
+      if (parsed === undefined) {
+        return res.status(400).json({ message: "Fecha del movimiento no válida." });
+      }
+      if (parsed) movementCreatedAt = parsed;
+    }
 
     const movement = await sequelize.transaction(async (transaction) => {
       const row = await CashShiftMovement.create(
         {
           shiftId: shift.id,
-          accountId,
-          userId,
+          accountId: shift.accountId,
+          userId: req.user.userId,
           direction,
           category,
           amount: amt,
@@ -358,6 +424,8 @@ export async function createShiftMovement(req, res) {
           notes: notes?.trim() || null,
           productId: productId || null,
           quantity: quantity != null && quantity !== "" ? parseFloat(quantity) : null,
+          createdAt: movementCreatedAt,
+          updatedAt: movementCreatedAt,
         },
         { transaction },
       );
@@ -382,15 +450,20 @@ export async function createShiftMovement(req, res) {
         category,
         amount: amt,
         concept: conceptTrim,
-        accountId,
+        accountId: shift.accountId,
         referenceId: row.id,
         referenceType: "cash_shift_movement",
         transaction,
+        date: movementCreatedAt,
       });
       if (expense) expenseId = expense.id;
 
       if (inventoryMovementId || expenseId) {
         await row.update({ inventoryMovementId, expenseId }, { transaction });
+      }
+
+      if (shift.status === "closed") {
+        await recalculateClosedShiftFinancials(shift, transaction);
       }
 
       return row;
@@ -419,7 +492,7 @@ export async function createShiftMovement(req, res) {
 export async function openShift(req, res) {
   try {
     const { accountId, userId } = req.user;
-    const { cashCounts, notes } = req.body;
+    const { notes, openedAt } = req.body;
 
     const existing = await findOpenShiftForAccount(accountId);
     if (existing) {
@@ -429,19 +502,28 @@ export async function openShift(req, res) {
       });
     }
 
-    const counts = normalizeCashCounts(cashCounts);
-    const openingCashTotal = computeCashTotal(counts);
-    if (openingCashTotal <= 0) {
+    const resolved = resolveCashFromBody(req.body);
+    if (!resolved) {
       return res.status(400).json({
-        message: "Ingresa el capital inicial (al menos una moneda o billete).",
+        message: "Ingresa el capital inicial en efectivo.",
       });
+    }
+
+    const { counts, total: openingCashTotal } = resolved;
+    let openedAtDate = new Date();
+    if (req.user.loginRol === PROGRAMMER_ROLE && openedAt) {
+      const parsed = parseOptionalIsoDate(openedAt);
+      if (parsed === undefined) {
+        return res.status(400).json({ message: "Fecha de apertura no válida." });
+      }
+      if (parsed) openedAtDate = parsed;
     }
 
     const shift = await CashShift.create({
       accountId,
       userId,
       status: "open",
-      openedAt: new Date(),
+      openedAt: openedAtDate,
       openingCashCounts: counts,
       openingCashTotal,
       openingNotes: notes || null,
@@ -460,7 +542,7 @@ export async function closeShift(req, res) {
   try {
     const { accountId } = req.user;
     const { id } = req.params;
-    const { cashCounts, notes } = req.body;
+    const { notes, closedAt } = req.body;
 
     const shift = await CashShift.findByPk(id);
     if (!shift) return res.status(404).json({ message: "Turno no encontrado." });
@@ -471,8 +553,11 @@ export async function closeShift(req, res) {
       return res.status(400).json({ message: "Este turno ya está cerrado." });
     }
 
-    const counts = normalizeCashCounts(cashCounts);
-    const closingCashTotal = computeCashTotal(counts);
+    const resolved = resolveCashFromBody(req.body);
+    if (!resolved) {
+      return res.status(400).json({ message: "Ingresa el efectivo contado al cierre." });
+    }
+    const { counts, total: closingCashTotal } = resolved;
 
     const orders = await getShiftPosOrders(shift.id);
     const sales = await sumOrderTotals(orders);
@@ -481,9 +566,18 @@ export async function closeShift(req, res) {
     const expectedCashTotal = computeExpectedCash(opening, sales.salesCash, cashOut, cashIn);
     const cashDifference = to2(closingCashTotal - expectedCashTotal);
 
+    let closedAtDate = new Date();
+    if (req.user.loginRol === PROGRAMMER_ROLE && closedAt) {
+      const parsed = parseOptionalIsoDate(closedAt);
+      if (parsed === undefined) {
+        return res.status(400).json({ message: "Fecha de cierre no válida." });
+      }
+      if (parsed) closedAtDate = parsed;
+    }
+
     await shift.update({
       status: "closed",
-      closedAt: new Date(),
+      closedAt: closedAtDate,
       closingCashCounts: counts,
       closingCashTotal,
       expectedCashTotal,
@@ -1001,6 +1095,178 @@ export async function getDailyShiftReport(req, res) {
       }),
       sales,
     });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
+
+/** PATCH /shifts/:id — corrección de turno (solo Programador). */
+export async function updateShiftProgrammer(req, res) {
+  try {
+    if (!requireProgrammerRole(req, res)) return;
+
+    const shift = await CashShift.findByPk(req.params.id);
+    if (!shift) return res.status(404).json({ message: "Turno no encontrado." });
+
+    const {
+      openedAt,
+      closedAt,
+      openingCashCounts,
+      openingCashTotal,
+      closingCashCounts,
+      closingCashTotal,
+      openingNotes,
+      closingNotes,
+      status,
+    } = req.body;
+
+    const patch = {};
+
+    if (openedAt !== undefined) {
+      const parsed = parseOptionalIsoDate(openedAt);
+      if (parsed === undefined) return res.status(400).json({ message: "Fecha de apertura no válida." });
+      if (parsed) patch.openedAt = parsed;
+    }
+    if (closedAt !== undefined) {
+      const parsed = parseOptionalIsoDate(closedAt);
+      if (parsed === undefined) return res.status(400).json({ message: "Fecha de cierre no válida." });
+      patch.closedAt = parsed;
+    }
+    if (openingNotes !== undefined) patch.openingNotes = openingNotes?.trim() || null;
+    if (closingNotes !== undefined) patch.closingNotes = closingNotes?.trim() || null;
+    if (status === "open" || status === "closed") patch.status = status;
+
+    if (openingCashCounts != null) {
+      const counts = normalizeCashCounts(openingCashCounts);
+      patch.openingCashCounts = counts;
+      patch.openingCashTotal = computeCashTotal(counts);
+    } else if (openingCashTotal != null) {
+      patch.openingCashTotal = to2(openingCashTotal);
+      patch.openingCashCounts = normalizeCashCounts(emptyCashCounts());
+    }
+
+    if (closingCashCounts != null) {
+      const counts = normalizeCashCounts(closingCashCounts);
+      patch.closingCashCounts = counts;
+      patch.closingCashTotal = computeCashTotal(counts);
+    } else if (closingCashTotal != null) {
+      patch.closingCashTotal = to2(closingCashTotal);
+      patch.closingCashCounts = normalizeCashCounts(emptyCashCounts());
+    }
+
+    await sequelize.transaction(async (transaction) => {
+      await shift.update(patch, { transaction });
+      await shift.reload({ transaction });
+      if (shift.status === "closed") {
+        await recalculateClosedShiftFinancials(shift, transaction);
+      }
+    });
+
+    await shift.reload();
+    res.json({
+      message: "Turno actualizado.",
+      shift: await buildShiftResponse(shift),
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
+
+/** PATCH /shifts/:shiftId/movements/:movementId — editar gasto/movimiento (solo Programador). */
+export async function updateShiftMovementProgrammer(req, res) {
+  try {
+    if (!requireProgrammerRole(req, res)) return;
+
+    const shift = await CashShift.findByPk(req.params.id);
+    if (!shift) return res.status(404).json({ message: "Turno no encontrado." });
+
+    const movement = await CashShiftMovement.findByPk(req.params.movementId);
+    if (!movement || movement.shiftId !== shift.id) {
+      return res.status(404).json({ message: "Movimiento no encontrado." });
+    }
+
+    const { direction, category, amount, concept, notes, createdAt } = req.body;
+    const patch = {};
+
+    if (direction != null) {
+      if (!["out", "in"].includes(direction)) {
+        return res.status(400).json({ message: "Dirección no válida." });
+      }
+      patch.direction = direction;
+    }
+    if (category != null) patch.category = category;
+    if (amount != null) {
+      const amt = to2(amount);
+      if (!amt || amt <= 0) return res.status(400).json({ message: "Monto inválido." });
+      patch.amount = amt;
+    }
+    if (concept != null) {
+      const conceptTrim = String(concept).trim();
+      if (!conceptTrim) return res.status(400).json({ message: "Concepto requerido." });
+      patch.concept = conceptTrim;
+    }
+    if (notes !== undefined) patch.notes = notes?.trim() || null;
+    if (createdAt !== undefined) {
+      const parsed = parseOptionalIsoDate(createdAt);
+      if (parsed === undefined) return res.status(400).json({ message: "Fecha no válida." });
+      if (parsed) {
+        patch.createdAt = parsed;
+        patch.updatedAt = parsed;
+      }
+    }
+
+    await sequelize.transaction(async (transaction) => {
+      await movement.update(patch, { transaction });
+
+      if (movement.expenseId) {
+        const expensePatch = {};
+        if (patch.amount != null) expensePatch.amount = patch.amount;
+        if (patch.concept != null) expensePatch.concept = patch.concept;
+        if (patch.createdAt) expensePatch.date = patch.createdAt;
+        if (Object.keys(expensePatch).length) {
+          const expense = await Expense.findByPk(movement.expenseId, { transaction });
+          if (expense) await expense.update(expensePatch, { transaction });
+        }
+      }
+
+      if (shift.status === "closed") {
+        await recalculateClosedShiftFinancials(shift, transaction);
+      }
+    });
+
+    res.json({
+      message: "Movimiento actualizado.",
+      movement: movementToJson(movement),
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+}
+
+/** DELETE /shifts/:shiftId/movements/:movementId — eliminar movimiento (solo Programador). */
+export async function deleteShiftMovementProgrammer(req, res) {
+  try {
+    if (!requireProgrammerRole(req, res)) return;
+
+    const shift = await CashShift.findByPk(req.params.id);
+    if (!shift) return res.status(404).json({ message: "Turno no encontrado." });
+
+    const movement = await CashShiftMovement.findByPk(req.params.movementId);
+    if (!movement || movement.shiftId !== shift.id) {
+      return res.status(404).json({ message: "Movimiento no encontrado." });
+    }
+
+    await sequelize.transaction(async (transaction) => {
+      if (movement.expenseId) {
+        await Expense.destroy({ where: { id: movement.expenseId }, transaction });
+      }
+      await movement.destroy({ transaction });
+      if (shift.status === "closed") {
+        await recalculateClosedShiftFinancials(shift, transaction);
+      }
+    });
+
+    res.json({ message: "Movimiento eliminado." });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }

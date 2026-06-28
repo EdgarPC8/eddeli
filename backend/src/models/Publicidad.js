@@ -3,6 +3,37 @@
  */
 import { DataTypes } from "sequelize";
 import { sequelize } from "../database/connection.js";
+import { repairJsonFieldValue } from "../utils/jsonFieldUtils.js";
+
+function defineJsonArrayField(fieldName, { emptyTo = [] } = {}) {
+  return {
+    type: DataTypes.JSON,
+    allowNull: false,
+    defaultValue: emptyTo,
+    get() {
+      const v = repairJsonFieldValue(this.getDataValue(fieldName), { emptyArrayToNull: false });
+      return Array.isArray(v) ? v : emptyTo;
+    },
+    set(value) {
+      const v = repairJsonFieldValue(value, { emptyArrayToNull: false });
+      this.setDataValue(fieldName, Array.isArray(v) ? v : emptyTo);
+    },
+  };
+}
+
+function defineJsonArrayFieldNullable(fieldName) {
+  return {
+    type: DataTypes.JSON,
+    allowNull: true,
+    get() {
+      const v = repairJsonFieldValue(this.getDataValue(fieldName));
+      return Array.isArray(v) ? v : null;
+    },
+    set(value) {
+      this.setDataValue(fieldName, repairJsonFieldValue(value));
+    },
+  };
+}
 
 export const PublicidadCampaign = sequelize.define(
   "ERP_publicidad_campaigns",
@@ -15,30 +46,12 @@ export const PublicidadCampaign = sequelize.define(
       allowNull: false,
       defaultValue: "draft",
     },
-    screenIds: { type: DataTypes.JSON, allowNull: false, defaultValue: [] },
+    screenIds: defineJsonArrayField("screenIds"),
     loop: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
     /** none | single_loop | playlist_loop — música de fondo mientras la campaña está activa */
     musicMode: { type: DataTypes.STRING(32), allowNull: false, defaultValue: "none" },
     /** Lista de pistas: [{ id, title, mediaPath, durationSeconds, order }] */
-    musicTracks: {
-      type: DataTypes.JSON,
-      allowNull: false,
-      defaultValue: [],
-      get() {
-        const raw = this.getDataValue("musicTracks");
-        if (!raw) return [];
-        if (Array.isArray(raw)) return raw;
-        if (typeof raw === "string") {
-          try {
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? parsed : [];
-          } catch {
-            return [];
-          }
-        }
-        return [];
-      },
-    },
+    musicTracks: defineJsonArrayField("musicTracks"),
     createdByAccountId: { type: DataTypes.INTEGER, allowNull: true },
   },
   { timestamps: true },
@@ -57,24 +70,7 @@ export const PublicidadPlaylistItem = sequelize.define(
       allowNull: false,
     },
     /** Productos del tablero menú (contentType = menu) */
-    menuItems: {
-      type: DataTypes.JSON,
-      allowNull: true,
-      get() {
-        const raw = this.getDataValue("menuItems");
-        if (!raw) return null;
-        if (Array.isArray(raw)) return raw;
-        if (typeof raw === "string") {
-          try {
-            const parsed = JSON.parse(raw);
-            return Array.isArray(parsed) ? parsed : null;
-          } catch {
-            return null;
-          }
-        }
-        return raw;
-      },
-    },
+    menuItems: defineJsonArrayFieldNullable("menuItems"),
     contentId: { type: DataTypes.STRING(120), allowNull: true },
     title: { type: DataTypes.STRING(200), allowNull: false },
     subtitle: { type: DataTypes.STRING(300), allowNull: true },

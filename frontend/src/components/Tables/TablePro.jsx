@@ -15,6 +15,8 @@ import {
   Typography,
   Box,
   TableSortLabel,
+  alpha,
+  useTheme,
 } from "@mui/material";
 
 const TablePro = ({
@@ -28,7 +30,12 @@ const TablePro = ({
   showIndex = false,
   indexHeader = "#",
   tableMaxHeight = "calc(100vh - 220px)",
+  onRowClick,
+  selectedRowId = null,
+  getRowId = (row) => row.id,
 }) => {
+  const theme = useTheme();
+  const accent = theme.palette.primary.main;
   const [searchText, setSearchText] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(defaultRowsPerPage);
@@ -151,8 +158,27 @@ const TablePro = ({
             </TableHead>
 
             <TableBody>
-              {paginatedRows.map((row, idx) => (
-                <TableRow hover key={row.id ?? `${idx}-${Math.random()}`}>
+              {paginatedRows.map((row, idx) => {
+                const rowId = getRowId(row);
+                const selected =
+                  selectedRowId != null && rowId != null && rowId === selectedRowId;
+                return (
+                <TableRow
+                  hover
+                  key={row.id ?? `${idx}-${Math.random()}`}
+                  selected={selected}
+                  onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  sx={{
+                    cursor: onRowClick ? "pointer" : undefined,
+                    bgcolor: selected ? alpha(accent, 0.08) : undefined,
+                    "&.Mui-selected": {
+                      bgcolor: alpha(accent, 0.1),
+                    },
+                    "&.Mui-selected:hover": {
+                      bgcolor: alpha(accent, 0.14),
+                    },
+                  }}
+                >
                   {showIndex && (
                     <TableCell sx={{ py: 0.5 }}>
                       {showPagination ? page * rowsPerPage + idx + 1 : idx + 1}
@@ -160,12 +186,21 @@ const TablePro = ({
                   )}
 
                   {columns.map((column) => (
-                    <TableCell key={column.id} sx={{ py: 0.5 }}>
+                    <TableCell
+                      key={column.id}
+                      sx={{ py: 0.5 }}
+                      onClick={
+                        column.stopRowClick
+                          ? (e) => e.stopPropagation()
+                          : undefined
+                      }
+                    >
                       {column.render ? column.render(row) : row[column.id]}
                     </TableCell>
                   ))}
                 </TableRow>
-              ))}
+              );
+              })}
 
               {paginatedRows.length === 0 && (
                 <TableRow>

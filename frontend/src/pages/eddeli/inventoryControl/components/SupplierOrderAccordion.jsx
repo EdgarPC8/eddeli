@@ -5,6 +5,7 @@ import {
   Box,
   Button,
   Divider,
+  Grid,
   IconButton,
   MenuItem,
   TextField,
@@ -16,14 +17,19 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import PaymentsIcon from "@mui/icons-material/Payments";
+import AddIcon from "@mui/icons-material/Add";
+import PostAddIcon from "@mui/icons-material/PostAdd";
 import {
+  addSupplierOrderItemRequest,
   deleteSupplierOrderRequest,
   markSupplierOrderPaidRequest,
   markSupplierOrderReceivedRequest,
 } from "../../../../api/ordersRequest";
 import SimpleDialog from "../../../../components/Dialogs/SimpleDialog";
+import SearchableSelect from "../../../../components/SearchableSelect";
 import { formatDateTime } from "../../../../helpers/functions.js";
 import DocumentAttachmentIcon from "./DocumentAttachmentIcon";
+import ProductPriceReference, { getDefaultDistributorPrice } from "./ProductPriceReference";
 import { useState } from "react";
 
 function supplierTotal(order) {
@@ -58,11 +64,14 @@ export default function SupplierOrderAccordion({
   onReload,
   onRemove,
   onEdit,
+  onAddAnother,
+  products = [],
 }) {
   const theme = useTheme();
   const [openDelete, setOpenDelete] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("efectivo");
   const [busy, setBusy] = useState(false);
+  const [addDraft, setAddDraft] = useState({ productId: "", quantity: "", unitPrice: "" });
 
   const severity = supplierSeverity(order);
   const base = severityColor(severity, theme.palette);
@@ -92,6 +101,32 @@ export default function SupplierOrderAccordion({
       await toast({ promise: deleteSupplierOrderRequest(order.id) });
       setOpenDelete(false);
       onRemove?.(order.id);
+      await onReload?.();
+    } catch {
+      /* toast */
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleAddProduct = async () => {
+    const productId = Number(addDraft.productId);
+    const quantity = Number(String(addDraft.quantity ?? "").replace(",", "."));
+    const unitPrice = Number(String(addDraft.unitPrice ?? "").replace(",", "."));
+    if (!productId || !Number.isFinite(quantity) || quantity <= 0) {
+      void toast?.({ message: "Selecciona producto y cantidad válidos.", variant: "warning" });
+      return;
+    }
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+      void toast?.({ message: "Precio unitario inválido.", variant: "warning" });
+      return;
+    }
+    setBusy(true);
+    try {
+      await toast({
+        promise: addSupplierOrderItemRequest(order.id, { productId, quantity, unitPrice }),
+      });
+      setAddDraft({ productId: "", quantity: "", unitPrice: "" });
       await onReload?.();
     } catch {
       /* toast */
@@ -224,6 +259,97 @@ export default function SupplierOrderAccordion({
                   Editar
                 </Button>
               )}
+              {onAddAnother && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  color="secondary"
+                  startIcon={<PostAddIcon />}
+                  disabled={busy}
+                  onClick={() => onAddAnother(order)}
+                >
+                  Otro pedido a este proveedor
+                </Button>
+              )}
+            </Box>
+          )}
+
+          {canManage && !order.receivedAt && products.length > 0 && (
+            <Box
+              sx={{
+                mt: 2,
+                p: 1.5,
+                border: "1px dashed",
+                borderColor: "divider",
+                borderRadius: 1,
+              }}
+            >
+              <Typography variant="subtitle2" gutterBottom>
+                Añadir producto a este pedido
+              </Typography>
+              <Grid container spacing={1} alignItems="flex-end">
+                <Grid item xs={12} sm={5}>
+                  <SearchableSelect
+                    label="Producto"
+                    items={products}
+                    value={addDraft.productId}
+                    onChange={(val) => {
+                      const p = products.find((x) => String(x.id) === String(val));
+                      setAddDraft((prev) => ({
+                        ...prev,
+                        productId: val != null && val !== "" ? String(val) : "",
+                        unitPrice:
+                          p != null
+                            ? String(getDefaultDistributorPrice(p))
+                            : prev.unitPrice,
+                      }));
+                    }}
+                    getOptionLabel={(p) => p?.name ?? ""}
+                    getOptionValue={(p) => p?.id ?? ""}
+                    placeholder="Buscar producto…"
+                  />
+                  {(() => {
+                    const p = addDraft.productId
+                      ? products.find((x) => String(x.id) === String(addDraft.productId))
+                      : null;
+                    return p ? <ProductPriceReference product={p} compact /> : null;
+                  })()}
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <TextField
+                    label="Cantidad"
+                    type="number"
+                    inputProps={{ min: 0.01, step: "any" }}
+                    size="small"
+                    fullWidth
+                    value={addDraft.quantity}
+                    onChange={(e) => setAddDraft((p) => ({ ...p, quantity: e.target.value }))}
+                  />
+                </Grid>
+                <Grid item xs={6} sm={3}>
+                  <TextField
+                    label="Precio unitario"
+                    type="number"
+                    inputProps={{ min: 0, step: "0.01" }}
+                    size="small"
+                    fullWidth
+                    value={addDraft.unitPrice}
+                    onChange={(e) => setAddDraft((p) => ({ ...p, unitPrice: e.target.value }))}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={1}>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    fullWidth
+                    startIcon={<AddIcon />}
+                    disabled={busy}
+                    onClick={() => void handleAddProduct()}
+                  >
+                    Agregar
+                  </Button>
+                </Grid>
+              </Grid>
             </Box>
           )}
         </AccordionDetails>

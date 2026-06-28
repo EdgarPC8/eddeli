@@ -5,12 +5,24 @@
 import "dotenv/config";
 import { sequelize } from "../src/database/connection.js";
 import { InventoryCategory, InventoryProduct } from "../src/models/Inventory.js";
+import {
+  PublicidadCampaign,
+  PublicidadPlaylistItem,
+} from "../src/models/Publicidad.js";
 import { repairJsonFieldValue } from "../src/utils/jsonFieldUtils.js";
 
 const PRODUCT_JSON_FIELDS = ["packageTiers", "wholesaleRules"];
 const CATEGORY_JSON_FIELDS = ["packageTiers", "mixMatchProductIds"];
+const CAMPAIGN_JSON_FIELDS = ["screenIds", "musicTracks"];
+const PLAYLIST_JSON_FIELDS = ["menuItems"];
 
-async function repairModel(Model, fields, label) {
+function normalizeJsonField(raw, { emptyArrayToNull = true } = {}) {
+  const repaired = repairJsonFieldValue(raw, { emptyArrayToNull });
+  if (repaired == null) return null;
+  return repaired;
+}
+
+async function repairModel(Model, fields, label, { emptyArrayToNull = true } = {}) {
   const rows = await Model.findAll();
   let fixed = 0;
   for (const row of rows) {
@@ -18,8 +30,14 @@ async function repairModel(Model, fields, label) {
     for (const field of fields) {
       const raw = row.getDataValue(field);
       if (raw == null) continue;
-      if (typeof raw === "string") {
-        updates[field] = repairJsonFieldValue(raw);
+      const next = normalizeJsonField(raw, { emptyArrayToNull });
+      const same =
+        next === raw ||
+        (Array.isArray(next) &&
+          Array.isArray(raw) &&
+          JSON.stringify(next) === JSON.stringify(raw));
+      if (typeof raw === "string" || !same) {
+        updates[field] = next ?? (emptyArrayToNull ? null : []);
       }
     }
     if (Object.keys(updates).length) {
@@ -33,10 +51,14 @@ async function repairModel(Model, fields, label) {
 
 try {
   await sequelize.authenticate();
-  console.log("🔧 Reparando campos JSON en categorías y productos…");
+  console.log("🔧 Reparando campos JSON (categorías, productos, publicidad)…");
   const a = await repairModel(InventoryCategory, CATEGORY_JSON_FIELDS, "Categorías");
   const b = await repairModel(InventoryProduct, PRODUCT_JSON_FIELDS, "Productos");
-  console.log(`✅ Listo (${a + b} registros actualizados).`);
+  const c = await repairModel(PublicidadCampaign, CAMPAIGN_JSON_FIELDS, "Publicidad campañas", {
+    emptyArrayToNull: false,
+  });
+  const d = await repairModel(PublicidadPlaylistItem, PLAYLIST_JSON_FIELDS, "Publicidad playlist");
+  console.log(`✅ Listo (${a + b + c + d} registros actualizados).`);
   await sequelize.close();
   process.exit(0);
 } catch (error) {

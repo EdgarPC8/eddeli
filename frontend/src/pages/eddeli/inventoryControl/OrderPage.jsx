@@ -5,6 +5,7 @@ import {
   Box,
 } from "@mui/material";
 import { useCallback, useRef, useState } from "react";
+import { parse, format } from "date-fns";
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
 import OrderForm from "./components/OrderForm";
 import SupplierOrderForm from "./components/SupplierOrderForm";
@@ -32,6 +33,7 @@ function OrderPage() {
   const [orderToEdit, setOrderToEdit] = useState(null);
   const [isEditingSupplier, setIsEditingSupplier] = useState(false);
   const [supplierOrderToEdit, setSupplierOrderToEdit] = useState(null);
+  const [supplierPrefill, setSupplierPrefill] = useState(null);
 
   const loadedMonthsRef = useRef(new Set());
   const visibleMonthRef = useRef(new Date());
@@ -100,9 +102,30 @@ function OrderPage() {
   const closeSupplierDialog = useCallback(async () => {
     setIsEditingSupplier(false);
     setSupplierOrderToEdit(null);
+    setSupplierPrefill(null);
     setOpenSupplierDialog(false);
     await refreshCurrentRange();
   }, [refreshCurrentRange]);
+
+  const openAddSupplierOrder = useCallback((order) => {
+    setIsEditingSupplier(false);
+    setSupplierOrderToEdit(null);
+    let dateStr = format(new Date(), "yyyy-MM-dd");
+    if (order?.date) {
+      try {
+        const d = parse(order.date, "dd/MM/yyyy HH:mm:ss", new Date());
+        if (!Number.isNaN(d.getTime())) dateStr = format(d, "yyyy-MM-dd");
+      } catch {
+        /* fecha por defecto */
+      }
+    }
+    setSupplierPrefill({
+      supplierId: order.supplierId || order.ERP_supplier?.id,
+      supplierName: order.ERP_supplier?.name || "",
+      date: dateStr,
+    });
+    setOpenSupplierDialog(true);
+  }, []);
 
   return (
     <Container>
@@ -139,6 +162,7 @@ function OrderPage() {
           onClick={() => {
             setIsEditingSupplier(false);
             setSupplierOrderToEdit(null);
+            setSupplierPrefill(null);
             handleSupplierDialog();
           }}
         >
@@ -168,12 +192,15 @@ function OrderPage() {
         onClose={() => {
           setIsEditingSupplier(false);
           setSupplierOrderToEdit(null);
+          setSupplierPrefill(null);
           handleSupplierDialog();
         }}
         tittle={
           isEditingSupplier
             ? "Editar pedido a proveedor"
-            : "Registrar pedido a proveedor"
+            : supplierPrefill?.supplierName
+              ? `Nuevo pedido a ${supplierPrefill.supplierName}`
+              : "Registrar pedido a proveedor"
         }
       >
         <SupplierOrderForm
@@ -181,6 +208,9 @@ function OrderPage() {
           reload={refreshCurrentRange}
           isEditing={isEditingSupplier}
           datos={supplierOrderToEdit}
+          prefillSupplierId={supplierPrefill?.supplierId}
+          prefillDate={supplierPrefill?.date}
+          lockSupplier={Boolean(supplierPrefill?.supplierId)}
         />
       </SimpleDialog>
 
@@ -201,8 +231,10 @@ function OrderPage() {
         onEditSupplier={(pedido) => {
           setIsEditingSupplier(true);
           setSupplierOrderToEdit(pedido);
+          setSupplierPrefill(null);
           setOpenSupplierDialog(true);
         }}
+        onAddSupplierOrder={openAddSupplierOrder}
       />
     </Container>
   );

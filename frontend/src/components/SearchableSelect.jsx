@@ -18,6 +18,7 @@ export default function SearchableSelect({
   onEnterWithInput,
   /** Texto extra para filtrar (nombre, código de barras, SKU, etc.). */
   getSearchText,
+  disabled = false,
 }) {
   const [inputLen, setInputLen] = useState(0);
 
@@ -51,6 +52,7 @@ export default function SearchableSelect({
     <Box sx={{ width: "100%" }}>
       <Autocomplete
         size="small"
+        disabled={disabled}
         options={options}
         loading={loading}
         value={selectedOption}
@@ -118,7 +120,11 @@ export default function SearchableSelect({
             onKeyDown={(e) => {
               params.inputProps?.onKeyDown?.(e);
               if (e.key === "Enter" && onEnterWithInput) {
-                const val = String(e.currentTarget.value ?? "").trim();
+                const input = e.currentTarget;
+                const listboxOpen = input.getAttribute("aria-expanded") === "true";
+                const hasHighlighted = Boolean(input.getAttribute("aria-activedescendant"));
+                if (listboxOpen && hasHighlighted) return;
+                const val = String(input.value ?? "").trim();
                 if (val) {
                   e.preventDefault();
                   e.stopPropagation();

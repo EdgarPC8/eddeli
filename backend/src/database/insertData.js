@@ -7,6 +7,7 @@ import { Roles } from "../models/Roles.js";
 import { Users } from "../models/Users.js";
 import { Account, AccountRoles } from "../models/Account.js";
 import { sequelize } from "./connection.js";
+import { prepareTablesForRestore } from "./prepareTablesForRestore.js";
 import { repairJsonFieldValue, deserializeJsonFields } from "../utils/jsonFieldUtils.js";
 import { Notifications } from "../models/Notifications.js";
 
@@ -101,8 +102,8 @@ export const BACKUP_TABLE_ENTRIES = [
   { key: "SupplierOrderItem", model: SupplierOrderItem },
   { key: "TaskPlan", model: TaskPlan },
   { key: "TaskItem", model: TaskItem },
-  { key: "PublicidadCampaign", model: PublicidadCampaign },
-  { key: "PublicidadPlaylistItem", model: PublicidadPlaylistItem },
+  { key: "PublicidadCampaign", model: PublicidadCampaign, sanitize: "PublicidadCampaign" },
+  { key: "PublicidadPlaylistItem", model: PublicidadPlaylistItem, sanitize: "PublicidadPlaylistItem" },
   { key: "PublicidadDevice", model: PublicidadDevice },
   { key: "MediaAsset", model: MediaAsset, sanitize: "MediaAsset" },
   { key: "Expense", model: Expense },
@@ -224,17 +225,29 @@ export async function writeBackupToDisk(jsonData) {
 const sanitizeRows = (rows, config = {}) => {
   if (!Array.isArray(rows)) return rows;
   const jsonStringFields = config.jsonStringFields || [];
+  const emptyArrayToNull = config.emptyArrayToNull !== false;
   return rows.map((row) => {
     if (!row || typeof row !== "object") return row;
     const next = { ...row };
     for (const field of jsonStringFields) {
       if (field in next) {
-        next[field] = repairJsonFieldValue(next[field]);
+        next[field] = repairJsonFieldValue(next[field], { emptyArrayToNull });
       }
     }
     return next;
   });
 };
+
+/** Normaliza todos los campos JSON del backup (quita strings anidados y slashes corruptos). */
+function sanitizeBackupJsonFields(data) {
+  const out = { ...data };
+  for (const [tableKey, config] of Object.entries(SANITIZE_CONFIG)) {
+    if (Array.isArray(out[tableKey])) {
+      out[tableKey] = sanitizeRows(out[tableKey], config);
+    }
+  }
+  return out;
+}
 
 const SANITIZE_CONFIG = {
   InventoryCategory: {
@@ -251,6 +264,13 @@ const SANITIZE_CONFIG = {
   },
   MediaAsset: {
     jsonStringFields: ["metadata"],
+  },
+  PublicidadCampaign: {
+    jsonStringFields: ["screenIds", "musicTracks"],
+    emptyArrayToNull: false,
+  },
+  PublicidadPlaylistItem: {
+    jsonStringFields: ["menuItems"],
   },
 };
 
@@ -321,17 +341,7 @@ export async function requireValidBackupFile() {
 
 /** Evita FK rotas al restaurar backups viejos sin turnos de caja. */
 export function prepareBackupForRestore(jsonData) {
-  const data = { ...jsonData };
-
-  data.InventoryCategory = sanitizeRows(
-    data.InventoryCategory,
-    SANITIZE_CONFIG.InventoryCategory,
-  );
-  data.InventoryProduct = sanitizeRows(
-    data.InventoryProduct,
-    SANITIZE_CONFIG.InventoryProduct,
-  );
-  data.CashShift = sanitizeRows(data.CashShift, SANITIZE_CONFIG.CashShift);
+  const data = sanitizeBackupJsonFields({ ...jsonData });
 
   const shifts = Array.isArray(data.CashShift) ? data.CashShift : [];
   const validShiftIds = new Set(shifts.map((s) => s?.id).filter((id) => id != null));
@@ -399,22 +409,24 @@ export async function ensureBackupFileExists() {
 }
 
 /** Borra tablas, las recrea e importa backup.json (Comandos / scripts). */
-export async function recreateDatabaseFromBackup() {
+export async function recreateDatabaseFromBackup({ forceFull = false } = {}) {
   await requireValidBackupFile();
 
-  const dialect = sequelize.getDialect?.() || "mysql";
-  if (dialect === "mysql") {
-    await sequelize.query("SET FOREIGN_KEY_CHECKS = 0");
-    try {
-      await sequelize.sync({ force: true });
-    } finally {
-      await sequelize.query("SET FOREIGN_KEY_CHECKS = 1");
-    }
-  } else {
-    await sequelize.sync({ force: true });
-  }
+  const prep = await prepareTablesForRestore(BACKUP_TABLE_ENTRIES, { forceFull });
+  console.log(
+    `📋 Preparación BD: modo=${prep.mode}` +
+      (prep.recreated?.length ? `, recreadas=[${prep.recreated.join(", ")}]` : "") +
+      (prep.truncated?.length ? `, truncadas=${prep.truncated.length} tablas` : ""),
+  );
 
-  return insertData();
+  const insertResult = await insertData();
+  return {
+    ...insertResult,
+    resetMode: prep.mode,
+    tablesRecreated: prep.recreated || [],
+    tablesTruncated: prep.truncated || [],
+    schemaAudit: prep.schemaAudit,
+  };
 }
 
 /** Respaldo / restore solo tablas EdDeli (inventario, pedidos, finanzas, editor, notificaciones, cuentas). Quiz, forms, alumni, CV → softed/backend. */

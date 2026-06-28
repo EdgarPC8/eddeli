@@ -8,6 +8,7 @@ import {
   CircularProgress,
   FormControl,
   Grid,
+  IconButton,
   InputAdornment,
   InputLabel,
   MenuItem,
@@ -30,6 +31,7 @@ import LockIcon from "@mui/icons-material/Lock";
 import HistoryIcon from "@mui/icons-material/History";
 import AddIcon from "@mui/icons-material/Add";
 import SwapVertIcon from "@mui/icons-material/SwapVert";
+import EditIcon from "@mui/icons-material/Edit";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { formatDateTime } from "../../helpers/functions.js";
 import {
@@ -39,11 +41,16 @@ import {
   getShifts,
   openShift,
 } from "../../api/shiftRequest.js";
+import ShiftProgrammerEditDialog from "./ShiftProgrammerEditDialog.jsx";
+import ProgrammerMovementDateField, {
+  movementDateForApi,
+} from "./inventoryControl/components/ProgrammerMovementDateField.jsx";
 import { getAllProducts } from "../../api/inventoryControlRequest.js";
 import {
   CASH_BILLS,
   CASH_COINS,
   computeCashTotal,
+  datetimeLocalForApi,
   emptyCashCounts,
   formatMoney,
   parseQty,
@@ -70,6 +77,7 @@ const emptyMovementForm = () => ({
   notes: "",
   product: null,
   quantity: "",
+  movementDate: "",
 });
 
 const compactFieldSx = {
@@ -181,22 +189,34 @@ function operatorFromShift(shift, user) {
 
 export default function TurnoPage() {
   const { user, toast } = useAuth();
-  const isAdmin = user?.loginRol === "Administrador" || user?.loginRol === "Programador";
+  const isProgrammer = user?.loginRol === "Programador";
+  const isAdmin = user?.loginRol === "Administrador" || isProgrammer;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeShift, setActiveShift] = useState(null);
   const [history, setHistory] = useState([]);
   const [openCounts, setOpenCounts] = useState(emptyCashCounts);
   const [closeCounts, setCloseCounts] = useState(emptyCashCounts);
+  const [openCashTotal, setOpenCashTotal] = useState("");
+  const [closeCashTotal, setCloseCashTotal] = useState("");
+  const [openAt, setOpenAt] = useState("");
+  const [closeAt, setCloseAt] = useState("");
   const [openNotes, setOpenNotes] = useState("");
   const [closeNotes, setCloseNotes] = useState("");
   const [movementForm, setMovementForm] = useState(emptyMovementForm);
   const [movementSaving, setMovementSaving] = useState(false);
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
+  const [editShiftId, setEditShiftId] = useState(null);
 
-  const openTotal = useMemo(() => computeCashTotal(openCounts), [openCounts]);
-  const closeTotal = useMemo(() => computeCashTotal(closeCounts), [closeCounts]);
+  const openTotal = useMemo(
+    () => (isProgrammer ? computeCashTotal(openCounts) : to2(openCashTotal)),
+    [isProgrammer, openCounts, openCashTotal],
+  );
+  const closeTotal = useMemo(
+    () => (isProgrammer ? computeCashTotal(closeCounts) : to2(closeCashTotal)),
+    [isProgrammer, closeCounts, closeCashTotal],
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -279,6 +299,9 @@ export default function TurnoPage() {
         productId: movementForm.product?.id,
         quantity:
           movementForm.quantity !== "" ? Number(movementForm.quantity) : undefined,
+        createdAt: isProgrammer
+          ? movementDateForApi(movementForm.movementDate) || undefined
+          : undefined,
       });
       void toast?.({ message: "Movimiento registrado.", variant: "success" });
       setMovementForm(emptyMovementForm());
@@ -295,19 +318,33 @@ export default function TurnoPage() {
 
   const handleOpenShift = async () => {
     if (openTotal <= 0) {
-      void toast?.({ message: "Ingresa el capital inicial en monedas o billetes.", variant: "warning" });
+      void toast?.({
+        message: isProgrammer
+          ? "Ingresa el capital inicial en monedas o billetes."
+          : "Ingresa el total en efectivo de apertura.",
+        variant: "warning",
+      });
       return;
     }
     try {
       setSaving(true);
-      await openShift({
-        cashCounts: openCounts,
+      const payload = {
         notes: openNotes || undefined,
-      });
+        ...(isProgrammer
+          ? {
+              cashCounts: openCounts,
+              openedAt: datetimeLocalForApi(openAt) || undefined,
+            }
+          : { cashTotal: openTotal }),
+      };
+      await openShift(payload);
       void toast?.({ message: "Turno abierto. Ya puedes vender en caja.", variant: "success" });
       setOpenCounts(emptyCashCounts());
+      setOpenCashTotal("");
+      setOpenAt("");
       setOpenNotes("");
       setCloseCounts(emptyCashCounts());
+      setCloseCashTotal("");
       await load();
     } catch (e) {
       void toast?.({
@@ -324,8 +361,13 @@ export default function TurnoPage() {
     try {
       setSaving(true);
       const { data } = await closeShift(activeShift.id, {
-        cashCounts: closeCounts,
         notes: closeNotes || undefined,
+        ...(isProgrammer
+          ? {
+              cashCounts: closeCounts,
+              closedAt: datetimeLocalForApi(closeAt) || undefined,
+            }
+          : { cashTotal: closeTotal }),
       });
       const diff = Number(data?.summary?.cashDifference ?? 0);
       void toast?.({
@@ -336,6 +378,8 @@ export default function TurnoPage() {
         variant: diff === 0 ? "success" : "warning",
       });
       setCloseCounts(emptyCashCounts());
+      setCloseCashTotal("");
+      setCloseAt("");
       setCloseNotes("");
       await load();
     } catch (e) {
@@ -380,6 +424,9 @@ export default function TurnoPage() {
             </Typography>
           </>
         )}
+        {isProgrammer && (
+          <Chip label="Modo Programador" size="small" color="info" sx={{ height: 22 }} />
+        )}
         {isAdmin && (
           <Button component={RouterLink} to="/turno/supervision" size="small" variant="outlined" sx={{ ml: "auto" }}>
             Supervisión por fecha
@@ -404,10 +451,38 @@ export default function TurnoPage() {
             </Typography>
           </Stack>
 
-          <CashArqueoBlock
-            counts={openCounts}
-            onChange={(key, val) => setOpenCounts((p) => ({ ...p, [key]: val }))}
-          />
+          {isProgrammer ? (
+            <CashArqueoBlock
+              counts={openCounts}
+              onChange={(key, val) => setOpenCounts((p) => ({ ...p, [key]: val }))}
+            />
+          ) : (
+            <TextField
+              size="small"
+              margin="dense"
+              label="Total en efectivo (apertura)"
+              type="number"
+              value={openCashTotal}
+              onChange={(e) => setOpenCashTotal(e.target.value)}
+              inputProps={{ min: 0, step: 0.01 }}
+              fullWidth
+              sx={{ ...compactFieldSx, mb: 1 }}
+            />
+          )}
+
+          {isProgrammer && (
+            <TextField
+              size="small"
+              margin="dense"
+              label="Fecha apertura (opc.)"
+              type="datetime-local"
+              value={openAt}
+              onChange={(e) => setOpenAt(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              sx={{ ...compactFieldSx, mb: 1 }}
+            />
+          )}
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
             <Typography variant="body2" fontWeight={800} color="primary.main" sx={{ minWidth: 140 }}>
@@ -516,6 +591,17 @@ export default function TurnoPage() {
               {movementSaving ? "Guardando…" : "Registrar"}
             </Button>
           </Stack>
+
+          {isProgrammer && (
+            <Box sx={{ mb: 1, maxWidth: 280 }}>
+              <ProgrammerMovementDateField
+                isProgrammer
+                value={movementForm.movementDate}
+                onChange={(v) => setMovementForm((p) => ({ ...p, movementDate: v }))}
+                label="Fecha del gasto (opc.)"
+              />
+            </Box>
+          )}
 
           {movementForm.category === "compra_mercancia" && (
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} sx={{ mb: 1 }}>
@@ -627,11 +713,41 @@ export default function TurnoPage() {
             Esperado = apertura + ventas en efectivo − salidas + entradas. Transfer. y tarjeta solo se resumen.
           </Typography>
 
-          <CashArqueoBlock
-            counts={closeCounts}
-            onChange={(key, val) => setCloseCounts((p) => ({ ...p, [key]: val }))}
-            disabled={saving}
-          />
+          {isProgrammer ? (
+            <CashArqueoBlock
+              counts={closeCounts}
+              onChange={(key, val) => setCloseCounts((p) => ({ ...p, [key]: val }))}
+              disabled={saving}
+            />
+          ) : (
+            <TextField
+              size="small"
+              margin="dense"
+              label="Total en efectivo contado (cierre)"
+              type="number"
+              value={closeCashTotal}
+              onChange={(e) => setCloseCashTotal(e.target.value)}
+              disabled={saving}
+              inputProps={{ min: 0, step: 0.01 }}
+              fullWidth
+              sx={{ ...compactFieldSx, mb: 1 }}
+            />
+          )}
+
+          {isProgrammer && (
+            <TextField
+              size="small"
+              margin="dense"
+              label="Fecha cierre (opc.)"
+              type="datetime-local"
+              value={closeAt}
+              onChange={(e) => setCloseAt(e.target.value)}
+              disabled={saving}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+              sx={{ ...compactFieldSx, mb: 1 }}
+            />
+          )}
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
             <Typography variant="body2" sx={{ minWidth: 100 }}>
@@ -689,11 +805,17 @@ export default function TurnoPage() {
                 <TableCell align="right">Inic.</TableCell>
                 <TableCell align="right">Cierre</TableCell>
                 <TableCell align="right">Dif.</TableCell>
+                {isProgrammer && <TableCell align="center">Edit.</TableCell>}
               </TableRow>
             </TableHead>
             <TableBody>
               {history.map((row) => (
-                <TableRow key={row.id} hover>
+                <TableRow
+                  key={row.id}
+                  hover
+                  sx={isProgrammer ? { cursor: "pointer" } : undefined}
+                  onClick={isProgrammer ? () => setEditShiftId(row.id) : undefined}
+                >
                   <TableCell>
                     <Chip
                       size="small"
@@ -727,11 +849,23 @@ export default function TurnoPage() {
                   >
                     {row.cashDifference != null ? formatMoney(row.cashDifference) : "—"}
                   </TableCell>
+                  {isProgrammer && (
+                    <TableCell align="center" onClick={(e) => e.stopPropagation()}>
+                      <IconButton
+                        size="small"
+                        color="info"
+                        aria-label="Editar turno"
+                        onClick={() => setEditShiftId(row.id)}
+                      >
+                        <EditIcon sx={{ fontSize: 16 }} />
+                      </IconButton>
+                    </TableCell>
+                  )}
                 </TableRow>
               ))}
               {history.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={isAdmin ? 7 : 6}>
+                  <TableCell colSpan={isProgrammer ? 8 : isAdmin ? 7 : 6}>
                     <Typography variant="caption" color="text.secondary">
                       Sin turnos registrados.
                     </Typography>
@@ -741,7 +875,20 @@ export default function TurnoPage() {
             </TableBody>
           </Table>
         </TableContainer>
+        {isProgrammer && (
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+            Clic en un turno para corregir arqueo, fechas y gastos.
+          </Typography>
+        )}
       </Paper>
+
+      <ShiftProgrammerEditDialog
+        open={Boolean(editShiftId)}
+        shiftId={editShiftId}
+        onClose={() => setEditShiftId(null)}
+        onSaved={() => void load()}
+        toast={toast}
+      />
     </Box>
   );
 }

@@ -271,9 +271,16 @@ function ProductsPage() {
         open={openDialog}
         onClose={closeProductDialog}
         fullWidth
-        maxWidth="md"
+        maxWidth="lg"
         scroll="paper"
-        PaperProps={{ sx: { maxHeight: "92vh", display: "flex", flexDirection: "column" } }}
+        PaperProps={{
+          sx: {
+            maxHeight: "98vh",
+            display: "flex",
+            flexDirection: "column",
+            width: { xs: "100%", sm: "min(1080px, 98vw)" },
+          },
+        }}
       >
         <Box
           sx={{
@@ -281,12 +288,12 @@ function ProductsPage() {
             alignItems: "center",
             justifyContent: "space-between",
             px: 2,
-            pt: 1.5,
-            pb: 0.5,
+            pt: 1,
+            pb: 0,
             flexShrink: 0,
           }}
         >
-          <DialogTitle sx={{ p: 0, flex: 1, fontWeight: 700 }}>
+          <DialogTitle sx={{ p: 0, flex: 1, fontWeight: 700, fontSize: "1.05rem" }}>
             {titleUserDialog}
           </DialogTitle>
           <IconButton aria-label="Cerrar" onClick={closeProductDialog} size="small">
@@ -297,36 +304,25 @@ function ProductsPage() {
         <DialogContent
           dividers
           sx={{
-            px: 2,
-            py: 1.5,
-            flex: 1,
-            overflow: "hidden",
-            display: "flex",
-            flexDirection: "column",
+            px: { xs: 1.5, sm: 2 },
+            py: 1,
+            flex: "0 1 auto",
+            overflow: "visible",
           }}
         >
-          <Box
-            sx={{
-              overflowY: "auto",
-              flex: 1,
-              pr: 0.5,
-              maxHeight: { xs: "calc(92vh - 140px)", sm: "calc(92vh - 130px)" },
-            }}
-          >
-            <ProductForm
-              key={isEditing ? datos?.id ?? "edit" : datos?.barcode ?? "new"}
-              onClose={closeProductDialog}
-              isEditing={isEditing}
-              datos={datos}
-              reload={fecthData}
-            />
-          </Box>
+          <ProductForm
+            key={isEditing ? datos?.id ?? "edit" : datos?.barcode ?? "new"}
+            onClose={closeProductDialog}
+            isEditing={isEditing}
+            datos={datos}
+            reload={fecthData}
+          />
         </DialogContent>
 
         <DialogActions
           sx={{
             px: 2,
-            py: 1.5,
+            py: 1,
             gap: 1,
             flexShrink: 0,
             borderTop: 1,

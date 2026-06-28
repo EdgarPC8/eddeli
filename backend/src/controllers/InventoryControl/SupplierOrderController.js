@@ -175,6 +175,56 @@ export const updateSupplierOrder = async (req, res) => {
   }
 };
 
+/** POST /supplier-orders/:id/items — agregar línea a pedido proveedor pendiente. */
+export const addSupplierOrderItem = async (req, res) => {
+  try {
+    const token = getHeaderToken(req);
+    const user = await verifyJWT(token);
+    const isPrivileged = ["Administrador", "Programador"].includes(user?.loginRol);
+    if (!isPrivileged) {
+      return res.status(403).json({
+        message: "Solo Administrador o Programador pueden agregar productos al pedido",
+      });
+    }
+
+    const order = await SupplierOrder.findByPk(req.params.id);
+    if (!order) return res.status(404).json({ message: "Pedido no encontrado" });
+    if (order.receivedAt) {
+      return res.status(400).json({ message: "No se pueden agregar productos a un pedido ya recibido" });
+    }
+
+    const productId = Number(req.body?.productId);
+    const quantity = toNum(req.body?.quantity);
+    const unitPrice = toNum(req.body?.unitPrice ?? req.body?.price, -1);
+    if (!productId || quantity <= 0) {
+      return res.status(400).json({ message: "Producto y cantidad válidos son requeridos" });
+    }
+    if (unitPrice < 0) {
+      return res.status(400).json({ message: "Precio unitario inválido" });
+    }
+
+    const product = await InventoryProduct.findByPk(productId);
+    if (!product) return res.status(404).json({ message: "Producto no encontrado" });
+
+    const item = await SupplierOrderItem.create({
+      orderId: order.id,
+      productId,
+      quantity,
+      unitPrice: unitPrice >= 0 ? unitPrice : toNum(product.distributorPrice ?? product.price, 0),
+    });
+
+    const full = await SupplierOrder.findByPk(order.id, { include: orderIncludes });
+    res.status(201).json({
+      message: "Producto agregado al pedido",
+      item,
+      order: formatSupplierOrdersList([full])[0],
+    });
+  } catch (error) {
+    console.error("addSupplierOrderItem:", error);
+    res.status(500).json({ message: error.message || "Error al agregar producto" });
+  }
+};
+
 export const deleteSupplierOrder = async (req, res) => {
   try {
     const order = await SupplierOrder.findByPk(req.params.id);

@@ -11,7 +11,10 @@
     "db:sync": "DB_SYNC_ALTER=1 node scripts/sync-schema.js",
     "db:sync:categories": "node scripts/sync-category-schema.js",
     "db:migrate:categories": "node scripts/migrate-category-hierarchy.js",
+    "db:reorganize:categories": "node scripts/reorganize-categories-products.js",
     "db:repair:json-fields": "node scripts/repair-json-fields.js",
+    "db:audit:json-fields": "node scripts/audit-json-fields.js --backup",
+    "db:verify:backup-json": "node scripts/verify-backup-json.js",
     "db:seed:panes-group": "node scripts/seed-panes-pricing-group.js",
     "db:reset": "node scripts/reset-database.js",
     "db:check-backup": "node scripts/check-backup.js"

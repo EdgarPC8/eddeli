@@ -55,3 +55,18 @@ export function isValidCountsPayload(input) {
   if (!input || typeof input !== "object") return false;
   return Object.keys(input).every((k) => VALID_KEYS.has(k));
 }
+
+/** Acepta arqueo por denominación o solo total (empleados sin modo programador). */
+export function resolveCashFromBody(body = {}) {
+  const { cashCounts, cashTotal } = body;
+  if (cashCounts && typeof cashCounts === "object") {
+    const counts = normalizeCashCounts(cashCounts);
+    const total = computeCashTotal(counts);
+    if (total > 0) return { counts, total };
+  }
+  const total = Number(Number(cashTotal || 0).toFixed(2));
+  if (total > 0) {
+    return { counts: normalizeCashCounts(emptyCashCounts()), total };
+  }
+  return null;
+}

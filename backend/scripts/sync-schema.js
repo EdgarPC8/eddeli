@@ -1,5 +1,6 @@
 /**
  * Sincroniza el esquema de BD con los modelos (ALTER TABLE).
+ * Incluye inventario, turnos, publicidad, media, etc.
  * Uso: npm run db:sync
  */
 import "dotenv/config";

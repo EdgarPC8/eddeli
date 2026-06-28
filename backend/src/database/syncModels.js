@@ -3,7 +3,8 @@ import { CashShiftMovement } from "../models/CashShiftMovement.js";
 import { InventoryProduct, InventoryMovement, InventoryCategory, ProductCompareGroup, ProductCompareGroupItem } from "../models/Inventory.js";
 import { Order, Supplier, SupplierOrder, SupplierOrderItem } from "../models/Orders.js";
 import { TaskPlan, TaskItem } from "../models/Tasks.js";
-import { PublicidadCampaign, PublicidadPlaylistItem } from "../models/Publicidad.js";
+import { PublicidadCampaign, PublicidadPlaylistItem, PublicidadDevice } from "../models/Publicidad.js";
+import { MediaAsset } from "../models/MediaAsset.js";
 import { FinancialObligation, ObligationPayment, Income, Expense, Payment, RecurringExpenseTemplate, RecurringExpenseOccurrence } from "../models/Finance.js";
 import { DocumentAttachment } from "../models/DocumentAttachment.js";
 import { NotificationProgram, NotificationDispatchLog } from "../models/NotificationProgram.js";
@@ -23,8 +24,10 @@ const MODELS_TO_SYNC = [
   SupplierOrderItem,
   TaskPlan,
   TaskItem,
+  MediaAsset,
   PublicidadCampaign,
   PublicidadPlaylistItem,
+  PublicidadDevice,
   FinancialObligation,
   ObligationPayment,
   RecurringExpenseTemplate,

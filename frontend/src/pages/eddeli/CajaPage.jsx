@@ -303,33 +303,47 @@ export default function CajaPage() {
     });
   };
 
-  const addSelectedProduct = () => {
-    const found = products.find((p) => String(p.id) === String(selectedProductId));
-    if (!found) {
-      void toast?.({ message: "Selecciona un producto para agregar.", variant: "warning" });
-      return;
+  const handleProductPick = (productId) => {
+    if (!productId) return;
+    const found = products.find((p) => String(p.id) === String(productId));
+    if (found) {
+      addToCart(found);
+      setSelectedProductId("");
     }
-    addToCart(found);
-    setSelectedProductId("");
   };
 
-  const scannerUiBlocked =
-    saving || stockDialogOpen || quickDownOpen || addCustomerOpen || quickProductsOpen;
-
-  const handleBarcodeCode = useCallback(
-    (code) => {
-      const found = findEddeliProductByCode(products, code);
+  const handleProductSearchEnter = useCallback(
+    (query) => {
+      const trimmed = String(query || "").trim();
+      if (!trimmed) return;
+      const byCode = findEddeliProductByCode(products, trimmed);
+      if (byCode) {
+        addToCart(byCode);
+        setSelectedProductId("");
+        return;
+      }
+      const found = findProductByQuery(trimmed);
       if (found) {
         addToCart(found);
         setSelectedProductId("");
         return;
       }
       void toast?.({
-        message: `Código ${code} leído, pero no existe en productos.`,
+        message: `No se encontró "${trimmed}" en productos.`,
         variant: "warning",
       });
     },
-    [products, toast]
+    [products, toast],
+  );
+
+  const scannerUiBlocked =
+    saving || stockDialogOpen || quickDownOpen || addCustomerOpen || quickProductsOpen;
+
+  const handleBarcodeCode = useCallback(
+    (code) => {
+      handleProductSearchEnter(code);
+    },
+    [handleProductSearchEnter],
   );
 
   useBarcodeScanner({
@@ -815,20 +829,20 @@ export default function CajaPage() {
               <SearchableSelect
                 fullWidth
                 label="Producto"
-                placeholder="Buscar o escanear código de barras"
+                placeholder="Buscar, clic o Enter para agregar al carrito"
                 items={productsByStockDesc}
                 value={selectedProductId}
-                onChange={setSelectedProductId}
+                onChange={handleProductPick}
                 getOptionLabel={formatProductSearchLabel}
                 getOptionValue={(item) => String(item.id)}
+                getSearchText={(item) =>
+                  [item.name, item.barcode, item.sku].filter(Boolean).join(" ")
+                }
                 renderOption={renderCajaProductOption}
-                onEnterWithInput={handleBarcodeCode}
+                onEnterWithInput={handleProductSearchEnter}
               />
               <Button variant="outlined" startIcon={<AppsIcon />} onClick={() => setQuickProductsOpen(true)}>
                 Accesos rápidos
-              </Button>
-              <Button variant="contained" onClick={addSelectedProduct}>
-                Agregar
               </Button>
             </Stack>
 

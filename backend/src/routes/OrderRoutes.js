@@ -39,6 +39,7 @@ import {
   getSupplierOrders,
   createSupplierOrder,
   updateSupplierOrder,
+  addSupplierOrderItem,
   deleteSupplierOrder,
   markSupplierOrderReceived,
   markSupplierOrderPaid,
@@ -150,6 +151,7 @@ router.delete("/suppliers/:id", isAuthenticated, deleteSupplier);
 
 router.get("/supplier-orders", isAuthenticated, getSupplierOrders);
 router.post("/supplier-orders", isAuthenticated, createSupplierOrder);
+router.post("/supplier-orders/:id/items", isAuthenticated, addSupplierOrderItem);
 router.put("/supplier-orders/:id", isAuthenticated, updateSupplierOrder);
 router.delete("/supplier-orders/:id", isAuthenticated, deleteSupplierOrder);
 router.put("/supplier-orders/:id/received", isAuthenticated, markSupplierOrderReceived);

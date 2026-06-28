@@ -25,9 +25,6 @@ import ShiftRoutes from "./src/routes/ShiftRoutes.js";
 import TaskRoutes from "./src/routes/TaskRoutes.js";
 import PublicidadRoutes from "./src/routes/PublicidadRoutes.js";
 import MediaRoutes from "./src/routes/MediaRoutes.js";
-import { syncDatabaseSchema } from "./src/database/syncModels.js";
-import { ensurePublicidadSchema } from "./src/database/ensurePublicidadSchema.js";
-
 import ImgRoutes from "./src/routes/ImgRoutes.js";
 import FilesRoutes from "./src/routes/FilesRoutes.js";
 import DocumentRoutes from "./src/routes/DocumentRoutes.js";
@@ -120,14 +117,7 @@ export async function main() {
     // ═══════════════════════════════════════════════════════════════════
     // await recreateDatabaseFromBackup();
 
-    await ensurePublicidadSchema();
-
-    const syncResult = await syncDatabaseSchema();
-    if (syncResult.skipped) {
-      console.log("✅ Conexión realizada (sin ALTER; usa npm run db:sync si cambiaste modelos).");
-    } else {
-      console.log("✅ Conexión realizada y esquema sincronizado (DB_SYNC_ALTER activo).");
-    }
+    console.log("✅ Conexión a la base de datos OK (esquema: npm run db:sync o db:reset).");
 
     httpServer.listen(PORT, async () => {
       console.log(`🟢 Backend + Socket.IO escuchando en puerto ${PORT}`);

@@ -58,6 +58,55 @@ function productUniqueErrorMessage(error) {
   return null;
 }
 
+const PRODUCT_NUMERIC_FIELDS = [
+  "standardWeightGrams",
+  "netWeight",
+  "stock",
+  "minStock",
+  "price",
+  "supplierPrice",
+  "distributorPrice",
+  "taxRate",
+];
+
+function normalizeProductNumericFields(payload, { fillMissing = false } = {}) {
+  for (const key of PRODUCT_NUMERIC_FIELDS) {
+    if (!(key in payload)) {
+      if (fillMissing) payload[key] = 0;
+      continue;
+    }
+    const raw = payload[key];
+    if (raw === null || raw === "") {
+      payload[key] = 0;
+      continue;
+    }
+    const n = Number(raw);
+    payload[key] = Number.isFinite(n) ? n : 0;
+  }
+}
+
+function normalizeProductRelationFields(payload) {
+  if ("categoryId" in payload) {
+    if (payload.categoryId === "" || payload.categoryId == null) {
+      delete payload.categoryId;
+    } else {
+      const n = Number(payload.categoryId);
+      if (Number.isFinite(n)) payload.categoryId = n;
+      else delete payload.categoryId;
+    }
+  }
+
+  if ("unitId" in payload) {
+    if (payload.unitId === "" || payload.unitId == null) {
+      delete payload.unitId;
+    } else {
+      const n = Number(payload.unitId);
+      if (Number.isFinite(n)) payload.unitId = n;
+      else delete payload.unitId;
+    }
+  }
+}
+
 
 // controllers/ProductController.js (solo createProduct)
 // ✅ Copia y pega tal cual
@@ -99,6 +148,8 @@ export const updateProduct = async (req, res) => {
     const incomingRel = normalize(req.body.primaryImageUrl || "");
     const updates = { ...req.body };
     applyBarcodeFields(updates);
+    normalizeProductNumericFields(updates);
+    normalizeProductRelationFields(updates);
 
     let moved = false;
 
@@ -184,24 +235,8 @@ export const createProduct = async (req, res) => {
   try {
     const payload = { ...req.body };
     applyBarcodeFields(payload);
-
-    // --- normalizaciones numéricas ---
-    [
-      "unitId",
-      "categoryId",
-      "standardWeightGrams",
-      "netWeight",
-      "stock",
-      "minStock",
-      "price",
-      "supplierPrice",
-      "distributorPrice",
-      "taxRate",
-    ].forEach((k) => {
-      if (k in payload && payload[k] !== null && payload[k] !== "") {
-        payload[k] = Number(payload[k]);
-      }
-    });
+    normalizeProductNumericFields(payload, { fillMissing: true });
+    normalizeProductRelationFields(payload);
 
     // --- booleanos ---
     if ("isActive" in payload) {

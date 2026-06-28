@@ -144,6 +144,7 @@ export default function OrderCalendarView({
   onRemoveOrderItem,
   onEdit,
   onEditSupplier,
+  onAddSupplierOrder,
 }) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(null);
@@ -609,9 +610,11 @@ export default function OrderCalendarView({
                         canManage={canManageOrders}
                         tone={tones.state}
                         toast={toastAuth}
+                        products={products}
                         onReload={onReload}
                         onRemove={(id) => onRemoveOrder?.(id, 'supplier')}
                         onEdit={onEditSupplier}
+                        onAddAnother={onAddSupplierOrder}
                       />
                     );
                   }

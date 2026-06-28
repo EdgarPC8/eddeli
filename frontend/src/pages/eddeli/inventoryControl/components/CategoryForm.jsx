@@ -36,6 +36,7 @@ function CategoryForm({
   reload,
   allCategories = [],
   presetParentId = null,
+  onSaved,
 }) {
   const { handleSubmit, register, reset, setValue, watch } = useForm();
   const idData = datos?.id;
@@ -71,7 +72,8 @@ function CategoryForm({
 
   const rootCategories = useMemo(() => getRootCategories(allCategories), [allCategories]);
   const editingHasChildren = isEditing && hasChildCategories(allCategories, datos?.id);
-  const lockAsChild = Boolean(presetParentId) || Boolean(datos?.parentId);
+  /** Solo bloquea cambiar a principal al editar una subcategoría existente. */
+  const lockAsChild = isEditing && Boolean(datos?.parentId);
 
   const categoryProducts = useMemo(() => {
     if (!isEditing || !datos?.id) return [];
@@ -105,6 +107,14 @@ function CategoryForm({
   };
 
   const submitForm = async (formData) => {
+    if (categoryKind === "child" && !parentId) {
+      toastAuth({
+        message: "Selecciona la categoría padre de la subcategoría.",
+        variant: "error",
+      });
+      return;
+    }
+
     const payload = {
       ...formData,
       isPublic: Boolean(formData.isPublic),
@@ -116,15 +126,21 @@ function CategoryForm({
         mixMatchEnabled && packageTiers.length && mixProductIds.length ? mixProductIds : null,
     };
 
+    const savedParentId =
+      categoryKind === "child" && parentId ? Number(parentId) : null;
+
+    const afterSave = async () => {
+      resetForm();
+      if (reload) await reload();
+      if (onSaved) onSaved({ parentId: savedParentId });
+      if (onClose) onClose();
+    };
+
     try {
       if (isEditing) {
         await toastAuth({
           promise: updateCategoryRequest(datos.id, payload),
-          onSuccess: async () => {
-            resetForm();
-            if (reload) await reload();
-            if (onClose) onClose();
-          },
+          onSuccess: afterSave,
         });
         return;
       }
@@ -132,11 +148,7 @@ function CategoryForm({
       await toastAuth({
         promise: createCategoryRequest(payload),
         successMessage: "Categoría guardada con éxito",
-        onSuccess: async () => {
-          resetForm();
-          if (reload) await reload();
-          if (onClose) onClose();
-        },
+        onSuccess: afterSave,
       });
     } catch {
       /* toast mostró error */
@@ -228,14 +240,23 @@ function CategoryForm({
               value={parentId}
               onChange={(e) => setParentId(e.target.value)}
               required
-              disabled={Boolean(presetParentId) && !isEditing}
-              helperText="Ej. Panadería, Líquidos, Abarrotes"
+              helperText={
+                presetParentId && !isEditing
+                  ? "Puedes cambiar la categoría padre antes de guardar."
+                  : "Ej. Panadería, Líquidos, Abarrotes"
+              }
             >
-              {rootCategories.map((c) => (
-                <MenuItem key={c.id} value={String(c.id)}>
-                  {c.name}
+              {rootCategories.length === 0 ? (
+                <MenuItem value="" disabled>
+                  Crea una categoría principal primero
                 </MenuItem>
-              ))}
+              ) : (
+                rootCategories.map((c) => (
+                  <MenuItem key={c.id} value={String(c.id)}>
+                    {c.name}
+                  </MenuItem>
+                ))
+              )}
             </TextField>
           </Grid>
         ) : null}

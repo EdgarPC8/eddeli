@@ -1,14 +1,17 @@
 import {
-  Container,
-  IconButton,
-  Button,
-  Tooltip,
-  Chip,
   Box,
+  Button,
+  Chip,
+  Container,
+  Grid,
+  IconButton,
+  Paper,
+  Stack,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
-import { Edit, Delete, Category, Add } from "@mui/icons-material";
+import { Edit, Delete, Category, Add, SubdirectoryArrowRight } from "@mui/icons-material";
 import CategoryForm from "./components/CategoryForm";
 import {
   getCategories,
@@ -16,28 +19,58 @@ import {
 } from "../../../api/inventoryControlRequest.js";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import { runMutationReload } from "../../../utils/mutationToast.js";
-import { buildCategoryTreeRows, hasChildCategories } from "../../../utils/categoryUtils.js";
-
-import DataTable from "../../../components/Tables/DataTable";
+import {
+  getRootCategories,
+  getChildCategories,
+  hasChildCategories,
+} from "../../../utils/categoryUtils.js";
+import TablePro from "../../../components/Tables/TablePro";
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
+
+const TABLE_HEIGHT = "calc(100vh - 240px)";
 
 function CategoryPage() {
   const { toast } = useAuth();
   const [data, setData] = useState([]);
+  const [selectedRootId, setSelectedRootId] = useState(null);
   const [open, setOpen] = useState(false);
   const [dataToDelete, setDataToDelete] = useState({});
   const [openDialog, setOpenDialog] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [datos, setDatos] = useState([]);
+  const [datos, setDatos] = useState({});
   const [titleUserDialog, settitleUserDialog] = useState("");
   const [presetParentId, setPresetParentId] = useState(null);
 
   const fecthData = async () => {
     const { data: rows } = await getCategories();
-    setData(rows || []);
+    const list = rows || [];
+    setData(list);
+    setSelectedRootId((prev) => {
+      const roots = getRootCategories(list);
+      if (prev && roots.some((r) => Number(r.id) === Number(prev))) return prev;
+      return roots[0]?.id ?? null;
+    });
   };
 
-  const tableRows = useMemo(() => buildCategoryTreeRows(data), [data]);
+  const rootCategories = useMemo(
+    () =>
+      getRootCategories(data).sort((a, b) =>
+        String(a.name).localeCompare(String(b.name), "es"),
+      ),
+    [data],
+  );
+
+  const selectedRoot = useMemo(
+    () => rootCategories.find((c) => Number(c.id) === Number(selectedRootId)) ?? null,
+    [rootCategories, selectedRootId],
+  );
+
+  const childCategories = useMemo(() => {
+    if (!selectedRootId) return [];
+    return getChildCategories(data, selectedRootId).sort((a, b) =>
+      String(a.name).localeCompare(String(b.name), "es"),
+    );
+  }, [data, selectedRootId]);
 
   const handleDialog = () => setOpen(!open);
   const handleDialogUser = () => {
@@ -53,12 +86,30 @@ function CategoryPage() {
     setOpenDialog(true);
   };
 
-  const openCreateChild = (parentRow) => {
+  const openCreateChild = () => {
+    if (!selectedRoot) return;
     setIsEditing(false);
     setDatos({});
-    setPresetParentId(parentRow.id);
-    settitleUserDialog(`Nueva subcategoría de ${parentRow.name}`);
+    setPresetParentId(selectedRoot.id);
+    settitleUserDialog(`Nueva subcategoría de ${selectedRoot.name}`);
     setOpenDialog(true);
+  };
+
+  const openEdit = (row, isRoot) => {
+    setDatos(row);
+    setIsEditing(true);
+    setPresetParentId(row.parentId || null);
+    settitleUserDialog(
+      isRoot
+        ? `Editar categoría — ${row.name}`
+        : `Editar subcategoría — ${row.name}`,
+    );
+    setOpenDialog(true);
+  };
+
+  const openDelete = (row) => {
+    setDataToDelete(row);
+    handleDialog();
   };
 
   const deleteData = async () => {
@@ -69,97 +120,103 @@ function CategoryPage() {
     });
   };
 
-  const columns = [
+  const renderActions = (row, isRoot) => (
+    <Stack direction="row" spacing={0.25} onClick={(e) => e.stopPropagation()}>
+      <Tooltip title="Editar">
+        <IconButton size="small" onClick={() => openEdit(row, isRoot)}>
+          <Edit fontSize="small" />
+        </IconButton>
+      </Tooltip>
+      <Tooltip title="Eliminar">
+        <IconButton size="small" color="error" onClick={() => openDelete(row)}>
+          <Delete fontSize="small" />
+        </IconButton>
+      </Tooltip>
+    </Stack>
+  );
+
+  const rootColumns = [
     {
-      headerName: "#",
-      field: "#",
-      width: 40,
-      sortable: false,
-      renderCell: (_params, index) => index + 1,
-    },
-    {
-      headerName: "Nombre",
-      field: "name",
-      width: 260,
-      renderCell: (params) => (
-        <Box sx={{ pl: params.row.depth * 2.5 }}>
-          <Typography variant="body2" fontWeight={params.row.isRoot ? 700 : 400}>
-            {params.row.depth > 0 ? `↳ ${params.row.name}` : params.row.name}
-          </Typography>
-        </Box>
+      id: "name",
+      label: "Nombre",
+      render: (row) => (
+        <Typography variant="body2" fontWeight={700}>
+          {row.name}
+        </Typography>
       ),
     },
     {
-      headerName: "Tipo",
-      field: "tipo",
-      width: 140,
-      renderCell: (params) =>
-        params.row.isRoot ? (
-          <Chip size="small" label="Principal" color="primary" variant="outlined" />
+      id: "childCount",
+      label: "Subcategorías",
+      getSortValue: (row) => getChildCategories(data, row.id).length,
+      render: (row) => {
+        const count = getChildCategories(data, row.id).length;
+        return (
+          <Chip
+            size="small"
+            label={count}
+            color={count > 0 ? "primary" : "default"}
+            variant="outlined"
+          />
+        );
+      },
+    },
+    {
+      id: "description",
+      label: "Descripción",
+      render: (row) => row.description || "—",
+    },
+    {
+      id: "isPublic",
+      label: "Público",
+      render: (row) => (row.isPublic ? "Sí" : "No"),
+    },
+    {
+      id: "actions",
+      label: "Acciones",
+      stopRowClick: true,
+      render: (row) => renderActions(row, true),
+    },
+  ];
+
+  const childColumns = [
+    {
+      id: "name",
+      label: "Nombre",
+      render: (row) => (
+        <Stack direction="row" spacing={0.75} alignItems="center">
+          <SubdirectoryArrowRight fontSize="small" color="action" />
+          <Typography variant="body2">{row.name}</Typography>
+        </Stack>
+      ),
+    },
+    {
+      id: "description",
+      label: "Descripción",
+      render: (row) => row.description || "—",
+    },
+    {
+      id: "isPublic",
+      label: "Público",
+      render: (row) => (row.isPublic ? "Sí" : "No"),
+    },
+    {
+      id: "packageTiers",
+      label: "Tramos caja",
+      render: (row) => {
+        const tiers = Array.isArray(row.packageTiers) ? row.packageTiers : [];
+        return tiers.length ? (
+          <Chip size="small" label={`${tiers.length} tramo(s)`} variant="outlined" />
         ) : (
-          <Chip size="small" label="Subcategoría" variant="outlined" />
-        ),
+          "—"
+        );
+      },
     },
     {
-      headerName: "Categoría padre",
-      field: "parentName",
-      width: 160,
-      renderCell: (params) => params.row.parentName || "—",
-    },
-    {
-      headerName: "Descripción",
-      field: "description",
-      width: 280,
-    },
-    {
-      headerName: "Público?",
-      field: "isPublic",
-      width: 90,
-      renderCell: (params) => (params.row.isPublic ? "Sí" : "No"),
-    },
-    {
-      headerName: "Acciones",
-      field: "actions",
-      width: 200,
-      sortable: false,
-      renderCell: (params) => (
-        <>
-          {params.row.isRoot ? (
-            <Tooltip title="Agregar subcategoría">
-              <IconButton onClick={() => openCreateChild(params.row)} size="small" color="primary">
-                <Add fontSize="small" />
-              </IconButton>
-            </Tooltip>
-          ) : null}
-          <Tooltip title="Editar">
-            <IconButton
-              onClick={() => {
-                setDatos(params.row);
-                setIsEditing(true);
-                setPresetParentId(params.row.parentId || null);
-                settitleUserDialog(
-                  params.row.parentId
-                    ? `Editar subcategoría — ${params.row.name}`
-                    : `Editar categoría — ${params.row.name}`,
-                );
-                setOpenDialog(true);
-              }}
-            >
-              <Edit />
-            </IconButton>
-          </Tooltip>
-          <Tooltip title="Eliminar">
-            <IconButton
-              onClick={() => {
-                handleDialog();
-                setDataToDelete(params.row);
-              }}
-            >
-              <Delete />
-            </IconButton>
-          </Tooltip>
-        </>
-      ),
+      id: "actions",
+      label: "Acciones",
+      stopRowClick: true,
+      render: (row) => renderActions(row, false),
     },
   ];
 
@@ -168,11 +225,11 @@ function CategoryPage() {
   }, []);
 
   return (
-    <Container>
+    <Container maxWidth="xl" sx={{ py: 2 }}>
       <SimpleDialog
         open={open}
         onClose={handleDialog}
-        tittle="Eliminar Categoría"
+        tittle="Eliminar categoría"
         onClickAccept={deleteData}
       >
         {hasChildCategories(data, dataToDelete.id)
@@ -192,14 +249,119 @@ function CategoryPage() {
           reload={fecthData}
           allCategories={data}
           presetParentId={presetParentId}
+          onSaved={({ parentId }) => {
+            if (parentId) setSelectedRootId(parentId);
+          }}
         />
       </SimpleDialog>
 
-      <Button variant="text" endIcon={<Category />} onClick={openCreateRoot} sx={{ mr: 1 }}>
-        Nueva categoría principal
-      </Button>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ xs: "stretch", sm: "center" }}
+        spacing={1.5}
+        mb={2}
+      >
+        <Box>
+          <Stack direction="row" spacing={1} alignItems="center" mb={0.5}>
+            <Category color="primary" />
+            <Typography variant="h5" sx={{ fontWeight: 800 }}>
+              Categorías y subcategorías
+            </Typography>
+          </Stack>
+          <Typography variant="body2" color="text.secondary">
+            Selecciona una categoría principal a la izquierda para ver y editar sus
+            subcategorías a la derecha.
+          </Typography>
+        </Box>
+      </Stack>
 
-      <DataTable data={tableRows} columns={columns} />
+      <Grid container spacing={2}>
+        <Grid item xs={12} lg={5}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+            <Typography variant="subtitle1" fontWeight={700}>
+              Categorías principales
+            </Typography>
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={<Add />}
+              onClick={openCreateRoot}
+            >
+              Nueva categoría
+            </Button>
+          </Stack>
+          <TablePro
+            columns={rootColumns}
+            rows={rootCategories}
+            showIndex
+            defaultRowsPerPage={10}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+            tableMaxHeight={TABLE_HEIGHT}
+            onRowClick={(row) => setSelectedRootId(row.id)}
+            selectedRowId={selectedRootId}
+          />
+        </Grid>
+
+        <Grid item xs={12} lg={7}>
+          <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+            <Box>
+              <Typography variant="subtitle1" fontWeight={700}>
+                Subcategorías
+              </Typography>
+              {selectedRoot ? (
+                <Typography variant="caption" color="text.secondary">
+                  de {selectedRoot.name} · {childCategories.length} registrada(s)
+                </Typography>
+              ) : (
+                <Typography variant="caption" color="text.secondary">
+                  Selecciona una categoría principal
+                </Typography>
+              )}
+            </Box>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<Add />}
+              onClick={openCreateChild}
+              disabled={!selectedRoot}
+            >
+              Nueva subcategoría
+            </Button>
+          </Stack>
+
+          {selectedRoot ? (
+            <TablePro
+              columns={childColumns}
+              rows={childCategories}
+              showIndex
+              defaultRowsPerPage={10}
+              rowsPerPageOptions={[5, 10, 25, 50]}
+              tableMaxHeight={TABLE_HEIGHT}
+            />
+          ) : (
+            <Paper
+              sx={{
+                height: TABLE_HEIGHT,
+                minHeight: 280,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                p: 3,
+                borderRadius: 2,
+                border: "1px dashed",
+                borderColor: "divider",
+              }}
+            >
+              <Typography variant="body2" color="text.secondary" textAlign="center">
+                {rootCategories.length === 0
+                  ? "Crea una categoría principal para empezar."
+                  : "Haz clic en una categoría de la izquierda para ver sus subcategorías."}
+              </Typography>
+            </Paper>
+          )}
+        </Grid>
+      </Grid>
     </Container>
   );
 }

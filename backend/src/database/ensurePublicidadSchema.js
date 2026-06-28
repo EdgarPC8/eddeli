@@ -1,6 +1,6 @@
 /**
- * Crea tablas de Publicidad si no existen (sin ALTER masivo en cada arranque).
- * Tras cambiar columnas del modelo: npm run db:sync
+ * @deprecated No se ejecuta en el arranque del API. Usa `npm run db:sync`.
+ * Mantenido por si algún script lo invoca explícitamente.
  */
 import {
   PublicidadCampaign,
