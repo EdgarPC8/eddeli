@@ -1,1 +1,24 @@
+# Dependencias
 backend/node_modules/
+frontend/node_modules/
+
+# Variables de entorno
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env
+
+# Build frontend (artefactos generados)
+frontend/dist/
+assets/
+index.html
+
+# Datos sensibles / backups locales
+backend/src/database/backup.json
+backend/src/backups/
+*.backup.json
+
+# Sistema
+.DS_Store
+*.log

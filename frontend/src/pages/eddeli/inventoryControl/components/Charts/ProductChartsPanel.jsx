@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Box,
   FormControl,
-  Grid,
   InputLabel,
   MenuItem,
   Paper,
@@ -13,6 +11,7 @@ import {
   Typography,
 } from '@mui/material';
 import { getProductSeriesChartsRequest } from '../../../../../api/financeRequest';
+import ChartBlockHeader from '../../../../../components/Charts/ChartBlockHeader';
 import ProductSeriesChart from './ProductSeriesChart';
 
 const paperSx = {
@@ -43,7 +42,6 @@ export default function ProductChartsPanel() {
   const [band, setBand] = useState(1);
   const [loading, setLoading] = useState(true);
   const [sales, setSales] = useState(null);
-  const [purchases, setPurchases] = useState(null);
   const [meta, setMeta] = useState({ totalBands: 1, totalRanked: 0, rankStart: 1, rankEnd: 10 });
 
   useEffect(() => {
@@ -54,7 +52,6 @@ export default function ProductChartsPanel() {
         const { data } = await getProductSeriesChartsRequest(period, band);
         if (cancelled) return;
         setSales(data?.sales ?? null);
-        setPurchases(data?.purchases ?? null);
         setMeta({
           totalBands: data?.totalBands ?? 1,
           totalRanked: data?.totalRanked ?? 0,
@@ -63,10 +60,7 @@ export default function ProductChartsPanel() {
         });
       } catch (e) {
         console.error('ProductChartsPanel:', e);
-        if (!cancelled) {
-          setSales(null);
-          setPurchases(null);
-        }
+        if (!cancelled) setSales(null);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -85,19 +79,25 @@ export default function ProductChartsPanel() {
     return Array.from({ length: count }, (_, i) => i + 1);
   }, [meta.totalBands]);
 
+  const periodLabel = sales?.periodLabel ?? '';
+  const rankStart = sales?.rankStart ?? meta.rankStart;
+  const rankEnd = sales?.rankEnd ?? meta.rankEnd;
+
   return (
-    <Box>
+    <Paper sx={{ ...paperSx, overflowX: 'auto' }}>
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
-        alignItems={{ xs: 'flex-start', sm: 'center' }}
+        alignItems={{ xs: 'flex-start', sm: 'flex-start' }}
         justifyContent="space-between"
         spacing={1}
         sx={{ mb: 1.5 }}
       >
-        <Typography variant="subtitle2" color="text.secondary">
-          Ranking por importe en el período · bloques de 10 productos ({meta.totalRanked} con movimiento)
-        </Typography>
-        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+        <ChartBlockHeader
+          title="Ingresos por producto"
+          subtitle="Productos finales vendidos en pedidos y caja (pagados). Pasa el mouse sobre la gráfica para ver importe y cantidad."
+          sx={{ mb: 0, flex: 1 }}
+        />
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ flexShrink: 0 }}>
           <FormControl size="small" sx={{ minWidth: 130 }}>
             <InputLabel id="product-charts-band-label">Rango</InputLabel>
             <Select
@@ -105,6 +105,7 @@ export default function ProductChartsPanel() {
               label="Rango"
               value={band}
               onChange={(e) => setBand(Number(e.target.value))}
+              disabled={loading || meta.totalRanked === 0}
             >
               {bandOptions.map((b) => (
                 <MenuItem key={b} value={b}>
@@ -133,28 +134,19 @@ export default function ProductChartsPanel() {
         </Stack>
       </Stack>
 
-      <Grid container spacing={{ xs: 1.5, sm: 2 }}>
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ ...paperSx, overflowX: 'auto' }}>
-            <ProductSeriesChart
-              title="Ingresos por producto"
-              subtitle={`Posiciones ${sales?.rankStart ?? meta.rankStart}–${sales?.rankEnd ?? meta.rankEnd} en ventas.`}
-              bundle={sales}
-              loading={loading}
-            />
-          </Paper>
-        </Grid>
-        <Grid item xs={12} md={6}>
-          <Paper sx={{ ...paperSx, overflowX: 'auto' }}>
-            <ProductSeriesChart
-              title="Compras por producto"
-              subtitle={`Posiciones ${purchases?.rankStart ?? meta.rankStart}–${purchases?.rankEnd ?? meta.rankEnd} en compras.`}
-              bundle={purchases}
-              loading={loading}
-            />
-          </Paper>
-        </Grid>
-      </Grid>
-    </Box>
+      <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+        {loading
+          ? 'Cargando…'
+          : `${periodLabel} · posiciones ${rankStart}–${rankEnd} · ${meta.totalRanked} productos con ventas`}
+      </Typography>
+
+      <ProductSeriesChart
+        bundle={sales}
+        loading={loading}
+        chartHeight={300}
+        showHeader={false}
+        sideLegend
+      />
+    </Paper>
   );
 }

@@ -18,4 +18,8 @@
     width: 80mm !important;
     max-width: 80mm !important;
   }
+  #sale-receipt-print-root.print-ticket55 > div {
+    width: 55mm !important;
+    max-width: 55mm !important;
+  }
 }

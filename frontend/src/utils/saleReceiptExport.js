@@ -1,5 +1,6 @@
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
+import { getTicketPdfPageSize, isTicketFormat } from "./receiptFormats.js";
 
 function triggerDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
@@ -32,11 +33,12 @@ export async function downloadReceiptAsPng(element, filename = "comprobante.png"
 export async function downloadReceiptAsPdf(element, format = "a4", filename = "comprobante.pdf") {
   const canvas = await captureReceiptElement(element);
   const imgData = canvas.toDataURL("image/png");
-  const isTicket = format === "ticket80";
+  const isTicket = isTicketFormat(format);
+  const ticketSize = getTicketPdfPageSize(format);
   const pdf = new jsPDF({
     orientation: "portrait",
     unit: "mm",
-    format: isTicket ? [80, 200] : "a4",
+    format: isTicket ? ticketSize : "a4",
   });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();

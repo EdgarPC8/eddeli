@@ -33,7 +33,9 @@ function CategoryForm({
   presetParentId = null,
   onSaved,
 }) {
-  const { handleSubmit, register, reset, setValue, watch } = useForm();
+  const { handleSubmit, register, reset, setValue, watch } = useForm({
+    defaultValues: { isPublic: true },
+  });
   const idData = datos?.id;
   const { toast: toastAuth } = useAuth();
 
@@ -190,8 +192,7 @@ function CategoryForm({
           <FormControlLabel
             control={
               <Switch
-                {...register("isPublic")}
-                checked={watch("isPublic") || false}
+                checked={Boolean(watch("isPublic"))}
                 onChange={(e) => setValue("isPublic", e.target.checked)}
               />
             }

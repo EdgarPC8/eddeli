@@ -15,7 +15,7 @@ import {
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../../../context/AuthContext";
 import {
-  getAllProducts,
+  getAllProductsAll,
   createRecipeRequest,
   updateRecipeRequest,
 } from "../../../../api/inventoryControlRequest";
@@ -117,7 +117,7 @@ function RecipeForm({ isEditing = false, datos = [], onClose, reload, productFin
   };
 
   const loadData = async () => {
-    const { data } = await getAllProducts();
+    const { data } = await getAllProductsAll();
     setAllProducts(data);
 
     if (isEditing && datos) {

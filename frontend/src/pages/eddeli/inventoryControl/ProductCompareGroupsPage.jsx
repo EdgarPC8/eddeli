@@ -34,7 +34,7 @@ import {
   updateCompareGroup,
   deleteCompareGroup,
   bootstrapPastelesCompareGroup,
-  getAllProducts,
+  getAllProductsAll,
 } from "../../../api/inventoryControlRequest";
 
 const SECTION_OPTIONS = [
@@ -483,7 +483,7 @@ export default function ProductCompareGroupsPage() {
     try {
       const [groupsRes, productsRes] = await Promise.all([
         getCompareGroups(),
-        getAllProducts(),
+        getAllProductsAll(),
       ]);
       setGroups(Array.isArray(groupsRes.data) ? groupsRes.data : []);
       setProducts(Array.isArray(productsRes.data) ? productsRes.data : []);

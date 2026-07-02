@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext.jsx";
+import { SubscriptionProvider } from "./context/SubscriptionContext.jsx";
 import ProtectedRoute from "./context/ProtectedRoute.jsx";
 import PublicOnlyRoute from "./context/PublicOnlyRoute.jsx";
 import NavBar from "./components/NavBar.jsx";
@@ -15,6 +16,7 @@ import RecipePage from "./pages/eddeli/inventoryControl/RecipePage.jsx";
 import GenericIngredientsPage from "./pages/eddeli/inventoryControl/GenericIngredientsPage.jsx";
 import OrderPage from "./pages/eddeli/inventoryControl/OrderPage.jsx";
 import CustomerPage from "./pages/eddeli/inventoryControl/CustomerPage.jsx";
+import SupplierPage from "./pages/eddeli/inventoryControl/SupplierPage.jsx";
 import FinancePage from "./pages/eddeli/inventoryControl/FinancePage.jsx";
 import LoansDebtsPage from "./pages/eddeli/inventoryControl/LoansDebtsPage.jsx";
 import RecurringExpensesPage from "./pages/eddeli/inventoryControl/RecurringExpensesPage.jsx";
@@ -55,6 +57,8 @@ import PublicidadPlayerPage from "./pages/eddeli/publicidad/PublicidadPlayerPage
 import PublicidadTvPlayerPage from "./pages/eddeli/publicidad/PublicidadTvPlayerPage.jsx";
 import PublicidadTvDevicePlayerPage from "./pages/eddeli/publicidad/PublicidadTvDevicePlayerPage.jsx";
 import PublicidadDevicesPage from "./pages/eddeli/publicidad/PublicidadDevicesPage.jsx";
+import SubscriptionExpiredPage from "./pages/SubscriptionExpiredPage.jsx";
+import NoSubscriptionPage from "./pages/NoSubscriptionPage.jsx";
 
 const AUTH_ROLES = [
   "Estudiante",
@@ -72,6 +76,7 @@ const AUTH_ROLES = [
 export default function App() {
   return (
     <AuthProvider>
+      <SubscriptionProvider>
       <div id="sale-receipt-print-root" aria-hidden="true" />
       <Routes>
         <Route element={<PublicOnlyRoute />}>
@@ -89,6 +94,11 @@ export default function App() {
 
           <Route path="/catalogo" element={<CatalogoPage />} />
           <Route path="/punto_venta" element={<StoresPublicPage />} />
+
+          <Route element={<ProtectedRoute requiredRol={AUTH_ROLES} />}>
+            <Route path="/subscription-expired" element={<SubscriptionExpiredPage />} />
+            <Route path="/no-subscription" element={<NoSubscriptionPage />} />
+          </Route>
 
           <Route element={<ProtectedRoute requiredRol={AUTH_ROLES} />}>
             <Route path="/" element={<DashBoardPage />} />
@@ -149,6 +159,7 @@ export default function App() {
             <Route path="/inventory/insumos" element={<GenericIngredientsPage />} />
             <Route path="/inventory/orders" element={<OrderPage />} />
             <Route path="/inventory/customers" element={<CustomerPage />} />
+            <Route path="/inventory/suppliers" element={<SupplierPage />} />
             <Route path="/inventory/finance" element={<FinancePage />} />
             <Route path="/inventory/collections" element={<CollectionsPage />} />
             <Route path="/inventory/prestamos-deudas" element={<LoansDebtsPage />} />
@@ -161,6 +172,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
+      </SubscriptionProvider>
     </AuthProvider>
   );
 }

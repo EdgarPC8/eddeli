@@ -4,6 +4,7 @@ import {
   Stack,
   Tooltip,
   IconButton,
+  TablePagination,
 } from "@mui/material";
 import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import { useEffect, useState } from "react";
@@ -15,8 +16,9 @@ import MovementsListPanel from "./components/MovementsListPanel";
 import { useAuth } from "../../../context/AuthContext";
 
 import {
-  getAllProducts,
+  getAllProductsAll,
   getAllMovements,
+  unwrapListResponse,
   deleteMovement,
   updateMovementsDateBatch,
 } from "../../../api/inventoryControlRequest";
@@ -29,6 +31,9 @@ function MovementPage() {
   const [editingMovement, setEditingMovement] = useState(null);
   const [movements, setMovements] = useState([]);
   const [products, setProducts] = useState([]);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
+  const [total, setTotal] = useState(0);
 
   const handleDialog = () => {
     setEditingMovement(null);
@@ -41,13 +46,14 @@ function MovementPage() {
   };
 
   const fetchProducts = async () => {
-    const { data } = await getAllProducts();
-    setProducts(data);
+    const { data } = await getAllProductsAll();
+    setProducts(Array.isArray(data) ? data : unwrapListResponse(data));
   };
 
   const fetchMovements = async () => {
-    const { data } = await getAllMovements();
-    setMovements(data);
+    const { data } = await getAllMovements({ page: page + 1, pageSize });
+    setMovements(unwrapListResponse(data));
+    setTotal(data?.total ?? unwrapListResponse(data).length);
   };
 
   const handleDelete = async (row) => {
@@ -86,8 +92,11 @@ function MovementPage() {
 
   useEffect(() => {
     fetchProducts();
-    fetchMovements();
   }, []);
+
+  useEffect(() => {
+    fetchMovements();
+  }, [page, pageSize]);
 
   return (
     <Container>
@@ -147,6 +156,20 @@ function MovementPage() {
         onDelete={handleDelete}
         onBatchDate={onBatchDateWithToast}
         onBatchDateSaved={fetchMovements}
+      />
+
+      <TablePagination
+        component="div"
+        count={total}
+        page={page}
+        onPageChange={(_, newPage) => setPage(newPage)}
+        rowsPerPage={pageSize}
+        onRowsPerPageChange={(e) => {
+          setPageSize(Number.parseInt(e.target.value, 10));
+          setPage(0);
+        }}
+        rowsPerPageOptions={[25, 50, 100, 200]}
+        labelRowsPerPage="Por página"
       />
     </Container>
   );

@@ -35,7 +35,7 @@ import {
   getAllCustomersRequest,
   addOrderItemToOrderRequest,
 } from '../../../../api/ordersRequest';
-import { getAllProducts } from '../../../../api/inventoryControlRequest';
+import { getAllProductsAll } from '../../../../api/inventoryControlRequest';
 import { useAuth } from '../../../../context/AuthContext';
 import SimpleDialog from '../../../../components/Dialogs/SimpleDialog';
 import SearchableSelect from '../../../../components/SearchableSelect';
@@ -221,7 +221,7 @@ export default function OrderCalendarView({
       try {
         const [custRes, prodRes] = await Promise.all([
           getAllCustomersRequest(),
-          getAllProducts(),
+          getAllProductsAll(),
         ]);
         if (cancelled) return;
         setCustomers(custRes?.data || []);
@@ -650,23 +650,8 @@ export default function OrderCalendarView({
                             </Typography>
                           </Box>
 
-                          {/* Acciones de la orden */}
+                          {/* Acciones de la orden (editar / eliminar) */}
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <Tooltip title="Comprobante / factura">
-                              <IconButton
-                                size="small"
-                                color="primary"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPrintReceipt(buildReceiptFromCustomerOrder(order));
-                                  setPrintOpen(true);
-                                }}
-                                onFocus={(e) => e.stopPropagation()}
-                              >
-                                <PrintIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-
                             {canManageOrders && (
                               <Tooltip title={orderEditMode[order.id] ? "Cancelar edición" : "Editar orden"}>
                                 <IconButton
@@ -701,6 +686,21 @@ export default function OrderCalendarView({
                       </AccordionSummary>
 
                       <AccordionDetails>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1.5 }}>
+                          <Tooltip title="Comprobante / factura">
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              onClick={() => {
+                                setPrintReceipt(buildReceiptFromCustomerOrder(order));
+                                setPrintOpen(true);
+                              }}
+                            >
+                              <PrintIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        </Box>
+
                         {/* Bloque de edición de la ORDEN */}
                         {orderEditMode[order.id] && (
                           <Box

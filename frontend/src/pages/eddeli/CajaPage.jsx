@@ -197,7 +197,7 @@ export default function CajaPage() {
 
   const loadData = async () => {
     const [productsRes, customersRes, shiftRes, tierGroupsRes] = await Promise.allSettled([
-      getAllProducts({ withTierGroups: "true" }),
+      getAllProducts({ withTierGroups: "true", all: "true" }),
       getAllCustomersRequest(),
       getActiveShift(),
       getTierGroups({ active: "true" }),

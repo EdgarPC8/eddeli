@@ -182,12 +182,23 @@ export const unlinkPresentationRequest = async (productId) =>
 
 // 🟢 PRODUCTOS
 
-// Obtener todos los productos con categoría y unidad asociadas
+/** Extrae filas de respuesta paginada o array legacy del API. */
+export function unwrapListResponse(data) {
+  if (Array.isArray(data)) return data;
+  if (data?.data && Array.isArray(data.data)) return data.data;
+  if (data?.products && Array.isArray(data.products)) return data.products;
+  return [];
+}
+
+// Obtener productos (paginado por defecto; pasar all: "true" para lista completa)
 export const getAllProducts = async (params = {}) =>
   await axios.get("/inventory/products", {
     params,
     headers: { Authorization: jwt() },
   });
+
+/** Lista completa de productos (caja, formularios, etc.). */
+export const getAllProductsAll = (params = {}) => getAllProducts({ all: "true", ...params });
 
 // Crear un nuevo producto
 export const createProduct = async (data) =>
@@ -259,10 +270,14 @@ export const getMovementsByProduct = async (productId) =>
     headers: { Authorization: jwt() },
   });
 
-  export const getAllMovements = async () =>
+  export const getAllMovements = async (params = {}) =>
   await axios.get("/inventory/movements", {
+    params,
     headers: { Authorization: jwt() },
   });
+
+/** Lista completa de movimientos (usar con moderación). */
+export const getAllMovementsAll = () => getAllMovements({ all: "true" });
 
 export const simulateProduction = async (productId, cantidad) =>
   await axios.get("/inventory/simulate-production", {
@@ -334,12 +349,15 @@ export const deleteRecipeRequest = async (id) =>
 
 // 🏷️ CATEGORÍAS
 
-// Obtener todas las categorías
+// Obtener todas las categorías (admin; requiere sesión)
 export const getCategories = (params = {}) =>
   axios.get("/inventory/categories", {
-    params, // ej: { public: true } o { isActive: true }
+    params,
     headers: { Authorization: jwt() },
   });
+
+/** Categorías públicas del catálogo (sin autenticación). */
+export const getPublicCategories = () => axios.get("/inventory/categories/public");
 
 // Crear una nueva categoría
 export const createCategoryRequest = async (data) =>
@@ -399,6 +417,18 @@ export const updateCustomerRequest = async (id, data) =>
 
 export const deleteCustomerRequest = async (id) =>
   await axios.delete(`/inventory/customers/${id}`, { headers: { Authorization: jwt() } });
+
+export const getAllSuppliersRequest = async () =>
+  await axios.get("/inventory/suppliers", { headers: { Authorization: jwt() } });
+
+export const createSupplierRequest = async (data) =>
+  await axios.post("/inventory/suppliers", data, { headers: { Authorization: jwt() } });
+
+export const updateSupplierRequest = async (id, data) =>
+  await axios.put(`/inventory/suppliers/${id}`, data, { headers: { Authorization: jwt() } });
+
+export const deleteSupplierRequest = async (id) =>
+  await axios.delete(`/inventory/suppliers/${id}`, { headers: { Authorization: jwt() } });
 
 
 

@@ -1,3 +1,4 @@
+import { Op } from "sequelize";
 import { InventoryCategory } from "../../models/Inventory.js";
 
 const CATEGORY_INCLUDE_PARENT = {
@@ -26,18 +27,91 @@ async function validateParentId(parentId, categoryId = null) {
   return pid;
 }
 
+async function assertUniqueCategoryName(name, parentId, categoryId = null) {
+  const trimmed = String(name ?? "").trim();
+  if (!trimmed) {
+    throw new Error("El nombre de la categoría es obligatorio.");
+  }
+
+  const where = {
+    name: trimmed,
+    parentId: parentId == null ? { [Op.is]: null } : parentId,
+  };
+
+  const existing = await InventoryCategory.findOne({
+    where,
+    include: [CATEGORY_INCLUDE_PARENT],
+  });
+  if (existing && (!categoryId || Number(existing.id) !== Number(categoryId))) {
+    if (existing.parentId == null) {
+      throw new Error(
+        `Ya existe la categoría principal «${existing.name}». Búscala en la lista de la izquierda.`,
+      );
+    }
+    const parentName = existing.parent?.name || `categoría #${existing.parentId}`;
+    throw new Error(
+      `Ya existe la subcategoría «${existing.name}» dentro de «${parentName}». Selecciónala a la izquierda para verla.`,
+    );
+  }
+
+  return trimmed;
+}
+
+function mapCategoryError(err, fallbackMessage) {
+  if (err?.message && (/packageTiers|categoría|padre|niveles|nombre|obligatorio|existe/i.test(err.message))) {
+    return { status: 400, message: err.message };
+  }
+  if (err?.name === "SequelizeUniqueConstraintError") {
+    return {
+      status: 400,
+      message:
+        "Ya existe una categoría con ese nombre. Si el error persiste, ejecuta npm run db:sync:categorias en el servidor.",
+    };
+  }
+  return { status: 500, message: fallbackMessage, error: err };
+}
+
 async function applyCategoryPayload(body, categoryId = null) {
   const payload = { ...body };
   delete payload.packageTiers;
   delete payload.mixMatchProductIds;
   delete payload.mixMatchLabel;
+
+  if ("name" in payload) {
+    const parentForCheck =
+      "parentId" in payload
+        ? payload.parentId == null || payload.parentId === ""
+          ? null
+          : Number(payload.parentId)
+        : undefined;
+    let resolvedParent = parentForCheck;
+    if (resolvedParent === undefined && categoryId) {
+      const current = await InventoryCategory.findByPk(categoryId, {
+        attributes: ["parentId"],
+      });
+      resolvedParent = current?.parentId ?? null;
+    }
+    payload.name = await assertUniqueCategoryName(
+      payload.name,
+      resolvedParent ?? null,
+      categoryId,
+    );
+  }
+
   if ("parentId" in payload) {
     payload.parentId = await validateParentId(payload.parentId, categoryId);
+    if ("name" in payload) {
+      payload.name = await assertUniqueCategoryName(payload.name, payload.parentId, categoryId);
+    }
   }
+
+  if ("isPublic" in payload) {
+    payload.isPublic = Boolean(payload.isPublic);
+  }
+
   return payload;
 }
 
-// Crear categoría
 export const createCategory = async (req, res) => {
   try {
     const payload = await applyCategoryPayload(req.body);
@@ -47,10 +121,12 @@ export const createCategory = async (req, res) => {
     });
     res.status(201).json(full);
   } catch (err) {
-    if (err?.message && (/packageTiers|categoría|padre|niveles/i.test(err.message))) {
-      return res.status(400).json({ message: err.message });
-    }
-    res.status(500).json({ message: "Error al crear categoría", error: err });
+    const mapped = mapCategoryError(err, "Error al crear categoría");
+    if (mapped.status === 500) console.error("createCategory:", err);
+    res.status(mapped.status).json({
+      message: mapped.message,
+      ...(mapped.error ? { error: mapped.error } : {}),
+    });
   }
 };
 
@@ -73,11 +149,16 @@ export const getAllCategories = async (req, res) => {
     res.json(categories);
   } catch (err) {
     console.error("Error al obtener categorías:", err);
-    res.status(500).json({ message: "Error al obtener categorías", error: err });
+    res.status(500).json({ message: "Error al obtener categorías", error: err.message });
   }
 };
 
-// Editar categoría
+/** Categorías visibles en catálogo público (sin autenticación). */
+export const getAllCategoriesPublic = async (req, res) => {
+  req.query.public = "true";
+  return getAllCategories(req, res);
+};
+
 export const updateCategory = async (req, res) => {
   try {
     const { id } = req.params;
@@ -98,14 +179,15 @@ export const updateCategory = async (req, res) => {
     });
     res.json(full);
   } catch (err) {
-    if (err?.message && (/packageTiers|categoría|padre|niveles/i.test(err.message))) {
-      return res.status(400).json({ message: err.message });
-    }
-    res.status(500).json({ message: "Error al actualizar categoría", error: err });
+    const mapped = mapCategoryError(err, "Error al actualizar categoría");
+    if (mapped.status === 500) console.error("updateCategory:", err);
+    res.status(mapped.status).json({
+      message: mapped.message,
+      ...(mapped.error ? { error: mapped.error } : {}),
+    });
   }
 };
 
-// Eliminar categoría
 export const deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;

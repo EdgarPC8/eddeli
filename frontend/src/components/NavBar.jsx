@@ -38,6 +38,7 @@ import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
 import Inventory2Icon from "@mui/icons-material/Inventory2";
 import CategoryIcon from "@mui/icons-material/Category";
 import PeopleIcon from "@mui/icons-material/People";
+import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import StraightenIcon from "@mui/icons-material/Straighten";
 import LogoutIcon from "@mui/icons-material/Logout";
 import SwapHorizIcon from "@mui/icons-material/SwapHoriz";
@@ -85,30 +86,44 @@ import CambiarRol from "./CambiarRol.jsx";
 import SimpleDialog from "./Dialogs/SimpleDialog.jsx";
 import { getUnreadCount } from "../api/notificationsRequest.js";
 import { useNotificationSocket } from "../hooks/useNotificationSocket.js";
+import { useSubscriptions } from "../hooks/useSubscriptions.js";
+import { getAllowedPaths, isPathAllowed } from "../utils/subscriptionAccess.js";
 import { LOGO_PATH } from "../config.js";
 import { activeApp } from "../config/appInfo.js";
 
 const DRAWER_W = 260;
 
+/** Accesos directos (siempre visibles arriba del menú). */
 const MENU_ITEMS = [
   { name: "Dashboard", link: "/", icon: <DashboardIcon />, roles: ["Programador", "Administrador"] },
-  { name: "Caja", link: "/caja", icon: <PointOfSaleIcon />, roles: ["Programador", "Administrador", "Empleado"] },
-  { name: "Turno", link: "/turno", icon: <ScheduleIcon />, roles: ["Programador", "Administrador", "Empleado"] },
-  { name: "Supervisión caja", link: "/turno/supervision", icon: <AssessmentIcon />, roles: ["Programador", "Administrador"] },
-  { name: "Tareas", link: "/tareas", icon: <AssignmentTurnedInIcon />, roles: ["Programador", "Administrador", "Empleado"] },
-  { name: "Facturación", link: "/facturacion", icon: <ReceiptIcon />, roles: ["Programador", "Administrador"] },
-  { name: "Catálogo config", link: "/catalog_manager", icon: <ViewModuleIcon />, roles: ["Programador", "Administrador"] },
-  { name: "Grupos comparativos", link: "/compare_groups", icon: <CompareArrowsIcon />, roles: ["Programador", "Administrador"] },
   { name: "Notificaciones", link: "/notifications", icon: <NotificationsIcon />, roles: ["Programador", "Administrador", "Empleado"] },
 ];
 
+/** Módulos agrupados en acordeón. */
 const MENU_GROUPS = [
   {
+    id: "operacion",
+    label: "Operación",
+    items: [
+      { name: "Caja", link: "/caja", icon: <PointOfSaleIcon />, roles: ["Programador", "Administrador", "Empleado"] },
+      { name: "Turno", link: "/turno", icon: <ScheduleIcon />, roles: ["Programador", "Administrador", "Empleado"] },
+      { name: "Tareas", link: "/tareas", icon: <AssignmentTurnedInIcon />, roles: ["Programador", "Administrador", "Empleado"] },
+      { name: "Facturación", link: "/facturacion", icon: <ReceiptIcon />, roles: ["Programador", "Administrador"] },
+      { name: "Supervisión caja", link: "/turno/supervision", icon: <AssessmentIcon />, roles: ["Programador", "Administrador"] },
+    ],
+  },
+  {
     id: "ventas",
-    label: "Ventas y clientes",
+    label: "Ventas",
     items: [
       { name: "Pedidos", link: "/inventory/orders", icon: <AssignmentIcon />, roles: ["Programador", "Administrador"] },
       { name: "Clientes", link: "/inventory/customers", icon: <PeopleIcon />, roles: ["Programador", "Administrador"] },
+    ],
+  },
+  {
+    id: "finanzas",
+    label: "Finanzas",
+    items: [
       { name: "Finanzas", link: "/inventory/finance", icon: <MonetizationOnIcon />, roles: ["Programador", "Administrador"] },
       { name: "Cobranzas", link: "/inventory/collections", icon: <RequestQuoteIcon />, roles: ["Programador", "Administrador"] },
       { name: "Préstamos y deudas", link: "/inventory/prestamos-deudas", icon: <AccountBalanceWalletIcon />, roles: ["Programador", "Administrador"] },
@@ -124,17 +139,26 @@ const MENU_GROUPS = [
       { name: "Categorías", link: "/inventory/categories", icon: <CategoryIcon />, roles: ["Programador", "Administrador"] },
       { name: "Tramos", link: "/inventory/tramos", icon: <ViewModuleIcon />, roles: ["Programador", "Administrador"] },
       { name: "Unidades", link: "/inventory/units", icon: <StraightenIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Insumos y marcas", link: "/inventory/insumos", icon: <ScienceIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Recetas", link: "/inventory/recipes", icon: <ReceiptLongIcon />, roles: ["Programador", "Administrador"] },
     ],
   },
   {
     id: "produccion",
-    label: "Producción y canal",
+    label: "Producción",
     items: [
+      { name: "Insumos y marcas", link: "/inventory/insumos", icon: <ScienceIcon />, roles: ["Programador", "Administrador"] },
+      { name: "Recetas", link: "/inventory/recipes", icon: <ReceiptLongIcon />, roles: ["Programador", "Administrador"] },
       { name: "Producción", link: "/inventory/production", icon: <FactoryIcon />, roles: ["Programador", "Administrador"] },
+      { name: "Proveedores", link: "/inventory/suppliers", icon: <LocalShippingIcon />, roles: ["Programador", "Administrador"] },
+    ],
+  },
+  {
+    id: "canal",
+    label: "Canal digital",
+    items: [
+      { name: "Catálogo config", link: "/catalog_manager", icon: <ViewModuleIcon />, roles: ["Programador", "Administrador"] },
       { name: "Puntos de venta", link: "/inventory/puntos-venta", icon: <StorefrontRoundedIcon />, roles: ["Programador", "Administrador"] },
       { name: "Productos destacados", link: "/inventory/productos-destacados", icon: <StarRoundedIcon />, roles: ["Programador", "Administrador"] },
+      { name: "Grupos comparativos", link: "/compare_groups", icon: <CompareArrowsIcon />, roles: ["Programador", "Administrador"] },
     ],
   },
   {
@@ -142,26 +166,14 @@ const MENU_GROUPS = [
     label: "Publicidad",
     items: [
       { name: "Campañas", link: "/publicidad", icon: <TvIcon />, roles: ["Programador", "Administrador"] },
-      {
-        name: "Dispositivos TV",
-        link: "/publicidad/dispositivos",
-        icon: <TvIcon />,
-        roles: ["Programador", "Administrador"],
-      },
-      {
-        name: "Reproductor",
-        link: "/publicidad/reproductor",
-        icon: <PlayCircleOutlineIcon />,
-        roles: ["Programador", "Administrador"],
-      },
+      { name: "Dispositivos TV", link: "/publicidad/dispositivos", icon: <TvIcon />, roles: ["Programador", "Administrador"] },
+      { name: "Reproductor", link: "/publicidad/reproductor", icon: <PlayCircleOutlineIcon />, roles: ["Programador", "Administrador"] },
     ],
   },
   {
     id: "diseno-promocional",
-    label: "Diseño Promocional",
+    label: "Diseño promocional",
     items: [
-      { name: "Imágenes", link: "/img", icon: <ImageIcon />, roles: ["Programador"] },
-      { name: "Archivos", link: "/file", icon: <InsertDriveFileIcon />, roles: ["Programador"] },
       { name: "Editor de diseño", link: "/diseno-promocional/editor", icon: <EditNoteIcon />, roles: ["Programador", "Administrador"] },
       { name: "Vista con productos", link: "/diseno-promocional/vista", icon: <VolumeUpIcon />, roles: ["Programador", "Administrador"] },
       { name: "Plantillas", link: "/diseno-promocional/plantillas", icon: <CollectionsBookmarkIcon />, roles: ["Programador", "Administrador"] },
@@ -175,8 +187,14 @@ const MENU_GROUPS = [
       { name: "Cuentas", link: "/cuentas", icon: <ManageAccountsIcon />, roles: ["Programador", "Administrador"] },
       { name: "Roles", link: "/roles", icon: <SettingsApplicationsIcon />, roles: ["Programador", "Administrador"] },
       { name: "Panel de control", link: "/panel_control", icon: <DnsIcon />, roles: ["Programador", "Administrador"] },
-      // Oculto hasta que exista API backend /notification-programs (ver NotificationProgramsPage)
-      // { name: "Programar notificaciones", link: "/notification-programs", icon: <NotificationsIcon />, roles: ["Programador", "Administrador"] },
+    ],
+  },
+  {
+    id: "sistema",
+    label: "Sistema",
+    items: [
+      { name: "Imágenes", link: "/img", icon: <ImageIcon />, roles: ["Programador"] },
+      { name: "Archivos", link: "/file", icon: <InsertDriveFileIcon />, roles: ["Programador"] },
       { name: "Logs", link: "/logs", icon: <HistoryIcon />, roles: ["Programador"] },
       { name: "Backups JSON", link: "/backups", icon: <BackupIcon />, roles: ["Programador"] },
       { name: "Comandos", link: "/comandos", icon: <TerminalIcon />, roles: ["Programador"] },
@@ -207,6 +225,12 @@ export default function NavBar() {
   const navigate = useNavigate();
   const location = useLocation();
   const { isAuthenticated, isLoading, user, logout, profileImageUser } = useAuth();
+  const { subscription } = useSubscriptions();
+
+  const allowedPaths = useMemo(
+    () => (subscription?.subscribed ? getAllowedPaths(subscription) : new Set()),
+    [subscription],
+  );
 
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [expandedGroupId, setExpandedGroupId] = useState(null);
@@ -226,8 +250,22 @@ export default function NavBar() {
     user?.username ||
     "";
 
-  const menuItems = useMemo(() => menuItemsForRole(user?.loginRol), [user?.loginRol]);
-  const menuGroups = useMemo(() => menuGroupsForRole(user?.loginRol), [user?.loginRol]);
+  const menuItems = useMemo(() => {
+    const items = menuItemsForRole(user?.loginRol);
+    if (!subscription?.subscribed) return items;
+    return items.filter((item) => isPathAllowed(item.link, allowedPaths));
+  }, [user?.loginRol, subscription, allowedPaths]);
+
+  const menuGroups = useMemo(() => {
+    const groups = menuGroupsForRole(user?.loginRol);
+    if (!subscription?.subscribed) return groups;
+    return groups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter((item) => isPathAllowed(item.link, allowedPaths)),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [user?.loginRol, subscription, allowedPaths]);
 
   useEffect(() => {
     const activeGroup = menuGroups.find((group) =>

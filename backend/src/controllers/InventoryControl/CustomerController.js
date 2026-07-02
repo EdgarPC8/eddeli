@@ -1,4 +1,14 @@
 import { Customer } from "../../models/Orders.js";
+
+function normalizeCustomerPayload(body = {}) {
+  const payload = { ...body };
+  if ("cedula" in payload) {
+    const cedula = String(payload.cedula ?? "").trim();
+    payload.cedula = cedula || null;
+  }
+  return payload;
+}
+
 // controllers/CustomerController.js
 // Obtener todos los clientes
 export const getAllCustomers = async (req, res) => {
@@ -17,7 +27,7 @@ export const createCustomer = async (req, res) => {
     if (existing) {
       return res.status(409).json({ message: 'Ya existe un cliente con ese teléfono' });
     }
-    const customer = await Customer.create(req.body);
+    const customer = await Customer.create(normalizeCustomerPayload(req.body));
     res.status(201).json(customer);
   } catch (error) {
     res.status(500).json({ message: 'Error al crear cliente', error });
@@ -29,7 +39,7 @@ export const updateCustomer = async (req, res) => {
   try {
     const customer = await Customer.findByPk(req.params.id);
     if (!customer) return res.status(404).json({ message: 'Cliente no encontrado' });
-    await customer.update(req.body);
+    await customer.update(normalizeCustomerPayload(req.body));
     res.json(customer);
   } catch (error) {
     res.status(500).json({ message: 'Error al actualizar cliente', error });

@@ -69,7 +69,7 @@ export const getFinanceSummaryRequest = async () => {
   });
 };
 
-/** Series Top 8 ingresos/compras por producto (semana | mes | año). */
+/** Series de ventas por producto final (semana | mes | año). */
 export const getProductSeriesChartsRequest = async (period = "month", band = 1) =>
   axios.get("/finance/product-series", {
     params: { period, band },

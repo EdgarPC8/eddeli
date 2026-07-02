@@ -12,7 +12,7 @@ export const activeApp = {
     tiktok: "https://tiktok.com/@panaderia_eddeli",
     email: "panaderiaeddeli@gmail.com",
   },
-  description: "Sistema integral de gestión y control para la panadería EdDeli.",
+  description: "Sistema de Gestión de Negocios",
   author: "SoftEd",
   year: new Date().getFullYear(),
   background: "#fff8f2",

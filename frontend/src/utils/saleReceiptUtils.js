@@ -1,6 +1,8 @@
 import { activeApp } from "../config/appInfo.js";
 import { getOrderCustomerDisplay } from "./eddeliPosOrderUtils.js";
 import { formatDateTime } from "../helpers/functions.js";
+import { printHtmlDocument } from "./printHtmlDocument.js";
+import { getReceiptLayout } from "./receiptFormats.js";
 
 const to2 = (n) => Number(Number(n || 0).toFixed(2));
 
@@ -52,6 +54,7 @@ export function applyReceiptDocumentType(receipt, documentType) {
       customerPhone: "",
       customerAddress: "",
       customerEmail: "",
+      customerCedula: "",
     };
   }
 
@@ -71,6 +74,7 @@ export function applyReceiptDocumentType(receipt, documentType) {
     customerPhone: raw.phone || receipt.customerPhone || "",
     customerAddress: raw.address || receipt.customerAddress || "",
     customerEmail: raw.email || receipt.customerEmail || "",
+    customerCedula: raw.cedula || receipt.customerCedula || "",
   };
 }
 
@@ -88,6 +92,15 @@ export function formatMoneyReceipt(n) {
 export function formatReceiptDate(iso) {
   return formatDateTime(iso);
 }
+
+/** Etiquetas cortas en comprobante impreso. */
+export const RECEIPT_FIELD_LABELS = {
+  name: "Nom:",
+  cedula: "CI:",
+  phone: "Tel:",
+  address: "Dir:",
+  payment: "Pag:",
+};
 
 export function paymentMethodLabel(method) {
   const m = String(method || "").toLowerCase();
@@ -137,11 +150,13 @@ export function normalizeSaleReceipt(sale) {
     customerPhone: customer.phone || "",
     customerAddress: customer.address || "",
     customerEmail: customer.email || "",
+    customerCedula: customer.cedula || "",
     _customerRaw: {
       name: customerNameRaw,
       phone: customer.phone || "",
       address: customer.address || "",
       email: customer.email || "",
+      cedula: customer.cedula || "",
     },
     paymentMethod: paymentMethodLabel(sale.paymentMethod),
     items,
@@ -250,62 +265,108 @@ export function buildReceiptFromCheckout({
   });
 }
 
+/** Aplica datos editables del cliente solo para vista previa / impresión. */
+export function applyReceiptCustomerOverrides(receipt, fields = {}) {
+  if (!receipt) return null;
+  if (receipt.documentType === "consumidor_final") return receipt;
+
+  return {
+    ...receipt,
+    customerName: String(fields.name ?? receipt.customerName ?? "").trim() || "—",
+    customerCedula: String(fields.cedula ?? receipt.customerCedula ?? "").trim(),
+    customerPhone: String(fields.phone ?? receipt.customerPhone ?? "").trim(),
+    customerAddress: String(fields.address ?? receipt.customerAddress ?? "").trim(),
+  };
+}
+
 export function printSaleReceipt(receipt, format) {
-  const root = document.getElementById("sale-receipt-print-root");
-  if (!root) return;
-  root.innerHTML = buildPrintHtml(receipt, format);
-  root.className = format === "ticket80" ? "print-ticket80" : "print-a4";
-  window.print();
+  printHtmlDocument(buildPrintHtml(receipt, format), { format });
 }
 
 function buildPrintHtml(receipt, format) {
-  const isTicket = format === "ticket80";
-  const w = isTicket ? "80mm" : "210mm";
-  const fs = isTicket ? "11px" : "13px";
-  const pad = isTicket ? "6px 4px" : "24px";
+  const layout = getReceiptLayout(format);
+  const isTicket = layout.isTicket;
+  const p = layout.print;
+  const cols = layout.productColPct;
+  const w = isTicket ? "100%" : "210mm";
+  const fs = isTicket ? p.fs : "14px";
+  const pad = isTicket ? "0" : "24px";
+  const productCell = isTicket
+    ? "padding:2px 1px;word-wrap:break-word;overflow-wrap:break-word;white-space:normal;vertical-align:top;line-height:1.35;font-weight:600"
+    : "padding:2px 0;font-weight:600";
+  const numCell = isTicket
+    ? `text-align:center;padding:2px 1px;vertical-align:top;font-size:${p.num}px;font-weight:700`
+    : "text-align:center;padding:2px 4px;font-weight:700";
+  const moneyCell = isTicket
+    ? `text-align:right;padding:2px 1px;vertical-align:top;font-size:${p.num}px;font-weight:700;word-wrap:break-word;overflow-wrap:break-word`
+    : "text-align:right;padding:2px 0;font-weight:700";
+  const totalRow = (label, value, bold = false) => {
+    const fw = bold ? "font-weight:800;" : "font-weight:700;";
+    const fsTotal = bold ? (isTicket ? `font-size:${p.totalBold}px;` : "font-size:17px;") : "";
+    return `<div style="display:table;width:100%;${fw}${fsTotal}">
+      <span style="display:table-cell;padding:0 1px">${label}</span>
+      <span style="display:table-cell;text-align:right;white-space:nowrap;padding:0 1px">${value}</span>
+    </div>`;
+  };
+  const signatureBlock = isTicket
+    ? `<div style="margin-top:10px">
+        <div style="border-top:1.5px solid #000;margin-top:28px;padding-top:5px;text-align:center;font-weight:800;font-size:${p.signature}px">Entrega</div>
+        <div style="border-top:1.5px solid #000;margin-top:28px;padding-top:5px;text-align:center;font-weight:800;font-size:${p.signature}px">Recibe</div>
+      </div>`
+    : `<div style="display:flex;justify-content:space-between;gap:32px;margin-top:36px">
+        <div style="flex:1;text-align:center">
+          <div style="border-top:1.5px solid #000;margin-top:40px;padding-top:6px;font-weight:800;font-size:14px">Entrega</div>
+        </div>
+        <div style="flex:1;text-align:center">
+          <div style="border-top:1.5px solid #000;margin-top:40px;padding-top:6px;font-weight:800;font-size:14px">Recibe</div>
+        </div>
+      </div>`;
   const rows = (receipt.items || [])
     .map(
       (it) =>
         `<tr>
-          <td style="padding:2px 0">${escapeHtml(it.name)}</td>
-          <td style="text-align:center;padding:2px 4px">${it.quantity}</td>
-          <td style="text-align:right;padding:2px 0">${formatMoneyReceipt(it.price)}</td>
-          <td style="text-align:right;padding:2px 0">${formatMoneyReceipt(it.lineTotal)}</td>
+          <td style="${productCell}">${escapeHtml(it.name)}</td>
+          <td style="${numCell}">${it.quantity}</td>
+          <td style="${moneyCell}">${formatMoneyReceipt(it.price)}</td>
+          <td style="${moneyCell}">${formatMoneyReceipt(it.lineTotal)}</td>
         </tr>`,
     )
     .join("");
 
-  return `<div style="width:${w};max-width:100%;margin:0 auto;padding:${pad};font-family:Arial,sans-serif;font-size:${fs};color:#000">
-    <div style="text-align:center;margin-bottom:${isTicket ? 8 : 16}px">
-      <div style="font-weight:700;font-size:${isTicket ? 14 : 20}px;color:#000">${escapeHtml(receipt.businessName)}</div>
-      ${receipt.businessDescription ? `<div style="font-weight:700;font-size:${isTicket ? 10 : 12}px;color:#000;margin-top:4px">${escapeHtml(receipt.businessDescription)}</div>` : ""}
-      <div style="font-weight:700;margin-top:${isTicket ? 8 : 12}px;font-size:${isTicket ? 12 : 16}px;color:#000">${escapeHtml(receipt.documentTitle)}</div>
-      <div style="font-weight:700;font-size:${isTicket ? 10 : 12}px;color:#000;margin-top:4px">N° ${receipt.id || "—"} · ${escapeHtml(receipt.date)}</div>
+  return `<div style="width:${w};max-width:${w};margin:0 auto;padding:${pad};box-sizing:border-box;font-family:Arial,sans-serif;font-size:${fs};font-weight:600;color:#000;line-height:1.35;overflow:hidden">
+    <div style="text-align:center;margin-bottom:${isTicket ? 6 : 16}px">
+      <div style="font-weight:800;font-size:${isTicket ? p.title : 22}px;color:#000">${escapeHtml(receipt.businessName)}</div>
+      ${receipt.businessDescription ? `<div style="font-weight:800;font-size:${isTicket ? p.desc : 13}px;color:#000;margin-top:2px">${escapeHtml(receipt.businessDescription)}</div>` : ""}
+      <div style="font-weight:800;margin-top:${isTicket ? 5 : 12}px;font-size:${isTicket ? p.docTitle : 17}px;color:#000">${escapeHtml(receipt.documentTitle)}</div>
+      <div style="font-weight:800;font-size:${isTicket ? p.meta : 13}px;color:#000;margin-top:2px">N° ${receipt.id || "—"}</div>
+      <div style="font-weight:900;font-size:${isTicket ? p.date : 18}px;color:#000;margin-top:3px">${escapeHtml(receipt.date)}</div>
     </div>
-    <div style="margin-bottom:${isTicket ? 6 : 12}px;font-size:${isTicket ? 10 : 12}px;color:#000">
-      <div><strong>Cliente:</strong> ${escapeHtml(receipt.customerName)}</div>
-      ${receipt.customerPhone ? `<div><strong>Tel:</strong> ${escapeHtml(receipt.customerPhone)}</div>` : ""}
-      ${receipt.customerAddress ? `<div><strong>Dir:</strong> ${escapeHtml(receipt.customerAddress)}</div>` : ""}
-      <div><strong>Pago:</strong> ${escapeHtml(receipt.paymentMethod)}</div>
+    <div style="margin-bottom:${isTicket ? 6 : 12}px;font-size:${isTicket ? p.customer : 16}px;font-weight:700;color:#000;line-height:1.4">
+      <div style="margin-bottom:${isTicket ? 2 : 3}px"><strong>${RECEIPT_FIELD_LABELS.name}</strong> ${escapeHtml(receipt.customerName)}</div>
+      ${receipt.customerCedula ? `<div style="margin-bottom:${isTicket ? 2 : 3}px"><strong>${RECEIPT_FIELD_LABELS.cedula}</strong> ${escapeHtml(receipt.customerCedula)}</div>` : ""}
+      ${receipt.customerPhone ? `<div style="margin-bottom:${isTicket ? 2 : 3}px"><strong>${RECEIPT_FIELD_LABELS.phone}</strong> ${escapeHtml(receipt.customerPhone)}</div>` : ""}
+      ${receipt.customerAddress ? `<div style="margin-bottom:${isTicket ? 2 : 3}px"><strong>${RECEIPT_FIELD_LABELS.address}</strong> ${escapeHtml(receipt.customerAddress)}</div>` : ""}
+      <div><strong>${RECEIPT_FIELD_LABELS.payment}</strong> ${escapeHtml(receipt.paymentMethod)}</div>
     </div>
-    <table style="width:100%;border-collapse:collapse;margin-bottom:${isTicket ? 6 : 12}px;color:#000">
+    <table style="width:100%;border-collapse:collapse;margin-bottom:${isTicket ? 6 : 12}px;color:#000;table-layout:fixed">
       <thead>
         <tr style="border-bottom:1px solid #ccc">
-          <th style="text-align:left;padding:2px 0;font-weight:700;color:#000">Producto</th>
-          <th style="text-align:center;padding:2px 4px;font-weight:700;color:#000">Cant</th>
-          <th style="text-align:right;padding:2px 0;font-weight:700;color:#000">P.U.</th>
-          <th style="text-align:right;padding:2px 0;font-weight:700;color:#000">Total</th>
+          <th style="text-align:left;padding:2px 1px;font-weight:800;color:#000;width:${isTicket ? cols.product : "auto"}">Producto</th>
+          <th style="text-align:center;padding:2px 1px;font-weight:800;color:#000;width:${isTicket ? cols.cant : "auto"}">Cant</th>
+          <th style="text-align:right;padding:2px 1px;font-weight:800;color:#000;width:${isTicket ? cols.pu : "auto"}">P.U.</th>
+          <th style="text-align:right;padding:2px 1px;font-weight:800;color:#000;width:${isTicket ? cols.total : "auto"}">Total</th>
         </tr>
       </thead>
       <tbody>${rows}</tbody>
     </table>
-    <div style="border-top:1px dashed #999;padding-top:${isTicket ? 6 : 10}px;color:#000">
-      <div style="display:flex;justify-content:space-between"><span>Subtotal</span><span>${formatMoneyReceipt(receipt.subtotal)}</span></div>
-      ${receipt.iva > 0 ? `<div style="display:flex;justify-content:space-between"><span>IVA</span><span>${formatMoneyReceipt(receipt.iva)}</span></div>` : ""}
-      <div style="display:flex;justify-content:space-between;font-weight:700;font-size:${isTicket ? 13 : 16}px;margin-top:4px;color:#000"><span>TOTAL</span><span>${formatMoneyReceipt(receipt.total)}</span></div>
+    <div style="border-top:1px dashed #999;padding-top:${isTicket ? 3 : 10}px;color:#000">
+      ${totalRow("Subtotal", formatMoneyReceipt(receipt.subtotal))}
+      ${receipt.iva > 0 ? totalRow("IVA", formatMoneyReceipt(receipt.iva)) : ""}
+      ${totalRow("TOTAL", formatMoneyReceipt(receipt.total), true)}
     </div>
-    ${receipt.notes ? `<div style="margin-top:${isTicket ? 6 : 10}px;font-size:${isTicket ? 9 : 11}px;color:#000">${escapeHtml(receipt.notes)}</div>` : ""}
-    <div style="text-align:center;margin-top:${isTicket ? 10 : 16}px;font-size:${isTicket ? 9 : 11}px;color:#000">Gracias por su compra</div>
+    ${receipt.notes ? `<div style="margin-top:${isTicket ? 4 : 10}px;font-size:${isTicket ? p.notes : 12}px;font-weight:700;color:#000;word-wrap:break-word">${escapeHtml(receipt.notes)}</div>` : ""}
+    <div style="text-align:center;margin-top:${isTicket ? 6 : 16}px;margin-bottom:0;font-size:${isTicket ? p.footer : 12}px;font-weight:800;color:#000">Gracias por su compra</div>
+    ${signatureBlock}
   </div>`;
 }
 

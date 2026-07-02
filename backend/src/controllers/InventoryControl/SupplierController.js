@@ -34,7 +34,17 @@ export const updateSupplier = async (req, res) => {
   try {
     const row = await Supplier.findByPk(req.params.id);
     if (!row) return res.status(404).json({ message: "Proveedor no encontrado" });
-    await row.update(req.body);
+    const { name, phone, email, address, notes } = req.body || {};
+    if (name != null && !String(name).trim()) {
+      return res.status(400).json({ message: "El nombre del proveedor es obligatorio" });
+    }
+    await row.update({
+      ...(name != null ? { name: String(name).trim() } : {}),
+      ...(phone !== undefined ? { phone: phone || null } : {}),
+      ...(email !== undefined ? { email: email || null } : {}),
+      ...(address !== undefined ? { address: address || null } : {}),
+      ...(notes !== undefined ? { notes: notes || null } : {}),
+    });
     res.json(row);
   } catch (error) {
     console.error("updateSupplier:", error);

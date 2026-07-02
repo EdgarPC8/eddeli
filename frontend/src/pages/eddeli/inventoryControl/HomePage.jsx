@@ -9,7 +9,7 @@ import {
   IconButton
 } from "@mui/material";
 import ResponsiveTable from "./components/DataTableFinance";
-import { getAllProducts } from "../../../api/inventoryControlRequest";
+import { getAllProductsAll } from "../../../api/inventoryControlRequest";
 import {
   getFinanceSummaryRequest,
   getAllIncomesRequest,
@@ -47,7 +47,7 @@ export const HomePage = () => {
     : 0;
 
   const fetchProducts = async () => {
-    const { data } = await getAllProducts();
+    const { data } = await getAllProductsAll();
 
     const agotados = data.filter((p) => p.stock <= 0);
     const porAgotarse = data

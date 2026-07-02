@@ -45,7 +45,7 @@ import ShiftProgrammerEditDialog from "./ShiftProgrammerEditDialog.jsx";
 import ProgrammerMovementDateField, {
   movementDateForApi,
 } from "./inventoryControl/components/ProgrammerMovementDateField.jsx";
-import { getAllProducts } from "../../api/inventoryControlRequest.js";
+import { getAllProductsAll } from "../../api/inventoryControlRequest.js";
 import {
   CASH_BILLS,
   CASH_COINS,
@@ -244,7 +244,7 @@ export default function TurnoPage() {
   useEffect(() => {
     if (movementForm.category !== "compra_mercancia" || products.length > 0) return;
     setProductsLoading(true);
-    getAllProducts()
+    getAllProductsAll()
       .then((res) => setProducts(Array.isArray(res.data) ? res.data : []))
       .catch(() => setProducts([]))
       .finally(() => setProductsLoading(false));

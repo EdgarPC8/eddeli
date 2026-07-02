@@ -28,11 +28,14 @@ export const updateOrderStatusRequest = async (orderId, status) =>
     headers: { Authorization: jwt() },
   });
 
-// Obtener pedidos (con cliente e items). Opcional: { from, to } como Date
-export const getAllOrdersRequest = async ({ from, to } = {}) => {
+// Obtener pedidos (con cliente e items). Opcional: { from, to, page, pageSize, all }
+export const getAllOrdersRequest = async ({ from, to, all = true, page, pageSize } = {}) => {
   const params = new URLSearchParams();
   if (from) params.set("from", format(from, "yyyy-MM-dd"));
   if (to) params.set("to", format(to, "yyyy-MM-dd"));
+  if (all) params.set("all", "true");
+  if (page) params.set("page", String(page));
+  if (pageSize) params.set("pageSize", String(pageSize));
   const qs = params.toString();
   return axios.get(`/orders${qs ? `?${qs}` : ""}`, {
     headers: { Authorization: jwt() },

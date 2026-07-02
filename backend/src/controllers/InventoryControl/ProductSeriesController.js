@@ -13,10 +13,9 @@ import {
   format,
 } from "date-fns";
 import { Order, OrderItem } from "../../models/Orders.js";
-import { InventoryMovement, InventoryProduct } from "../../models/Inventory.js";
+import { InventoryProduct } from "../../models/Inventory.js";
 
 const RANK_BAND_SIZE = 10;
-const CAJA_POS_TAG = "[CAJA_POS]";
 
 const VALID_PERIODS = new Set(["week", "month", "year"]);
 
@@ -113,7 +112,7 @@ function buildBundle(rows, periodConfig, rankBand, { getProductId, getDate, getQ
   }
 
   const ranked = [...totals.entries()].sort(
-    (a, b) => b[1].amt - a[1].amt || b[1].qty - a[1].qty
+    (a, b) => b[1].qty - a[1].qty || b[1].amt - a[1].amt
   );
   const totalRanked = ranked.length;
   const bandSlice = ranked.slice(sliceStart, sliceEnd);
@@ -164,17 +163,23 @@ function buildBundle(rows, periodConfig, rankBand, { getProductId, getDate, getQ
     dataset,
     datasetAmount,
     _topIds: topIds,
+    _totals: totals,
   };
 }
 
 async function finalizeBundle(partial) {
   const nameMap = await loadProductNames(partial._topIds);
-  const products = partial._topIds.map((id, index) => ({
-    id,
-    name: nameMap[id] || `Producto #${id}`,
-    rank: partial.rankStart + index,
-  }));
-  const { _topIds, ...rest } = partial;
+  const products = partial._topIds.map((id, index) => {
+    const t = partial._totals?.get(id);
+    return {
+      id,
+      name: nameMap[id] || `Producto #${id}`,
+      rank: partial.rankStart + index,
+      totalQty: roundQty(t?.qty ?? 0),
+      totalAmt: roundAmt(t?.amt ?? 0),
+    };
+  });
+  const { _topIds, _totals, ...rest } = partial;
   return { ...rest, products };
 }
 
@@ -190,10 +195,13 @@ async function buildSalesBundle(periodConfig, rankBand) {
         model: Order,
         attributes: [],
         required: true,
-        where: {
-          status: "pagado",
-          notes: { [Op.notLike]: `%${CAJA_POS_TAG}%` },
-        },
+        where: { status: "pagado" },
+      },
+      {
+        model: InventoryProduct,
+        attributes: [],
+        required: true,
+        where: { type: "final" },
       },
     ],
   });
@@ -208,27 +216,6 @@ async function buildSalesBundle(periodConfig, rankBand) {
   return finalizeBundle(partial);
 }
 
-async function buildPurchasesBundle(periodConfig, rankBand) {
-  const { start, end } = periodConfig;
-  const movements = await InventoryMovement.findAll({
-    attributes: ["productId", "quantity", "price", "date"],
-    where: {
-      type: "entrada",
-      reason: "ENTRADA_COMPRA",
-      date: { [Op.between]: [start, end] },
-    },
-  });
-
-  const partial = buildBundle(movements, periodConfig, rankBand, {
-    getProductId: (r) => r.productId,
-    getDate: (r) => r.date,
-    getQty: (r) => Number(r.quantity || 0),
-    getAmount: (r) => Number(r.price || 0),
-  });
-
-  return finalizeBundle(partial);
-}
-
 export const getProductSeriesCharts = async (req, res) => {
   try {
     const period = VALID_PERIODS.has(req.query.period) ? req.query.period : "month";
@@ -236,12 +223,9 @@ export const getProductSeriesCharts = async (req, res) => {
     const periodConfig = getPeriodConfig(period);
     const range = bandToRange(rankBand);
 
-    const [sales, purchases] = await Promise.all([
-      buildSalesBundle(periodConfig, rankBand),
-      buildPurchasesBundle(periodConfig, rankBand),
-    ]);
+    const sales = await buildSalesBundle(periodConfig, rankBand);
 
-    const totalRanked = Math.max(sales.totalRanked ?? 0, purchases.totalRanked ?? 0);
+    const totalRanked = sales.totalRanked ?? 0;
     const totalBands = Math.max(1, Math.ceil(totalRanked / RANK_BAND_SIZE));
 
     res.json({
@@ -255,7 +239,6 @@ export const getProductSeriesCharts = async (req, res) => {
       periodLabel: periodConfig.label,
       granularity: periodConfig.granularity,
       sales,
-      purchases,
     });
   } catch (error) {
     console.error("getProductSeriesCharts:", error);

@@ -32,7 +32,7 @@ import {
   createCatalogEntry,
   updateCatalogEntry,
   deleteCatalogEntry,
-  getAllProducts,
+  getAllProductsAll,
   getCategories,
 } from "../../../api/inventoryControlRequest";
 import AutoCatalogLab from "./components/AutoCatalogLab";
@@ -562,7 +562,7 @@ export default function CatalogManager() {
   };
 
   const fetchProducts = async () => {
-    const { data } = await getAllProducts();
+    const { data } = await getAllProductsAll();
     setProducts(Array.isArray(data) ? data : []);
   };
 

@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Box, Typography, useTheme } from '@mui/material';
+import { Box, Grid, Stack, Typography, useTheme } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import { LineChart } from '@mui/x-charts/LineChart';
 import { format } from 'date-fns';
@@ -32,14 +32,61 @@ function formatXLabel(date, granularity) {
   return d.toLocaleDateString('es-EC', { day: '2-digit', month: 'short' });
 }
 
-/**
- * Top 8 + Otros en importe ($). La cantidad aparece en el tooltip al pasar el mouse.
- */
+function ProductLegendList({ products, paletteColors }) {
+  if (!products.length) return null;
+
+  return (
+    <Stack
+      spacing={1}
+      sx={{
+        py: 0.5,
+        pr: { xs: 0, md: 1 },
+        maxHeight: { xs: 200, md: 320 },
+        overflowY: 'auto',
+      }}
+    >
+      {products.map((item, index) => {
+        const color = paletteColors[index % paletteColors.length];
+        return (
+          <Stack key={item.id} direction="row" spacing={1} alignItems="flex-start" sx={{ minWidth: 0 }}>
+            <Box
+              sx={{
+                width: 12,
+                height: 12,
+                borderRadius: 0.5,
+                bgcolor: color,
+                flexShrink: 0,
+                mt: 0.35,
+                boxShadow: `0 0 0 1px ${alpha(color, 0.4)}`,
+              }}
+            />
+            <Box sx={{ minWidth: 0, flex: 1 }}>
+              <Typography variant="body2" fontWeight={600} sx={{ lineHeight: 1.3 }} title={item.name}>
+                {item.rank != null ? `#${item.rank} ` : ''}
+                {item.name}
+              </Typography>
+              {(item.totalAmt > 0 || item.totalQty > 0) && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', lineHeight: 1.35 }}>
+                  {moneyFmt(item.totalAmt)}
+                  {item.totalQty > 0 ? ` · ${qtyFmt(item.totalQty)} u` : ''}
+                </Typography>
+              )}
+            </Box>
+          </Stack>
+        );
+      })}
+    </Stack>
+  );
+}
+
 export default function ProductSeriesChart({
   title,
   subtitle = '',
   bundle = null,
   loading = false,
+  chartHeight = 250,
+  showHeader = true,
+  sideLegend = false,
 }) {
   const theme = useTheme();
   const products = bundle?.products ?? [];
@@ -134,13 +181,8 @@ export default function ProductSeriesChart({
 
   const periodHint = bundle?.periodLabel ? `${bundle.periodLabel}. ` : '';
 
-  return (
-    <Box sx={{ width: '100%' }}>
-      <ChartBlockHeader
-        title={title}
-        subtitle={`${periodHint}${subtitle} Pasa el mouse sobre un día para ver importe y cantidad.`}
-      />
-
+  const chartBlock = (
+    <>
       {loading ? (
         <Typography variant="body2" color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
           Cargando…
@@ -173,22 +215,19 @@ export default function ProductSeriesChart({
             },
           ]}
           series={series}
-          height={250}
+          height={chartHeight}
           experimentalFeatures={{ preferStrictDomainInLineCharts: true }}
           margin={{ left: 4, right: 8, top: 8, bottom: 24 }}
           slotProps={{
             axisLine: { stroke: axisStroke },
             axisTick: { stroke: axisStroke },
-            legend: {
-              labelStyle: { fill: theme.palette.text.primary },
-            },
+            legend: { hidden: true },
             tooltip: {
               trigger: 'axis',
               renderer: tooltipRenderer,
             },
           }}
           sx={{
-            '& .MuiChartsLegend-series text': { fill: `${theme.palette.text.primary} !important` },
             '& .MuiAreaElement-root': {
               fillOpacity: theme.palette.mode === 'dark' ? 0.14 : 0.18,
             },
@@ -199,6 +238,36 @@ export default function ProductSeriesChart({
             },
           }}
         />
+      )}
+    </>
+  );
+
+  return (
+    <Box sx={{ width: '100%', minWidth: 0 }}>
+      {showHeader && (
+        <ChartBlockHeader
+          title={title}
+          subtitle={`${periodHint}${subtitle} Pasa el mouse sobre un día para ver importe y cantidad.`}
+        />
+      )}
+
+      {sideLegend ? (
+        <Grid container spacing={{ xs: 1.5, md: 2 }} alignItems="stretch">
+          <Grid item xs={12} md={3.5} lg={3} sx={{ minWidth: 0 }}>
+            {loading ? (
+              <Typography variant="body2" color="text.secondary">
+                Cargando…
+              </Typography>
+            ) : (
+              <ProductLegendList products={products} paletteColors={paletteColors} />
+            )}
+          </Grid>
+          <Grid item xs={12} md={8.5} lg={9} sx={{ minWidth: 0 }}>
+            {chartBlock}
+          </Grid>
+        </Grid>
+      ) : (
+        chartBlock
       )}
     </Box>
   );

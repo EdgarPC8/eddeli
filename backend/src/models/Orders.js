@@ -7,6 +7,7 @@ import { CashShift } from './CashShift.js';
 export const Customer = sequelize.define("ERP_customers", {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   name: { type: DataTypes.STRING, allowNull: false },
+  cedula: { type: DataTypes.STRING(32), allowNull: true },
   phone: { type: DataTypes.STRING },
   address: { type: DataTypes.STRING },
   email: { type: DataTypes.STRING },

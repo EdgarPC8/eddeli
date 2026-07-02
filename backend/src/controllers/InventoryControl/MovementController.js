@@ -17,6 +17,7 @@ import {
 } from '../../utils/genericIngredientUtils.js';
 
 import { Op, fn, col, literal } from "sequelize";
+import { parsePagination, sendPaginated } from "../../utils/pagination.js";
 
 // helpers
 const startOfDay = (d) => {
@@ -1325,28 +1326,42 @@ export const getMovementsByProduct = async (req, res) => {
 
 export const getAllMovements = async (req, res) => {
   try {
-    const movements = await InventoryMovement.findAll({
-      include: [
-        { model: InventoryProduct, attributes: ["id", "name"] }
-      ],
-      order: [['date', 'DESC']]
-    });
-    
-    // Formatear fechas correctamente antes de enviar
-    const formattedMovements = movements.map(movement => {
+    const pagination = parsePagination(req);
+    const queryOptions = {
+      include: [{ model: InventoryProduct, attributes: ["id", "name"] }],
+      order: [["date", "DESC"]],
+    };
+
+    const formatMovementRow = (movement) => {
       const movementData = movement.toJSON();
       if (movementData.date) {
-        // Asegurar que la fecha esté en formato ISO completo
         const date = new Date(movementData.date);
         if (!isNaN(date.getTime())) {
           movementData.date = date.toISOString();
         }
       }
       return movementData;
+    };
+
+    if (pagination.all) {
+      const movements = await InventoryMovement.findAll(queryOptions);
+      return res.json(movements.map(formatMovementRow));
+    }
+
+    const { count, rows } = await InventoryMovement.findAndCountAll({
+      ...queryOptions,
+      offset: pagination.offset,
+      limit: pagination.limit,
+      distinct: true,
     });
-    
-    res.json(formattedMovements);
+
+    return sendPaginated(res, {
+      rows: rows.map(formatMovementRow),
+      total: count,
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error al obtener todos los movimientos", error });
+    res.status(500).json({ message: "Error al obtener todos los movimientos", error: error.message });
   }
 };

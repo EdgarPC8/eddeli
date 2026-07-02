@@ -76,7 +76,15 @@ export const login = async (req, res) => {
 
 export const changeRole = async (req, res) => {
   const { accountId, rolId } = req.body;
-  console.log(accountId, rolId )
+
+  if (!accountId || !rolId) {
+    return res.status(400).json({ message: "accountId y rolId son obligatorios" });
+  }
+
+  if (Number(accountId) !== Number(req.user?.accountId)) {
+    return res.status(403).json({ message: "No puedes cambiar el rol de otra cuenta" });
+  }
+
   try {
     const account = await Account.findByPk(accountId, {
       include: [

@@ -89,7 +89,6 @@ export const InventoryCategory = sequelize.define("ERP_inventory_categories", {
   name: {
     type: DataTypes.STRING,
     allowNull: false,
-    unique: true
   },
   description: { type: DataTypes.TEXT },
   isPublic: {            // 👈 nueva columna

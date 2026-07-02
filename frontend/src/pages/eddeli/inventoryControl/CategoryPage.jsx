@@ -7,6 +7,7 @@ import {
   IconButton,
   Paper,
   Stack,
+  TextField,
   Tooltip,
   Typography,
 } from "@mui/material";
@@ -40,6 +41,7 @@ function CategoryPage() {
   const [datos, setDatos] = useState({});
   const [titleUserDialog, settitleUserDialog] = useState("");
   const [presetParentId, setPresetParentId] = useState(null);
+  const [search, setSearch] = useState("");
 
   const fecthData = async () => {
     const { data: rows } = await getCategories();
@@ -67,10 +69,34 @@ function CategoryPage() {
 
   const childCategories = useMemo(() => {
     if (!selectedRootId) return [];
-    return getChildCategories(data, selectedRootId).sort((a, b) =>
+    const children = getChildCategories(data, selectedRootId).sort((a, b) =>
       String(a.name).localeCompare(String(b.name), "es"),
     );
-  }, [data, selectedRootId]);
+    const q = search.trim().toLowerCase();
+    if (!q) return children;
+    return children.filter((c) => String(c.name).toLowerCase().includes(q));
+  }, [data, selectedRootId, search]);
+
+  const filteredRootCategories = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rootCategories;
+    return rootCategories.filter((root) => {
+      if (String(root.name).toLowerCase().includes(q)) return true;
+      return getChildCategories(data, root.id).some((c) =>
+        String(c.name).toLowerCase().includes(q),
+      );
+    });
+  }, [rootCategories, data, search]);
+
+  useEffect(() => {
+    const q = search.trim().toLowerCase();
+    if (!q || !data.length) return;
+    const match =
+      data.find((c) => String(c.name).toLowerCase().includes(q)) ?? null;
+    if (!match) return;
+    if (match.parentId) setSelectedRootId(match.parentId);
+    else setSelectedRootId(match.id);
+  }, [search, data]);
 
   const handleDialog = () => setOpen(!open);
   const handleDialogUser = () => {
@@ -259,9 +285,16 @@ function CategoryPage() {
           </Stack>
           <Typography variant="body2" color="text.secondary">
             Selecciona una categoría principal a la izquierda para ver y editar sus
-            subcategorías a la derecha.
+            subcategorías a la derecha. Usa el buscador para encontrar por nombre.
           </Typography>
         </Box>
+        <TextField
+          size="small"
+          placeholder="Buscar categoría o subcategoría…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          sx={{ minWidth: { sm: 280 } }}
+        />
       </Stack>
 
       <Grid container spacing={2}>
@@ -281,7 +314,7 @@ function CategoryPage() {
           </Stack>
           <TablePro
             columns={rootColumns}
-            rows={rootCategories}
+            rows={filteredRootCategories}
             showIndex
             defaultRowsPerPage={10}
             rowsPerPageOptions={[5, 10, 25, 50]}

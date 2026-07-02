@@ -8,7 +8,7 @@ import {
   getAllSuppliersRequest,
   createSupplierRequest,
 } from "../../../../api/ordersRequest";
-import { getAllProducts } from "../../../../api/inventoryControlRequest";
+import { getAllProductsAll } from "../../../../api/inventoryControlRequest";
 import { useAuth } from "../../../../context/AuthContext";
 import SearchableSelect from "../../../../components/SearchableSelect";
 import AttachmentField from "./AttachmentField.jsx";
@@ -89,7 +89,7 @@ export default function SupplierOrderForm({
   }, [selectedProductId, products, setValue]);
 
   const fetchCatalog = async () => {
-    const [prodRes, supRes] = await Promise.all([getAllProducts(), getAllSuppliersRequest()]);
+    const [prodRes, supRes] = await Promise.all([getAllProductsAll(), getAllSuppliersRequest()]);
     setProducts(prodRes?.data || []);
     setSuppliers(supRes?.data || []);
   };

@@ -1,5 +1,5 @@
 // controllers/ProductController.js
-import { Op } from "sequelize";
+import { Op, literal } from "sequelize";
 import fs from "fs";
 import { join } from "path";
 const { __dirname } = fileDirName(import.meta);
@@ -15,6 +15,11 @@ import {
 } from "../../models/Inventory.js";
 import fileDirName from "../../libs/file-dirname.js";
 import { normalizePackageTiersStrict } from "../../utils/productPricingUtils.js";
+import { parsePagination, sendPaginated } from "../../utils/pagination.js";
+
+const PRODUCT_TYPE_ORDER = literal(
+  `CASE \`${InventoryProduct.tableName}\`.\`type\` WHEN 'final' THEN 1 WHEN 'intermediate' THEN 2 ELSE 3 END`,
+);
 
 const PRODUCT_CATEGORY_INCLUDE = {
   model: InventoryCategory,
@@ -411,44 +416,67 @@ export const patchProductStock = async (req, res) => {
   }
 };
 
-// Obtener todos los productos con categoría y unidad
+// Obtener productos con categoría y unidad (paginado por defecto; ?all=true para lista completa)
 export const getAllProducts = async (req, res) => {
   try {
-    const products = await InventoryProduct.findAll({
-      include: [
-        PRODUCT_CATEGORY_INCLUDE,
-        { model: InventoryUnit, attributes: ["id", "name", "abbreviation"] },
-      ],
-    });
+    const pagination = parsePagination(req);
+    const include = [
+      PRODUCT_CATEGORY_INCLUDE,
+      { model: InventoryUnit, attributes: ["id", "name", "abbreviation"] },
+    ];
+    const order = [
+      [PRODUCT_TYPE_ORDER, "ASC"],
+      ["name", "ASC"],
+    ];
 
-    const finals = [];
-    const intermediates = [];
-    const raws = [];
-
-    products.forEach((p) => {
-      if (p.type === "final") finals.push(p);
-      else if (p.type === "intermediate") intermediates.push(p);
-      else raws.push(p);
-    });
-
-    // 👉 Orden final: Finales → Intermedios → Materia prima
-    const orderedProducts = [...finals, ...intermediates, ...raws];
-
-    if (req.query.withTierGroups === "true") {
-      const tierGroups = await PricingTierGroup.findAll({
+    const loadTierGroups = async () =>
+      PricingTierGroup.findAll({
         where: { isActive: true },
         order: [
           ["position", "ASC"],
           ["name", "ASC"],
         ],
       });
-      return res.json({ products: orderedProducts, tierGroups });
+
+    if (pagination.all) {
+      const products = await InventoryProduct.findAll({ include, order });
+
+      if (req.query.withTierGroups === "true") {
+        const tierGroups = await loadTierGroups();
+        return res.json({ products, tierGroups });
+      }
+
+      return res.json(products);
     }
 
-    res.json(orderedProducts);
+    const { count, rows } = await InventoryProduct.findAndCountAll({
+      include,
+      order,
+      offset: pagination.offset,
+      limit: pagination.limit,
+      distinct: true,
+    });
 
+    if (req.query.withTierGroups === "true") {
+      const tierGroups = await loadTierGroups();
+      return res.json({
+        products: rows,
+        tierGroups,
+        total: count,
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        totalPages: Math.max(1, Math.ceil(count / pagination.pageSize)),
+      });
+    }
+
+    return sendPaginated(res, {
+      rows,
+      total: count,
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Error al obtener productos", error });
+    res.status(500).json({ message: "Error al obtener productos", error: error.message });
   }
 };
 

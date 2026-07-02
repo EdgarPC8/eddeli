@@ -24,9 +24,11 @@ import {
 import Cropper from "react-easy-crop";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../../../../context/AuthContext";
+import SearchableSelect from "../../../../components/SearchableSelect.jsx";
 import {
-  getRootCategories,
-  getChildCategories,
+  getAssignableCategories,
+  formatCategoryLabel,
+  indexCategories,
 } from "../../../../utils/categoryUtils.js";
 import {
   createProduct as apiCreateProduct,
@@ -318,6 +320,16 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
     if (datos?.primaryImageUrl) return `${pathImg}${datos.primaryImageUrl}`;
     return null;
   }, [previewUrl, datos?.primaryImageUrl]);
+
+  const categoryOptions = useMemo(() => {
+    const byId = indexCategories(categories);
+    return getAssignableCategories(categories)
+      .map((cat) => ({
+        ...cat,
+        optionLabel: formatCategoryLabel(cat, byId),
+      }))
+      .sort((a, b) => a.optionLabel.localeCompare(b.optionLabel, "es"));
+  }, [categories]);
 
   const ASPECTS = { "1:1": 1, "4:3": 4 / 3, "16:9": 16 / 9, free: undefined };
   const [aspectKey, setAspectKey] = useState("1:1");
@@ -657,33 +669,17 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
           </TextField>
         </Grid>
         <Grid item xs={12} sm={6}>
-          <TextField
+          <SearchableSelect
             label="Categoría"
-            select
-            size="small"
-            fullWidth
-            variant="standard"
-            margin="dense"
+            items={categoryOptions}
             value={watch("categoryId") || ""}
-            {...register("categoryId")}
-          >
-            <MenuItem value="">Sin categoría</MenuItem>
-            {getRootCategories(categories).flatMap((root) => {
-              const children = getChildCategories(categories, root.id);
-              if (children.length > 0) {
-                return children.map((child) => (
-                  <MenuItem key={child.id} value={child.id}>
-                    {root.name} › {child.name}
-                  </MenuItem>
-                ));
-              }
-              return [
-                <MenuItem key={root.id} value={root.id}>
-                  {root.name}
-                </MenuItem>,
-              ];
-            })}
-          </TextField>
+            getOptionLabel={(item) => item.optionLabel || item.name || ""}
+            onChange={(val) =>
+              setValue("categoryId", val, { shouldValidate: true, shouldDirty: true })
+            }
+            emptyOptionLabel="Sin categoría"
+            placeholder="Buscar categoría..."
+          />
         </Grid>
 
         <Grid item xs={6} sm={3}>

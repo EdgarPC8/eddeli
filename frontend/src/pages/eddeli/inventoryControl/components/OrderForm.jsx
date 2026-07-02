@@ -9,7 +9,7 @@ import {
   getAllCustomersRequest,
   deleteOrderItem,
 } from "../../../../api/ordersRequest";
-import { getAllProducts } from "../../../../api/inventoryControlRequest";
+import { getAllProductsAll } from "../../../../api/inventoryControlRequest";
 import { useAuth } from "../../../../context/AuthContext";
 import SearchableSelect from "../../../../components/SearchableSelect";
 import ProductPriceReference, {
@@ -106,6 +106,8 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
         productId: it.productId,
         quantity: it.quantity,
         price: it.price,
+        deliveredAt: it.deliveredAt,
+        paidAt: it.paidAt,
         ERP_inventory_product: { name: it.name },
       })),
       ERP_customer: customers.find((c) => String(c.id) === String(selectedCustomer)) || datos.ERP_customer,
@@ -122,7 +124,7 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
   }, [currentProduct, setValue]);
 
   const fetchProducts = async () => {
-    const { data } = await getAllProducts();
+    const { data } = await getAllProductsAll();
     setProducts(data || []);
   };
 
@@ -241,6 +243,8 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
             : 0,
         name: item.ERP_inventory_product?.name || "",
         unitLabel: getProductUnitLabel(item.ERP_inventory_product),
+        deliveredAt: item.deliveredAt || null,
+        paidAt: item.paidAt || null,
       }));
 
       setItems(loadedItems);
@@ -380,7 +384,7 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
           />
         </Grid>
 
-        <Grid item xs={12} display="flex" justifyContent="flex-end" alignItems="center" gap={1}>
+        <Grid item xs={12} display="flex" justifyContent="flex-end" alignItems="center" gap={1} flexWrap="wrap">
           {isEditing && printReceipt && (
             <Tooltip title="Comprobante / factura">
               <IconButton color="primary" onClick={() => setPrintOpen(true)}>

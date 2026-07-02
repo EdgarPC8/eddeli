@@ -197,7 +197,7 @@ export const DashBoardPage = () => {
                     </Box>
                 </Grid>
 
-                {/* Ingresos y compras por producto (Top 8) */}
+                {/* Ventas de productos finales — ancho completo */}
                 <Grid item xs={12}>
                     <ProductChartsPanel />
                 </Grid>

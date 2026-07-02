@@ -30,22 +30,27 @@ export const getFinanceDashboard = async (req, res) => {
     ] = await Promise.all([
       invokeController(getFinanceSummary, req),
       invokeController(getAllExpenses, req),
-      invokeController(getAllOrders, req),
+      invokeController(getAllOrders, { ...req, query: { ...req.query, all: "true" } }),
       invokeController(getOrderAnalytics, req),
       invokeController(getIncomeExpenseBreakdown, req),
       invokeController(getExpensesForChart, req),
       invokeController(getFinanceWorkbenchAll, req),
-      invokeController(getAllProducts, req),
+      invokeController(getAllProducts, { ...req, query: { ...req.query, all: "true" } }),
       computeObligationsDashboardData(),
       computeRecurringDashboardData(),
     ]);
 
-    const productsStock = buildProductsStockAlerts(products);
+    const productsList = Array.isArray(products)
+      ? products
+      : products?.products ?? products?.data ?? [];
+    const ordersList = Array.isArray(orders) ? orders : orders?.data ?? [];
+
+    const productsStock = buildProductsStockAlerts(productsList);
 
     return res.json({
       summary,
       expenses: Array.isArray(expenses) ? expenses : [],
-      orders: Array.isArray(orders) ? orders : [],
+      orders: ordersList,
       overView: Array.isArray(overView) ? overView : [],
       incomeExpenseBreakdown: incomeExpenseBreakdown ?? {},
       expensesForChart: Array.isArray(expensesForChart) ? expensesForChart : [],

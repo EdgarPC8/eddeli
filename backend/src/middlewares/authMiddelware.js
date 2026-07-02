@@ -53,4 +53,41 @@ const requireAdminOrProgrammer = (req, res, next) => {
   next();
 };
 
-export { isAuthenticated, requireProgrammer, requireAdminOrProgrammer };
+/**
+ * Administrador, Programador o Empleado (operación de caja/turno).
+ * Debe usarse DESPUÉS de isAuthenticated.
+ */
+const requireStaff = (req, res, next) => {
+  const rol = req.user?.loginRol;
+  if (!["Programador", "Administrador", "Empleado"].includes(rol)) {
+    return res.status(403).json({ message: "Rol no autorizado para esta acción" });
+  }
+  next();
+};
+
+/** Foto de perfil: el propio usuario o admin/programador. */
+const requireSelfOrAdmin = (req, res, next) => {
+  const rol = req.user?.loginRol;
+  if (rol === "Programador" || rol === "Administrador") return next();
+  const userId = Number(req.params.userId);
+  if (Number(req.user?.userId) === userId) return next();
+  return res.status(403).json({ message: "No puedes modificar la foto de otro usuario" });
+};
+
+/** Perfil de cuenta: la propia cuenta o admin/programador. */
+const requireOwnAccountOrAdmin = (req, res, next) => {
+  const rol = req.user?.loginRol;
+  if (rol === "Programador" || rol === "Administrador") return next();
+  const accountId = Number(req.params.accountId);
+  if (Number(req.user?.accountId) === accountId) return next();
+  return res.status(403).json({ message: "No puedes consultar la cuenta de otro usuario" });
+};
+
+export {
+  isAuthenticated,
+  requireProgrammer,
+  requireAdminOrProgrammer,
+  requireStaff,
+  requireSelfOrAdmin,
+  requireOwnAccountOrAdmin,
+};

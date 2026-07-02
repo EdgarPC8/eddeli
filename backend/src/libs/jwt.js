@@ -10,7 +10,15 @@
  */
 import jwt from "jsonwebtoken";
 
-/** Secreto HS256. En producción usar process.env.JWT_SECRET obligatorio. */
+const isProduction = process.env.NODE_ENV === "production";
+
+if (isProduction && !process.env.JWT_SECRET) {
+  throw new Error(
+    "JWT_SECRET es obligatorio en producción. Defínelo en backend/.env (ver .env.example).",
+  );
+}
+
+/** Secreto HS256. En desarrollo sin .env se usa fallback local (nunca en producción). */
 const JWT_SECRET = process.env.JWT_SECRET || "privateKey";
 
 function createAccessToken({ payload }) {

@@ -18,6 +18,7 @@ import {
   InputLabel,
   MenuItem,
   Select,
+  TablePagination,
 } from "@mui/material";
 import CloseIcon from "@mui/icons-material/Close";
 import ViewModuleIcon from "@mui/icons-material/ViewModule";
@@ -32,6 +33,7 @@ import ProductForm from "./components/ProductForm";
 import ProductsGridView from "./components/ProductsGridView";
 import {
   getAllProducts,
+  unwrapListResponse,
   deleteProduct,
   getCategories,
 } from "../../../api/inventoryControlRequest";
@@ -60,13 +62,17 @@ function ProductsPage() {
   const [cardSearch, setCardSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [allCategories, setAllCategories] = useState([]);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(50);
+  const [total, setTotal] = useState(0);
 
   const fecthData = async () => {
-    const [{ data }, { data: cats }] = await Promise.all([
-      getAllProducts(),
+    const [{ data: body }, { data: cats }] = await Promise.all([
+      getAllProducts({ page: page + 1, pageSize }),
       getCategories(),
     ]);
-    setData(data || []);
+    setData(unwrapListResponse(body));
+    setTotal(body?.total ?? unwrapListResponse(body).length);
     setAllCategories(cats || []);
   };
 
@@ -254,7 +260,7 @@ function ProductsPage() {
 
   useEffect(() => {
     fecthData();
-  }, []);
+  }, [page, pageSize]);
 
   return (
     <Container>
@@ -457,6 +463,20 @@ function ProductsPage() {
           showIndex={true}
         />
       )}
+
+      <TablePagination
+        component="div"
+        count={total}
+        page={page}
+        onPageChange={(_, newPage) => setPage(newPage)}
+        rowsPerPage={pageSize}
+        onRowsPerPageChange={(e) => {
+          setPageSize(Number.parseInt(e.target.value, 10));
+          setPage(0);
+        }}
+        rowsPerPageOptions={[25, 50, 100, 200]}
+        labelRowsPerPage="Por página"
+      />
     </Container>
   );
 }

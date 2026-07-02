@@ -36,9 +36,10 @@ export function buildCustomerDisplayName(customer) {
 
 export function formatCustomerDocument(customer) {
   if (!customer) return "";
-  const num = customer.documentNumber || customer.ci;
+  const num = customer.cedula || customer.documentNumber || customer.ci;
   if (!num) return "";
   const type = DOC_TYPE_OPTIONS.find((d) => d.value === customer.documentType)?.label;
+  if (customer.cedula) return `Cédula: ${num}`;
   return type ? `${type}: ${num}` : num;
 }
 

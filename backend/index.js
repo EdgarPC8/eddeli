@@ -30,6 +30,7 @@ import FilesRoutes from "./src/routes/FilesRoutes.js";
 import DocumentRoutes from "./src/routes/DocumentRoutes.js";
 import EditorRoutes from "./src/routes/EditorRoutes.js";
 import ComandsRoutes from "./src/routes/ComandsRoutes.js";
+import SubscriptionsRoutes from "./src/routes/SubscriptionsRoutes.js";
 
 import NotificationProgramRoutes from "./src/routes/NotificationProgramRoutes.js";
 import { startNotificationScheduler } from "./src/services/notificationScheduler.js";
@@ -98,6 +99,7 @@ app.use(`/${api}/shifts`, ShiftRoutes);
 app.use(`/${api}/tasks`, TaskRoutes);
 app.use(`/${api}/publicidad`, PublicidadRoutes);
 app.use(`/${api}/media`, MediaRoutes);
+app.use(`/${api}/subscriptions`, SubscriptionsRoutes);
 
 // Socket para notificaciones y signage publicidad
 initNotificationSocket(io);

@@ -17,7 +17,7 @@ import RenderFromIntermediate from "./components/RenderFromIntermediate";
 import SearchableSelect from "../../../components/SearchableSelect";
 import TablePro from "../../../components/Tables/TablePro";
 import {
-  getAllProducts,
+  getAllProductsAll,
   registerMovement,
 } from "../../../api/inventoryControlRequest";
 import { useAuth } from "../../../context/AuthContext";
@@ -140,7 +140,7 @@ export default function ProductionManagerPage() {
   const [selectedProductId, setSelectedProductId] = useState("");
 
   const fetchdata = async () => {
-    const { data } = await getAllProducts();
+    const { data } = await getAllProductsAll();
     const productsData = data
       .filter((p) => p.type !== "raw")
       .sort((a, b) => (b.stock ?? 0) - (a.stock ?? 0));

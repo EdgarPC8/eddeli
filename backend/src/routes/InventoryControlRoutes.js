@@ -1,6 +1,6 @@
 // routes/inventoryRoutes.js
 import express from 'express';
-import { isAuthenticated, requireProgrammer } from "../middlewares/authMiddelware.js";
+import { isAuthenticated, requireProgrammer, requireAdminOrProgrammer } from "../middlewares/authMiddelware.js";
 
 // Product Controllers
 import {
@@ -33,6 +33,7 @@ import {
 import {
   createCategory,
   getAllCategories,
+  getAllCategoriesPublic,
   updateCategory,
   deleteCategory,
 } from '../controllers/InventoryControl/CategoryController.js';
@@ -67,6 +68,12 @@ import {
   updateCustomer,
   deleteCustomer
  } from '../controllers/InventoryControl/CustomerController.js';
+import {
+  getAllSuppliers,
+  createSupplier,
+  updateSupplier,
+  deleteSupplier,
+} from '../controllers/InventoryControl/SupplierController.js';
 import { simulateFromIntermediate, simulateProductionController } from '../controllers/InventoryControl/ProductionManagerController.js';
 import { 
   getHomeProducts,
@@ -143,10 +150,10 @@ router.patch("/stores/:storeId/products/:productId", isAuthenticated, toggleStor
 // 📋 CATÁLOGO (CatalogController + CatalogVitrinaController)
 // ----------------------------------
 // CatalogController: admin CRUD, template-items (publicidad), populares
-router.get("/getPopularProducts", getPopularProducts);
-router.get("/getAutoCatalogSeed", getAutoCatalogSeed);
-router.get("/catalog", getCatalogEntries);
-router.get("/catalog/template-items", getCatalogTemplateItems); // → ProductSelector (diseño promocional)
+router.get("/getPopularProducts", isAuthenticated, requireAdminOrProgrammer, getPopularProducts);
+router.get("/getAutoCatalogSeed", isAuthenticated, requireAdminOrProgrammer, getAutoCatalogSeed);
+router.get("/catalog", isAuthenticated, requireAdminOrProgrammer, getCatalogEntries);
+router.get("/catalog/template-items", isAuthenticated, requireAdminOrProgrammer, getCatalogTemplateItems);
 router.post("/catalog", isAuthenticated, createCatalogEntry);
 router.put("/catalog/:id", isAuthenticated, updateCatalogEntry);
 router.delete("/catalog/:id", isAuthenticated, deleteCatalogEntry);
@@ -200,6 +207,11 @@ router.get('/customers', isAuthenticated, getAllCustomers);
 router.post('/customers', isAuthenticated, createCustomer);
 router.put('/customers/:id', isAuthenticated, updateCustomer);
 router.delete('/customers/:id', isAuthenticated, deleteCustomer);
+
+router.get('/suppliers', isAuthenticated, getAllSuppliers);
+router.post('/suppliers', isAuthenticated, createSupplier);
+router.put('/suppliers/:id', isAuthenticated, updateSupplier);
+router.delete('/suppliers/:id', isAuthenticated, deleteSupplier);
 // ----------------------------------
 // 📦 PRODUCTOS
 // ----------------------------------
@@ -260,10 +272,11 @@ router.delete('/recipes/:id', isAuthenticated, deleteRecipe);
 // ----------------------------------
 // 🏷️ CATEGORÍAS
 // ----------------------------------
-router.post('/categories', isAuthenticated, createCategory);        // Crear categoría
-router.get('/categories', getAllCategories);       // Listar categorías
-router.put('/categories/:id', isAuthenticated, updateCategory);     // Editar categoría
-router.delete('/categories/:id', isAuthenticated, deleteCategory);  // Eliminar categoría
+router.post('/categories', isAuthenticated, requireAdminOrProgrammer, createCategory);
+router.get('/categories/public', getAllCategoriesPublic);
+router.get('/categories', isAuthenticated, getAllCategories);
+router.put('/categories/:id', isAuthenticated, requireAdminOrProgrammer, updateCategory);
+router.delete('/categories/:id', isAuthenticated, requireAdminOrProgrammer, deleteCategory);
 
 // ----------------------------------
 // 📏 UNIDADES

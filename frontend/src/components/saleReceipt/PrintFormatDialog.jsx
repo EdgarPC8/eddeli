@@ -27,7 +27,7 @@ import {
   downloadReceiptAsPng,
 } from "../../utils/saleReceiptExport.js";
 
-/** Modal: formato de impresión, tipo de documento (solo al imprimir) y vista previa. */
+/** Modal: formato de impresión, tipo de documento y vista previa. */
 export default function PrintFormatDialog({ open, onClose, receipt, initialFormat = "a4" }) {
   const [format, setFormat] = useState(initialFormat);
   const [documentType, setDocumentType] = useState("documento");
@@ -106,6 +106,7 @@ export default function PrintFormatDialog({ open, onClose, receipt, initialForma
               value={format}
               onChange={(_, v) => v && setFormat(v)}
               size="small"
+              sx={{ flexWrap: "wrap", gap: 0.5 }}
             >
               <ToggleButton value="a4">
                 <DescriptionIcon fontSize="small" sx={{ mr: 0.5 }} />
@@ -114,6 +115,10 @@ export default function PrintFormatDialog({ open, onClose, receipt, initialForma
               <ToggleButton value="ticket80">
                 <ReceiptLongIcon fontSize="small" sx={{ mr: 0.5 }} />
                 Ticket 80 mm
+              </ToggleButton>
+              <ToggleButton value="ticket55">
+                <ReceiptLongIcon fontSize="small" sx={{ mr: 0.5 }} />
+                Ticket 55 mm
               </ToggleButton>
             </ToggleButtonGroup>
           </Box>

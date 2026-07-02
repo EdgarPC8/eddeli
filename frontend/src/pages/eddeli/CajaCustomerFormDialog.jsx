@@ -10,7 +10,7 @@ import {
 } from "@mui/material";
 import { createCustomerRequest } from "../../api/ordersRequest.js";
 
-const EMPTY_FORM = { name: "", phone: "", email: "", address: "" };
+const EMPTY_FORM = { name: "", cedula: "", phone: "", email: "", address: "" };
 
 /** Modal para crear cliente desde caja. */
 export default function CajaCustomerFormDialog({ open, onClose, onCreated, toast }) {
@@ -33,6 +33,7 @@ export default function CajaCustomerFormDialog({ open, onClose, onCreated, toast
       setSaving(true);
       const { data } = await createCustomerRequest({
         name,
+        cedula: form.cedula?.trim() || undefined,
         phone: form.phone?.trim() || undefined,
         email: form.email?.trim() || undefined,
         address: form.address?.trim() || undefined,
@@ -62,6 +63,15 @@ export default function CajaCustomerFormDialog({ open, onClose, onCreated, toast
               required
               value={form.name}
               onChange={(e) => setField("name", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="Cédula"
+              fullWidth
+              value={form.cedula}
+              onChange={(e) => setField("cedula", e.target.value)}
+              helperText="Opcional"
             />
           </Grid>
           <Grid item xs={12} sm={6}>

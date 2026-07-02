@@ -1,7 +1,7 @@
 import { CashShift } from "../models/CashShift.js";
 import { CashShiftMovement } from "../models/CashShiftMovement.js";
 import { InventoryProduct, InventoryMovement, InventoryCategory, ProductCompareGroup, ProductCompareGroupItem, PricingTierGroup } from "../models/Inventory.js";
-import { Order, Supplier, SupplierOrder, SupplierOrderItem } from "../models/Orders.js";
+import { Customer, Order, Supplier, SupplierOrder, SupplierOrderItem } from "../models/Orders.js";
 import { TaskPlan, TaskItem } from "../models/Tasks.js";
 import { PublicidadCampaign, PublicidadPlaylistItem, PublicidadDevice } from "../models/Publicidad.js";
 import { MediaAsset } from "../models/MediaAsset.js";
@@ -11,6 +11,7 @@ import { NotificationProgram, NotificationDispatchLog } from "../models/Notifica
 import { Notifications } from "../models/Notifications.js";
 
 const MODELS_TO_SYNC = [
+  Customer,
   InventoryProduct,
   InventoryMovement,
   InventoryCategory,

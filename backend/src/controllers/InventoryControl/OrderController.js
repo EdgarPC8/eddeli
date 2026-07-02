@@ -10,6 +10,7 @@ import { de, es } from 'date-fns/locale';
 import { Op } from "sequelize";
 import { sequelize } from "../../database/connection.js";
 import { logger } from "../../log/LogActivity.js";
+import { parsePagination, sendPaginated } from "../../utils/pagination.js";
 
 
 
@@ -1340,6 +1341,7 @@ export const getAllOrders = async (req, res) => {
   try {
     const fromDate = parseRangeDate(req.query.from, false);
     const toDate = parseRangeDate(req.query.to, true);
+    const pagination = parsePagination(req, { defaultPageSize: 100 });
 
     const where = {
       notes: { [Op.notLike]: `%${CAJA_POS_TAG}%` },
@@ -1350,28 +1352,47 @@ export const getAllOrders = async (req, res) => {
       if (toDate) where.date[Op.lte] = toDate;
     }
 
-    const orders = await Order.findAll({
+    const include = [
+      {
+        model: Customer,
+        as: "ERP_customer",
+      },
+      {
+        model: OrderItem,
+        as: "ERP_order_items",
+        include: [
+          {
+            model: InventoryProduct,
+            as: "ERP_inventory_product",
+          },
+        ],
+      },
+    ];
+
+    if (pagination.all) {
+      const orders = await Order.findAll({
+        where,
+        include,
+        order: [["date", "DESC"]],
+      });
+      return res.json(formatOrdersList(orders));
+    }
+
+    const { count, rows } = await Order.findAndCountAll({
       where,
-      include: [
-        {
-          model: Customer,
-          as: "ERP_customer",
-        },
-        {
-          model: OrderItem,
-          as: "ERP_order_items",
-          include: [
-            {
-              model: InventoryProduct,
-              as: "ERP_inventory_product",
-            },
-          ],
-        },
-      ],
+      include,
       order: [["date", "DESC"]],
+      offset: pagination.offset,
+      limit: pagination.limit,
+      distinct: true,
     });
 
-    res.json(formatOrdersList(orders));
+    return sendPaginated(res, {
+      rows: formatOrdersList(rows),
+      total: count,
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+    });
   } catch (error) {
     console.error("getAllOrders:", error);
     res.status(500).json({ message: "Error al obtener pedidos" });

@@ -39,7 +39,7 @@ import BakeryDiningIcon from "@mui/icons-material/BakeryDining";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
-import { getCatalogBySection, getCategories, getPublicCompareGroups } from "../../api/inventoryControlRequest";
+import { getCatalogBySection, getPublicCategories, getPublicCompareGroups } from "../../api/inventoryControlRequest";
 import { pathImg } from "../../api/axios";
 import ProductCompareTable from "../../components/eddeli/ProductCompareTable";
 
@@ -685,7 +685,7 @@ const handleClosePreview = () => {
   // Cargar categorías
   const fetchCategories = async () => {
     try {
-      const { data } = await getCategories({ public: true });
+      const { data } = await getPublicCategories();
       const opts = Array.isArray(data)
         ? [{ value: "todas", label: "Todas" }].concat(
             data.map((c) => ({

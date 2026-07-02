@@ -26,7 +26,7 @@ import RecipeForm from "./components/RecipeForm";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import { runMutationReload } from "../../../utils/mutationToast.js";
 import {
-  getAllProducts,
+  getAllProductsAll,
   getRecipeByProduct,
   deleteRecipeRequest,
   getRecipeCosting,
@@ -77,7 +77,7 @@ function RecipePage() {
   const handleDialogUser = () => setOpenDialog(!openDialog);
 
   const fetchProducts = async () => {
-    const { data } = await getAllProducts();
+    const { data } = await getAllProductsAll();
     setProducts(data.filter((p) => p.type === "final" || p.type === "intermediate"));
   };
 

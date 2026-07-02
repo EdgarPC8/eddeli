@@ -25,7 +25,7 @@ import {
     createHomeProductRequest,
     updateHomeProductRequest,
     deleteHomeProductRequest,
-    getAllProducts,
+    getAllProductsAll,
   } from "../../../api/inventoryControlRequest";
   import { pathImg } from "../../../api/axios";
   import { useAuth } from "../../../context/AuthContext";
@@ -638,7 +638,7 @@ import {
   
     const fetchProducts = async () => {
       try {
-        const { data } = await getAllProducts();
+        const { data } = await getAllProductsAll();
         setProducts(Array.isArray(data) ? data : []);
       } catch (err) {
         toastAuth({

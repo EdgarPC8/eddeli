@@ -17,7 +17,7 @@ import { useAuth } from "../../../../context/AuthContext";
 import {
   createTierGroup,
   updateTierGroup,
-  getAllProducts,
+  getAllProductsAll,
   getCategories,
 } from "../../../../api/inventoryControlRequest";
 import { normalizePackageTiers } from "../../../../utils/productLookup.js";
@@ -203,7 +203,7 @@ function TramoForm({ isEditing = false, datos = {}, onClose, reload }) {
 
   useEffect(() => {
     loadData();
-    Promise.all([getAllProducts(), getCategories()])
+    Promise.all([getAllProductsAll(), getCategories()])
       .then(([prodRes, catRes]) => {
         setAllProducts(prodRes.data || []);
         setCategories(catRes.data || []);

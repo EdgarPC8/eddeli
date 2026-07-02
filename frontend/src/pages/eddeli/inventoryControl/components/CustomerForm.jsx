@@ -50,6 +50,7 @@ import { createCustomerRequest,updateCustomerRequest } from '../../../../api/ord
     const loadData = async () => {
       if (isEditing && datos) {
         setValue("name", datos.name || "");
+        setValue("cedula", datos.cedula || "");
         setValue("phone", datos.phone || "");
         setValue("email", datos.email || "");
         setValue("address", datos.address || "");
@@ -73,6 +74,17 @@ import { createCustomerRequest,updateCustomerRequest } from '../../../../api/ord
             />
           </Grid>
   
+          <Grid item xs={12}>
+            <TextField
+              label="Cédula"
+              fullWidth
+              variant="standard"
+              {...register("cedula")}
+              InputLabelProps={idData ? { shrink: true } : {}}
+              helperText="Opcional"
+            />
+          </Grid>
+
           <Grid item xs={12}>
             <TextField
               label="Teléfono"

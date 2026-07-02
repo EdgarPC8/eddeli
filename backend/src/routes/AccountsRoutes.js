@@ -14,24 +14,28 @@ import {
     deleteRol,
     updateRol,
 } from "../controllers/AccountController.js";
-import { isAuthenticated } from "../middlewares/authMiddelware.js";
+import {
+    isAuthenticated,
+    requireAdminOrProgrammer,
+    requireOwnAccountOrAdmin,
+} from "../middlewares/authMiddelware.js";
 
 
 const router = new Router();
-router.get("/account", isAuthenticated,getAccounts);
-router.get("/account/:id", isAuthenticated,getOneAccount);
-router.get("/account/:accountId/:rolId", isAuthenticated,getAccount);
-router.post("/account", isAuthenticated,addAccount);
-router.delete("/account/:id", isAuthenticated,deleteAccount);
-router.put("/account/:id",isAuthenticated,updateAccount);
-router.put("/account/resetPassword/:id",isAuthenticated,resetPassword);
-router.put("/account/updateAccountUser/:id/:userId/:rolId",isAuthenticated,updateAccountUser);
+router.get("/account", isAuthenticated, requireAdminOrProgrammer, getAccounts);
+router.get("/account/:id", isAuthenticated, requireAdminOrProgrammer, getOneAccount);
+router.get("/account/:accountId/:rolId", isAuthenticated, requireOwnAccountOrAdmin, getAccount);
+router.post("/account", isAuthenticated, requireAdminOrProgrammer, addAccount);
+router.delete("/account/:id", isAuthenticated, requireAdminOrProgrammer, deleteAccount);
+router.put("/account/:id", isAuthenticated, requireAdminOrProgrammer, updateAccount);
+router.put("/account/resetPassword/:id", isAuthenticated, requireAdminOrProgrammer, resetPassword);
+router.put("/account/updateAccountUser/:id/:userId/:rolId", isAuthenticated, requireAdminOrProgrammer, updateAccountUser);
 
-router.get("/rol",getRoles);
-router.get("/rol/:id", isAuthenticated,getOneRol);
-router.post("/rol", isAuthenticated,addRol);
-router.delete("/rol/:id", isAuthenticated,deleteRol);
-router.put("/rol/:id",isAuthenticated,updateRol);
+router.get("/rol", isAuthenticated, requireAdminOrProgrammer, getRoles);
+router.get("/rol/:id", isAuthenticated, requireAdminOrProgrammer, getOneRol);
+router.post("/rol", isAuthenticated, requireAdminOrProgrammer, addRol);
+router.delete("/rol/:id", isAuthenticated, requireAdminOrProgrammer, deleteRol);
+router.put("/rol/:id", isAuthenticated, requireAdminOrProgrammer, updateRol);
 
 
 export default router;

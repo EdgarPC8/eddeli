@@ -27,28 +27,31 @@ export function AuthProvider({ children }) {
   const { enqueueSnackbar } = useSnackbar();
 
   const loadUserProfile = async () => {
-    const session = await getSessionRequest();
-    const { data } = await getAccount(session.data.accountId, session.data.rolId);
-    const u = data.user || {};
-    setUser({
-      firstName: u.firstName,
-      secondName: u.secondName,
-      firstLastName: u.firstLastName,
-      secondLastName: u.secondLastName,
-      ci: u.ci,
-      birthday: u.birthday,
-      gender: u.gender,
-      photo: u.photo,
-      username: data.username,
-      accountId: data.id,
-      userId: session.data.userId,
-      rolId: session.data.rolId,
-      loginRol: session.data.loginRol,
-      roles: data.roles || [],
-    });
-    setProfileImageUser(u.photo ? buildImageUrl(u.photo) : null);
-    setIsAuthenticated(true);
-    setIsLoading(false);
+    try {
+      const session = await getSessionRequest();
+      const { data } = await getAccount(session.data.accountId, session.data.rolId);
+      const u = data.user || {};
+      setUser({
+        firstName: u.firstName,
+        secondName: u.secondName,
+        firstLastName: u.firstLastName,
+        secondLastName: u.secondLastName,
+        ci: u.ci,
+        birthday: u.birthday,
+        gender: u.gender,
+        photo: u.photo,
+        username: data.username,
+        accountId: data.id,
+        userId: session.data.userId,
+        rolId: session.data.rolId,
+        loginRol: session.data.loginRol,
+        roles: data.roles || [],
+      });
+      setProfileImageUser(u.photo ? buildImageUrl(u.photo) : null);
+      setIsAuthenticated(true);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const signin = async (userData) => {
