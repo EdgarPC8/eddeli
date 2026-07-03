@@ -16,11 +16,11 @@ import HomeIcon from "@mui/icons-material/Home";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import { useSubscriptions } from "../hooks/useSubscriptions.js";
-import { activateSubscription } from "../api/subscriptionsRequest.js";
+import Subscription from "../sdk/Subscription";
 
 export default function SubscriptionExpiredPage() {
   const navigate = useNavigate();
-  const { isLoading, subscription, refetch } = useSubscriptions();
+  const { isLoading, subscription } = useSubscriptions();
   const [licenseKey, setLicenseKey] = useState("");
   const [activating, setActivating] = useState(false);
   const [error, setError] = useState("");
@@ -31,12 +31,18 @@ export default function SubscriptionExpiredPage() {
     setActivating(true);
     setError("");
     try {
-      await activateSubscription(licenseKey.trim());
+      await Subscription.activateSubscription({
+        licenseKey: licenseKey.trim(),
+      });
+
       setSuccess(true);
-      await refetch();
       setTimeout(() => navigate("/"), 2000);
     } catch (err) {
-      setError(err.response?.data?.error || err.response?.data?.message || "Error al activar la licencia");
+      setError(
+        err.response?.data?.error ||
+          err.response?.data?.message ||
+          "Error al activar la licencia",
+      );
     } finally {
       setActivating(false);
     }
@@ -44,7 +50,14 @@ export default function SubscriptionExpiredPage() {
 
   if (isLoading) {
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
         <CircularProgress size={64} />
       </Box>
     );
@@ -90,7 +103,9 @@ export default function SubscriptionExpiredPage() {
                 variant="contained"
                 onClick={handleActivate}
                 disabled={activating || !licenseKey.trim()}
-                startIcon={activating ? <CircularProgress size={18} /> : <VpnKeyIcon />}
+                startIcon={
+                  activating ? <CircularProgress size={18} /> : <VpnKeyIcon />
+                }
               >
                 Activar
               </Button>
@@ -104,9 +119,9 @@ export default function SubscriptionExpiredPage() {
               Módulos del plan anterior
             </Typography>
             <Stack spacing={1} sx={{ mb: 4, textAlign: "left" }}>
-              {modules.map((mod) => (
+              {modules.map((mod, i) => (
                 <Box
-                  key={mod.key}
+                  key={i}
                   sx={{
                     display: "flex",
                     alignItems: "center",
@@ -134,7 +149,11 @@ export default function SubscriptionExpiredPage() {
           </>
         )}
 
-        <Button variant="outlined" startIcon={<HomeIcon />} onClick={() => navigate("/home")}>
+        <Button
+          variant="outlined"
+          startIcon={<HomeIcon />}
+          onClick={() => navigate("/home")}
+        >
           Volver al inicio público
         </Button>
       </Paper>

@@ -1,46 +1,85 @@
+import { Account, AccountRoles } from "../models/Account.js";
+import { Users } from "../models/Users.js";
+import { Roles } from "../models/Roles.js";
+import { UserData } from "../models/UserData.js";
+import { License } from "../models/License.js";
+import { Logs } from "../models/Logs.js";
 import { CashShift } from "../models/CashShift.js";
 import { CashShiftMovement } from "../models/CashShiftMovement.js";
-import { InventoryProduct, InventoryMovement, InventoryCategory, ProductCompareGroup, ProductCompareGroupItem, PricingTierGroup } from "../models/Inventory.js";
-import { Customer, Order, Supplier, SupplierOrder, SupplierOrderItem } from "../models/Orders.js";
+import { InventoryProduct, InventoryMovement, InventoryCategory, InventoryUnit, InventoryRecipe, HomeProduct, Catalog, Store, StoreProduct, ProductCompareGroup, ProductCompareGroupItem, PricingTierGroup } from "../models/Inventory.js";
+import { Customer, Order, OrderItem, Supplier, SupplierOrder, SupplierOrderItem } from "../models/Orders.js";
 import { TaskPlan, TaskItem } from "../models/Tasks.js";
 import { PublicidadCampaign, PublicidadPlaylistItem, PublicidadDevice } from "../models/Publicidad.js";
 import { MediaAsset } from "../models/MediaAsset.js";
-import { FinancialObligation, ObligationPayment, Income, Expense, Payment, RecurringExpenseTemplate, RecurringExpenseOccurrence } from "../models/Finance.js";
+import { ItemGroup, ItemGroupItem, FinancialObligation, ObligationPayment, Income, Expense, Payment, RecurringExpenseTemplate, RecurringExpenseOccurrence } from "../models/Finance.js";
 import { DocumentAttachment } from "../models/DocumentAttachment.js";
 import { NotificationProgram, NotificationDispatchLog } from "../models/NotificationProgram.js";
 import { Notifications } from "../models/Notifications.js";
+import { EditorTemplate, EditorTemplateGroup, EditorTemplateLayer, EditorLayerProp, EditorLayerBind, EditorDesign, EditorDesignLayerOverride } from "../models/Editor.js";
 
 const MODELS_TO_SYNC = [
+  // ── Sin FK externas ──
+  Users,
+  Roles,
   Customer,
-  InventoryProduct,
-  InventoryMovement,
+  InventoryUnit,
   InventoryCategory,
-  ProductCompareGroup,
-  ProductCompareGroupItem,
-  PricingTierGroup,
-  CashShift,
-  CashShiftMovement,
-  Order,
   Supplier,
-  SupplierOrder,
-  SupplierOrderItem,
-  TaskPlan,
-  TaskItem,
   MediaAsset,
   PublicidadCampaign,
-  PublicidadPlaylistItem,
+  NotificationProgram,
+  TaskPlan,
+  ProductCompareGroup,
+  License,
+  Logs,
+
+  // ── FK a tablas del grupo anterior ──
+  Account,
+  UserData,
+  Store,
+  InventoryProduct,
+  CashShift,
+  Order,
+  SupplierOrder,
   PublicidadDevice,
-  FinancialObligation,
-  ObligationPayment,
-  RecurringExpenseTemplate,
-  RecurringExpenseOccurrence,
+  Notifications,
+  TaskItem,
+  AccountRoles,
+
+  // ── FK a tablas del grupo anterior ──
+  InventoryMovement,
+  InventoryRecipe,
+  HomeProduct,
+  StoreProduct,
+  Catalog,
+  ProductCompareGroupItem,
+  PricingTierGroup,
+  PublicidadPlaylistItem,
+  OrderItem,
+  SupplierOrderItem,
+  CashShiftMovement,
+  NotificationDispatchLog,
+
+  // ── Editor ──
+  EditorTemplate,
+  EditorTemplateGroup,
+  EditorTemplateLayer,
+  EditorLayerProp,
+  EditorLayerBind,
+  EditorDesign,
+  EditorDesignLayerOverride,
+
+  // ── Finance ──
+  ItemGroup,
   Income,
   Expense,
+  FinancialObligation,
+  RecurringExpenseTemplate,
   Payment,
+  ItemGroupItem,
+  ObligationPayment,
+  RecurringExpenseOccurrence,
   DocumentAttachment,
-  NotificationProgram,
-  NotificationDispatchLog,
-  Notifications,
 ];
 
 /** true solo si DB_SYNC_ALTER=1|true|yes (evita ALTER TABLE en cada reinicio de nodemon). */

@@ -86,8 +86,6 @@ import CambiarRol from "./CambiarRol.jsx";
 import SimpleDialog from "./Dialogs/SimpleDialog.jsx";
 import { getUnreadCount } from "../api/notificationsRequest.js";
 import { useNotificationSocket } from "../hooks/useNotificationSocket.js";
-import { useSubscriptions } from "../hooks/useSubscriptions.js";
-import { getAllowedPaths, isPathAllowed } from "../utils/subscriptionAccess.js";
 import { LOGO_PATH } from "../config.js";
 import { activeApp } from "../config/appInfo.js";
 
@@ -95,8 +93,18 @@ const DRAWER_W = 260;
 
 /** Accesos directos (siempre visibles arriba del menú). */
 const MENU_ITEMS = [
-  { name: "Dashboard", link: "/", icon: <DashboardIcon />, roles: ["Programador", "Administrador"] },
-  { name: "Notificaciones", link: "/notifications", icon: <NotificationsIcon />, roles: ["Programador", "Administrador", "Empleado"] },
+  {
+    name: "Dashboard",
+    link: "/",
+    icon: <DashboardIcon />,
+    roles: ["Programador", "Administrador"],
+  },
+  {
+    name: "Notificaciones",
+    link: "/notifications",
+    icon: <NotificationsIcon />,
+    roles: ["Programador", "Administrador", "Empleado"],
+  },
 ];
 
 /** Módulos agrupados en acordeón. */
@@ -105,106 +113,309 @@ const MENU_GROUPS = [
     id: "operacion",
     label: "Operación",
     items: [
-      { name: "Caja", link: "/caja", icon: <PointOfSaleIcon />, roles: ["Programador", "Administrador", "Empleado"] },
-      { name: "Turno", link: "/turno", icon: <ScheduleIcon />, roles: ["Programador", "Administrador", "Empleado"] },
-      { name: "Tareas", link: "/tareas", icon: <AssignmentTurnedInIcon />, roles: ["Programador", "Administrador", "Empleado"] },
-      { name: "Facturación", link: "/facturacion", icon: <ReceiptIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Supervisión caja", link: "/turno/supervision", icon: <AssessmentIcon />, roles: ["Programador", "Administrador"] },
+      {
+        name: "Caja",
+        link: "/caja",
+        icon: <PointOfSaleIcon />,
+        roles: ["Programador", "Administrador", "Empleado"],
+      },
+      {
+        name: "Turno",
+        link: "/turno",
+        icon: <ScheduleIcon />,
+        roles: ["Programador", "Administrador", "Empleado"],
+      },
+      {
+        name: "Tareas",
+        link: "/tareas",
+        icon: <AssignmentTurnedInIcon />,
+        roles: ["Programador", "Administrador", "Empleado"],
+      },
+      {
+        name: "Facturación",
+        link: "/facturacion",
+        icon: <ReceiptIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Supervisión caja",
+        link: "/turno/supervision",
+        icon: <AssessmentIcon />,
+        roles: ["Programador", "Administrador"],
+      },
     ],
   },
   {
     id: "ventas",
     label: "Ventas",
     items: [
-      { name: "Pedidos", link: "/inventory/orders", icon: <AssignmentIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Clientes", link: "/inventory/customers", icon: <PeopleIcon />, roles: ["Programador", "Administrador"] },
+      {
+        name: "Pedidos",
+        link: "/inventory/orders",
+        icon: <AssignmentIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Clientes",
+        link: "/inventory/customers",
+        icon: <PeopleIcon />,
+        roles: ["Programador", "Administrador"],
+      },
     ],
   },
   {
     id: "finanzas",
     label: "Finanzas",
     items: [
-      { name: "Finanzas", link: "/inventory/finance", icon: <MonetizationOnIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Cobranzas", link: "/inventory/collections", icon: <RequestQuoteIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Préstamos y deudas", link: "/inventory/prestamos-deudas", icon: <AccountBalanceWalletIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Gastos recurrentes", link: "/inventory/gastos-recurrentes", icon: <HomeWorkIcon />, roles: ["Programador", "Administrador"] },
+      {
+        name: "Finanzas",
+        link: "/inventory/finance",
+        icon: <MonetizationOnIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Cobranzas",
+        link: "/inventory/collections",
+        icon: <RequestQuoteIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Préstamos y deudas",
+        link: "/inventory/prestamos-deudas",
+        icon: <AccountBalanceWalletIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Gastos recurrentes",
+        link: "/inventory/gastos-recurrentes",
+        icon: <HomeWorkIcon />,
+        roles: ["Programador", "Administrador"],
+      },
     ],
   },
   {
     id: "inventario",
     label: "Inventario",
     items: [
-      { name: "Productos", link: "/inventory/products", icon: <Inventory2Icon />, roles: ["Programador", "Administrador"] },
-      { name: "Movimientos", link: "/inventory/movement", icon: <CompareArrowsIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Categorías", link: "/inventory/categories", icon: <CategoryIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Tramos", link: "/inventory/tramos", icon: <ViewModuleIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Unidades", link: "/inventory/units", icon: <StraightenIcon />, roles: ["Programador", "Administrador"] },
+      {
+        name: "Productos",
+        link: "/inventory/products",
+        icon: <Inventory2Icon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Movimientos",
+        link: "/inventory/movement",
+        icon: <CompareArrowsIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Categorías",
+        link: "/inventory/categories",
+        icon: <CategoryIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Tramos",
+        link: "/inventory/tramos",
+        icon: <ViewModuleIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Unidades",
+        link: "/inventory/units",
+        icon: <StraightenIcon />,
+        roles: ["Programador", "Administrador"],
+      },
     ],
   },
   {
     id: "produccion",
     label: "Producción",
     items: [
-      { name: "Insumos y marcas", link: "/inventory/insumos", icon: <ScienceIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Recetas", link: "/inventory/recipes", icon: <ReceiptLongIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Producción", link: "/inventory/production", icon: <FactoryIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Proveedores", link: "/inventory/suppliers", icon: <LocalShippingIcon />, roles: ["Programador", "Administrador"] },
+      {
+        name: "Insumos y marcas",
+        link: "/inventory/insumos",
+        icon: <ScienceIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Recetas",
+        link: "/inventory/recipes",
+        icon: <ReceiptLongIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Producción",
+        link: "/inventory/production",
+        icon: <FactoryIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Proveedores",
+        link: "/inventory/suppliers",
+        icon: <LocalShippingIcon />,
+        roles: ["Programador", "Administrador"],
+      },
     ],
   },
   {
     id: "canal",
     label: "Canal digital",
     items: [
-      { name: "Catálogo config", link: "/catalog_manager", icon: <ViewModuleIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Puntos de venta", link: "/inventory/puntos-venta", icon: <StorefrontRoundedIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Productos destacados", link: "/inventory/productos-destacados", icon: <StarRoundedIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Grupos comparativos", link: "/compare_groups", icon: <CompareArrowsIcon />, roles: ["Programador", "Administrador"] },
+      {
+        name: "Catálogo config",
+        link: "/catalog_manager",
+        icon: <ViewModuleIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Puntos de venta",
+        link: "/inventory/puntos-venta",
+        icon: <StorefrontRoundedIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Productos destacados",
+        link: "/inventory/productos-destacados",
+        icon: <StarRoundedIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Grupos comparativos",
+        link: "/compare_groups",
+        icon: <CompareArrowsIcon />,
+        roles: ["Programador", "Administrador"],
+      },
     ],
   },
   {
     id: "publicidad",
     label: "Publicidad",
     items: [
-      { name: "Campañas", link: "/publicidad", icon: <TvIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Dispositivos TV", link: "/publicidad/dispositivos", icon: <TvIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Reproductor", link: "/publicidad/reproductor", icon: <PlayCircleOutlineIcon />, roles: ["Programador", "Administrador"] },
+      {
+        name: "Campañas",
+        link: "/publicidad",
+        icon: <TvIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Dispositivos TV",
+        link: "/publicidad/dispositivos",
+        icon: <TvIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Reproductor",
+        link: "/publicidad/reproductor",
+        icon: <PlayCircleOutlineIcon />,
+        roles: ["Programador", "Administrador"],
+      },
     ],
   },
   {
     id: "diseno-promocional",
     label: "Diseño promocional",
     items: [
-      { name: "Editor de diseño", link: "/diseno-promocional/editor", icon: <EditNoteIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Vista con productos", link: "/diseno-promocional/vista", icon: <VolumeUpIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Plantillas", link: "/diseno-promocional/plantillas", icon: <CollectionsBookmarkIcon />, roles: ["Programador", "Administrador"] },
+      {
+        name: "Editor de diseño",
+        link: "/diseno-promocional/editor",
+        icon: <EditNoteIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Vista con productos",
+        link: "/diseno-promocional/vista",
+        icon: <VolumeUpIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Plantillas",
+        link: "/diseno-promocional/plantillas",
+        icon: <CollectionsBookmarkIcon />,
+        roles: ["Programador", "Administrador"],
+      },
     ],
   },
   {
     id: "admin",
     label: "Administración",
     items: [
-      { name: "Usuarios", link: "/users", icon: <GroupIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Cuentas", link: "/cuentas", icon: <ManageAccountsIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Roles", link: "/roles", icon: <SettingsApplicationsIcon />, roles: ["Programador", "Administrador"] },
-      { name: "Panel de control", link: "/panel_control", icon: <DnsIcon />, roles: ["Programador", "Administrador"] },
+      {
+        name: "Usuarios",
+        link: "/users",
+        icon: <GroupIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Cuentas",
+        link: "/cuentas",
+        icon: <ManageAccountsIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Roles",
+        link: "/roles",
+        icon: <SettingsApplicationsIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Panel de control",
+        link: "/panel_control",
+        icon: <DnsIcon />,
+        roles: ["Programador", "Administrador"],
+      },
     ],
   },
   {
     id: "sistema",
     label: "Sistema",
     items: [
-      { name: "Imágenes", link: "/img", icon: <ImageIcon />, roles: ["Programador"] },
-      { name: "Archivos", link: "/file", icon: <InsertDriveFileIcon />, roles: ["Programador"] },
-      { name: "Logs", link: "/logs", icon: <HistoryIcon />, roles: ["Programador"] },
-      { name: "Backups JSON", link: "/backups", icon: <BackupIcon />, roles: ["Programador"] },
-      { name: "Comandos", link: "/comandos", icon: <TerminalIcon />, roles: ["Programador"] },
+      {
+        name: "Imágenes",
+        link: "/img",
+        icon: <ImageIcon />,
+        roles: ["Programador"],
+      },
+      {
+        name: "Archivos",
+        link: "/file",
+        icon: <InsertDriveFileIcon />,
+        roles: ["Programador"],
+      },
+      {
+        name: "Logs",
+        link: "/logs",
+        icon: <HistoryIcon />,
+        roles: ["Programador"],
+      },
+      {
+        name: "Backups JSON",
+        link: "/backups",
+        icon: <BackupIcon />,
+        roles: ["Programador"],
+      },
+      {
+        name: "Comandos",
+        link: "/comandos",
+        icon: <TerminalIcon />,
+        roles: ["Programador"],
+      },
     ],
   },
 ];
 
 const PUBLIC_NAV = [
-  { label: "Catálogo", to: "/catalogo", icon: <BakeryDiningIcon fontSize="small" /> },
-  { label: "Locales", to: "/punto_venta", icon: <StoreMallDirectoryRoundedIcon fontSize="small" /> },
+  {
+    label: "Catálogo",
+    to: "/catalogo",
+    icon: <BakeryDiningIcon fontSize="small" />,
+  },
+  {
+    label: "Locales",
+    to: "/punto_venta",
+    icon: <StoreMallDirectoryRoundedIcon fontSize="small" />,
+  },
 ];
 
 function menuItemsForRole(loginRol) {
@@ -224,13 +435,8 @@ export default function NavBar() {
   const theme = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, isLoading, user, logout, profileImageUser } = useAuth();
-  const { subscription } = useSubscriptions();
-
-  const allowedPaths = useMemo(
-    () => (subscription?.subscribed ? getAllowedPaths(subscription) : new Set()),
-    [subscription],
-  );
+  const { isAuthenticated, isLoading, user, logout, profileImageUser } =
+    useAuth();
 
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [expandedGroupId, setExpandedGroupId] = useState(null);
@@ -252,20 +458,13 @@ export default function NavBar() {
 
   const menuItems = useMemo(() => {
     const items = menuItemsForRole(user?.loginRol);
-    if (!subscription?.subscribed) return items;
-    return items.filter((item) => isPathAllowed(item.link, allowedPaths));
-  }, [user?.loginRol, subscription, allowedPaths]);
+    return items;
+  }, [user?.loginRol]);
 
   const menuGroups = useMemo(() => {
     const groups = menuGroupsForRole(user?.loginRol);
-    if (!subscription?.subscribed) return groups;
-    return groups
-      .map((group) => ({
-        ...group,
-        items: group.items.filter((item) => isPathAllowed(item.link, allowedPaths)),
-      }))
-      .filter((group) => group.items.length > 0);
-  }, [user?.loginRol, subscription, allowedPaths]);
+    return groups;
+  }, [user?.loginRol]);
 
   useEffect(() => {
     const activeGroup = menuGroups.find((group) =>
@@ -279,7 +478,11 @@ export default function NavBar() {
   };
 
   const renderMenuItem = (item, nested = false) => (
-    <ListItem key={item.link} disablePadding sx={{ display: "block", pl: nested ? 1 : 0 }}>
+    <ListItem
+      key={item.link}
+      disablePadding
+      sx={{ display: "block", pl: nested ? 1 : 0 }}
+    >
       <ListItemButton
         selected={location.pathname === item.link}
         onClick={() => navigate(item.link)}
@@ -291,7 +494,12 @@ export default function NavBar() {
         }}
       >
         <Tooltip title={!drawerOpen ? item.name : ""} placement="right">
-          <ListItemIcon sx={{ minWidth: drawerOpen ? 40 : "auto", justifyContent: "center" }}>
+          <ListItemIcon
+            sx={{
+              minWidth: drawerOpen ? 40 : "auto",
+              justifyContent: "center",
+            }}
+          >
             {item.icon}
           </ListItemIcon>
         </Tooltip>
@@ -331,12 +539,19 @@ export default function NavBar() {
           justifyContent: "flex-end",
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1, px: 1 }}>
+        <Box
+          sx={{ display: "flex", alignItems: "center", gap: 1, flex: 1, px: 1 }}
+        >
           <Box
             component="img"
             src={LOGO_PATH}
             alt={activeApp.alias}
-            sx={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }}
+            sx={{
+              width: 44,
+              height: 44,
+              borderRadius: "50%",
+              objectFit: "cover",
+            }}
           />
           {drawerOpen && (
             <Typography variant="subtitle2" fontWeight={700} noWrap>
@@ -356,7 +571,9 @@ export default function NavBar() {
       <Divider />
       <List sx={{ px: 1, py: 1 }}>
         {menuItems.map((item) => renderMenuItem(item))}
-        {menuGroups.length > 0 && menuItems.length > 0 && <Divider sx={{ my: 1 }} />}
+        {menuGroups.length > 0 && menuItems.length > 0 && (
+          <Divider sx={{ my: 1 }} />
+        )}
         {menuGroups.map((group, groupIndex) =>
           drawerOpen ? (
             <Accordion
@@ -374,7 +591,11 @@ export default function NavBar() {
             >
               <AccordionSummary
                 expandIcon={<ExpandMoreIcon fontSize="small" />}
-                sx={{ minHeight: 36, px: 0.5, "& .MuiAccordionSummary-content": { my: 0.5 } }}
+                sx={{
+                  minHeight: 36,
+                  px: 0.5,
+                  "& .MuiAccordionSummary-content": { my: 0.5 },
+                }}
               >
                 <Typography
                   variant="caption"
@@ -406,7 +627,14 @@ export default function NavBar() {
   );
 
   return (
-    <Box sx={{ display: "flex", minHeight: "100vh", width: "100%", overflowX: "hidden" }}>
+    <Box
+      sx={{
+        display: "flex",
+        minHeight: "100vh",
+        width: "100%",
+        overflowX: "hidden",
+      }}
+    >
       <AppBar
         position="fixed"
         sx={{
@@ -420,7 +648,12 @@ export default function NavBar() {
       >
         <Toolbar>
           {showDrawer && !drawerOpen && (
-            <IconButton color="inherit" edge="start" onClick={() => setDrawerOpen(true)} sx={{ mr: 1 }}>
+            <IconButton
+              color="inherit"
+              edge="start"
+              onClick={() => setDrawerOpen(true)}
+              sx={{ mr: 1 }}
+            >
               <MenuIcon />
             </IconButton>
           )}
@@ -437,7 +670,9 @@ export default function NavBar() {
               textTransform: "none",
               fontWeight: 600,
               mr: 1,
-              ...(location.pathname === homePath && { bgcolor: "rgba(255,255,255,0.12)" }),
+              ...(location.pathname === homePath && {
+                bgcolor: "rgba(255,255,255,0.12)",
+              }),
             }}
           >
             Inicio
@@ -453,7 +688,9 @@ export default function NavBar() {
                 textTransform: "none",
                 fontWeight: 600,
                 mr: 1,
-                ...(location.pathname === item.to && { bgcolor: "rgba(255,255,255,0.12)" }),
+                ...(location.pathname === item.to && {
+                  bgcolor: "rgba(255,255,255,0.12)",
+                }),
               }}
             >
               {item.label}
@@ -464,23 +701,28 @@ export default function NavBar() {
 
           <ThemeSwitcher />
 
-          {profileLoading && <CircularProgress size={22} color="inherit" sx={{ ml: 2 }} />}
-
-          {!showUserActions && !profileLoading && !isAuthenticated && !isLoading && (
-            <Button
-              variant="outlined"
-              color="inherit"
-              sx={{
-                ml: 2,
-                textTransform: "none",
-                fontWeight: 700,
-                borderColor: "rgba(255,255,255,0.5)",
-              }}
-              onClick={() => navigate("/login")}
-            >
-              Iniciar sesión
-            </Button>
+          {profileLoading && (
+            <CircularProgress size={22} color="inherit" sx={{ ml: 2 }} />
           )}
+
+          {!showUserActions &&
+            !profileLoading &&
+            !isAuthenticated &&
+            !isLoading && (
+              <Button
+                variant="outlined"
+                color="inherit"
+                sx={{
+                  ml: 2,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  borderColor: "rgba(255,255,255,0.5)",
+                }}
+                onClick={() => navigate("/login")}
+              >
+                Iniciar sesión
+              </Button>
+            )}
 
           {showUserActions && (
             <>
@@ -517,18 +759,33 @@ export default function NavBar() {
                 </Box>
               </Popover>
 
-              <Typography variant="body2" sx={{ mx: 1.5, display: { xs: "none", sm: "block" } }}>
+              <Typography
+                variant="body2"
+                sx={{ mx: 1.5, display: { xs: "none", sm: "block" } }}
+              >
                 {displayName}
               </Typography>
-              <IconButton color="inherit" onClick={(e) => setUserAnchor(e.currentTarget)}>
+              <IconButton
+                color="inherit"
+                onClick={(e) => setUserAnchor(e.currentTarget)}
+              >
                 <Avatar
                   src={profileImageUser || undefined}
-                  sx={{ width: 36, height: 36, bgcolor: "secondary.main", color: "secondary.contrastText" }}
+                  sx={{
+                    width: 36,
+                    height: 36,
+                    bgcolor: "secondary.main",
+                    color: "secondary.contrastText",
+                  }}
                 >
                   {(displayName[0] || "U").toUpperCase()}
                 </Avatar>
               </IconButton>
-              <Menu anchorEl={userAnchor} open={Boolean(userAnchor)} onClose={() => setUserAnchor(null)}>
+              <Menu
+                anchorEl={userAnchor}
+                open={Boolean(userAnchor)}
+                onClose={() => setUserAnchor(null)}
+              >
                 <MenuItem
                   onClick={() => {
                     setUserAnchor(null);
@@ -621,7 +878,19 @@ export default function NavBar() {
         </Drawer>
       )}
 
-      <Box component="main" sx={{ flexGrow: 1, pt: 10, px: { xs: 1.5, sm: 2, md: 3 }, pb: 3, width: "100%", minWidth: 0, overflowX: "hidden", boxSizing: "border-box" }}>
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          pt: 10,
+          px: { xs: 1.5, sm: 2, md: 3 },
+          pb: 3,
+          width: "100%",
+          minWidth: 0,
+          overflowX: "hidden",
+          boxSizing: "border-box",
+        }}
+      >
         <Outlet />
       </Box>
     </Box>

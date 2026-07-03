@@ -30,7 +30,6 @@ import FilesRoutes from "./src/routes/FilesRoutes.js";
 import DocumentRoutes from "./src/routes/DocumentRoutes.js";
 import EditorRoutes from "./src/routes/EditorRoutes.js";
 import ComandsRoutes from "./src/routes/ComandsRoutes.js";
-import SubscriptionsRoutes from "./src/routes/SubscriptionsRoutes.js";
 
 import NotificationProgramRoutes from "./src/routes/NotificationProgramRoutes.js";
 import { startNotificationScheduler } from "./src/services/notificationScheduler.js";
@@ -38,8 +37,14 @@ import { initNotificationSocket } from "./src/sockets/notificationSocket.js";
 import { initPublicidadSocket } from "./src/sockets/publicidadSocket.js";
 import { Server } from "socket.io";
 import { createServer } from "http";
-import { corsOriginCallback, isOriginAllowed } from "./src/utils/corsOrigins.js";
-import { errorMiddleware, notFoundMiddleware } from "./src/middlewares/errorMiddleware.js";
+import {
+  corsOriginCallback,
+  isOriginAllowed,
+} from "./src/utils/corsOrigins.js";
+import {
+  errorMiddleware,
+  notFoundMiddleware,
+} from "./src/middlewares/errorMiddleware.js";
 
 // ✅ __dirname en ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -99,7 +104,6 @@ app.use(`/${api}/shifts`, ShiftRoutes);
 app.use(`/${api}/tasks`, TaskRoutes);
 app.use(`/${api}/publicidad`, PublicidadRoutes);
 app.use(`/${api}/media`, MediaRoutes);
-app.use(`/${api}/subscriptions`, SubscriptionsRoutes);
 
 // Socket para notificaciones y signage publicidad
 initNotificationSocket(io);
@@ -119,7 +123,9 @@ export async function main() {
     // ═══════════════════════════════════════════════════════════════════
     // await recreateDatabaseFromBackup();
 
-    console.log("✅ Conexión a la base de datos OK (esquema: npm run db:sync o db:reset).");
+    console.log(
+      "✅ Conexión a la base de datos OK (esquema: npm run db:sync o db:reset).",
+    );
 
     httpServer.listen(PORT, async () => {
       console.log(`🟢 Backend + Socket.IO escuchando en puerto ${PORT}`);
