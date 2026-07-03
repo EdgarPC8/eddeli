@@ -20,7 +20,14 @@ export default function NoSubscriptionPage() {
 
   if (isLoading) {
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
         <CircularProgress size={64} />
       </Box>
     );
@@ -39,16 +46,26 @@ export default function NoSubscriptionPage() {
           Esta sección no está incluida en tu plan actual.
         </Typography>
         {location.state?.from && (
-          <Chip label={location.state.from} size="small" sx={{ mb: 3 }} variant="outlined" />
+          <Chip
+            label={location.state.from}
+            size="small"
+            sx={{ mb: 3 }}
+            variant="outlined"
+          />
         )}
 
-        <Typography variant="subtitle2" fontWeight={600} gutterBottom sx={{ mt: 2 }}>
+        <Typography
+          variant="subtitle2"
+          fontWeight={600}
+          gutterBottom
+          sx={{ mt: 2 }}
+        >
           Módulos de tu plan
         </Typography>
         <Stack spacing={1} sx={{ mb: 4, textAlign: "left" }}>
-          {modules.map((mod) => (
+          {modules.map((mod, i) => (
             <Box
-              key={mod.key}
+              key={i}
               sx={{ p: 1.5, borderRadius: 1, bgcolor: "action.hover" }}
             >
               <Typography variant="body2" fontWeight={600}>
@@ -58,7 +75,11 @@ export default function NoSubscriptionPage() {
           ))}
         </Stack>
 
-        <Button variant="contained" startIcon={<HomeIcon />} onClick={() => navigate("/")}>
+        <Button
+          variant="contained"
+          startIcon={<HomeIcon />}
+          onClick={() => navigate("/")}
+        >
           Ir al panel
         </Button>
       </Paper>

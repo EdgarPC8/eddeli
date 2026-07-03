@@ -4,22 +4,23 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import { useAuth } from "./AuthContext.jsx";
-import { useSubscriptions } from "./SubscriptionContext.jsx";
-import {
-  getAllowedPaths,
-  isPathAllowed,
-  SUBSCRIPTION_SKIP_PATHS,
-  SUBSCRIPTIONS_ENABLED,
-} from "../utils/subscriptionAccess.js";
+import { useSubscriptions } from "../hooks/useSubscriptions.js";
 
 export default function ProtectedRoute({ requiredRol }) {
   const { isAuthenticated, isLoading, user } = useAuth();
-  const { isLoading: isLoadingSub, subscription, checkFailed } = useSubscriptions();
   const location = useLocation();
+  const { isLoading: isLoadingSub, subscription, expired } = useSubscriptions();
 
-  if (isLoading) {
+  if (isLoading || isLoadingSub) {
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
         <CircularProgress size={64} />
       </Box>
     );
@@ -29,7 +30,14 @@ export default function ProtectedRoute({ requiredRol }) {
 
   if (!user?.loginRol) {
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
+      <Box
+        sx={{
+          display: "flex",
+          justifyContent: "center",
+          alignItems: "center",
+          height: "100vh",
+        }}
+      >
         <CircularProgress size={64} />
       </Box>
     );
@@ -48,43 +56,21 @@ export default function ProtectedRoute({ requiredRol }) {
     );
   }
 
-  // Licencias desactivadas: acceso solo por rol (ver SUBSCRIPTIONS_ENABLED).
-  // Para reactivar la validación de planes, pon SUBSCRIPTIONS_ENABLED = true.
-  if (!SUBSCRIPTIONS_ENABLED) {
-    return <Outlet />;
-  }
-
-  // Páginas de suscripción: no esperar al gestor central
-  if (SUBSCRIPTION_SKIP_PATHS.includes(location.pathname)) {
-    return <Outlet />;
-  }
-
-  if (isLoadingSub) {
-    return (
-      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "100vh" }}>
-        <CircularProgress size={64} />
-      </Box>
-    );
-  }
-
   // Gestor caído o timeout: no bloquear el acceso
-  if (checkFailed) {
-    return <Outlet />;
-  }
+  // if (checkFailed) {
+  //   return <Outlet />;
+  // }
 
-  if (!subscription?.subscribed) {
+  if (!subscription.subscribed || expired) {
     return <Navigate to="/subscription-expired" replace />;
   }
 
-  const allowedPaths = getAllowedPaths(subscription);
+  const hasAccess = subscription.subscription.modules.find((m) =>
+    m.sections.includes(location.pathname),
+  );
 
-  // Gestor respondió pero sin rutas mapeables: no bloquear toda la app
-  if (allowedPaths.size === 0) {
-    return <Outlet />;
-  }
-
-  if (!isPathAllowed(location.pathname, allowedPaths)) {
-    return <Navigate to="/no-subscription" replace state={{ from: location.pathname }} />;
+  if (!hasAccess) {
+    return <Navigate to="/no-subscription" replace />;
   }
 
   return <Outlet />;

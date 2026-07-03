@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext.jsx";
-import { SubscriptionProvider } from "./context/SubscriptionContext.jsx";
 import ProtectedRoute from "./context/ProtectedRoute.jsx";
 import PublicOnlyRoute from "./context/PublicOnlyRoute.jsx";
 import NavBar from "./components/NavBar.jsx";
@@ -73,10 +72,15 @@ const AUTH_ROLES = [
   "Moderador",
 ];
 
+import Subscription from "./sdk/Subscription";
+
+Subscription.configure({
+  apikey: import.meta.env.VITE_SUBSCRIPTION_API_KEY,
+});
+
 export default function App() {
   return (
     <AuthProvider>
-      <SubscriptionProvider>
       <div id="sale-receipt-print-root" aria-hidden="true" />
       <Routes>
         <Route element={<PublicOnlyRoute />}>
@@ -84,21 +88,23 @@ export default function App() {
         </Route>
 
         {/* Reproductor TV kiosco — sin NavBar ni login (APK Panadería TV / box HDMI) */}
-        <Route path="/tv/device/:deviceId" element={<PublicidadTvDevicePlayerPage />} />
+        <Route
+          path="/tv/device/:deviceId"
+          element={<PublicidadTvDevicePlayerPage />}
+        />
         <Route path="/tv/:campaignId" element={<PublicidadTvPlayerPage />} />
 
         <Route element={<NavBar />}>
           <Route element={<PublicOnlyRoute />}>
             <Route path="/home" element={<HomeLogout />} />
           </Route>
-
+          <Route
+            path="/subscription-expired"
+            element={<SubscriptionExpiredPage />}
+          />
+          <Route path="/no-subscription" element={<NoSubscriptionPage />} />
           <Route path="/catalogo" element={<CatalogoPage />} />
           <Route path="/punto_venta" element={<StoresPublicPage />} />
-
-          <Route element={<ProtectedRoute requiredRol={AUTH_ROLES} />}>
-            <Route path="/subscription-expired" element={<SubscriptionExpiredPage />} />
-            <Route path="/no-subscription" element={<NoSubscriptionPage />} />
-          </Route>
 
           <Route element={<ProtectedRoute requiredRol={AUTH_ROLES} />}>
             <Route path="/" element={<DashBoardPage />} />
@@ -117,62 +123,125 @@ export default function App() {
             <Route path="/file" element={<FileManagerPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute requiredRol={["Administrador", "Programador", "Empleado"]} />}>
+          <Route
+            element={
+              <ProtectedRoute
+                requiredRol={["Administrador", "Programador", "Empleado"]}
+              />
+            }
+          >
             <Route path="/caja" element={<CajaPage />} />
             <Route path="/turno" element={<TurnoPage />} />
             <Route path="/tareas" element={<TareasPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute requiredRol={["Administrador", "Programador"]} />}>
+          <Route
+            element={
+              <ProtectedRoute requiredRol={["Administrador", "Programador"]} />
+            }
+          >
             <Route path="/facturacion" element={<FacturacionPage />} />
-            <Route path="/turno/supervision" element={<TurnoSupervisionPage />} />
+            <Route
+              path="/turno/supervision"
+              element={<TurnoSupervisionPage />}
+            />
             <Route path="/panel_control" element={<PanelControlPage />} />
             {/* Ruta reservada; menú oculto hasta API backend (NotificationProgramsPage) */}
-            <Route path="/notification-programs" element={<NotificationProgramsPage />} />
+            <Route
+              path="/notification-programs"
+              element={<NotificationProgramsPage />}
+            />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/cuentas" element={<CuentasPage />} />
             <Route path="/roles" element={<RolesPage />} />
             <Route path="/backery" element={<CatalogoPage />} />
             <Route path="/catalog_manager" element={<CatalogManagerPage />} />
-            <Route path="/compare_groups" element={<ProductCompareGroupsPage />} />
+            <Route
+              path="/compare_groups"
+              element={<ProductCompareGroupsPage />}
+            />
             {/* —— Módulo Diseño Promocional (editor tipo Photoshop + plantillas) —— */}
             <Route path="/diseno-promocional/editor" element={<EditorPage />} />
-            <Route path="/diseno-promocional/vista" element={<ProductTemplateStudio />} />
-            <Route path="/diseno-promocional/plantillas" element={<EditorTemplatesView />} />
+            <Route
+              path="/diseno-promocional/vista"
+              element={<ProductTemplateStudio />}
+            />
+            <Route
+              path="/diseno-promocional/plantillas"
+              element={<EditorTemplatesView />}
+            />
             <Route path="/editor/:id?" element={<EditorPage />} />
             <Route path="/publicity_edit" element={<AdTemplateEditor />} />
             {/* —— Módulo Publicidad (campañas y reproductor para pantallas digitales) —— */}
             <Route path="/publicidad" element={<PublicidadCampaignsPage />} />
-            <Route path="/publicidad/dispositivos" element={<PublicidadDevicesPage />} />
-            <Route path="/publicidad/campanas/nueva" element={<PublicidadCampaignEditorPage />} />
-            <Route path="/publicidad/campanas/:id" element={<PublicidadCampaignEditorPage />} />
-            <Route path="/publicidad/reproductor/:campaignId?" element={<PublicidadPlayerPage />} />
+            <Route
+              path="/publicidad/dispositivos"
+              element={<PublicidadDevicesPage />}
+            />
+            <Route
+              path="/publicidad/campanas/nueva"
+              element={<PublicidadCampaignEditorPage />}
+            />
+            <Route
+              path="/publicidad/campanas/:id"
+              element={<PublicidadCampaignEditorPage />}
+            />
+            <Route
+              path="/publicidad/reproductor/:campaignId?"
+              element={<PublicidadPlayerPage />}
+            />
             {/* Diseño Promocional — rutas legacy */}
-            <Route path="/editorDefault" element={<Navigate to="/diseno-promocional/editor" replace />} />
-            <Route path="/templates" element={<Navigate to="/diseno-promocional/plantillas" replace />} />
+            <Route
+              path="/editorDefault"
+              element={<Navigate to="/diseno-promocional/editor" replace />}
+            />
+            <Route
+              path="/templates"
+              element={<Navigate to="/diseno-promocional/plantillas" replace />}
+            />
             <Route path="/inventory/products" element={<ProductsPage />} />
             <Route path="/inventory/categories" element={<CategoryPage />} />
             <Route path="/inventory/tramos" element={<TramosPage />} />
             <Route path="/inventory/units" element={<UnitPage />} />
             <Route path="/inventory/movement" element={<MovementPage />} />
             <Route path="/inventory/recipes" element={<RecipePage />} />
-            <Route path="/inventory/insumos" element={<GenericIngredientsPage />} />
+            <Route
+              path="/inventory/insumos"
+              element={<GenericIngredientsPage />}
+            />
             <Route path="/inventory/orders" element={<OrderPage />} />
             <Route path="/inventory/customers" element={<CustomerPage />} />
             <Route path="/inventory/suppliers" element={<SupplierPage />} />
             <Route path="/inventory/finance" element={<FinancePage />} />
-            <Route path="/inventory/collections" element={<CollectionsPage />} />
-            <Route path="/inventory/prestamos-deudas" element={<LoansDebtsPage />} />
-            <Route path="/inventory/gastos-recurrentes" element={<RecurringExpensesPage />} />
-            <Route path="/inventory/production" element={<ProductionManagerPage />} />
-            <Route path="/inventory/productos-destacados" element={<HomeProductPage />} />
-            <Route path="/inventory/puntos-venta" element={<StoresManagerPage />} />
+            <Route
+              path="/inventory/collections"
+              element={<CollectionsPage />}
+            />
+            <Route
+              path="/inventory/prestamos-deudas"
+              element={<LoansDebtsPage />}
+            />
+            <Route
+              path="/inventory/gastos-recurrentes"
+              element={<RecurringExpensesPage />}
+            />
+            <Route
+              path="/inventory/production"
+              element={<ProductionManagerPage />}
+            />
+            <Route
+              path="/inventory/productos-destacados"
+              element={<HomeProductPage />}
+            />
+            <Route
+              path="/inventory/puntos-venta"
+              element={<StoresManagerPage />}
+            />
           </Route>
         </Route>
 
         <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
-      </SubscriptionProvider>
     </AuthProvider>
   );
 }
