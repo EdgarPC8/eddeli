@@ -17,6 +17,7 @@ import ProductPriceReference, {
   getProductUnitLabel,
   formatOrderLineTotal,
   formatProductPrice,
+  formatUnitPrice,
 } from "./ProductPriceReference";
 import PrintFormatDialog from "../../../../components/saleReceipt/PrintFormatDialog.jsx";
 import { buildReceiptFromCustomerOrder } from "../../../../utils/saleReceiptUtils.js";
@@ -316,7 +317,7 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
             InputLabelProps={{ shrink: true }}
             helperText={
               currentProduct
-                ? `Por defecto: $${getDefaultDistributorPrice(currentProduct).toFixed(2)}`
+                ? `Por defecto: ${formatUnitPrice(getDefaultDistributorPrice(currentProduct))}`
                 : undefined
             }
             {...register("price")}
@@ -342,7 +343,7 @@ function OrderForm({ onClose, reload, isEditing = false, datos = null }) {
                 <Box component="li" key={`${item.productId}-${index}`} sx={{ mb: 0.75 }}>
                   <Typography variant="body2" component="span">
                     {item.name} — {item.quantity} {item.unitLabel || "u."} ×{" "}
-                    {formatProductPrice(item.price)} ={" "}
+                    {formatUnitPrice(item.price)} ={" "}
                     {formatProductPrice(formatOrderLineTotal(item.quantity, item.price))}
                   </Typography>
                   <Button

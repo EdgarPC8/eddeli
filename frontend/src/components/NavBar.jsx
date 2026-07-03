@@ -87,7 +87,7 @@ import SimpleDialog from "./Dialogs/SimpleDialog.jsx";
 import { getUnreadCount } from "../api/notificationsRequest.js";
 import { useNotificationSocket } from "../hooks/useNotificationSocket.js";
 import { useSubscriptions } from "../hooks/useSubscriptions.js";
-import { getAllowedPaths, isPathAllowed } from "../utils/subscriptionAccess.js";
+import { getAllowedPaths, isPathAllowed, SUBSCRIPTIONS_ENABLED } from "../utils/subscriptionAccess.js";
 import { LOGO_PATH } from "../config.js";
 import { activeApp } from "../config/appInfo.js";
 
@@ -252,12 +252,16 @@ export default function NavBar() {
 
   const menuItems = useMemo(() => {
     const items = menuItemsForRole(user?.loginRol);
+    // Licencias desactivadas: menú solo por rol (SUBSCRIPTIONS_ENABLED).
+    if (!SUBSCRIPTIONS_ENABLED) return items;
     if (!subscription?.subscribed) return items;
     return items.filter((item) => isPathAllowed(item.link, allowedPaths));
   }, [user?.loginRol, subscription, allowedPaths]);
 
   const menuGroups = useMemo(() => {
     const groups = menuGroupsForRole(user?.loginRol);
+    // Licencias desactivadas: menú solo por rol (SUBSCRIPTIONS_ENABLED).
+    if (!SUBSCRIPTIONS_ENABLED) return groups;
     if (!subscription?.subscribed) return groups;
     return groups
       .map((group) => ({

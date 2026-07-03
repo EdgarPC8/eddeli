@@ -130,7 +130,7 @@ export const SupplierOrderItem = sequelize.define("ERP_supplier_order_items", {
   orderId: { type: DataTypes.INTEGER, allowNull: false },
   productId: { type: DataTypes.INTEGER, allowNull: false },
   quantity: { type: DataTypes.FLOAT, allowNull: false },
-  unitPrice: { type: DataTypes.DECIMAL(10, 2), allowNull: false, defaultValue: 0 },
+  unitPrice: { type: DataTypes.DECIMAL(10, 3), allowNull: false, defaultValue: 0 },
 }, {
   timestamps: false,
 });

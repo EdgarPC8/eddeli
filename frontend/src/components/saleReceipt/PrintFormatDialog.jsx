@@ -2,10 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Box,
   Button,
+  Checkbox,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   Stack,
   ToggleButton,
   ToggleButtonGroup,
@@ -31,6 +33,7 @@ import {
 export default function PrintFormatDialog({ open, onClose, receipt, initialFormat = "a4" }) {
   const [format, setFormat] = useState(initialFormat);
   const [documentType, setDocumentType] = useState("documento");
+  const [showNotes, setShowNotes] = useState(true);
   const [exporting, setExporting] = useState(false);
   const previewRef = useRef(null);
 
@@ -38,6 +41,7 @@ export default function PrintFormatDialog({ open, onClose, receipt, initialForma
     if (open) {
       setFormat(initialFormat);
       setDocumentType(receipt?.documentType || "documento");
+      setShowNotes(true);
     }
   }, [open, initialFormat, receipt?.documentType]);
 
@@ -50,8 +54,10 @@ export default function PrintFormatDialog({ open, onClose, receipt, initialForma
 
   const handlePrint = () => {
     if (!previewReceipt) return;
-    printSaleReceipt(previewReceipt, format);
+    printSaleReceipt(previewReceipt, format, { showNotes });
   };
+
+  const hasNotes = Boolean(previewReceipt?.notes);
 
   const handleDownloadPng = async () => {
     if (!previewRef.current) return;
@@ -123,6 +129,21 @@ export default function PrintFormatDialog({ open, onClose, receipt, initialForma
             </ToggleButtonGroup>
           </Box>
 
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={showNotes}
+                onChange={(e) => setShowNotes(e.target.checked)}
+                disabled={!hasNotes}
+              />
+            }
+            label={
+              hasNotes
+                ? "Mostrar descripción / notas del pedido"
+                : "Mostrar descripción / notas (este pedido no tiene)"
+            }
+          />
+
           <Typography variant="subtitle2" fontWeight={700}>
             Vista previa
           </Typography>
@@ -138,7 +159,7 @@ export default function PrintFormatDialog({ open, onClose, receipt, initialForma
               borderColor: "divider",
             }}
           >
-            <SaleReceiptContent receipt={previewReceipt} format={format} />
+            <SaleReceiptContent receipt={previewReceipt} format={format} showNotes={showNotes} />
           </Box>
         </Stack>
       </DialogContent>

@@ -5,6 +5,9 @@ import { printHtmlDocument } from "./printHtmlDocument.js";
 import { getReceiptLayout } from "./receiptFormats.js";
 
 const to2 = (n) => Number(Number(n || 0).toFixed(2));
+// Precio unitario: se conserva con hasta 3 decimales (ej. 0.125) para que la
+// multiplicación cuadre. Los totales de dinero siguen redondeando a 2 decimales.
+const to3 = (n) => Number(Number(n || 0).toFixed(3));
 
 export const DOCUMENT_TYPE_LABELS = {
   factura: "Factura",
@@ -89,6 +92,13 @@ export function formatMoneyReceipt(n) {
   return `$${to2(n).toFixed(2)}`;
 }
 
+/** Precio unitario en comprobante: hasta 3 decimales, mínimo 2 (ej. $0.125, $1.50). */
+export function formatUnitMoneyReceipt(n) {
+  const v = to3(n);
+  const decimals = Math.round(v * 100) === v * 100 ? 2 : 3;
+  return `$${v.toFixed(decimals)}`;
+}
+
 export function formatReceiptDate(iso) {
   return formatDateTime(iso);
 }
@@ -117,7 +127,7 @@ export function normalizeSaleReceipt(sale) {
   const items = (sale.items || []).map((row) => ({
     name: row.name || row.productName || "Producto",
     quantity: Number(row.quantity || 0),
-    price: to2(row.price),
+    price: to3(row.price),
     lineTotal: to2(row.lineTotal ?? Number(row.quantity) * Number(row.price)),
     taxRate: Number(row.taxRate || 0),
     subtotal: to2(row.subtotal ?? row.lineTotal),
@@ -177,7 +187,7 @@ export function buildReceiptFromCustomerOrder(order) {
   const rawItems = order.ERP_order_items || order.items || [];
   const items = rawItems.map((row) => {
     const qty = Number(row.quantity || 0);
-    const price = to2(row.price);
+    const price = to3(row.price);
     const lineTotal = to2(qty * price);
     const taxRate = Number(row.ERP_inventory_product?.taxRate || row.taxRate || 0);
     let subtotal = lineTotal;
@@ -227,7 +237,7 @@ export function buildReceiptFromCheckout({
 }) {
   const items = cart.map((row) => {
     const qty = Number(row.quantity || 0);
-    const price = to2(row.price);
+    const price = to3(row.price);
     const lineTotal = to2(qty * price);
     const taxRate = Number(row.taxRate || 0);
     let subtotal = lineTotal;
@@ -279,11 +289,12 @@ export function applyReceiptCustomerOverrides(receipt, fields = {}) {
   };
 }
 
-export function printSaleReceipt(receipt, format) {
-  printHtmlDocument(buildPrintHtml(receipt, format), { format });
+export function printSaleReceipt(receipt, format, options = {}) {
+  printHtmlDocument(buildPrintHtml(receipt, format, options), { format });
 }
 
-function buildPrintHtml(receipt, format) {
+function buildPrintHtml(receipt, format, options = {}) {
+  const { showNotes = true } = options;
   const layout = getReceiptLayout(format);
   const isTicket = layout.isTicket;
   const p = layout.print;
@@ -327,11 +338,16 @@ function buildPrintHtml(receipt, format) {
         `<tr>
           <td style="${productCell}">${escapeHtml(it.name)}</td>
           <td style="${numCell}">${it.quantity}</td>
-          <td style="${moneyCell}">${formatMoneyReceipt(it.price)}</td>
+          <td style="${moneyCell}">${formatUnitMoneyReceipt(it.price)}</td>
           <td style="${moneyCell}">${formatMoneyReceipt(it.lineTotal)}</td>
         </tr>`,
     )
     .join("");
+
+  const totalQuantity = (receipt.items || []).reduce(
+    (acc, it) => acc + Number(it.quantity || 0),
+    0,
+  );
 
   return `<div style="width:${w};max-width:${w};margin:0 auto;padding:${pad};box-sizing:border-box;font-family:Arial,sans-serif;font-size:${fs};font-weight:600;color:#000;line-height:1.35;overflow:hidden">
     <div style="text-align:center;margin-bottom:${isTicket ? 6 : 16}px">
@@ -358,13 +374,21 @@ function buildPrintHtml(receipt, format) {
         </tr>
       </thead>
       <tbody>${rows}</tbody>
+      <tfoot>
+        <tr style="border-top:1px solid #ccc">
+          <td style="text-align:right;padding:3px 1px;font-weight:800;color:#000">Total Cant</td>
+          <td style="text-align:center;padding:3px 1px;font-weight:800;color:#000">${totalQuantity}</td>
+          <td style="padding:3px 1px"></td>
+          <td style="padding:3px 1px"></td>
+        </tr>
+      </tfoot>
     </table>
     <div style="border-top:1px dashed #999;padding-top:${isTicket ? 3 : 10}px;color:#000">
       ${totalRow("Subtotal", formatMoneyReceipt(receipt.subtotal))}
       ${receipt.iva > 0 ? totalRow("IVA", formatMoneyReceipt(receipt.iva)) : ""}
       ${totalRow("TOTAL", formatMoneyReceipt(receipt.total), true)}
     </div>
-    ${receipt.notes ? `<div style="margin-top:${isTicket ? 4 : 10}px;font-size:${isTicket ? p.notes : 12}px;font-weight:700;color:#000;word-wrap:break-word">${escapeHtml(receipt.notes)}</div>` : ""}
+    ${showNotes && receipt.notes ? `<div style="margin-top:${isTicket ? 4 : 10}px;font-size:${isTicket ? p.notes : 12}px;font-weight:700;color:#000;word-wrap:break-word">${escapeHtml(receipt.notes)}</div>` : ""}
     <div style="text-align:center;margin-top:${isTicket ? 6 : 16}px;margin-bottom:0;font-size:${isTicket ? p.footer : 12}px;font-weight:800;color:#000">Gracias por su compra</div>
     ${signatureBlock}
   </div>`;

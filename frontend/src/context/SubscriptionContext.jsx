@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { checkSubscription } from "../api/subscriptionsRequest.js";
+import { SUBSCRIPTIONS_ENABLED } from "../utils/subscriptionAccess.js";
 import { useAuth } from "./AuthContext.jsx";
 
 const SUBSCRIPTION_TIMEOUT_MS = 10_000;
@@ -13,6 +14,15 @@ export function SubscriptionProvider({ children }) {
   const [checkFailed, setCheckFailed] = useState(false);
 
   const refetch = useCallback(async () => {
+    // Licencias desactivadas: no llamamos al gestor central.
+    // Para reactivar, pon SUBSCRIPTIONS_ENABLED = true en subscriptionAccess.js.
+    if (!SUBSCRIPTIONS_ENABLED) {
+      setSubscription({ subscribed: true, subscription: null });
+      setCheckFailed(false);
+      setIsLoading(false);
+      return;
+    }
+
     if (!isAuthenticated) {
       setSubscription(null);
       setCheckFailed(false);

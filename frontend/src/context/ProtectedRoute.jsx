@@ -9,6 +9,7 @@ import {
   getAllowedPaths,
   isPathAllowed,
   SUBSCRIPTION_SKIP_PATHS,
+  SUBSCRIPTIONS_ENABLED,
 } from "../utils/subscriptionAccess.js";
 
 export default function ProtectedRoute({ requiredRol }) {
@@ -45,6 +46,12 @@ export default function ProtectedRoute({ requiredRol }) {
         </Typography>
       </Box>
     );
+  }
+
+  // Licencias desactivadas: acceso solo por rol (ver SUBSCRIPTIONS_ENABLED).
+  // Para reactivar la validación de planes, pon SUBSCRIPTIONS_ENABLED = true.
+  if (!SUBSCRIPTIONS_ENABLED) {
+    return <Outlet />;
   }
 
   // Páginas de suscripción: no esperar al gestor central

@@ -33,6 +33,7 @@ import ProductPriceReference, {
   getProductUnitLabel,
   formatOrderLineTotal,
   formatProductPrice,
+  formatUnitPrice,
 } from "./ProductPriceReference";
 import { useState } from "react";
 
@@ -207,7 +208,7 @@ export default function SupplierOrderAccordion({
             return (
               <Typography key={item.id} variant="body2">
                 • {item.ERP_inventory_product?.name || "Producto"} — {item.quantity} {unit} ×{" "}
-                {formatProductPrice(item.unitPrice)} = {formatProductPrice(lineTotal)}
+                {formatUnitPrice(item.unitPrice)} = {formatProductPrice(lineTotal)}
               </Typography>
             );
           })}

@@ -131,24 +131,38 @@ export const createSupplierOrder = async (req, res) => {
 export const updateSupplierOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const { supplierId, date, notes, items } = req.body || {};
+    const { supplierId, date, notes, items, receivedAt, paidAt } = req.body || {};
     const order = await SupplierOrder.findByPk(id);
     if (!order) return res.status(404).json({ message: "Pedido no encontrado" });
-    if (order.receivedAt) {
+
+    const isReceived = Boolean(order.receivedAt);
+    // Corrección manual de fechas (Programador): no re-dispara movimientos de stock.
+    const hasDateOverride = receivedAt !== undefined || paidAt !== undefined;
+    if (hasDateOverride) {
+      const user = await verifyJWT(getHeaderToken(req));
+      if (user?.loginRol !== "Programador") {
+        return res
+          .status(403)
+          .json({ message: "Solo el rol Programador puede editar las fechas de entrega y pago" });
+      }
+    }
+    if (isReceived && !hasDateOverride) {
       return res.status(400).json({ message: "No se puede editar un pedido ya recibido" });
     }
 
     await sequelize.transaction(async (t) => {
       await order.update(
         {
-          ...(supplierId != null ? { supplierId: Number(supplierId) } : {}),
-          ...(date ? { date: new Date(date) } : {}),
-          ...(notes !== undefined ? { notes: notes || null } : {}),
+          ...(!isReceived && supplierId != null ? { supplierId: Number(supplierId) } : {}),
+          ...(!isReceived && date ? { date: new Date(date) } : {}),
+          ...(!isReceived && notes !== undefined ? { notes: notes || null } : {}),
+          ...(receivedAt !== undefined ? { receivedAt: receivedAt ? new Date(receivedAt) : null } : {}),
+          ...(paidAt !== undefined ? { paidAt: paidAt ? new Date(paidAt) : null } : {}),
         },
         { transaction: t }
       );
 
-      if (Array.isArray(items)) {
+      if (!isReceived && Array.isArray(items)) {
         await SupplierOrderItem.destroy({ where: { orderId: order.id }, transaction: t });
         for (const row of items) {
           const productId = Number(row.productId);

@@ -7,6 +7,21 @@ export function formatProductPrice(amount) {
   }).format(Number(amount || 0));
 }
 
+/**
+ * Precio UNITARIO con hasta 3 decimales (ej. $0.125).
+ * Los totales de dinero se siguen mostrando con 2 decimales (formatProductPrice),
+ * pero el precio por unidad admite 3 decimales para que la multiplicación cuadre
+ * (10 × $0.125 = $1.25).
+ */
+export function formatUnitPrice(amount) {
+  return new Intl.NumberFormat("es-EC", {
+    style: "currency",
+    currency: "USD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 3,
+  }).format(Number(amount || 0));
+}
+
 /** Precio por defecto en pedidos a distribuidor/cliente. */
 export function getDefaultDistributorPrice(product) {
   if (!product) return 0;
@@ -35,7 +50,7 @@ export function OrderLineSummary({ quantity, unitPrice, unitLabel, sx }) {
   const total = formatOrderLineTotal(qty, price);
   return (
     <Typography variant="body2" fontWeight={600} color="primary.main" sx={sx}>
-      {qty} {unit} × {formatProductPrice(price)} = {formatProductPrice(total)}
+      {qty} {unit} × {formatUnitPrice(price)} = {formatProductPrice(total)}
     </Typography>
   );
 }

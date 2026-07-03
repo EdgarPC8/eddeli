@@ -1,5 +1,7 @@
 import { Grid, TextField, Box, Button, IconButton, Tooltip, Typography } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import { useForm } from "react-hook-form";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -52,6 +54,20 @@ const normalizeToYYYYMMDD = (datos) => {
   return localISODate();
 };
 
+/** Convierte una fecha (ISO o "dd/MM/yyyy HH:mm:ss") a "YYYY-MM-DD" para inputs date. */
+const dateToInputValue = (value) => {
+  if (!value) return "";
+  if (typeof value === "string" && value.includes("/")) {
+    const [datePart] = value.split(" ");
+    const [dd, mm, yyyy] = datePart.split("/");
+    if (dd && mm && yyyy) return `${yyyy}-${mm}-${dd}`;
+  }
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+};
+
 export default function SupplierOrderForm({
   onClose,
   reload,
@@ -69,7 +85,8 @@ export default function SupplierOrderForm({
   const [selectedSupplier, setSelectedSupplier] = useState("");
   const [newSupplierName, setNewSupplierName] = useState("");
   const [pendingVoucherFile, setPendingVoucherFile] = useState(null);
-  const { toast } = useAuth();
+  const { toast, user } = useAuth();
+  const isProgramador = user?.loginRol === "Programador";
 
   const selectedProductId = watch("productId");
   const watchQuantity = watch("quantity");
@@ -123,6 +140,26 @@ export default function SupplierOrderForm({
     setItems((prev) => prev.filter((_, i) => i !== index));
   };
 
+  const moveItem = (index, direction) => {
+    setItems((prev) => {
+      const target = index + direction;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const updateItemField = (index, field, rawValue) => {
+    setItems((prev) =>
+      prev.map((it, i) => {
+        if (i !== index) return it;
+        const value = rawValue === "" ? "" : Number(rawValue);
+        return { ...it, [field]: value };
+      }),
+    );
+  };
+
   const handleQuickCreateSupplier = async () => {
     const name = newSupplierName.trim();
     if (!name) {
@@ -149,6 +186,14 @@ export default function SupplierOrderForm({
       return;
     }
 
+    const invalidItem = items.some(
+      (it) => !(Number(it.quantity) > 0) || !(Number(it.unitPrice) >= 0) || it.unitPrice === "",
+    );
+    if (invalidItem) {
+      toast({ message: "Revisa la cantidad y el precio de los productos", variant: "warning" });
+      return;
+    }
+
     const localDT = new Date(`${data.date}T12:00:00`);
     const payload = {
       supplierId: Number(selectedSupplier),
@@ -156,10 +201,20 @@ export default function SupplierOrderForm({
       date: toLocalISOWithOffset(localDT),
       items: items.map((it) => ({
         productId: it.productId,
-        quantity: it.quantity,
-        unitPrice: it.unitPrice,
+        quantity: Number(it.quantity),
+        unitPrice: Number(it.unitPrice),
       })),
     };
+
+    // Solo el rol Programador puede corregir manualmente las fechas de entrega y pago.
+    if (isProgramador) {
+      payload.receivedAt = data.receivedAt
+        ? toLocalISOWithOffset(new Date(`${data.receivedAt}T12:00:00`))
+        : null;
+      payload.paidAt = data.paidAt
+        ? toLocalISOWithOffset(new Date(`${data.paidAt}T12:00:00`))
+        : null;
+    }
 
     const voucherFile = pendingVoucherFile;
 
@@ -215,6 +270,8 @@ export default function SupplierOrderForm({
       setSelectedSupplier(String(datos.supplierId || ""));
       setValue("notes", datos.notes || "");
       setValue("date", normalizeToYYYYMMDD(datos));
+      setValue("receivedAt", dateToInputValue(datos.receivedAt));
+      setValue("paidAt", dateToInputValue(datos.paidAt));
       const loaded = (datos.ERP_supplier_order_items || []).map((item) => ({
         productId: item.productId,
         quantity: item.quantity,
@@ -230,6 +287,8 @@ export default function SupplierOrderForm({
     setPendingVoucherFile(null);
     setValue("notes", "");
     setValue("date", prefillDate || localISODate());
+    setValue("receivedAt", "");
+    setValue("paidAt", "");
     setSelectedSupplier(prefillSupplierId ? String(prefillSupplierId) : "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datos, isEditing, prefillSupplierId, prefillDate]);
@@ -241,132 +300,262 @@ export default function SupplierOrderForm({
 
   return (
     <Box component="form" sx={{ mt: 1 }} onSubmit={handleSubmit(submitOrder)}>
-      <Grid container spacing={2}>
-        <Grid item xs={12}>
-          <SearchableSelect
-            label="Proveedor"
-            items={suppliers}
-            value={selectedSupplier}
-            onChange={(val) => setSelectedSupplier(val != null ? String(val) : "")}
-            disabled={lockSupplier}
-          />
-        </Grid>
-        {!lockSupplier && (
-          <>
-        <Grid item xs={12} sm={8}>
-          <TextField
-            fullWidth
-            size="small"
-            label="Nuevo proveedor (rápido)"
-            value={newSupplierName}
-            onChange={(e) => setNewSupplierName(e.target.value)}
-          />
-        </Grid>
-        <Grid item xs={12} sm={4}>
-          <Button fullWidth variant="outlined" onClick={handleQuickCreateSupplier}>
-            Crear proveedor
-          </Button>
-        </Grid>
-          </>
-        )}
+      <Grid container spacing={3}>
+        {/* Columna izquierda: entradas */}
+        <Grid item xs={12} md={6}>
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <SearchableSelect
+                label="Proveedor"
+                items={suppliers}
+                value={selectedSupplier}
+                onChange={(val) => setSelectedSupplier(val != null ? String(val) : "")}
+                disabled={lockSupplier}
+              />
+            </Grid>
+            {!lockSupplier && (
+              <>
+                <Grid item xs={12} sm={8}>
+                  <TextField
+                    fullWidth
+                    size="small"
+                    label="Nuevo proveedor (rápido)"
+                    value={newSupplierName}
+                    onChange={(e) => setNewSupplierName(e.target.value)}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                  <Button fullWidth variant="outlined" onClick={handleQuickCreateSupplier}>
+                    Crear proveedor
+                  </Button>
+                </Grid>
+              </>
+            )}
 
-        <Grid item xs={12}>
-          <input type="hidden" {...register("productId")} />
-          <SearchableSelect
-            label="Producto"
-            items={products}
-            value={selectedProduct}
-            onChange={(val) => {
-              setSelectedProduct(val);
-              setValue("productId", val);
-            }}
-          />
-        </Grid>
-        {currentProduct && (
-          <Grid item xs={12}>
-            <ProductPriceReference
-              product={currentProduct}
-              quantity={watchQuantity}
-              unitPrice={watchUnitPrice}
-            />
-          </Grid>
-        )}
-        <Grid item xs={6}>
-          <TextField
-            fullWidth
-            label="Cantidad"
-            type="number"
-            inputProps={{ min: 0.01, step: "any" }}
-            {...register("quantity")}
-          />
-        </Grid>
-        <Grid item xs={6}>
-          <TextField
-            fullWidth
-            label="Precio unitario (USD)"
-            type="number"
-            inputProps={{ min: 0, step: "0.01" }}
-            {...register("unitPrice")}
-          />
-        </Grid>
-        <Grid item xs={12} sx={{ display: "flex", justifyContent: "flex-start" }}>
-          <Tooltip title="Agregar producto">
-            <IconButton color="primary" onClick={addItem} sx={{ border: 1, borderColor: "primary.main" }}>
-              <AddIcon />
-            </IconButton>
-          </Tooltip>
-        </Grid>
+            <Grid item xs={12}>
+              <input type="hidden" {...register("productId")} />
+              <SearchableSelect
+                label="Producto"
+                items={products}
+                value={selectedProduct}
+                onChange={(val) => {
+                  setSelectedProduct(val);
+                  setValue("productId", val);
+                }}
+              />
+            </Grid>
+            {currentProduct && (
+              <Grid item xs={12}>
+                <ProductPriceReference
+                  product={currentProduct}
+                  quantity={watchQuantity}
+                  unitPrice={watchUnitPrice}
+                />
+              </Grid>
+            )}
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="Cantidad"
+                type="number"
+                inputProps={{ min: 0.01, step: "any" }}
+                {...register("quantity")}
+              />
+            </Grid>
+            <Grid item xs={6}>
+              <TextField
+                fullWidth
+                label="Precio unitario (USD)"
+                type="number"
+                inputProps={{ min: 0, step: "0.001" }}
+                {...register("unitPrice")}
+              />
+            </Grid>
+            <Grid item xs={12} sx={{ display: "flex", justifyContent: "flex-start" }}>
+              <Tooltip title="Agregar producto">
+                <IconButton
+                  color="primary"
+                  onClick={addItem}
+                  sx={{ border: 1, borderColor: "primary.main" }}
+                >
+                  <AddIcon />
+                </IconButton>
+              </Tooltip>
+            </Grid>
 
-        {items.map((item, index) => (
-          <Grid item xs={12} key={`${item.productId}-${index}`}>
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 1 }}>
-              <Typography variant="body2">
-                {item.name} — {item.quantity} {item.unitLabel || "u."} ×{" "}
-                {formatProductPrice(item.unitPrice)} ={" "}
-                {formatProductPrice(formatOrderLineTotal(item.quantity, item.unitPrice))}
-              </Typography>
-              <Button color="error" size="small" onClick={() => removeItem(index)}>
-                Quitar
+            <Grid item xs={12}>
+              <TextField fullWidth label="Fecha del pedido" type="date" {...register("date")} />
+            </Grid>
+            {isProgramador && (
+              <>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Fecha de entrega"
+                    type="date"
+                    InputLabelProps={{ shrink: true }}
+                    helperText="Solo Programador · corrección manual"
+                    {...register("receivedAt")}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label="Fecha de pago"
+                    type="date"
+                    InputLabelProps={{ shrink: true }}
+                    helperText="Solo Programador · corrección manual"
+                    {...register("paidAt")}
+                  />
+                </Grid>
+              </>
+            )}
+            <Grid item xs={12}>
+              <TextField fullWidth label="Notas" multiline rows={2} {...register("notes")} />
+            </Grid>
+            <Grid item xs={12}>
+              {isEditing ? (
+                <AttachmentField
+                  entityType="supplier_order"
+                  entityId={datos.id}
+                  pendingFile={pendingVoucherFile}
+                  onPendingFileChange={setPendingVoucherFile}
+                  label="Factura / nota del proveedor"
+                />
+              ) : (
+                <AttachmentField
+                  label="Factura / nota del proveedor (opcional)"
+                  pendingFile={pendingVoucherFile}
+                  onPendingFileChange={setPendingVoucherFile}
+                />
+              )}
+            </Grid>
+            <Grid item xs={12}>
+              <Button type="submit" variant="contained" fullWidth>
+                {isEditing ? "Guardar pedido a proveedor" : "Registrar pedido a proveedor"}
               </Button>
-            </Box>
+            </Grid>
           </Grid>
-        ))}
+        </Grid>
 
-        {items.length > 0 && (
-          <Grid item xs={12}>
-            <Typography variant="subtitle1" fontWeight={700} align="right">
-              Total: {formatProductPrice(itemsTotal)}
+        {/* Columna derecha: lista de productos */}
+        <Grid item xs={12} md={6}>
+          <Box
+            sx={{
+              border: 1,
+              borderColor: "divider",
+              borderRadius: 2,
+              p: 2,
+              height: "100%",
+              display: "flex",
+              flexDirection: "column",
+              gap: 1.5,
+              bgcolor: "background.default",
+            }}
+          >
+            <Typography variant="subtitle1" fontWeight={700}>
+              Productos del pedido ({items.length})
             </Typography>
-          </Grid>
-        )}
 
-        <Grid item xs={12}>
-          <TextField fullWidth label="Fecha del pedido" type="date" {...register("date")} />
-        </Grid>
-        <Grid item xs={12}>
-          <TextField fullWidth label="Notas" multiline rows={2} {...register("notes")} />
-        </Grid>
-        <Grid item xs={12}>
-          {isEditing ? (
-            <AttachmentField
-              entityType="supplier_order"
-              entityId={datos.id}
-              pendingFile={pendingVoucherFile}
-              onPendingFileChange={setPendingVoucherFile}
-              label="Factura / nota del proveedor"
-            />
-          ) : (
-            <AttachmentField
-              label="Factura / nota del proveedor (opcional)"
-              pendingFile={pendingVoucherFile}
-              onPendingFileChange={setPendingVoucherFile}
-            />
-          )}
-        </Grid>
-        <Grid item xs={12}>
-          <Button type="submit" variant="contained" fullWidth>
-            {isEditing ? "Guardar pedido a proveedor" : "Registrar pedido a proveedor"}
-          </Button>
+            {items.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                Aún no has agregado productos. Selecciona un producto, cantidad y precio, y presiona el
+                botón +.
+              </Typography>
+            ) : (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                {items.map((item, index) => (
+                  <Box
+                    key={`${item.productId}-${index}`}
+                    sx={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      alignItems: "center",
+                      gap: 1,
+                      border: 1,
+                      borderColor: "divider",
+                      borderRadius: 1,
+                      p: 1,
+                      bgcolor: "background.paper",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        flex: "1 1 100%",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0.5,
+                        mb: 0.5,
+                      }}
+                    >
+                      <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
+                        {index + 1}. {item.name}
+                      </Typography>
+                      <Tooltip title="Subir">
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={() => moveItem(index, -1)}
+                            disabled={index === 0}
+                          >
+                            <ArrowUpwardIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title="Bajar">
+                        <span>
+                          <IconButton
+                            size="small"
+                            onClick={() => moveItem(index, 1)}
+                            disabled={index === items.length - 1}
+                          >
+                            <ArrowDownwardIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                    </Box>
+                    <TextField
+                      label="Cantidad"
+                      type="number"
+                      size="small"
+                      value={item.quantity}
+                      onChange={(e) => updateItemField(index, "quantity", e.target.value)}
+                      inputProps={{ min: 0.01, step: "any" }}
+                      sx={{ width: 100 }}
+                    />
+                    <Typography variant="body2" color="text.secondary">
+                      {item.unitLabel || "u."} ×
+                    </Typography>
+                    <TextField
+                      label="Precio unit."
+                      type="number"
+                      size="small"
+                      value={item.unitPrice}
+                      onChange={(e) => updateItemField(index, "unitPrice", e.target.value)}
+                      inputProps={{ min: 0, step: "0.001" }}
+                      sx={{ width: 110 }}
+                    />
+                    <Typography
+                      variant="body2"
+                      fontWeight={700}
+                      sx={{ ml: "auto", minWidth: 80, textAlign: "right" }}
+                    >
+                      {formatProductPrice(formatOrderLineTotal(item.quantity, item.unitPrice))}
+                    </Typography>
+                    <Button color="error" size="small" onClick={() => removeItem(index)}>
+                      Quitar
+                    </Button>
+                  </Box>
+                ))}
+              </Box>
+            )}
+
+            {items.length > 0 && (
+              <Typography variant="subtitle1" fontWeight={700} align="right" sx={{ mt: "auto" }}>
+                Total: {formatProductPrice(itemsTotal)}
+              </Typography>
+            )}
+          </Box>
         </Grid>
       </Grid>
     </Box>

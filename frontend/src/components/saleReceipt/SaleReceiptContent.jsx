@@ -1,7 +1,11 @@
 import React from "react";
 import { Box, Typography, Table, TableBody, TableCell, TableHead, TableRow } from "@mui/material";
 import { getReceiptLayout } from "../../utils/receiptFormats.js";
-import { formatMoneyReceipt, RECEIPT_FIELD_LABELS } from "../../utils/saleReceiptUtils.js";
+import {
+  formatMoneyReceipt,
+  formatUnitMoneyReceipt,
+  RECEIPT_FIELD_LABELS,
+} from "../../utils/saleReceiptUtils.js";
 
 const BLACK = "#000";
 const cellSx = { py: 0.5, color: BLACK, borderColor: "#ccc" };
@@ -41,10 +45,12 @@ function ReceiptSignatures({ isTicket, signatureSize }) {
 }
 
 /** Vista previa del comprobante (A4 o ticket térmico). */
-export default function SaleReceiptContent({ receipt, format = "a4" }) {
+export default function SaleReceiptContent({ receipt, format = "a4", showNotes = true }) {
   if (!receipt) return null;
   const layout = getReceiptLayout(format);
   const isTicket = layout.isTicket;
+  const items = receipt.items || [];
+  const totalQuantity = items.reduce((acc, it) => acc + Number(it.quantity || 0), 0);
 
   return (
     <Box
@@ -188,7 +194,7 @@ export default function SaleReceiptContent({ receipt, format = "a4" }) {
                   fontWeight: 700,
                 }}
               >
-                {formatMoneyReceipt(it.price)}
+                {formatUnitMoneyReceipt(it.price)}
               </TableCell>
               <TableCell
                 align="right"
@@ -206,6 +212,22 @@ export default function SaleReceiptContent({ receipt, format = "a4" }) {
               </TableCell>
             </TableRow>
           ))}
+          <TableRow>
+            <TableCell
+              align="right"
+              sx={{ ...cellSx, py: 0.5, px: isTicket ? 0.5 : 1, fontWeight: 800, borderTop: "1px solid #ccc" }}
+            >
+              Total Cant
+            </TableCell>
+            <TableCell
+              align="center"
+              sx={{ ...cellSx, py: 0.5, px: 0.5, fontWeight: 800, borderTop: "1px solid #ccc" }}
+            >
+              {totalQuantity}
+            </TableCell>
+            <TableCell sx={{ ...cellSx, py: 0.5, borderTop: "1px solid #ccc" }} />
+            <TableCell sx={{ ...cellSx, py: 0.5, borderTop: "1px solid #ccc" }} />
+          </TableRow>
         </TableBody>
       </Table>
 
@@ -234,7 +256,7 @@ export default function SaleReceiptContent({ receipt, format = "a4" }) {
         </Box>
       </Box>
 
-      {receipt.notes ? (
+      {showNotes && receipt.notes ? (
         <Typography variant="body2" display="block" sx={{ mt: 1, color: BLACK, fontWeight: 700 }}>
           {receipt.notes}
         </Typography>

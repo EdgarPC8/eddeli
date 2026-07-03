@@ -14,7 +14,7 @@ export function getTicketPageWidthMm(format) {
 /** Márgenes izquierdo y derecho iguales dentro del rollo (mm). */
 export function getTicketSideMarginMm(format) {
   if (format === "ticket55") return 2;
-  if (format === "ticket80") return 2;
+  if (format === "ticket80") return 3;
   return 0;
 }
 

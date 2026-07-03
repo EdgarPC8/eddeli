@@ -181,6 +181,8 @@ function OrderPage() {
               ? `Nuevo pedido a ${supplierPrefill.supplierName}`
               : "Registrar pedido a proveedor"
         }
+        maxWidth="lg"
+        fullWidth
       >
         <SupplierOrderForm
           onClose={closeSupplierDialog}

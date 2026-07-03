@@ -1,3 +1,16 @@
+/**
+ * Interruptor global de licencias / suscripciones.
+ *
+ * false = DESACTIVADO. La app NO valida planes con el gestor central;
+ *         el acceso se controla solo por rol. (Estado actual.)
+ * true  = ACTIVADO. Se vuelve a validar la suscripción y sus módulos.
+ *
+ * Para reactivar las licencias: cambia esto a `true`. El resto de la
+ * lógica (SubscriptionContext, ProtectedRoute, páginas de suscripción)
+ * sigue intacta y volverá a funcionar automáticamente.
+ */
+export const SUBSCRIPTIONS_ENABLED = false;
+
 /** Rutas autenticadas que no requieren plan activo. */
 export const SUBSCRIPTION_SKIP_PATHS = ["/subscription-expired", "/no-subscription"];
 

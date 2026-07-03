@@ -44,6 +44,7 @@ import ProductPriceReference, {
   getProductUnitLabel,
   formatOrderLineTotal,
   formatProductPrice,
+  formatUnitPrice,
 } from './ProductPriceReference';
 import DocumentAttachmentIcon from './DocumentAttachmentIcon';
 import PrintFormatDialog from '../../../../components/saleReceipt/PrintFormatDialog.jsx';
@@ -877,7 +878,7 @@ export default function OrderCalendarView({
                                       <Typography variant="caption">
                                         {item.quantity}{' '}
                                         {getProductUnitLabel(item.ERP_inventory_product)} ×{' '}
-                                        {formatProductPrice(item.price)} ={' '}
+                                        {formatUnitPrice(item.price)} ={' '}
                                         {formatProductPrice(formatOrderLineTotal(item.quantity, item.price))}
                                       </Typography>
                                     )}
