@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import Subscription from "../sdk/Subscription";
+import Subify from "subify";
 
 /**
  * Control de licencias/suscripciones.
@@ -32,19 +32,24 @@ export const useSubscriptions = () => {
   const [expired, setExpired] = useState(false);
 
   const fetchSub = async () => {
-    const { error, data } = await Subscription.getSubscriptionInfo();
+    const { error, data } = await Subify.getSubscriptionInfo();
+
     if (error) {
       console.error(error);
       // Evita que la pantalla se quede cargando si el gestor falla.
       setIsLoading(false);
       return;
     }
-    const expireDate = new Date(data.subscription.expires_at);
-    const now = new Date();
 
-    setExpired(now > expireDate);
     setSubscription(data);
     setIsLoading(false);
+
+    if (data.subscription) {
+      const expireDate = new Date(data.subscription.expires_at);
+      const now = new Date();
+
+      setExpired(now > expireDate);
+    }
   };
 
   useEffect(() => {

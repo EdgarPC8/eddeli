@@ -4,7 +4,10 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import { useAuth } from "./AuthContext.jsx";
-import { useSubscriptions, SUBSCRIPTIONS_ENABLED } from "../hooks/useSubscriptions.js";
+import {
+  useSubscriptions,
+  SUBSCRIPTIONS_ENABLED,
+} from "../hooks/useSubscriptions.js";
 
 export default function ProtectedRoute({ requiredRol }) {
   const { isAuthenticated, isLoading, user } = useAuth();

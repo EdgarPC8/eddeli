@@ -72,10 +72,10 @@ const AUTH_ROLES = [
   "Moderador",
 ];
 
-import Subscription from "./sdk/Subscription";
+import Subify from "subify";
 
-Subscription.configure({
-  apikey: import.meta.env.VITE_SUBSCRIPTION_API_KEY,
+Subify.configure({
+  apiKey: import.meta.env.VITE_SUBSCRIPTION_API_KEY,
 });
 
 export default function App() {

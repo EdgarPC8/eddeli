@@ -16,7 +16,8 @@ import HomeIcon from "@mui/icons-material/Home";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import VpnKeyIcon from "@mui/icons-material/VpnKey";
 import { useSubscriptions } from "../hooks/useSubscriptions.js";
-import Subscription from "../sdk/Subscription";
+
+import Subify from "subify";
 
 export default function SubscriptionExpiredPage() {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ export default function SubscriptionExpiredPage() {
     setActivating(true);
     setError("");
     try {
-      await Subscription.activateSubscription({
+      await Subify.activateSubscription({
         licenseKey: licenseKey.trim(),
       });
 
