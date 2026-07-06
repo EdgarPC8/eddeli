@@ -192,6 +192,7 @@ function OrderPage() {
           prefillSupplierId={supplierPrefill?.supplierId}
           prefillDate={supplierPrefill?.date}
           lockSupplier={Boolean(supplierPrefill?.supplierId)}
+          active={openSupplierDialog}
         />
       </SimpleDialog>
 

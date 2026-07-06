@@ -4,6 +4,10 @@ import {
   AccordionDetails,
   Box,
   Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Divider,
   Grid,
   IconButton,
@@ -18,16 +22,20 @@ import DeleteForeverIcon from "@mui/icons-material/DeleteForever";
 import LocalShippingIcon from "@mui/icons-material/LocalShipping";
 import PaymentsIcon from "@mui/icons-material/Payments";
 import AddIcon from "@mui/icons-material/Add";
+import EditCalendarIcon from "@mui/icons-material/EditCalendar";
 import {
   addSupplierOrderItemRequest,
   deleteSupplierOrderRequest,
   markSupplierOrderPaidRequest,
   markSupplierOrderReceivedRequest,
+  updateSupplierOrderRequest,
 } from "../../../../api/ordersRequest";
 import SimpleDialog from "../../../../components/Dialogs/SimpleDialog";
 import SearchableSelect from "../../../../components/SearchableSelect";
+import { useAuth } from "../../../../context/AuthContext";
 import { formatDateTime } from "../../../../helpers/functions.js";
 import DocumentAttachmentIcon from "./DocumentAttachmentIcon";
+import DocumentUploadButton from "./DocumentUploadButton";
 import ProductPriceReference, {
   getDefaultDistributorPrice,
   getProductUnitLabel,
@@ -38,10 +46,15 @@ import ProductPriceReference, {
 import { useState } from "react";
 
 function supplierTotal(order) {
-  return (order.ERP_supplier_order_items || []).reduce(
-    (acc, it) => acc + Number(it.quantity || 0) * Number(it.unitPrice || 0),
-    0
-  );
+  const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+  let sub = 0;
+  let iva = 0;
+  (order.ERP_supplier_order_items || []).forEach((it) => {
+    const line = Number(it.quantity || 0) * Number(it.unitPrice || 0);
+    sub += line;
+    iva += line * (Number(it.taxRate || 0) / 100);
+  });
+  return round2(round2(sub) + round2(iva));
 }
 
 function supplierSeverity(order) {
@@ -52,6 +65,20 @@ function supplierSeverity(order) {
   if (received && !paid) return 1;
   if (paid && !received) return 2;
   return 1;
+}
+
+/** Convierte una fecha (ISO o "dd/MM/yyyy HH:mm:ss") a "YYYY-MM-DD" para inputs date. */
+function toDateInputValue(value) {
+  if (!value) return "";
+  if (typeof value === "string" && value.includes("/")) {
+    const [datePart] = value.split(" ");
+    const [dd, mm, yyyy] = datePart.split("/");
+    if (dd && mm && yyyy) return `${yyyy}-${mm}-${dd}`;
+  }
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
 }
 
 function severityColor(severity, palette) {
@@ -72,10 +99,14 @@ export default function SupplierOrderAccordion({
   products = [],
 }) {
   const theme = useTheme();
+  const { user } = useAuth();
+  const isProgramador = user?.loginRol === "Programador";
   const [openDelete, setOpenDelete] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState("efectivo");
   const [busy, setBusy] = useState(false);
   const [addDraft, setAddDraft] = useState({ productId: "", quantity: "", unitPrice: "" });
+  const [dateDialogOpen, setDateDialogOpen] = useState(false);
+  const [dateDraft, setDateDraft] = useState({ receivedAt: "", paidAt: "" });
 
   const severity = supplierSeverity(order);
   const base = severityColor(severity, theme.palette);
@@ -98,6 +129,36 @@ export default function SupplierOrderAccordion({
 
   const handlePaid = () =>
     run(markSupplierOrderPaidRequest(order.id, { paymentMethod }));
+
+  const openDateDialog = () => {
+    setDateDraft({
+      receivedAt: toDateInputValue(order.receivedAt),
+      paidAt: toDateInputValue(order.paidAt),
+    });
+    setDateDialogOpen(true);
+  };
+
+  const handleSaveDates = async () => {
+    setBusy(true);
+    try {
+      await toast({
+        promise: updateSupplierOrderRequest(order.id, {
+          receivedAt: dateDraft.receivedAt
+            ? new Date(`${dateDraft.receivedAt}T12:00:00`).toISOString()
+            : null,
+          paidAt: dateDraft.paidAt
+            ? new Date(`${dateDraft.paidAt}T12:00:00`).toISOString()
+            : null,
+        }),
+      });
+      setDateDialogOpen(false);
+      await onReload?.();
+    } catch {
+      /* toast */
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const confirmDelete = async () => {
     setBusy(true);
@@ -149,6 +210,41 @@ export default function SupplierOrderAccordion({
       >
         ¿Eliminar el pedido #{order.id} a {order.ERP_supplier?.name || "proveedor"}?
       </SimpleDialog>
+
+      <Dialog open={dateDialogOpen} onClose={() => setDateDialogOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 700 }}>Editar fechas · Pedido #{order.id}</DialogTitle>
+        <DialogContent dividers>
+          <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: "block" }}>
+            Corrección manual (solo Programador). No re-dispara movimientos de stock.
+          </Typography>
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mt: 1 }}>
+            <TextField
+              label="Fecha de entrega"
+              type="date"
+              InputLabelProps={{ shrink: true }}
+              value={dateDraft.receivedAt}
+              onChange={(e) => setDateDraft((p) => ({ ...p, receivedAt: e.target.value }))}
+              fullWidth
+            />
+            <TextField
+              label="Fecha de pago"
+              type="date"
+              InputLabelProps={{ shrink: true }}
+              value={dateDraft.paidAt}
+              onChange={(e) => setDateDraft((p) => ({ ...p, paidAt: e.target.value }))}
+              fullWidth
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ px: 2, py: 1 }}>
+          <Button onClick={() => setDateDialogOpen(false)} color="inherit">
+            Cancelar
+          </Button>
+          <Button variant="contained" onClick={handleSaveDates} disabled={busy}>
+            Guardar fechas
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Accordion
         sx={{
@@ -204,11 +300,14 @@ export default function SupplierOrderAccordion({
 
           {(order.ERP_supplier_order_items || []).map((item) => {
             const unit = getProductUnitLabel(item.ERP_inventory_product);
-            const lineTotal = formatOrderLineTotal(item.quantity, item.unitPrice);
+            const base = formatOrderLineTotal(item.quantity, item.unitPrice);
+            const rate = Number(item.taxRate || 0);
+            const lineTotal = base * (1 + rate / 100);
             return (
               <Typography key={item.id} variant="body2">
                 • {item.ERP_inventory_product?.name || "Producto"} — {item.quantity} {unit} ×{" "}
-                {formatUnitPrice(item.unitPrice)} = {formatProductPrice(lineTotal)}
+                {formatUnitPrice(item.unitPrice)}
+                {rate > 0 ? ` + IVA ${rate}%` : ""} = {formatProductPrice(lineTotal)}
               </Typography>
             );
           })}
@@ -227,6 +326,18 @@ export default function SupplierOrderAccordion({
               </Typography>
             </>
           )}
+
+          <Divider sx={{ my: 1 }} />
+          <Typography variant="subtitle2" gutterBottom>
+            Factura / evidencia del proveedor
+          </Typography>
+          <DocumentUploadButton
+            entityType="supplier_order"
+            entityId={order.id}
+            label="Factura / nota proveedor"
+            buttonText="Subir factura"
+            canManage={canManage}
+          />
 
           {canManage && (
             <Box sx={{ mt: 2, display: "flex", flexWrap: "wrap", gap: 1, alignItems: "center" }}>
@@ -272,6 +383,20 @@ export default function SupplierOrderAccordion({
                 <Button size="small" variant="outlined" onClick={() => onEdit(order)}>
                   Editar
                 </Button>
+              )}
+              {isProgramador && (
+                <Tooltip title="Editar fechas de entrega y pago (Programador)">
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="secondary"
+                    startIcon={<EditCalendarIcon />}
+                    disabled={busy}
+                    onClick={openDateDialog}
+                  >
+                    Editar fechas
+                  </Button>
+                </Tooltip>
               )}
             </Box>
           )}

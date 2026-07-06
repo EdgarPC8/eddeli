@@ -50,6 +50,7 @@ const PRODUCT_NUMERIC_FIELDS = [
   "minStock",
   "stock",
   "standardWeightGrams",
+  "taxRate",
 ];
 
 const PRODUCT_FORM_DEFAULTS = {
@@ -66,6 +67,7 @@ const PRODUCT_FORM_DEFAULTS = {
   minStock: "",
   stock: "",
   standardWeightGrams: "",
+  taxRate: "",
 };
 
 function toNumOrZero(value) {
@@ -403,6 +405,7 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
     setValue("stock", datos.stock || 0);
     setValue("netWeight", datos.netWeight || 0);
     setValue("standardWeightGrams", datos.standardWeightGrams || 0);
+    setValue("taxRate", datos.taxRate || 0);
     setValue("barcode", normalizeProductBarcode(datos.barcode || ""));
 
     try {
@@ -508,9 +511,9 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
   
     return toastAuth({
       promise,
-      onSuccess: () => {
+      onSuccess: (result) => {
         if (onClose) onClose();
-        if (reload) reload();
+        if (reload) reload(result?.data);
         reset();
         clearPreview();
         return {
@@ -534,7 +537,12 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
       component="form"
       id="eddeli-product-form"
       sx={{ mt: 0 }}
-      onSubmit={handleSubmit(submitForm)}
+      onSubmit={(e) => {
+        // Evita que el submit burbujee al formulario padre (p. ej. el modal
+        // de pedido a proveedor) cuando este form se abre dentro de un Dialog.
+        e.stopPropagation();
+        handleSubmit(submitForm)(e);
+      }}
     >
       <Grid container spacing={1} columnSpacing={1.5}>
         {/* Fila 1: nombre, código, imagen */}
@@ -719,6 +727,20 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
             inputProps={{ step: "any", min: 0 }}
             placeholder="0"
             {...register("price")}
+          />
+        </Grid>
+        <Grid item xs={6} sm={3}>
+          <TextField
+            label="IVA (%)"
+            type="number"
+            size="small"
+            fullWidth
+            variant="standard"
+            margin="dense"
+            inputProps={{ step: "0.01", min: 0 }}
+            placeholder="0"
+            helperText="0 = sin IVA · 15 = con IVA"
+            {...register("taxRate")}
           />
         </Grid>
         <Grid item xs={6} sm={3}>

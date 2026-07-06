@@ -47,6 +47,7 @@ import ProductPriceReference, {
   formatUnitPrice,
 } from './ProductPriceReference';
 import DocumentAttachmentIcon from './DocumentAttachmentIcon';
+import DocumentUploadButton from './DocumentUploadButton';
 import PrintFormatDialog from '../../../../components/saleReceipt/PrintFormatDialog.jsx';
 import { buildReceiptFromCustomerOrder } from '../../../../utils/saleReceiptUtils.js';
 import { formatOrderItemFromApi } from '../../../../utils/orderListUtils';
@@ -1050,6 +1051,20 @@ export default function OrderCalendarView({
                               )}
                             </Typography>
                           )}
+
+                          <Divider sx={{ my: 1 }} />
+                          <Box onClick={(e) => e.stopPropagation()}>
+                            <Typography variant="subtitle2" gutterBottom>
+                              Recibo firmado / evidencia del cliente
+                            </Typography>
+                            <DocumentUploadButton
+                              entityType="order"
+                              entityId={order.id}
+                              label="Recibo firmado del cliente"
+                              buttonText="Subir recibo firmado"
+                              canManage={canManageOrders}
+                            />
+                          </Box>
 
                           {canManageOrders && (
                             <Box

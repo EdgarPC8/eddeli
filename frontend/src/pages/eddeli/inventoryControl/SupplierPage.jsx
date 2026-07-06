@@ -1,7 +1,7 @@
 import { Container, Typography, Button, IconButton, Tooltip } from "@mui/material";
 import { useEffect, useState } from "react";
 import { Edit, Delete } from "@mui/icons-material";
-import DataTable from "../../../components/Tables/DataTable";
+import TablePro from "../../../components/Tables/TablePro";
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
 import SupplierForm from "./components/SupplierForm";
 import {
@@ -38,27 +38,27 @@ function SupplierPage() {
   };
 
   const columns = [
-    { headerName: "#", field: "#", width: 40, renderCell: (_, i) => i + 1 },
-    { headerName: "Nombre", field: "name", width: 200 },
-    { headerName: "Teléfono", field: "phone", width: 150 },
-    { headerName: "Correo", field: "email", width: 200 },
-    { headerName: "Dirección", field: "address", width: 220 },
+    { label: "Nombre", id: "name", width: 200 },
+    { label: "Teléfono", id: "phone", width: 150, render: (row) => row.phone || "—" },
+    { label: "Correo", id: "email", width: 200, render: (row) => row.email || "—" },
+    { label: "Dirección", id: "address", width: 220, render: (row) => row.address || "—" },
     {
-      headerName: "Descripción",
-      field: "notes",
+      label: "Descripción",
+      id: "notes",
       width: 260,
-      renderCell: (params) => params.row.notes || "—",
+      render: (row) => row.notes || "—",
     },
     {
-      headerName: "Acciones",
-      field: "actions",
+      label: "Acciones",
+      id: "actions",
       width: 120,
-      renderCell: (params) => (
+      stopRowClick: true,
+      render: (row) => (
         <>
           <Tooltip title="Editar">
             <IconButton
               onClick={() => {
-                setDatos(params.row);
+                setDatos(row);
                 setIsEditing(true);
                 setTitleDialog("Editar proveedor");
                 handleDialogForm();
@@ -70,7 +70,7 @@ function SupplierPage() {
           <Tooltip title="Eliminar">
             <IconButton
               onClick={() => {
-                setDataToDelete(params.row);
+                setDataToDelete(row);
                 handleDialog();
               }}
             >
@@ -123,7 +123,14 @@ function SupplierPage() {
         Agregar proveedor
       </Button>
 
-      <DataTable data={data} columns={columns} />
+      <TablePro
+        rows={data}
+        columns={columns}
+        title="PROVEEDORES"
+        showIndex
+        defaultRowsPerPage={25}
+        rowsPerPageOptions={[25, 50, 100, 200]}
+      />
     </Container>
   );
 }

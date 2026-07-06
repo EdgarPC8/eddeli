@@ -4,7 +4,7 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { Box, CircularProgress, Typography } from "@mui/material";
 import { useAuth } from "./AuthContext.jsx";
-import { useSubscriptions } from "../hooks/useSubscriptions.js";
+import { useSubscriptions, SUBSCRIPTIONS_ENABLED } from "../hooks/useSubscriptions.js";
 
 export default function ProtectedRoute({ requiredRol }) {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -56,12 +56,15 @@ export default function ProtectedRoute({ requiredRol }) {
     );
   }
 
+  // Licencias desactivadas (desarrollo): acceso solo por rol, sin gestor.
+  if (!SUBSCRIPTIONS_ENABLED) return <Outlet />;
+
   // Gestor caído o timeout: no bloquear el acceso
   // if (checkFailed) {
   //   return <Outlet />;
   // }
 
-  if (!subscription.subscribed || expired) {
+  if (!subscription?.subscribed || expired) {
     return <Navigate to="/subscription-expired" replace />;
   }
 

@@ -50,7 +50,15 @@ const orderIncludes = [
 ];
 
 function orderTotal(items = []) {
-  return items.reduce((sum, it) => sum + toNum(it.quantity) * toNum(it.unitPrice), 0);
+  const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+  let sub = 0;
+  let iva = 0;
+  for (const it of items) {
+    const line = toNum(it.quantity) * toNum(it.unitPrice);
+    sub += line;
+    iva += line * (toNum(it.taxRate) / 100);
+  }
+  return round2(round2(sub) + round2(iva));
 }
 
 export const getSupplierOrders = async (req, res) => {
@@ -113,6 +121,7 @@ export const createSupplierOrder = async (req, res) => {
             productId,
             quantity,
             unitPrice: toNum(row.unitPrice ?? row.price ?? product.price, 0),
+            taxRate: Math.max(0, toNum(row.taxRate, 0)),
           },
           { transaction: t }
         );
@@ -174,6 +183,7 @@ export const updateSupplierOrder = async (req, res) => {
               productId,
               quantity,
               unitPrice: toNum(row.unitPrice ?? row.price, 0),
+              taxRate: Math.max(0, toNum(row.taxRate, 0)),
             },
             { transaction: t }
           );
@@ -225,6 +235,7 @@ export const addSupplierOrderItem = async (req, res) => {
       productId,
       quantity,
       unitPrice: unitPrice >= 0 ? unitPrice : toNum(product.distributorPrice ?? product.price, 0),
+      taxRate: Math.max(0, toNum(req.body?.taxRate, 0)),
     });
 
     const full = await SupplierOrder.findByPk(order.id, { include: orderIncludes });

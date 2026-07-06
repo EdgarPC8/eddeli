@@ -54,10 +54,11 @@ import {
   sameGroupId,
 } from "./helpers.js";
 import { formatDateTime } from "../../../../helpers/functions.js";
-import { buildReportTxtByProduct, buildDetailedReportTxt } from "./reportBuilders.js";
+import { buildReportTxtByProduct } from "./reportBuilders.js";
 import ItemsTable from "./ItemsTable.jsx";
 import CollectionsDialogs from "./CollectionsDialogs.jsx";
 import PendingSummaryPanel from "./PendingSummaryPanel.jsx";
+import DebtReportDialog from "./DebtReportDialog.jsx";
 
 export default function CollectionsWorkbench() {
   const isMobile = useMediaQuery("(max-width:900px)");
@@ -100,6 +101,7 @@ export default function CollectionsWorkbench() {
   const [editPaymentDate, setEditPaymentDate] = useState(nowLocalDateTime());
   const [editPaymentNote, setEditPaymentNote] = useState("");
   const [editPaymentMethod, setEditPaymentMethod] = useState("efectivo");
+  const [debtReportOpen, setDebtReportOpen] = useState(false);
 
   const loadWorkbench = async (keepSelection = true) => {
     try {
@@ -259,6 +261,18 @@ export default function CollectionsWorkbench() {
     
     return map;
   }, [customers, orders, groups, payments]);
+
+  /** Clientes con deuda pendiente (> 0), ordenados de mayor a menor. */
+  const customersWithDebt = useMemo(
+    () =>
+      [...customers]
+        .filter((c) => Number(totalCobrableByCustomer[c.id] ?? 0) > 0)
+        .sort(
+          (a, b) =>
+            (totalCobrableByCustomer[b.id] ?? 0) - (totalCobrableByCustomer[a.id] ?? 0)
+        ),
+    [customers, totalCobrableByCustomer]
+  );
 
   const customerOrders = useMemo(
     () => orders.filter((o) => o.customerId === selectedCustomerId),
@@ -859,42 +873,10 @@ export default function CollectionsWorkbench() {
             size="small"
             variant="contained"
             disabled={!customer || loading || customerItems.length === 0}
-            onClick={() => {
-              const pending = customerItems.filter((it) => !it.paidAt);
-              const { txt, total } = buildReportTxtByProduct({
-                title: "REPORTE TOTAL PENDIENTE (POR PRODUCTO)",
-                customer,
-                items: pending,
-              });
-              const filename = `deuda_total_${safeFileName(customer?.name)}_${todayISO()}.txt`;
-              downloadTextFile(filename, txt);
-              if (total <= 0)
-                setUiMsg({
-                  type: "info",
-                  text: "El cliente no tiene deuda pendiente (se descargó igual).",
-                });
-            }}
+            onClick={() => setDebtReportOpen(true)}
             sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" }, whiteSpace: "nowrap" }}
           >
-            Deuda total (TXT)
-          </Button>
-          <Button
-            size="small"
-            variant="contained"
-            disabled={!customer || loading || customerItems.length === 0}
-            onClick={() => {
-              const pendingItems = customerItems.filter((it) => !it.paidAt);
-              const { txt } = buildDetailedReportTxt({
-                title: "REPORTE DETALLADO DE DEUDA (POR PRODUCTO)",
-                customer,
-                items: pendingItems,
-              });
-              const filename = `deuda_detallada_${safeFileName(customer?.name)}_${todayISO()}.txt`;
-              downloadTextFile(filename, txt);
-            }}
-            sx={{ fontSize: { xs: "0.75rem", sm: "0.875rem" }, whiteSpace: "nowrap" }}
-          >
-            Deuda detallada (TXT)
+            Resumen de cuenta
           </Button>
         </Stack>
       </Stack>
@@ -913,38 +895,33 @@ export default function CollectionsWorkbench() {
           </Typography>
           {customers.length === 0 ? (
             <Alert severity="info">No hay clientes.</Alert>
+          ) : customersWithDebt.length === 0 ? (
+            <Alert severity="success">No hay clientes con deuda pendiente.</Alert>
           ) : (
             <Box
               sx={{
                 width: "100%",
                 maxWidth: "100%",
-                overflowX: "auto",
-                overflowY: "hidden",
+                maxHeight: 200,
+                overflowX: "hidden",
+                overflowY: "auto",
                 pb: 0.5,
                 "-webkitOverflowScrolling": "touch",
-                "&::-webkit-scrollbar": { height: 6 },
-                "&::-webkit-scrollbar-thumb": { backgroundColor: "rgba(0,0,0,0.2)", borderRadius: 3 },
+                "&::-webkit-scrollbar": { width: 8 },
+                "&::-webkit-scrollbar-thumb": { backgroundColor: "rgba(0,0,0,0.2)", borderRadius: 4 },
                 boxSizing: "border-box",
               }}
             >
-              <Stack
-                direction="row"
-                spacing={1}
+              <Box
                 sx={{
-                  minWidth: "max-content",
-                  py: 0.5,
-                  flexWrap: { xs: "wrap", sm: "nowrap" },
+                  display: "flex",
+                  flexWrap: "wrap",
                   gap: { xs: 0.5, sm: 1 },
-                  width: "max-content",
+                  py: 0.5,
+                  width: "100%",
                 }}
               >
-                {[...customers]
-                  .sort(
-                    (a, b) =>
-                      (totalCobrableByCustomer[b.id] ?? 0) -
-                      (totalCobrableByCustomer[a.id] ?? 0)
-                  )
-                  .map((c) => {
+                {customersWithDebt.map((c) => {
                   const active = c.id === selectedCustomerId;
                   const amount = Number(totalCobrableByCustomer[c.id] ?? 0);
                   const displayName = c.name.length > 25 ? `${c.name.slice(0, 22)}...` : c.name;
@@ -980,7 +957,7 @@ export default function CollectionsWorkbench() {
                     />
                   );
                 })}
-              </Stack>
+              </Box>
             </Box>
           )}
         </CardContent>
@@ -1623,6 +1600,14 @@ export default function CollectionsWorkbench() {
         setEditPaymentMethod={setEditPaymentMethod}
         confirmEditPayment={confirmEditPayment}
         editingPayment={editingPayment}
+      />
+
+      <DebtReportDialog
+        open={debtReportOpen}
+        onClose={() => setDebtReportOpen(false)}
+        customer={customer}
+        items={customerItems}
+        onError={(text) => setUiMsg({ type: "error", text })}
       />
       </Box>
     </Box>

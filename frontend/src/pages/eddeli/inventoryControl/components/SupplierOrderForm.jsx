@@ -1,25 +1,49 @@
-import { Grid, TextField, Box, Button, IconButton, Tooltip, Typography } from "@mui/material";
+import {
+  Grid,
+  TextField,
+  Box,
+  Button,
+  IconButton,
+  Tooltip,
+  Typography,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Checkbox,
+  FormControlLabel,
+} from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import AddBoxIcon from "@mui/icons-material/AddBox";
+import AddBusinessIcon from "@mui/icons-material/AddBusiness";
+import CloseIcon from "@mui/icons-material/Close";
+import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import { useForm } from "react-hook-form";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   createSupplierOrderRequest,
   updateSupplierOrderRequest,
   getAllSuppliersRequest,
-  createSupplierRequest,
 } from "../../../../api/ordersRequest";
 import { getAllProductsAll } from "../../../../api/inventoryControlRequest";
 import { useAuth } from "../../../../context/AuthContext";
 import SearchableSelect from "../../../../components/SearchableSelect";
 import AttachmentField from "./AttachmentField.jsx";
+import ProductForm from "./ProductForm.jsx";
+import SupplierForm from "./SupplierForm.jsx";
 import ProductPriceReference, {
   getProductUnitLabel,
   formatOrderLineTotal,
   formatProductPrice,
 } from "./ProductPriceReference";
 import { uploadSupplierOrderVoucher } from "../../../../api/documentRequest.js";
+import { useBarcodeScanner } from "../../../../hooks/useBarcodeScanner.js";
+import {
+  findEddeliProductByCode,
+  normalizeProductBarcode,
+} from "../../../../utils/productLookup.js";
 
 const pad2 = (n) => String(n).padStart(2, "0");
 
@@ -54,20 +78,6 @@ const normalizeToYYYYMMDD = (datos) => {
   return localISODate();
 };
 
-/** Convierte una fecha (ISO o "dd/MM/yyyy HH:mm:ss") a "YYYY-MM-DD" para inputs date. */
-const dateToInputValue = (value) => {
-  if (!value) return "";
-  if (typeof value === "string" && value.includes("/")) {
-    const [datePart] = value.split(" ");
-    const [dd, mm, yyyy] = datePart.split("/");
-    if (dd && mm && yyyy) return `${yyyy}-${mm}-${dd}`;
-  }
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "";
-  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-  return local.toISOString().slice(0, 10);
-};
-
 export default function SupplierOrderForm({
   onClose,
   reload,
@@ -76,6 +86,7 @@ export default function SupplierOrderForm({
   prefillSupplierId = null,
   prefillDate = null,
   lockSupplier = false,
+  active = true,
 }) {
   const { handleSubmit, register, reset, setValue, watch } = useForm();
   const [products, setProducts] = useState([]);
@@ -83,10 +94,11 @@ export default function SupplierOrderForm({
   const [items, setItems] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState("");
   const [selectedSupplier, setSelectedSupplier] = useState("");
-  const [newSupplierName, setNewSupplierName] = useState("");
   const [pendingVoucherFile, setPendingVoucherFile] = useState(null);
-  const { toast, user } = useAuth();
-  const isProgramador = user?.loginRol === "Programador";
+  const [productDialogOpen, setProductDialogOpen] = useState(false);
+  const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
+  const [ivaRate, setIvaRate] = useState(15);
+  const { toast } = useAuth();
 
   const selectedProductId = watch("productId");
   const watchQuantity = watch("quantity");
@@ -100,16 +112,52 @@ export default function SupplierOrderForm({
   useEffect(() => {
     if (!selectedProductId) return;
     const product = products.find((p) => p.id === Number(selectedProductId));
-    if (product?.distributorPrice != null) {
-      setValue("unitPrice", product.distributorPrice);
+    if (product?.supplierPrice != null) {
+      setValue("unitPrice", product.supplierPrice);
     }
   }, [selectedProductId, products, setValue]);
 
   const fetchCatalog = async () => {
     const [prodRes, supRes] = await Promise.all([getAllProductsAll(), getAllSuppliersRequest()]);
-    setProducts(prodRes?.data || []);
+    const list = prodRes?.data || [];
+    setProducts(list);
     setSuppliers(supRes?.data || []);
+    return list;
   };
+
+  const handleProductCreated = async (created) => {
+    setProductDialogOpen(false);
+    await fetchCatalog();
+    const id = created?.id ?? created?.data?.id;
+    if (id != null) {
+      setSelectedProduct(String(id));
+      setValue("productId", String(id));
+    }
+  };
+
+  const handleBarcodeScan = useCallback(
+    (rawCode) => {
+      const found = findEddeliProductByCode(products, rawCode);
+      if (found) {
+        setSelectedProduct(String(found.id));
+        setValue("productId", String(found.id));
+        toast({ message: `Producto: ${found.name}`, variant: "success" });
+        return;
+      }
+      const code = normalizeProductBarcode(rawCode) || String(rawCode || "").trim();
+      toast({
+        message: code ? `No se encontró producto con código "${code}"` : "Código vacío",
+        variant: "warning",
+      });
+    },
+    [products, setValue, toast],
+  );
+
+  useBarcodeScanner({
+    enabled: active && products.length > 0 && !productDialogOpen && !supplierDialogOpen,
+    onScan: handleBarcodeScan,
+    ignoreWhenTypingInInputs: true,
+  });
 
   const addItem = () => {
     const productId = Number(watch("productId"));
@@ -120,12 +168,15 @@ export default function SupplierOrderForm({
       return;
     }
     const product = products.find((p) => p.id === productId);
+    const productIva = Number(product?.taxRate) || 0;
+    if (productIva > 0) setIvaRate(productIva);
     setItems((prev) => [
       ...prev,
       {
         productId,
         quantity,
         unitPrice,
+        hasIva: productIva > 0,
         name: product?.name || "",
         unitLabel: getProductUnitLabel(product),
       },
@@ -160,20 +211,17 @@ export default function SupplierOrderForm({
     );
   };
 
-  const handleQuickCreateSupplier = async () => {
-    const name = newSupplierName.trim();
-    if (!name) {
-      toast({ message: "Escribe el nombre del proveedor", variant: "warning" });
-      return;
-    }
-    try {
-      const { data } = await toast({ promise: createSupplierRequest({ name }) });
-      setSuppliers((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
-      setSelectedSupplier(String(data.id));
-      setNewSupplierName("");
-    } catch {
-      /* toast */
-    }
+  const toggleItemIva = (index, checked) => {
+    setItems((prev) =>
+      prev.map((it, i) => (i === index ? { ...it, hasIva: checked } : it)),
+    );
+  };
+
+  const handleSupplierCreated = async (created) => {
+    setSupplierDialogOpen(false);
+    await fetchCatalog();
+    const id = created?.id ?? created?.data?.id;
+    if (id != null) setSelectedSupplier(String(id));
   };
 
   const submitOrder = async (data) => {
@@ -203,18 +251,9 @@ export default function SupplierOrderForm({
         productId: it.productId,
         quantity: Number(it.quantity),
         unitPrice: Number(it.unitPrice),
+        taxRate: it.hasIva ? Number(ivaRate) || 0 : 0,
       })),
     };
-
-    // Solo el rol Programador puede corregir manualmente las fechas de entrega y pago.
-    if (isProgramador) {
-      payload.receivedAt = data.receivedAt
-        ? toLocalISOWithOffset(new Date(`${data.receivedAt}T12:00:00`))
-        : null;
-      payload.paidAt = data.paidAt
-        ? toLocalISOWithOffset(new Date(`${data.paidAt}T12:00:00`))
-        : null;
-    }
 
     const voucherFile = pendingVoucherFile;
 
@@ -270,16 +309,19 @@ export default function SupplierOrderForm({
       setSelectedSupplier(String(datos.supplierId || ""));
       setValue("notes", datos.notes || "");
       setValue("date", normalizeToYYYYMMDD(datos));
-      setValue("receivedAt", dateToInputValue(datos.receivedAt));
-      setValue("paidAt", dateToInputValue(datos.paidAt));
       const loaded = (datos.ERP_supplier_order_items || []).map((item) => ({
         productId: item.productId,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
+        hasIva: Number(item.taxRate) > 0,
         name: item.ERP_inventory_product?.name || "",
         unitLabel: getProductUnitLabel(item.ERP_inventory_product),
       }));
       setItems(loaded);
+      const firstIva = (datos.ERP_supplier_order_items || []).find(
+        (item) => Number(item.taxRate) > 0,
+      );
+      if (firstIva) setIvaRate(Number(firstIva.taxRate));
       return;
     }
 
@@ -287,16 +329,24 @@ export default function SupplierOrderForm({
     setPendingVoucherFile(null);
     setValue("notes", "");
     setValue("date", prefillDate || localISODate());
-    setValue("receivedAt", "");
-    setValue("paidAt", "");
     setSelectedSupplier(prefillSupplierId ? String(prefillSupplierId) : "");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datos, isEditing, prefillSupplierId, prefillDate]);
 
-  const itemsTotal = useMemo(
-    () => items.reduce((acc, it) => acc + formatOrderLineTotal(it.quantity, it.unitPrice), 0),
-    [items],
-  );
+  const { subtotal, ivaTotal, itemsTotal } = useMemo(() => {
+    const rate = (Number(ivaRate) || 0) / 100;
+    const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
+    let sub = 0;
+    let iva = 0;
+    items.forEach((it) => {
+      const line = formatOrderLineTotal(it.quantity, it.unitPrice);
+      sub += line;
+      if (it.hasIva) iva += line * rate;
+    });
+    const rSub = round2(sub);
+    const rIva = round2(iva);
+    return { subtotal: rSub, ivaTotal: rIva, itemsTotal: round2(rSub + rIva) };
+  }, [items, ivaRate]);
 
   return (
     <Box component="form" sx={{ mt: 1 }} onSubmit={handleSubmit(submitOrder)}>
@@ -305,44 +355,59 @@ export default function SupplierOrderForm({
         <Grid item xs={12} md={6}>
           <Grid container spacing={2}>
             <Grid item xs={12}>
-              <SearchableSelect
-                label="Proveedor"
-                items={suppliers}
-                value={selectedSupplier}
-                onChange={(val) => setSelectedSupplier(val != null ? String(val) : "")}
-                disabled={lockSupplier}
-              />
-            </Grid>
-            {!lockSupplier && (
-              <>
-                <Grid item xs={12} sm={8}>
-                  <TextField
-                    fullWidth
-                    size="small"
-                    label="Nuevo proveedor (rápido)"
-                    value={newSupplierName}
-                    onChange={(e) => setNewSupplierName(e.target.value)}
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Box sx={{ flex: 1 }}>
+                  <SearchableSelect
+                    label="Proveedor"
+                    items={suppliers}
+                    value={selectedSupplier}
+                    onChange={(val) => setSelectedSupplier(val != null ? String(val) : "")}
+                    disabled={lockSupplier}
                   />
-                </Grid>
-                <Grid item xs={12} sm={4}>
-                  <Button fullWidth variant="outlined" onClick={handleQuickCreateSupplier}>
-                    Crear proveedor
-                  </Button>
-                </Grid>
-              </>
-            )}
+                </Box>
+                {!lockSupplier && (
+                  <Tooltip title="Agregar proveedor nuevo">
+                    <IconButton
+                      color="primary"
+                      onClick={() => setSupplierDialogOpen(true)}
+                      sx={{ border: 1, borderColor: "primary.main" }}
+                    >
+                      <AddBusinessIcon />
+                    </IconButton>
+                  </Tooltip>
+                )}
+              </Box>
+            </Grid>
 
             <Grid item xs={12}>
               <input type="hidden" {...register("productId")} />
-              <SearchableSelect
-                label="Producto"
-                items={products}
-                value={selectedProduct}
-                onChange={(val) => {
-                  setSelectedProduct(val);
-                  setValue("productId", val);
-                }}
-              />
+              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                <Box sx={{ flex: 1 }}>
+                  <SearchableSelect
+                    label="Producto"
+                    items={products}
+                    value={selectedProduct}
+                    onChange={(val) => {
+                      setSelectedProduct(val);
+                      setValue("productId", val);
+                    }}
+                    placeholder="Buscar o escanear código de barras…"
+                    getSearchText={(p) =>
+                      [p?.barcode, p?.sku].filter(Boolean).join(" ")
+                    }
+                    onEnterWithInput={handleBarcodeScan}
+                  />
+                </Box>
+                <Tooltip title="Crear producto nuevo">
+                  <IconButton
+                    color="primary"
+                    onClick={() => setProductDialogOpen(true)}
+                    sx={{ border: 1, borderColor: "primary.main" }}
+                  >
+                    <AddBoxIcon />
+                  </IconButton>
+                </Tooltip>
+              </Box>
             </Grid>
             {currentProduct && (
               <Grid item xs={12}>
@@ -353,22 +418,37 @@ export default function SupplierOrderForm({
                 />
               </Grid>
             )}
-            <Grid item xs={6}>
+            <Grid item xs={4}>
               <TextField
                 fullWidth
                 label="Cantidad"
                 type="number"
+                InputLabelProps={{ shrink: true }}
                 inputProps={{ min: 0.01, step: "any" }}
                 {...register("quantity")}
               />
             </Grid>
-            <Grid item xs={6}>
+            <Grid item xs={4}>
               <TextField
                 fullWidth
-                label="Precio unitario (USD)"
+                label="Precio unit."
                 type="number"
+                InputLabelProps={{ shrink: true }}
                 inputProps={{ min: 0, step: "0.001" }}
                 {...register("unitPrice")}
+              />
+            </Grid>
+            <Grid item xs={4}>
+              <TextField
+                fullWidth
+                label="IVA (%)"
+                type="number"
+                value={ivaRate}
+                onChange={(e) =>
+                  setIvaRate(e.target.value === "" ? "" : Number(e.target.value))
+                }
+                InputLabelProps={{ shrink: true }}
+                inputProps={{ min: 0, step: "0.01" }}
               />
             </Grid>
             <Grid item xs={12} sx={{ display: "flex", justifyContent: "flex-start" }}>
@@ -386,30 +466,6 @@ export default function SupplierOrderForm({
             <Grid item xs={12}>
               <TextField fullWidth label="Fecha del pedido" type="date" {...register("date")} />
             </Grid>
-            {isProgramador && (
-              <>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Fecha de entrega"
-                    type="date"
-                    InputLabelProps={{ shrink: true }}
-                    helperText="Solo Programador · corrección manual"
-                    {...register("receivedAt")}
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <TextField
-                    fullWidth
-                    label="Fecha de pago"
-                    type="date"
-                    InputLabelProps={{ shrink: true }}
-                    helperText="Solo Programador · corrección manual"
-                    {...register("paidAt")}
-                  />
-                </Grid>
-              </>
-            )}
             <Grid item xs={12}>
               <TextField fullWidth label="Notas" multiline rows={2} {...register("notes")} />
             </Grid>
@@ -445,15 +501,15 @@ export default function SupplierOrderForm({
               border: 1,
               borderColor: "divider",
               borderRadius: 2,
-              p: 2,
+              p: 1.5,
               height: "100%",
               display: "flex",
               flexDirection: "column",
-              gap: 1.5,
+              gap: 1,
               bgcolor: "background.default",
             }}
           >
-            <Typography variant="subtitle1" fontWeight={700}>
+            <Typography variant="subtitle2" fontWeight={700}>
               Productos del pedido ({items.length})
             </Typography>
 
@@ -463,7 +519,7 @@ export default function SupplierOrderForm({
                 botón +.
               </Typography>
             ) : (
-              <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
                 {items.map((item, index) => (
                   <Box
                     key={`${item.productId}-${index}`}
@@ -471,11 +527,13 @@ export default function SupplierOrderForm({
                       display: "flex",
                       flexWrap: "wrap",
                       alignItems: "center",
-                      gap: 1,
+                      columnGap: 0.75,
+                      rowGap: 0.25,
                       border: 1,
                       borderColor: "divider",
                       borderRadius: 1,
-                      p: 1,
+                      px: 0.75,
+                      py: 0.5,
                       bgcolor: "background.paper",
                     }}
                   >
@@ -484,17 +542,21 @@ export default function SupplierOrderForm({
                         flex: "1 1 100%",
                         display: "flex",
                         alignItems: "center",
-                        gap: 0.5,
-                        mb: 0.5,
+                        gap: 0.25,
                       }}
                     >
-                      <Typography variant="body2" fontWeight={600} sx={{ flex: 1 }}>
+                      <Typography
+                        variant="caption"
+                        fontWeight={600}
+                        sx={{ flex: 1, lineHeight: 1.2 }}
+                      >
                         {index + 1}. {item.name}
                       </Typography>
                       <Tooltip title="Subir">
                         <span>
                           <IconButton
                             size="small"
+                            sx={{ p: 0.25 }}
                             onClick={() => moveItem(index, -1)}
                             disabled={index === 0}
                           >
@@ -506,6 +568,7 @@ export default function SupplierOrderForm({
                         <span>
                           <IconButton
                             size="small"
+                            sx={{ p: 0.25 }}
                             onClick={() => moveItem(index, 1)}
                             disabled={index === items.length - 1}
                           >
@@ -513,51 +576,155 @@ export default function SupplierOrderForm({
                           </IconButton>
                         </span>
                       </Tooltip>
+                      <Tooltip title="Quitar">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          sx={{ p: 0.25 }}
+                          onClick={() => removeItem(index)}
+                        >
+                          <DeleteOutlineIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
                     </Box>
                     <TextField
-                      label="Cantidad"
+                      label="Cant."
                       type="number"
                       size="small"
                       value={item.quantity}
                       onChange={(e) => updateItemField(index, "quantity", e.target.value)}
+                      InputLabelProps={{ shrink: true }}
                       inputProps={{ min: 0.01, step: "any" }}
-                      sx={{ width: 100 }}
+                      sx={{ width: 78 }}
                     />
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="caption" color="text.secondary">
                       {item.unitLabel || "u."} ×
                     </Typography>
                     <TextField
-                      label="Precio unit."
+                      label="P. unit."
                       type="number"
                       size="small"
                       value={item.unitPrice}
                       onChange={(e) => updateItemField(index, "unitPrice", e.target.value)}
+                      InputLabelProps={{ shrink: true }}
                       inputProps={{ min: 0, step: "0.001" }}
-                      sx={{ width: 110 }}
+                      sx={{ width: 92 }}
+                    />
+                    <FormControlLabel
+                      sx={{ ml: 0.25, mr: 0, "& .MuiFormControlLabel-label": { fontSize: "0.75rem" } }}
+                      control={
+                        <Checkbox
+                          size="small"
+                          sx={{ p: 0.25 }}
+                          checked={Boolean(item.hasIva)}
+                          onChange={(e) => toggleItemIva(index, e.target.checked)}
+                        />
+                      }
+                      label={`IVA ${Number(ivaRate) || 0}%`}
                     />
                     <Typography
                       variant="body2"
                       fontWeight={700}
-                      sx={{ ml: "auto", minWidth: 80, textAlign: "right" }}
+                      sx={{ ml: "auto", minWidth: 72, textAlign: "right" }}
                     >
-                      {formatProductPrice(formatOrderLineTotal(item.quantity, item.unitPrice))}
+                      {formatProductPrice(
+                        formatOrderLineTotal(item.quantity, item.unitPrice) *
+                          (item.hasIva ? 1 + (Number(ivaRate) || 0) / 100 : 1),
+                      )}
                     </Typography>
-                    <Button color="error" size="small" onClick={() => removeItem(index)}>
-                      Quitar
-                    </Button>
                   </Box>
                 ))}
               </Box>
             )}
 
             {items.length > 0 && (
-              <Typography variant="subtitle1" fontWeight={700} align="right" sx={{ mt: "auto" }}>
-                Total: {formatProductPrice(itemsTotal)}
-              </Typography>
+              <Box sx={{ mt: "auto", pt: 1, borderTop: 1, borderColor: "divider" }}>
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Subtotal
+                  </Typography>
+                  <Typography variant="body2">{formatProductPrice(subtotal)}</Typography>
+                </Box>
+                <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                  <Typography variant="body2" color="text.secondary">
+                    IVA ({Number(ivaRate) || 0}%)
+                  </Typography>
+                  <Typography variant="body2">{formatProductPrice(ivaTotal)}</Typography>
+                </Box>
+                <Box sx={{ display: "flex", justifyContent: "space-between", mt: 0.5 }}>
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    Total
+                  </Typography>
+                  <Typography variant="subtitle1" fontWeight={700}>
+                    {formatProductPrice(itemsTotal)}
+                  </Typography>
+                </Box>
+              </Box>
             )}
           </Box>
         </Grid>
       </Grid>
+
+      <Dialog
+        open={productDialogOpen}
+        onClose={() => setProductDialogOpen(false)}
+        fullWidth
+        maxWidth="lg"
+        scroll="paper"
+      >
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, pt: 1 }}>
+          <DialogTitle sx={{ p: 0, fontWeight: 700, fontSize: "1.05rem" }}>
+            Crear producto
+          </DialogTitle>
+          <IconButton aria-label="Cerrar" onClick={() => setProductDialogOpen(false)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Box>
+        <DialogContent dividers>
+          <ProductForm
+            key={productDialogOpen ? "new-supplier-product" : "closed"}
+            isEditing={false}
+            datos={{}}
+            onClose={() => setProductDialogOpen(false)}
+            reload={handleProductCreated}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 2, py: 1, borderTop: 1, borderColor: "divider" }}>
+          <Button type="button" onClick={() => setProductDialogOpen(false)} color="inherit">
+            Cancelar
+          </Button>
+          <Box sx={{ flex: 1 }} />
+          <Button type="submit" form="eddeli-product-form" variant="contained" sx={{ minWidth: 160 }}>
+            Guardar producto
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={supplierDialogOpen}
+        onClose={() => setSupplierDialogOpen(false)}
+        fullWidth
+        maxWidth="sm"
+        scroll="paper"
+      >
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", px: 2, pt: 1 }}>
+          <DialogTitle sx={{ p: 0, fontWeight: 700, fontSize: "1.05rem" }}>
+            Agregar proveedor
+          </DialogTitle>
+          <IconButton aria-label="Cerrar" onClick={() => setSupplierDialogOpen(false)} size="small">
+            <CloseIcon />
+          </IconButton>
+        </Box>
+        <DialogContent dividers>
+          <SupplierForm
+            key={supplierDialogOpen ? "new-supplier" : "closed"}
+            isEditing={false}
+            datos={{}}
+            onClose={() => setSupplierDialogOpen(false)}
+            reload={handleSupplierCreated}
+          />
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 }

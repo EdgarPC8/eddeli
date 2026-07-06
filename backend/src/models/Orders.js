@@ -131,6 +131,12 @@ export const SupplierOrderItem = sequelize.define("ERP_supplier_order_items", {
   productId: { type: DataTypes.INTEGER, allowNull: false },
   quantity: { type: DataTypes.FLOAT, allowNull: false },
   unitPrice: { type: DataTypes.DECIMAL(10, 3), allowNull: false, defaultValue: 0 },
+  taxRate: {
+    type: DataTypes.DECIMAL(5, 2),
+    allowNull: false,
+    defaultValue: 0,
+    comment: "% IVA aplicado al ítem (0 = sin IVA)",
+  },
 }, {
   timestamps: false,
 });

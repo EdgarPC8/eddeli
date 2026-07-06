@@ -49,9 +49,9 @@ function SupplierForm({ isEditing = false, datos = {}, onClose, reload }) {
     toastAuth({
       promise: createSupplierRequest(payload),
       successMessage: "Proveedor guardado con éxito",
-      onSuccess: () => {
+      onSuccess: (result) => {
         if (onClose) onClose();
-        if (reload) reload();
+        if (reload) reload(result?.data);
         resetForm();
       },
     });
@@ -72,7 +72,15 @@ function SupplierForm({ isEditing = false, datos = {}, onClose, reload }) {
   }, [isEditing, datos]);
 
   return (
-    <Box component="form" sx={{ mt: 1 }} onSubmit={handleSubmit(submitForm)}>
+    <Box
+      component="form"
+      id="eddeli-supplier-form"
+      sx={{ mt: 1 }}
+      onSubmit={(e) => {
+        e.stopPropagation();
+        handleSubmit(submitForm)(e);
+      }}
+    >
       <Grid container spacing={2}>
         <Grid item xs={12}>
           <TextField
