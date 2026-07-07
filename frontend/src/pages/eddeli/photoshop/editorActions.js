@@ -7,6 +7,7 @@
  * - makeDefaultLayer({ type, groupId }): crea una capa por defecto (text | image | shape).
  */
 import { pathImg } from "../../../api/axios";
+import { mediaStoragePath } from "../../../utils/mediaPaths.js";
 
 /** Escala visual del canvas (píxeles lógicos / SCALE = píxeles mostrados) */
 export const SCALE = 3;
@@ -99,7 +100,7 @@ if (type === "text") {
       h: 500,
       zIndex: 100,
       props: {
-        src: img("EdDeli/ads/placeholders/no_image.png"),
+        src: img(mediaStoragePath("ads/placeholders/no_image.png")),
         fit: "cover",
         borderRadius: 20,
       },

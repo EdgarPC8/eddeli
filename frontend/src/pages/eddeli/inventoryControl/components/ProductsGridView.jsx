@@ -27,6 +27,7 @@ import {
   registerMovement,
 } from "../../../../api/inventoryControlRequest";
 import { pathImg } from "../../../../api/axios";
+import { mediaStoragePath } from "../../../../utils/mediaPaths.js";
 import toast from "react-hot-toast";
 import { useAuth } from "../../../../context/AuthContext";
 import {
@@ -248,7 +249,7 @@ function DuplicateDialog({ open, product, onClose, onSuccess }) {
     const categoryId = p.categoryId ?? p.ERP_inventory_category?.id ?? "";
     const unitId = p.unitId ?? p.ERP_inventory_unit?.id ?? "";
 
-    fd.append("subfolder", "EdDeli/products");
+    fd.append("subfolder", mediaStoragePath("products"));
     fd.append("name", String(name || p?.name || "").trim());
     if (p?.desc) fd.append("desc", p.desc);
     fd.append("type", p?.type || "raw");

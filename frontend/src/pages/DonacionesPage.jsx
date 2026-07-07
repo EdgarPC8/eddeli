@@ -1,5 +1,5 @@
 /**
- * Donaciones: QR y datos bancarios de los desarrolladores.
+ * Donaciones: QR y datos bancarios (imágenes desde /eddeliapi/img/{prefix}/qr/).
  */
 import {
   Avatar,
@@ -12,7 +12,9 @@ import {
   Typography,
 } from "@mui/material";
 import VolunteerActivismIcon from "@mui/icons-material/VolunteerActivism";
-import { BASE_URL } from "../config.js";
+import { buildImageUrl } from "../api/axios.js";
+import { useAppSettings } from "../context/AppSettingsContext.jsx";
+import { MEDIA_PREFIX_FALLBACK } from "../config/deployEnv.js";
 
 const BANCO_LOJA_LOGO =
   "https://play-lh.googleusercontent.com/P1klHkUCDArGPvUoTLx1Ch2DwVImHKM8k8YrK9jHkxs_I4Sp272Qx1S66wQO2xzzFg";
@@ -24,7 +26,7 @@ const DONATION_DATA = [
     accountNumber: "2951571509",
     bank: "Banco de Loja",
     accountType: "Cuenta de ahorros",
-    qrImage: `${BASE_URL}qr-edgar.png`,
+    qrFile: "qr-edgar.png",
   },
   {
     name: "Patricio Alexander Briceño Sarango",
@@ -32,11 +34,14 @@ const DONATION_DATA = [
     accountNumber: "2904396463",
     bank: "Banco de Loja",
     accountType: "Cuenta de ahorros",
-    qrImage: `${BASE_URL}qr-patricio.png`,
+    qrFile: "qr-patricio.png",
   },
 ];
 
 export default function DonacionesPage() {
+  const { settings } = useAppSettings();
+  const qrFolder = settings?.qrFolder || `${settings?.mediaFolderPrefix || MEDIA_PREFIX_FALLBACK}/qr`;
+
   return (
     <Box sx={{ maxWidth: 1000, mx: "auto", pb: 4 }}>
       <Typography variant="h4" align="center" gutterBottom fontWeight={700}>
@@ -78,7 +83,7 @@ export default function DonacionesPage() {
                   <Grid item xs={12} sm={5} textAlign="center">
                     <Box
                       component="img"
-                      src={donor.qrImage}
+                      src={buildImageUrl(`${qrFolder}/${donor.qrFile}`)}
                       alt={`QR ${donor.name}`}
                       sx={{ width: "100%", maxWidth: 200, borderRadius: 2, boxShadow: 2 }}
                     />

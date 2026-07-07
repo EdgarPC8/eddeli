@@ -10,8 +10,11 @@ import {
   uploadMediaFile,
 } from "./mediaRequest.js";
 import { CONTENT_TYPES } from "../pages/eddeli/publicidad/constants.js";
+import { mediaStoragePath } from "../utils/mediaPaths.js";
 
-export const PUBLICIDAD_IMG_FOLDER = "EdDeli/publicidad";
+export function publicidadImgFolder() {
+  return mediaStoragePath("publicidad");
+}
 
 export const getCampaigns = () => axios.get("/publicidad/campaigns", authHeaders());
 
@@ -69,7 +72,7 @@ export async function fetchMediaCatalog() {
 export async function uploadPublicidadImage(file, { name = "" } = {}) {
   const res = await uploadImageRequest({
     file,
-    folder: PUBLICIDAD_IMG_FOLDER,
+    folder: publicidadImgFolder(),
     name,
     replace: false,
   });

@@ -19,7 +19,8 @@
     "db:migrate:tramos": "node scripts/migrate-tramos-from-categories.js",
     "db:reset": "node scripts/reset-database.js",
     "db:check-backup": "node scripts/check-backup.js",
-    "db:fix:pos-customer": "node scripts/fix-pos-consumidor-final.js"
+    "db:fix:pos-customer": "node scripts/fix-pos-consumidor-final.js",
+    "db:fix:empleado-role": "node scripts/fix-estudiante-to-empleado-role.js"
   },
   "keywords": [],
   "author": "",

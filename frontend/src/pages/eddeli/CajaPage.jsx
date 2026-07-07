@@ -50,6 +50,7 @@ import CajaCustomerFormDialog from "./CajaCustomerFormDialog.jsx";
 import CajaQuickProductsDialog from "./CajaQuickProductsDialog.jsx";
 import SearchableSelect from "../../components/SearchableSelect.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
+import { useAppSettings } from "../../context/AppSettingsContext.jsx";
 import { buildCajaOrderNotes, findConsumidorFinalCustomer } from "../../utils/eddeliPosOrderUtils.js";
 import { buildCustomerDisplayName, formatCustomerDocument } from "./cajaCustomerUtils.js";
 import { formatMoney } from "../../utils/turnoCashUtils.js";
@@ -163,6 +164,7 @@ const lineBreakdown = (row) => {
 
 export default function CajaPage() {
   const { toast } = useAuth();
+  const { activeApp } = useAppSettings();
   const theme = useTheme();
   const [products, setProducts] = useState([]);
   const [tierGroups, setTierGroups] = useState([]);
@@ -1452,6 +1454,7 @@ export default function CajaPage() {
         onClose={() => setQuickProductsOpen(false)}
         products={products}
         tierGroups={effectiveTierGroups}
+        categoryMatch={activeApp.cajaQuickCategoryMatch}
         onAdd={(product, qty) => addToCart(product, qty)}
         onAddSurtido={addSurtidoBatch}
       />

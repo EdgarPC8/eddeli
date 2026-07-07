@@ -16,9 +16,11 @@ import { DocumentAttachment } from "../models/DocumentAttachment.js";
 import { NotificationProgram, NotificationDispatchLog } from "../models/NotificationProgram.js";
 import { Notifications } from "../models/Notifications.js";
 import { EditorTemplate, EditorTemplateGroup, EditorTemplateLayer, EditorLayerProp, EditorLayerBind, EditorDesign, EditorDesignLayerOverride } from "../models/Editor.js";
+import { AppSettings } from "../models/AppSettings.js";
 
 const MODELS_TO_SYNC = [
   // ── Sin FK externas ──
+  AppSettings,
   Users,
   Roles,
   Customer,

@@ -30,6 +30,8 @@ import FilesRoutes from "./src/routes/FilesRoutes.js";
 import DocumentRoutes from "./src/routes/DocumentRoutes.js";
 import EditorRoutes from "./src/routes/EditorRoutes.js";
 import ComandsRoutes from "./src/routes/ComandsRoutes.js";
+import AppSettingsRoutes from "./src/routes/AppSettingsRoutes.js";
+import { loadAppSettings } from "./src/services/appSettingsService.js";
 
 import NotificationProgramRoutes from "./src/routes/NotificationProgramRoutes.js";
 import { startNotificationScheduler } from "./src/services/notificationScheduler.js";
@@ -45,6 +47,7 @@ import {
   errorMiddleware,
   notFoundMiddleware,
 } from "./src/middlewares/errorMiddleware.js";
+import { PORT, API_PREFIX } from "./src/config/serverEnv.js";
 
 // ✅ __dirname en ES Modules
 const __filename = fileURLToPath(import.meta.url);
@@ -52,9 +55,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const httpServer = createServer(app);
-const api = "eddeliapi";
-
-const PORT = 3001;
+const api = API_PREFIX;
 
 const io = new Server(httpServer, {
   cors: {
@@ -90,6 +91,7 @@ app.use(`/${api}/documents`, DocumentRoutes);
 app.use(`/${api}/files`, express.static(path.resolve(__dirname, "src/files")));
 
 // ================================
+app.use(`/${api}`, AppSettingsRoutes);
 app.use(`/${api}/comands`, ComandsRoutes);
 app.use(`/${api}/editor`, EditorRoutes);
 app.use(`/${api}/users`, UsersRoutes);
@@ -115,6 +117,7 @@ app.use(errorMiddleware);
 export async function main() {
   try {
     await sequelize.authenticate();
+    await loadAppSettings();
 
     // ═══════════════════════════════════════════════════════════════════
     // ⚠️  SOLO DESARROLLO — Reset total (borra tablas y carga backup.json)
@@ -128,7 +131,7 @@ export async function main() {
     );
 
     httpServer.listen(PORT, async () => {
-      console.log(`🟢 Backend + Socket.IO escuchando en puerto ${PORT}`);
+      console.log(`🟢 Backend + Socket.IO · puerto ${PORT} · API /${api}`);
       await startNotificationScheduler();
     });
   } catch (error) {

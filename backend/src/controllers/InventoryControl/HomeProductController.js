@@ -11,11 +11,12 @@ import {
 import { join } from "path";
 import fs from "fs";
 import fileDirName from "../../libs/file-dirname.js";
+import { mediaFolderPrefix } from "../../services/appSettingsService.js";
 const { __dirname } = fileDirName(import.meta);
 
-const EDDELI_DIR = join(__dirname, "../../img/EdDeli");
+const appImgDir = () => join(__dirname, "../../img", mediaFolderPrefix());
 
-const imagePath = (filename) => join(EDDELI_DIR, filename);
+const imagePath = (filename) => join(appImgDir(), filename);
 
 const safeUnlink = (fullPath) => {
   try {

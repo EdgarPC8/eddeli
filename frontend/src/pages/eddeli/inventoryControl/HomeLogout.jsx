@@ -15,7 +15,7 @@ import {
   getStoresRequest,
   getStoreProductsPublicRequest,
 } from "../../../api/inventoryControlRequest.js";
-import { activeApp } from "../../../config/appInfo.js";
+import { useAppSettings } from "../../../context/AppSettingsContext.jsx";
 
 // 🔗 Iconos de redes
 import FacebookIcon from "@mui/icons-material/Facebook";
@@ -24,6 +24,7 @@ import WhatsAppIcon from "@mui/icons-material/WhatsApp";
 import EmailIcon from "@mui/icons-material/Email";
 
 export default function HomeLogout() {
+  const { activeApp } = useAppSettings();
   const theme = useTheme();
   const [products, setProducts] = useState([]);
   const [stores, setStores] = useState([]);

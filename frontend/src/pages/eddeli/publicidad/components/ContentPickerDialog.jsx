@@ -31,7 +31,9 @@ import {
   fetchMediaCatalog,
   uploadPublicidadImage,
   uploadPublicidadVideo,
+  publicidadImgFolder,
 } from "../../../../api/publicidadRequest.js";
+import { getMediaFolders } from "../../../../api/mediaRequest.js";
 import { useAuth } from "../../../../context/AuthContext.jsx";
 import { CONTENT_TYPES } from "../constants.js";
 
@@ -168,7 +170,7 @@ export default function ContentPickerDialog({ open, onClose, onSelect, existingI
             </Button>
             <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleUpload} />
             <Typography variant="caption" color="text.secondary" sx={{ alignSelf: "center" }}>
-              Se guarda en EdDeli/publicidad
+              Se guarda en {publicidadImgFolder()}
             </Typography>
           </Stack>
         )}
@@ -192,7 +194,7 @@ export default function ContentPickerDialog({ open, onClose, onSelect, existingI
               onChange={handleVideoUpload}
             />
             <Typography variant="caption" color="text.secondary" sx={{ alignSelf: "center" }}>
-              MP4, WebM, MOV… → EdDeli/videos
+              MP4, WebM, MOV… → {getMediaFolders().VIDEO}
             </Typography>
           </Stack>
         )}

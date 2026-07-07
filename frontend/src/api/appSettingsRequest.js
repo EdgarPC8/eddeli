@@ -1,17 +1,12 @@
-/** API configuración de la app (nombre, versión, logo, autores). */
-import axios, { jwt } from "./axios.js";
+import axios from "./axios.js";
+import { authHeaders } from "./axios.js";
 
-const auth = () => ({ headers: { Authorization: jwt() } });
+export async function fetchAppSettings() {
+  const { data } = await axios.get("/app/settings");
+  return data;
+}
 
-export const getAppSettingsRequest = () => axios.get("/app-settings");
-
-export const updateAppSettingsRequest = (data) =>
-  axios.put("/app-settings", data, auth());
-
-export const uploadAppLogoRequest = (file) => {
-  const fd = new FormData();
-  fd.append("logo", file);
-  return axios.post("/app-settings/logo", fd, {
-    headers: { Authorization: jwt(), "Content-Type": "multipart/form-data" },
-  });
-};
+export async function updateAppSettings(payload) {
+  const { data } = await axios.put("/app/settings", payload, authHeaders());
+  return data;
+}

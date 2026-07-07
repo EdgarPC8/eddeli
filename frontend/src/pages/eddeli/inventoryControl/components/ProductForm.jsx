@@ -40,7 +40,7 @@ import { pathImg } from "../../../../api/axios";
 import { useBarcodeScanner } from "../../../../hooks/useBarcodeScanner.js";
 import { normalizeProductBarcode, normalizePackageTiers } from "../../../../utils/productLookup.js";
 
-const PRODUCT_IMAGE_SUBFOLDER = "EdDeli/products";
+import { mediaStoragePath } from "../../../../utils/mediaPaths.js";
 
 const PRODUCT_NUMERIC_FIELDS = [
   "price",
@@ -479,7 +479,7 @@ function ProductForm({ isEditing = false, datos = {}, onClose, reload }) {
 
     const fd = new FormData();
 
-    fd.append("subfolder", PRODUCT_IMAGE_SUBFOLDER);
+    fd.append("subfolder", mediaStoragePath("products"));
 
     fd.append("name", name);
     const barcode = normalizeProductBarcode(data.barcode);

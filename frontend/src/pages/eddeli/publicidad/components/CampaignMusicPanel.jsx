@@ -24,6 +24,7 @@ import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
 import MusicNoteIcon from "@mui/icons-material/MusicNote";
 import { fetchMediaCatalog, uploadPublicidadAudio } from "../../../../api/publicidadRequest.js";
+import { getMediaFolders } from "../../../../api/mediaRequest.js";
 import { useAuth } from "../../../../context/AuthContext.jsx";
 import { MUSIC_MODE_LABELS, MUSIC_MODES } from "../constants.js";
 
@@ -165,7 +166,7 @@ export default function CampaignMusicPanel({ musicMode, musicTracks = [], onChan
               onChange={handleUpload}
             />
             <Typography variant="caption" color="text.secondary" sx={{ alignSelf: "center" }}>
-              MP3, WAV, OGG, M4A… → EdDeli/audio
+              MP3, WAV, OGG, M4A… → {getMediaFolders().AUDIO}
             </Typography>
           </Stack>
 

@@ -524,11 +524,13 @@ export const getProductRotationAnalysis = async (req, res) => {
 
 const orderIncludePaidTop = {
   model: Order,
+  as: "ERP_order",
   attributes: [],
   where: { status: 'pagado' },
 };
 const orderIncludeAnyTop = {
   model: Order,
+  as: "ERP_order",
   attributes: [],
   required: true,
 };
@@ -567,6 +569,7 @@ async function buildTopProductsDailyForMode(dateBy, startDate, endDate) {
       include: [
         {
           model: Order,
+          as: "ERP_order",
           attributes: [],
           where: {
             status: 'pagado',
@@ -656,6 +659,7 @@ async function buildTopProductsDailyForMode(dateBy, startDate, endDate) {
         include: [
           {
             model: Order,
+            as: "ERP_order",
             attributes: [],
             where: {
               status: 'pagado',

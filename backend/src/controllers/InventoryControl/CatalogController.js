@@ -56,9 +56,10 @@ async function aggregateSalesFromOrders({ since, okStatuses }) {
     include: [
       {
         model: Order,
+        as: "ERP_order",
         required: true,
         attributes: [],
-        where: orderWhereBase, // SIN alias (no se definió 'as' en asociaciones)
+        where: orderWhereBase,
       },
     ],
     group: ["productId"],
@@ -74,6 +75,7 @@ async function aggregateSalesFromOrders({ since, okStatuses }) {
     include: [
       {
         model: Order,
+        as: "ERP_order",
         required: true,
         attributes: [],
         where: windowWhere,

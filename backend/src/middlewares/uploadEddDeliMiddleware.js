@@ -3,6 +3,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import fileDirName from "../libs/file-dirname.js";
+import { mediaSubfolder } from "../services/appSettingsService.js";
 
 const { __dirname } = fileDirName(import.meta);
 
@@ -46,7 +47,7 @@ const safeSubfolder = (p = "") => {
 // Si no viene subfolder, por defecto "EdDeli/stores" para stores
 const resolveDestination = (req) => {
   const raw = String(req.body?.subfolder ?? req.query?.subfolder ?? "").trim();
-  const sub = raw ? safeSubfolder(raw) : "EdDeli/stores";
+  const sub = raw ? safeSubfolder(raw) : mediaSubfolder("stores");
   const dest = path.join(IMG_BASE_DIR, sub);
   fs.mkdirSync(dest, { recursive: true });
   return { dest, sub };

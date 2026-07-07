@@ -70,6 +70,7 @@ import {
 import { License } from "../models/License.js";
 import { Logs } from "../models/Logs.js";
 import { UserData } from "../models/UserData.js";
+import { AppSettings } from "../models/AppSettings.js";
 
 export const backupFilePath = resolve(__dirname, "backup.json");
 export const backups = resolve(__dirname, "..", "backups");
@@ -133,6 +134,7 @@ export const BACKUP_TABLE_ENTRIES = [
   { key: "EditorDesignLayerOverride", model: EditorDesignLayerOverride },
   { key: "License", model: License },
   { key: "Logs", model: Logs },
+  { key: "AppSettings", model: AppSettings },
 ];
 
 export function summarizeBackupData(data) {
@@ -451,8 +453,7 @@ export async function ensureBackupFileExists() {
   empty.Roles = [
     { id: 1, name: "Programador" },
     { id: 2, name: "Administrador" },
-    { id: 3, name: "Profesional" },
-    { id: 4, name: "Estudiante" },
+    { id: 3, name: "Empleado" },
   ];
   const payload = JSON.stringify(empty, null, 2);
   await fs.writeFile(backupFilePath, payload, "utf8");

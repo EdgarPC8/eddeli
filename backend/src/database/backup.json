@@ -14,7 +14,7 @@
     },
     {
       "id": 4,
-      "name": "Estudiante"
+      "name": "Empleado"
     }
   ],
   "Users": [
@@ -4948,6 +4948,198 @@
       "deleted": 0,
       "seen": 0,
       "createdAt": "2026-07-07T12:00:54.000Z"
+    },
+    {
+      "id": 407,
+      "userId": 1,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "Harina: quedan -9500 unidades (mínimo 1500).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:1",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
+    },
+    {
+      "id": 408,
+      "userId": 1193,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "Harina: quedan -9500 unidades (mínimo 1500).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:1",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
+    },
+    {
+      "id": 409,
+      "userId": 1,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "Azucar: quedan -750 unidades (mínimo 300).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:2",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
+    },
+    {
+      "id": 410,
+      "userId": 1193,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "Azucar: quedan -750 unidades (mínimo 300).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:2",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
+    },
+    {
+      "id": 411,
+      "userId": 1,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "Agua: quedan -12050 unidades (mínimo 500).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:6",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
+    },
+    {
+      "id": 412,
+      "userId": 1193,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "Agua: quedan -12050 unidades (mínimo 500).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:6",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
+    },
+    {
+      "id": 413,
+      "userId": 1,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "Chocolate Liquido: quedan 1.81 unidades (mínimo 100).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:9",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
+    },
+    {
+      "id": 414,
+      "userId": 1193,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "Chocolate Liquido: quedan 1.81 unidades (mínimo 100).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:9",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
+    },
+    {
+      "id": 415,
+      "userId": 1,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "Crema de leche Masscream: quedan 500 unidades (mínimo 1000).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:20",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
+    },
+    {
+      "id": 416,
+      "userId": 1193,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "Crema de leche Masscream: quedan 500 unidades (mínimo 1000).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:20",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
+    },
+    {
+      "id": 417,
+      "userId": 1,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "Royal: quedan 170 unidades (mínimo 200).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:23",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
+    },
+    {
+      "id": 418,
+      "userId": 1193,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "Royal: quedan 170 unidades (mínimo 200).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:23",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
+    },
+    {
+      "id": 419,
+      "userId": 1,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "Bicarbonato: quedan -450 unidades (mínimo 50).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:32",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
+    },
+    {
+      "id": 420,
+      "userId": 1193,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "Bicarbonato: quedan -450 unidades (mínimo 50).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:32",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
+    },
+    {
+      "id": 421,
+      "userId": 1,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "vela pequeña economica: quedan 0 unidades (mínimo 1).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:159",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
+    },
+    {
+      "id": 422,
+      "userId": 1193,
+      "type": "alert",
+      "title": "Stock mínimo alcanzado",
+      "message": "vela pequeña economica: quedan 0 unidades (mínimo 1).",
+      "link": "/inventory/products",
+      "sourceKey": "stock_min:159",
+      "deleted": 0,
+      "seen": 0,
+      "createdAt": "2026-07-07T13:14:54.000Z"
     }
   ],
   "NotificationProgram": [
@@ -5026,9 +5218,9 @@
       ],
       "handlerType": "stock_min",
       "active": 1,
-      "lastRunAt": "2026-07-07T12:14:54.000Z",
+      "lastRunAt": "2026-07-07T14:15:35.000Z",
       "createdAt": "2026-06-24T16:33:10.000Z",
-      "updatedAt": "2026-07-07T12:14:54.000Z"
+      "updatedAt": "2026-07-07T14:15:35.000Z"
     }
   ],
   "NotificationDispatchLog": [
@@ -7901,7 +8093,7 @@
       "genericProductId": null,
       "purchasePresentation": null,
       "createdAt": "2025-12-05T16:25:33.000Z",
-      "updatedAt": "2026-07-06T22:18:15.000Z"
+      "updatedAt": "2026-07-07T14:02:08.000Z"
     },
     {
       "id": 72,
@@ -8789,7 +8981,7 @@
       "categoryId": 38,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 2,
+      "stock": 1,
       "minStock": 0,
       "price": "1.00",
       "supplierPrice": "0.00",
@@ -8805,7 +8997,7 @@
       "genericProductId": null,
       "purchasePresentation": null,
       "createdAt": "2026-03-23T22:03:14.000Z",
-      "updatedAt": "2026-07-06T22:06:45.000Z"
+      "updatedAt": "2026-07-07T13:10:53.000Z"
     },
     {
       "id": 105,
@@ -9166,7 +9358,7 @@
       "categoryId": 26,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 19,
+      "stock": 11,
       "minStock": 0,
       "price": "0.15",
       "supplierPrice": "0.00",
@@ -9195,7 +9387,7 @@
       "genericProductId": null,
       "purchasePresentation": null,
       "createdAt": "2026-06-08T16:31:03.000Z",
-      "updatedAt": "2026-07-06T22:18:15.000Z"
+      "updatedAt": "2026-07-07T13:01:21.000Z"
     },
     {
       "id": 118,
@@ -9790,7 +9982,7 @@
       "categoryId": 28,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 29,
+      "stock": 19,
       "minStock": 0,
       "price": "0.10",
       "supplierPrice": "0.00",
@@ -9806,7 +9998,7 @@
       "genericProductId": null,
       "purchasePresentation": null,
       "createdAt": "2026-06-12T21:45:18.000Z",
-      "updatedAt": "2026-07-05T16:49:04.000Z"
+      "updatedAt": "2026-07-07T13:10:53.000Z"
     },
     {
       "id": 139,
@@ -9925,7 +10117,7 @@
       "categoryId": 26,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 4,
+      "stock": 20,
       "minStock": 0,
       "price": "0.15",
       "supplierPrice": "0.00",
@@ -9954,7 +10146,7 @@
       "genericProductId": null,
       "purchasePresentation": null,
       "createdAt": "2026-06-14T17:18:12.000Z",
-      "updatedAt": "2026-07-06T22:18:15.000Z"
+      "updatedAt": "2026-07-07T13:15:24.000Z"
     },
     {
       "id": 144,
@@ -115866,6 +116058,111 @@
       "createdBy": 1,
       "createdAt": "2026-07-06T22:29:58.000Z",
       "updatedAt": "2026-07-06T22:29:58.000Z"
+    },
+    {
+      "id": 6845,
+      "productId": 117,
+      "quantity": 8,
+      "description": "Venta POS · pedido #1436",
+      "price": null,
+      "type": "salida",
+      "reason": "SALIDA_VENTA",
+      "referenceType": "order",
+      "referenceId": 1436,
+      "date": "2026-07-07T13:01:21.000Z",
+      "createdBy": 1,
+      "createdAt": "2026-07-07T13:01:21.000Z",
+      "updatedAt": "2026-07-07T13:01:21.000Z"
+    },
+    {
+      "id": 6846,
+      "productId": 138,
+      "quantity": 10,
+      "description": "Venta POS · pedido #1437",
+      "price": null,
+      "type": "salida",
+      "reason": "SALIDA_VENTA",
+      "referenceType": "order",
+      "referenceId": 1437,
+      "date": "2026-07-07T13:10:53.000Z",
+      "createdBy": 1,
+      "createdAt": "2026-07-07T13:10:53.000Z",
+      "updatedAt": "2026-07-07T13:10:53.000Z"
+    },
+    {
+      "id": 6847,
+      "productId": 104,
+      "quantity": 1,
+      "description": "Venta POS · pedido #1437",
+      "price": null,
+      "type": "salida",
+      "reason": "SALIDA_VENTA",
+      "referenceType": "order",
+      "referenceId": 1437,
+      "date": "2026-07-07T13:10:53.000Z",
+      "createdBy": 1,
+      "createdAt": "2026-07-07T13:10:53.000Z",
+      "updatedAt": "2026-07-07T13:10:53.000Z"
+    },
+    {
+      "id": 6848,
+      "productId": 143,
+      "quantity": 24,
+      "description": "Entrada desde caja (ajuste de stock)",
+      "price": null,
+      "type": "entrada",
+      "reason": "ENTRADA_OTRA",
+      "referenceType": "caja_stock_adjust",
+      "referenceId": null,
+      "date": "2026-07-07T13:15:24.000Z",
+      "createdBy": 1,
+      "createdAt": "2026-07-07T13:15:24.000Z",
+      "updatedAt": "2026-07-07T13:15:24.000Z"
+    },
+    {
+      "id": 6849,
+      "productId": 143,
+      "quantity": 8,
+      "description": "Venta POS · pedido #1438",
+      "price": null,
+      "type": "salida",
+      "reason": "SALIDA_VENTA",
+      "referenceType": "order",
+      "referenceId": 1438,
+      "date": "2026-07-07T13:15:24.000Z",
+      "createdBy": 1,
+      "createdAt": "2026-07-07T13:15:24.000Z",
+      "updatedAt": "2026-07-07T13:15:24.000Z"
+    },
+    {
+      "id": 6850,
+      "productId": 71,
+      "quantity": 16,
+      "description": "Entrada desde caja (ajuste de stock)",
+      "price": null,
+      "type": "entrada",
+      "reason": "ENTRADA_OTRA",
+      "referenceType": "caja_stock_adjust",
+      "referenceId": null,
+      "date": "2026-07-07T14:02:08.000Z",
+      "createdBy": 1,
+      "createdAt": "2026-07-07T14:02:08.000Z",
+      "updatedAt": "2026-07-07T14:02:08.000Z"
+    },
+    {
+      "id": 6851,
+      "productId": 71,
+      "quantity": 16,
+      "description": "Venta POS · pedido #1439",
+      "price": null,
+      "type": "salida",
+      "reason": "SALIDA_VENTA",
+      "referenceType": "order",
+      "referenceId": 1439,
+      "date": "2026-07-07T14:02:08.000Z",
+      "createdBy": 1,
+      "createdAt": "2026-07-07T14:02:08.000Z",
+      "updatedAt": "2026-07-07T14:02:08.000Z"
     }
   ],
   "CashShift": [
@@ -137968,6 +138265,62 @@
       "financeIncomeId": null,
       "createdAt": "2026-07-06T22:29:58.000Z",
       "updatedAt": "2026-07-07T12:46:40.000Z"
+    },
+    {
+      "id": 1436,
+      "customerId": 34,
+      "status": "pagado",
+      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
+      "shiftId": 30,
+      "paymentMethod": "efectivo",
+      "paidAt": "2026-07-07T13:01:21.000Z",
+      "documentType": "consumidor_final",
+      "date": "2026-07-07T13:01:21.000Z",
+      "financeIncomeId": null,
+      "createdAt": "2026-07-07T13:01:21.000Z",
+      "updatedAt": "2026-07-07T13:01:21.000Z"
+    },
+    {
+      "id": 1437,
+      "customerId": 34,
+      "status": "pagado",
+      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
+      "shiftId": 30,
+      "paymentMethod": "efectivo",
+      "paidAt": "2026-07-07T13:10:53.000Z",
+      "documentType": "consumidor_final",
+      "date": "2026-07-07T13:10:53.000Z",
+      "financeIncomeId": null,
+      "createdAt": "2026-07-07T13:10:53.000Z",
+      "updatedAt": "2026-07-07T13:10:53.000Z"
+    },
+    {
+      "id": 1438,
+      "customerId": 34,
+      "status": "pagado",
+      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
+      "shiftId": 30,
+      "paymentMethod": "efectivo",
+      "paidAt": "2026-07-07T13:15:24.000Z",
+      "documentType": "consumidor_final",
+      "date": "2026-07-07T13:15:24.000Z",
+      "financeIncomeId": null,
+      "createdAt": "2026-07-07T13:15:24.000Z",
+      "updatedAt": "2026-07-07T13:15:24.000Z"
+    },
+    {
+      "id": 1439,
+      "customerId": 34,
+      "status": "pagado",
+      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
+      "shiftId": 30,
+      "paymentMethod": "efectivo",
+      "paidAt": "2026-07-07T14:02:08.000Z",
+      "documentType": "consumidor_final",
+      "date": "2026-07-07T14:02:08.000Z",
+      "financeIncomeId": null,
+      "createdAt": "2026-07-07T14:02:08.000Z",
+      "updatedAt": "2026-07-07T14:02:08.000Z"
     }
   ],
   "OrderItem": [
@@ -170366,6 +170719,71 @@
       "replacedQty": 0,
       "deliveredAt": "2026-07-06T22:29:58.000Z",
       "paidAt": "2026-07-06T22:29:58.000Z"
+    },
+    {
+      "id": 2530,
+      "orderId": 1436,
+      "productId": 117,
+      "quantity": 8,
+      "price": 0.125,
+      "soldQty": 8,
+      "damagedQty": 0,
+      "giftQty": 0,
+      "replacedQty": 0,
+      "deliveredAt": "2026-07-07T13:01:21.000Z",
+      "paidAt": "2026-07-07T13:01:21.000Z"
+    },
+    {
+      "id": 2531,
+      "orderId": 1437,
+      "productId": 138,
+      "quantity": 10,
+      "price": 0.1,
+      "soldQty": 10,
+      "damagedQty": 0,
+      "giftQty": 0,
+      "replacedQty": 0,
+      "deliveredAt": "2026-07-07T13:10:53.000Z",
+      "paidAt": "2026-07-07T13:10:53.000Z"
+    },
+    {
+      "id": 2532,
+      "orderId": 1437,
+      "productId": 104,
+      "quantity": 1,
+      "price": 1,
+      "soldQty": 1,
+      "damagedQty": 0,
+      "giftQty": 0,
+      "replacedQty": 0,
+      "deliveredAt": "2026-07-07T13:10:53.000Z",
+      "paidAt": "2026-07-07T13:10:53.000Z"
+    },
+    {
+      "id": 2533,
+      "orderId": 1438,
+      "productId": 143,
+      "quantity": 8,
+      "price": 0.125,
+      "soldQty": 8,
+      "damagedQty": 0,
+      "giftQty": 0,
+      "replacedQty": 0,
+      "deliveredAt": "2026-07-07T13:15:24.000Z",
+      "paidAt": "2026-07-07T13:15:24.000Z"
+    },
+    {
+      "id": 2534,
+      "orderId": 1439,
+      "productId": 71,
+      "quantity": 16,
+      "price": 0.125,
+      "soldQty": 16,
+      "damagedQty": 0,
+      "giftQty": 0,
+      "replacedQty": 0,
+      "deliveredAt": "2026-07-07T14:02:08.000Z",
+      "paidAt": "2026-07-07T14:02:08.000Z"
     }
   ],
   "Supplier": [
@@ -213698,6 +214116,76 @@
       "createdBy": 1,
       "createdAt": "2026-07-06T22:29:58.000Z",
       "updatedAt": "2026-07-06T22:29:58.000Z"
+    },
+    {
+      "id": 2396,
+      "date": "2026-07-07T13:01:21.000Z",
+      "amount": "1.00",
+      "concept": "Venta POS Pan Enrollado x8 (Ord #1436)",
+      "category": "Venta",
+      "referenceId": 2530,
+      "referenceType": "order_item",
+      "status": "paid",
+      "counterpartyName": null,
+      "createdBy": 1,
+      "createdAt": "2026-07-07T13:01:21.000Z",
+      "updatedAt": "2026-07-07T13:01:21.000Z"
+    },
+    {
+      "id": 2397,
+      "date": "2026-07-07T13:10:53.000Z",
+      "amount": "1.00",
+      "concept": "Venta POS Galletas con oreo x10 (Ord #1437)",
+      "category": "Venta",
+      "referenceId": 2531,
+      "referenceType": "order_item",
+      "status": "paid",
+      "counterpartyName": null,
+      "createdBy": 1,
+      "createdAt": "2026-07-07T13:10:53.000Z",
+      "updatedAt": "2026-07-07T13:10:53.000Z"
+    },
+    {
+      "id": 2398,
+      "date": "2026-07-07T13:10:53.000Z",
+      "amount": "1.00",
+      "concept": "Venta POS Bandeja tres leches x1 (Ord #1437)",
+      "category": "Venta",
+      "referenceId": 2532,
+      "referenceType": "order_item",
+      "status": "paid",
+      "counterpartyName": null,
+      "createdBy": 1,
+      "createdAt": "2026-07-07T13:10:53.000Z",
+      "updatedAt": "2026-07-07T13:10:53.000Z"
+    },
+    {
+      "id": 2399,
+      "date": "2026-07-07T13:15:24.000Z",
+      "amount": "1.00",
+      "concept": "Venta POS Pan de Cacho x8 (Ord #1438)",
+      "category": "Venta",
+      "referenceId": 2533,
+      "referenceType": "order_item",
+      "status": "paid",
+      "counterpartyName": null,
+      "createdBy": 1,
+      "createdAt": "2026-07-07T13:15:24.000Z",
+      "updatedAt": "2026-07-07T13:15:24.000Z"
+    },
+    {
+      "id": 2400,
+      "date": "2026-07-07T14:02:08.000Z",
+      "amount": "2.00",
+      "concept": "Venta POS Pan de Dulce x16 (Ord #1439)",
+      "category": "Venta",
+      "referenceId": 2534,
+      "referenceType": "order_item",
+      "status": "paid",
+      "counterpartyName": null,
+      "createdBy": 1,
+      "createdAt": "2026-07-07T14:02:08.000Z",
+      "updatedAt": "2026-07-07T14:02:08.000Z"
     }
   ],
   "Store": [
@@ -236063,6 +236551,69 @@
       "description": "EL Programador Edgar Torres realizó una acción",
       "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
       "date": "2026-07-07T12:31:57.000Z"
+    },
+    {
+      "id": 2029,
+      "httpMethod": "POST",
+      "action": "Acción desconocida",
+      "endPoint": "/eddeliapi/orders/pos/checkout",
+      "description": "EL Programador Edgar Torres realizó una acción",
+      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+      "date": "2026-07-07T13:01:21.000Z"
+    },
+    {
+      "id": 2030,
+      "httpMethod": "POST",
+      "action": "Acción desconocida",
+      "endPoint": "/eddeliapi/orders/pos/checkout",
+      "description": "EL Programador Edgar Torres realizó una acción",
+      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+      "date": "2026-07-07T13:10:53.000Z"
+    },
+    {
+      "id": 2031,
+      "httpMethod": "POST",
+      "action": "Acción desconocida",
+      "endPoint": "/eddeliapi/inventory/movements",
+      "description": "EL Programador Edgar Torres realizó una acción",
+      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+      "date": "2026-07-07T13:15:24.000Z"
+    },
+    {
+      "id": 2032,
+      "httpMethod": "POST",
+      "action": "Acción desconocida",
+      "endPoint": "/eddeliapi/orders/pos/checkout",
+      "description": "EL Programador Edgar Torres realizó una acción",
+      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+      "date": "2026-07-07T13:15:24.000Z"
+    },
+    {
+      "id": 2033,
+      "httpMethod": "POST",
+      "action": "Acción desconocida",
+      "endPoint": "/eddeliapi/inventory/movements",
+      "description": "EL Programador Edgar Torres realizó una acción",
+      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+      "date": "2026-07-07T14:02:08.000Z"
+    },
+    {
+      "id": 2034,
+      "httpMethod": "POST",
+      "action": "Acción desconocida",
+      "endPoint": "/eddeliapi/orders/pos/checkout",
+      "description": "EL Programador Edgar Torres realizó una acción",
+      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+      "date": "2026-07-07T14:02:08.000Z"
+    },
+    {
+      "id": 2035,
+      "httpMethod": "POST",
+      "action": "Acción desconocida",
+      "endPoint": "/eddeliapi/comands/backups/stored/prune-and-save",
+      "description": "EL Programador Edgar Torres realizó una acción",
+      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+      "date": "2026-07-07T14:23:29.000Z"
     }
   ]
 }

@@ -23,6 +23,7 @@ import RefreshIcon from "@mui/icons-material/Refresh";
 import TablePro from "../../../components/Tables/TablePro.jsx";
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog.jsx";
 import { useAuth } from "../../../context/AuthContext.jsx";
+import { APP_BASE_PATH } from "../../../config/deployEnv.js";
 import {
   deletePublicidadDevice,
   getCampaigns,
@@ -226,7 +227,7 @@ export default function PublicidadDevicesPage() {
               size="small"
               color="primary"
               onClick={() =>
-                window.open(`/eddeli/tv/device/${encodeURIComponent(row.deviceId)}`, "_blank")
+                window.open(`${APP_BASE_PATH}tv/device/${encodeURIComponent(row.deviceId)}`, "_blank")
               }
             >
               <OpenInNewIcon fontSize="small" />

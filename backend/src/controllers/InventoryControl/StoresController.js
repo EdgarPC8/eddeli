@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import fsp from "fs/promises";
 import fileDirName from "../../libs/file-dirname.js";
+import { mediaSubfolder } from "../../services/appSettingsService.js";
 import { Store } from "../../models/Inventory.js";
 
 const { __dirname } = fileDirName(import.meta);
@@ -77,7 +78,7 @@ export const createStore = async (req, res) => {
     // ✅ IMAGEN: usar la ruta del input (subfolder) + nombre de archivo
     // Prioridad: subfolder del body (lo que puso el usuario en el form)
     if (req.file?.filename) {
-      const subfolder = (req.body.subfolder || "EdDeli/stores").trim().replace(/\/+$/, "");
+      const subfolder = (req.body.subfolder || mediaSubfolder("stores")).trim().replace(/\/+$/, "");
       tempRelPath = subfolder
         ? `${subfolder}/${req.file.filename}`
         : req.file.filename;
@@ -120,7 +121,7 @@ export const updateStore = async (req, res) => {
     // 1️⃣ CASO: se sube imagen nueva (usar subfolder del form)
     // ===============================
     if (req.file?.filename) {
-      const subfolder = (req.body.subfolder || "EdDeli/stores").trim().replace(/\/+$/, "");
+      const subfolder = (req.body.subfolder || mediaSubfolder("stores")).trim().replace(/\/+$/, "");
       const newRel = subfolder
         ? `${subfolder}/${req.file.filename}`
         : req.file.filename;

@@ -86,8 +86,7 @@ import CambiarRol from "./CambiarRol.jsx";
 import SimpleDialog from "./Dialogs/SimpleDialog.jsx";
 import { getUnreadCount } from "../api/notificationsRequest.js";
 import { useNotificationSocket } from "../hooks/useNotificationSocket.js";
-import { LOGO_PATH } from "../config.js";
-import { activeApp } from "../config/appInfo.js";
+import { useAppSettings } from "../context/AppSettingsContext.jsx";
 
 const DRAWER_W = 260;
 
@@ -372,6 +371,12 @@ const MENU_GROUPS = [
     label: "Sistema",
     items: [
       {
+        name: "Configuración",
+        link: "/sistema/configuracion",
+        icon: <SettingsApplicationsIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
         name: "Imágenes",
         link: "/img",
         icon: <ImageIcon />,
@@ -437,6 +442,7 @@ export default function NavBar() {
   const location = useLocation();
   const { isAuthenticated, isLoading, user, logout, profileImageUser } =
     useAuth();
+  const { activeApp } = useAppSettings();
 
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [expandedGroupId, setExpandedGroupId] = useState(null);
@@ -544,7 +550,7 @@ export default function NavBar() {
         >
           <Box
             component="img"
-            src={LOGO_PATH}
+            src={activeApp.logoUrl}
             alt={activeApp.alias}
             sx={{
               width: 44,

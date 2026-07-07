@@ -15,6 +15,7 @@ import SlideStage from "./components/SlideStage.jsx";
 import SignageOfflineScreen from "./components/SignageOfflineScreen.jsx";
 import CampaignMusicPlayer from "./components/CampaignMusicPlayer.jsx";
 import SignageConnectionBadge from "./components/SignageConnectionBadge.jsx";
+import { apiBaseLabel } from "../../../config/deployEnv.js";
 
 export default function PublicidadTvPlayerPage() {
   const { campaignId } = useParams();
@@ -88,7 +89,7 @@ export default function PublicidadTvPlayerPage() {
       : connectionStatus === "online"
         ? `Campaña #${campaignId}`
         : connectionStatus === "offline"
-          ? "192.168.3.40:3001/eddeliapi"
+          ? apiBaseLabel()
           : "";
 
   return (

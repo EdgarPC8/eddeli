@@ -2,15 +2,28 @@
  * API escalable de medios (video, audio) — reutilizable fuera de Publicidad.
  */
 import axios, { authHeaders, jwt, pathFiles } from "./axios.js";
+import { mediaStoragePath } from "../utils/mediaPaths.js";
 
 export const MEDIA_MODULES = {
   PUBLICIDAD: "publicidad",
   GENERAL: "general",
 };
 
+export function getMediaFolders() {
+  return {
+    VIDEO: mediaStoragePath("videos"),
+    AUDIO: mediaStoragePath("audio"),
+  };
+}
+
+/** @deprecated usar getMediaFolders() */
 export const MEDIA_FOLDERS = {
-  VIDEO: "EdDeli/videos",
-  AUDIO: "EdDeli/audio",
+  get VIDEO() {
+    return mediaStoragePath("videos");
+  },
+  get AUDIO() {
+    return mediaStoragePath("audio");
+  },
 };
 
 export function mediaFileUrl(relativePath) {

@@ -264,7 +264,7 @@ const DEFAULT_PROGRAMS = [
   {
     code: "BUENOS_DIAS",
     title: "¡Buenos días!",
-    message: "Que tengas un excelente inicio de jornada en EdDeli. ☀️",
+    message: "Que tengas un excelente inicio de jornada. ☀️",
     link: "/inicio",
     notificationType: "info",
     scheduleType: "daily",

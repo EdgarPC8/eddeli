@@ -1,4 +1,5 @@
-# SPA EdDeli — despliegue directo en eddeli/ (copiado al build)
+# SPA — despliegue en subcarpeta (copiado al build).
+# Debe coincidir con VITE_BASE_PATH en frontend/.env (ej. /eddeli/).
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /eddeli/

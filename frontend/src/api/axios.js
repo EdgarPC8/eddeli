@@ -1,15 +1,15 @@
 /**
- * Cliente HTTP y Socket.IO para eddeliapi (puerto 3001).
+ * Cliente HTTP y Socket.IO — URL desde frontend/.env (VITE_API_*).
  */
 import axios from "axios";
 import { io } from "socket.io-client";
-
-/** 'local' = proxy Vite en dev; 'server' = IP:3001; 'production' = dominio institucional */
-const API_ENV = import.meta.env.DEV ? "local" : "production";
-const API_PATH = "eddeliapi";
-const API_PORT = 3001;
-const SERVER_HOST = "192.168.3.40";
-const PRODUCTION_ORIGIN = "https://aplicaciones.marianosamaniego.edu.ec";
+import {
+  API_PREFIX,
+  API_PORT,
+  API_HOST,
+  API_ORIGIN,
+  API_MODE,
+} from "../config/deployEnv.js";
 
 function isTvPlayerRoute() {
   if (typeof window === "undefined") return false;
@@ -17,32 +17,31 @@ function isTvPlayerRoute() {
 }
 
 function resolveApiBase() {
-  if (API_ENV === "production") return `${PRODUCTION_ORIGIN}/${API_PATH}`;
-  if (API_ENV === "server") return `http://${SERVER_HOST}:${API_PORT}/${API_PATH}`;
-  // TV / kiosco (celular, box HDMI): API directa al backend en la LAN
+  if (API_MODE === "production") return `${API_ORIGIN}/${API_PREFIX}`;
+  if (API_MODE === "server") return `http://${API_HOST}:${API_PORT}/${API_PREFIX}`;
   if (import.meta.env.DEV && isTvPlayerRoute()) {
     const host =
       window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-        ? SERVER_HOST
+        ? API_HOST
         : window.location.hostname;
-    return `http://${host}:${API_PORT}/${API_PATH}`;
+    return `http://${host}:${API_PORT}/${API_PREFIX}`;
   }
-  if (import.meta.env.DEV) return `/${API_PATH}`;
-  return `http://localhost:${API_PORT}/${API_PATH}`;
+  if (import.meta.env.DEV) return `/${API_PREFIX}`;
+  return `http://${API_HOST}:${API_PORT}/${API_PREFIX}`;
 }
 
 function resolveSocketOrigin() {
-  if (API_ENV === "production") return PRODUCTION_ORIGIN;
-  if (API_ENV === "server") return `http://${SERVER_HOST}:${API_PORT}`;
+  if (API_MODE === "production") return API_ORIGIN;
+  if (API_MODE === "server") return `http://${API_HOST}:${API_PORT}`;
   if (import.meta.env.DEV && isTvPlayerRoute()) {
     const host =
       window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
-        ? SERVER_HOST
+        ? API_HOST
         : window.location.hostname;
     return `http://${host}:${API_PORT}`;
   }
   if (import.meta.env.DEV) return window.location.origin;
-  return `http://localhost:${API_PORT}`;
+  return `http://${API_HOST}:${API_PORT}`;
 }
 
 const baseURL = resolveApiBase();

@@ -17,10 +17,10 @@ import {
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
-import { LOGO_PATH } from "../config.js";
-import { activeApp } from "../config/appInfo.js";
+import { useAppSettings } from "../context/AppSettingsContext.jsx";
 
 export default function Login() {
+  const { activeApp } = useAppSettings();
   const theme = useTheme();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -105,7 +105,7 @@ export default function Login() {
         >
           <Box
             component="img"
-            src={LOGO_PATH}
+            src={activeApp.logoUrl}
             alt={activeApp.name}
             sx={{
               width: 280,
@@ -150,7 +150,7 @@ export default function Login() {
           <Box sx={{ display: { md: "none" }, textAlign: "center", mb: 3 }}>
             <Box
               component="img"
-              src={LOGO_PATH}
+              src={activeApp.logoUrl}
               alt={activeApp.name}
               sx={{
                 width: 150,

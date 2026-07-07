@@ -1,5 +1,6 @@
 // components/layerUtils.js
 import { pathImg } from "../../../api/axios";
+import { mediaStoragePath } from "../../../utils/mediaPaths.js";
 
 export const SCALE = 3;
 
@@ -80,7 +81,7 @@ export const makeDefaultLayer = ({ type, groupId }) => {
       h: 500,
       zIndex: 100,
       props: {
-        src: img("EdDeli/ads/placeholders/no_image.png"),
+        src: img(mediaStoragePath("ads/placeholders/no_image.png")),
         fit: "cover",
         borderRadius: 20,
       },

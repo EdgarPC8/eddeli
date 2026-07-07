@@ -5,6 +5,7 @@ import { makeFileUpload } from "../middlewares/fileManagerMiddleware.js";
 import fs from "fs";
 import path from "path";
 import fileDirName from "../libs/file-dirname.js";
+import { mediaSubfolder } from "../services/appSettingsService.js";
 
 const { __dirname } = fileDirName(import.meta);
 const FILES_BASE_DIR = path.resolve(__dirname, "../files");
@@ -24,7 +25,7 @@ function parseLinkExpenseIds(raw) {
 
 function resolveEntityFolder(entityType, entityId, batchKey) {
   const key = batchKey || (entityId != null ? String(entityId) : "misc");
-  return `EdDeli/vouchers/${entityType}/${key}`;
+  return mediaSubfolder("vouchers", entityType, key);
 }
 
 export const documentUploadMiddleware = makeFileUpload({

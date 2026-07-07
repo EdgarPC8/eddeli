@@ -5,6 +5,7 @@ import path from "path";
 import fsp from "fs/promises";
 import fileDirName from "../libs/file-dirname.js";
 import { MediaAsset } from "../models/MediaAsset.js";
+import { getMediaFolders } from "../services/appSettingsService.js";
 
 const { __dirname } = fileDirName(import.meta);
 const IMG_BASE = path.resolve(__dirname, "../img");
@@ -13,12 +14,6 @@ const FILES_BASE = path.resolve(__dirname, "../files");
 export const VIDEO_EXT = new Set([".mp4", ".webm", ".mov", ".m4v"]);
 export const AUDIO_EXT = new Set([".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"]);
 export const IMAGE_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"]);
-
-export const MEDIA_FOLDERS = {
-  video: ["EdDeli/videos", "videos", "publicidad/videos"],
-  audio: ["EdDeli/audio", "EdDeli/music", "publicidad/audio"],
-  image: ["EdDeli/publicidad", "EdDeli/ads", "EdDeli/banners"],
-};
 
 async function walkFiles(baseDir, folderRel = "", maxDepth = 6, filterExt = null) {
   const rootFull = path.resolve(baseDir, folderRel);
@@ -69,6 +64,7 @@ function scanToItems(files, type, storage = "files") {
 }
 
 export async function scanMediaByType(mediaType) {
+  const MEDIA_FOLDERS = getMediaFolders();
   if (mediaType === "image") {
     const files = [];
     for (const folder of MEDIA_FOLDERS.image) {

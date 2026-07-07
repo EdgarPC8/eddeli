@@ -10,6 +10,7 @@ import {
   buildMediaCatalog,
   inferMediaTypeFromFilename,
 } from "../services/mediaCatalogService.js";
+import { mediaSubfolder } from "../services/appSettingsService.js";
 
 const MEDIA_EXT = new Set([...VIDEO_EXT, ...AUDIO_EXT]);
 
@@ -19,9 +20,9 @@ export const mediaUploadMiddleware = makeFileUpload({
   maxMB: 150,
   folderResolver: (req) => {
     const mediaType = String(req.body?.mediaType || req.query?.mediaType || "").toLowerCase();
-    if (mediaType === "audio") return req.body?.folder || "EdDeli/audio";
-    if (mediaType === "video") return req.body?.folder || "EdDeli/videos";
-    return req.body?.folder || "EdDeli/media";
+    if (mediaType === "audio") return req.body?.folder || mediaSubfolder("audio");
+    if (mediaType === "video") return req.body?.folder || mediaSubfolder("videos");
+    return req.body?.folder || mediaSubfolder("media");
   },
 });
 

@@ -22,6 +22,8 @@ import {
   updateStoreRequest,
 } from "../../../../api/inventoryControlRequest.js";
 import { pathImg, buildImageUrl } from "../../../../api/axios";
+import { useAppSettings } from "../../../../context/AppSettingsContext.jsx";
+import { mediaStoragePath } from "../../../../utils/mediaPaths.js";
 
 /* ============ Helpers de imagen ============ */
 async function getCroppedBlob(
@@ -279,6 +281,8 @@ function CropperDialog({ open, imageSrc, onClose, onConfirm, aspect }) {
 function StoreForm({ isEditing = false, datos = {}, onClose, reload }) {
   const { handleSubmit, register, reset, setValue, watch } = useForm();
   const { toast: toastAuth } = useAuth();
+  const { activeApp } = useAppSettings();
+  const defaultStoresFolder = mediaStoragePath("stores");
 
   // ------- Imagen -------
   const [selectedFile, setSelectedFile] = useState(null);
@@ -288,7 +292,7 @@ function StoreForm({ isEditing = false, datos = {}, onClose, reload }) {
   const [lastMeta, setLastMeta] = useState(null);
   const fileRef = useRef(null);
 
-  const [imageSubfolder, setImageSubfolder] = useState("EdDeli/stores");
+  const [imageSubfolder, setImageSubfolder] = useState(defaultStoresFolder);
 
   const currentImage = useMemo(() => {
     if (previewUrl) return previewUrl;
@@ -358,15 +362,14 @@ function StoreForm({ isEditing = false, datos = {}, onClose, reload }) {
     setValue("position", datos.position ?? 0);
     setValue("isActive", String(datos.isActive ?? true) ? "true" : "false");
 
-    // ✅ sugerir carpeta según imageUrl guardado
-    // imageUrl: "EdDeli/stores/loja.png" => input "EdDeli/stores"
-    if (datos?.imageUrl?.startsWith("EdDeli/")) {
-      const parts = datos.imageUrl.split("/");
+    const prefix = activeApp.mediaFolderPrefix || "sistema";
+    if (datos?.imageUrl?.includes("/")) {
+      const parts = String(datos.imageUrl).split("/");
       parts.pop();
-      const folderFull = parts.join("/") || "EdDeli";
+      const folderFull = parts.join("/") || prefix;
       setImageSubfolder(folderFull);
     } else {
-      setImageSubfolder("EdDeli/stores");
+      setImageSubfolder(defaultStoresFolder);
     }
   };
 
@@ -380,7 +383,7 @@ function StoreForm({ isEditing = false, datos = {}, onClose, reload }) {
     const fd = new FormData();
 
     // Enviar primero subfolder y customFileName para que el backend los use al guardar la imagen
-    const subfolder = normalize(imageSubfolder) || "EdDeli/stores";
+    const subfolder = normalize(imageSubfolder) || defaultStoresFolder;
     fd.append("subfolder", subfolder);
 
     // campos
@@ -542,13 +545,13 @@ function StoreForm({ isEditing = false, datos = {}, onClose, reload }) {
         <Grid item xs={12}>
           <Stack spacing={1}>
             <TextField
-              label='Carpeta destino (ej: "EdDeli" o "EdDeli/stores")'
+              label='Carpeta destino (ej: "sistema/stores")'
               size="small"
               fullWidth
               variant="standard"
               value={imageSubfolder}
               onChange={(e) => setImageSubfolder(e.target.value)}
-              placeholder='Ej: EdDeli | EdDeli/stores | EdDeli/stores/loja'
+              placeholder="Ej: sistema/stores"
               helperText='No pongas ".." ni rutas raras.'
             />
 

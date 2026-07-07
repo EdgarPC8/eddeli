@@ -193,12 +193,14 @@ async function buildSalesBundle(periodConfig, rankBand) {
     include: [
       {
         model: Order,
+        as: "ERP_order",
         attributes: [],
         required: true,
         where: { status: "pagado" },
       },
       {
         model: InventoryProduct,
+        as: "ERP_inventory_product",
         attributes: [],
         required: true,
         where: { type: "final" },

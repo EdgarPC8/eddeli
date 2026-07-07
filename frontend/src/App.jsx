@@ -56,21 +56,11 @@ import PublicidadPlayerPage from "./pages/eddeli/publicidad/PublicidadPlayerPage
 import PublicidadTvPlayerPage from "./pages/eddeli/publicidad/PublicidadTvPlayerPage.jsx";
 import PublicidadTvDevicePlayerPage from "./pages/eddeli/publicidad/PublicidadTvDevicePlayerPage.jsx";
 import PublicidadDevicesPage from "./pages/eddeli/publicidad/PublicidadDevicesPage.jsx";
+import AppSettingsPage from "./pages/AppSettingsPage.jsx";
 import SubscriptionExpiredPage from "./pages/SubscriptionExpiredPage.jsx";
 import NoSubscriptionPage from "./pages/NoSubscriptionPage.jsx";
 
-const AUTH_ROLES = [
-  "Estudiante",
-  "Administrador",
-  "Programador",
-  "Empresa",
-  "Profesional",
-  "Empleado",
-  "Doctor/a",
-  "Enfermero/a",
-  "Pasante",
-  "Moderador",
-];
+const AUTH_ROLES = ["Programador", "Administrador", "Empleado"];
 
 import Subify from "subify";
 
@@ -146,6 +136,8 @@ export default function App() {
               element={<TurnoSupervisionPage />}
             />
             <Route path="/panel_control" element={<PanelControlPage />} />
+            <Route path="/sistema/configuracion" element={<AppSettingsPage />} />
+            <Route path="/app-settings" element={<Navigate to="/sistema/configuracion" replace />} />
             {/* Ruta reservada; menú oculto hasta API backend (NotificationProgramsPage) */}
             <Route
               path="/notification-programs"

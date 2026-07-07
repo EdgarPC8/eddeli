@@ -73,22 +73,20 @@ function lineTotalFor(product, qty, tierGroups = []) {
   return resolveEddeliQuickLineTotal(product, qty, tierGroups);
 }
 
-function isPanaderiaProduct(product) {
+function matchesQuickCategory(product, categoryMatch) {
+  const needle = String(categoryMatch || "").trim().toLowerCase();
+  if (!needle) return true;
   const cat = getProductCategory(product);
   const root = getRootCategoryFromProduct(product);
   const rootName = String(root?.name || cat?.name || "").toLowerCase();
   const catName = String(cat?.name || "").toLowerCase();
-  return (
-    rootName.includes("panader") ||
-    catName === "panes" ||
-    catName.includes("panader")
-  );
+  return rootName.includes(needle) || catName.includes(needle);
 }
 
-export function filterPanaderiaInStock(products, tierGroups = []) {
+export function filterQuickAccessInStock(products, tierGroups = [], categoryMatch = "") {
   return (products || [])
     .filter((p) => {
-      if (!isPanaderiaProduct(p)) return false;
+      if (!matchesQuickCategory(p, categoryMatch)) return false;
       if (p.type && p.type !== "final") return false;
       if (p.isActive === 0 || p.isActive === false) return false;
       return Number(p.stock || 0) > 0;
@@ -116,6 +114,7 @@ export default function CajaQuickProductsDialog({
   onAdd,
   onAddSurtido,
   tierGroups = [],
+  categoryMatch = "",
 }) {
   const theme = useTheme();
   const [selectedQty, setSelectedQty] = useState(1);
@@ -123,7 +122,7 @@ export default function CajaQuickProductsDialog({
   const [selectedTierGroup, setSelectedTierGroup] = useState(null);
   const [basketQtyById, setBasketQtyById] = useState({});
 
-  const items = filterPanaderiaInStock(products, tierGroups);
+  const items = filterQuickAccessInStock(products, tierGroups, categoryMatch);
   const activeGroups = useMemo(() => findActiveTierGroups(tierGroups), [tierGroups]);
   const surtidoMode = Boolean(selectedTierGroup);
   const surtidoLabel = selectedTierGroup ? getTierGroupLabel(selectedTierGroup) : "";
@@ -512,7 +511,7 @@ export default function CajaQuickProductsDialog({
           <Typography color="text.secondary" sx={{ py: 6, textAlign: "center" }}>
             {surtidoMode
               ? "No hay panes disponibles en esta canasta."
-              : "No hay productos de panadería con stock disponible."}
+              : "No hay productos con stock para accesos rápidos."}
           </Typography>
         ) : (
           <Grid container spacing={1.5}>

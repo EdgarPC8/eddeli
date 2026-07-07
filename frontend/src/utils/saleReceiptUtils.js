@@ -1,4 +1,4 @@
-import { activeApp } from "../config/appInfo.js";
+import { getActiveAppSettings } from "../context/AppSettingsContext.jsx";
 import { getOrderCustomerDisplay } from "./eddeliPosOrderUtils.js";
 import { formatDateTime } from "../helpers/functions.js";
 import { printHtmlDocument } from "./printHtmlDocument.js";
@@ -148,10 +148,11 @@ export function normalizeSaleReceipt(sale) {
       ? "Consumidor Final"
       : customerNameRaw || displayFromOrder || customer.name || "—";
 
+  const app = getActiveAppSettings();
   return {
     id: sale.id,
-    businessName: activeApp.alias || "EdDeli",
-    businessDescription: activeApp.description || "",
+    businessName: app.alias || "App",
+    businessDescription: app.description || "",
     documentTitle: documentTitleForType(docType),
     documentType: docType,
     documentTypeLabel: documentTypeLabel(docType),

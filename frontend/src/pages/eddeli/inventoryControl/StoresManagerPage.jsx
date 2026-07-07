@@ -56,6 +56,7 @@ import {
 } from "../../../api/inventoryControlRequest";
 
 import { pathImg, buildImageUrl } from "../../../api/axios";
+import { mediaStoragePath } from "../../../utils/mediaPaths.js";
 import { useAuth } from "../../../context/AuthContext";
 import Cropper from "react-easy-crop";
 
@@ -893,7 +894,7 @@ function StoreForm({ value, onChange }) {
         </TextField>
 {/* ✅ Carpeta destino */}
 <TextField
-  label='Carpeta destino (ej: "EdDeli/stores")'
+  label={`Carpeta destino (ej: "${mediaStoragePath("stores")}")`}
   value={value.imageSubfolder || ""}
   onChange={(e) => set("imageSubfolder", e.target.value)}
   fullWidth
@@ -1075,7 +1076,7 @@ function StoresPage() {
       imageUrl: "",
       imageFile: null,
       customFileName: "",
-      imageSubfolder: "EdDeli/stores",
+      imageSubfolder: mediaStoragePath("stores"),
       moveImage: false,
     });
     setOpenForm(true);
@@ -1100,7 +1101,7 @@ function StoresPage() {
       imageFile: null,
       imageSubfolder: row.imageUrl?.includes("/")
         ? row.imageUrl.split("/").slice(0, -1).join("/")
-        : "EdDeli/stores",
+        : mediaStoragePath("stores"),
       customFileName: row.imageUrl
         ? row.imageUrl.split("/").pop().replace(/\.[^.]+$/, "")
         : "",
