@@ -39,3 +39,13 @@ export function getOrderCustomerDisplay(order) {
 export function isCajaPosOrder(order) {
   return String(order?.notes || "").includes(CAJA_POS_TAG);
 }
+
+/** Cliente genérico para ventas de mostrador sin datos de factura. */
+export function findConsumidorFinalCustomer(customers) {
+  return (
+    customers.find((c) => {
+      const n = String(c.name || "").toLowerCase();
+      return n.includes("consumidor") || n.includes("final");
+    }) ?? null
+  );
+}

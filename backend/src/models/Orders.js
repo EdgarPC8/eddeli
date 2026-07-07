@@ -142,14 +142,14 @@ export const SupplierOrderItem = sequelize.define("ERP_supplier_order_items", {
 });
 
 // Relaciones
-Customer.hasMany(Order, { foreignKey: 'customerId' });
-Order.belongsTo(Customer, { foreignKey: 'customerId' });
+Customer.hasMany(Order, { foreignKey: "customerId", as: "ERP_orders" });
+Order.belongsTo(Customer, { foreignKey: "customerId", as: "ERP_customer" });
 
-Order.hasMany(OrderItem, { foreignKey: 'orderId', onDelete: 'CASCADE' });
-OrderItem.belongsTo(Order, { foreignKey: 'orderId' });
+Order.hasMany(OrderItem, { foreignKey: "orderId", onDelete: "CASCADE", as: "ERP_order_items" });
+OrderItem.belongsTo(Order, { foreignKey: "orderId", as: "ERP_order" });
 
-InventoryProduct.hasMany(OrderItem, { foreignKey: 'productId' });
-OrderItem.belongsTo(InventoryProduct, { foreignKey: 'productId' });
+InventoryProduct.hasMany(OrderItem, { foreignKey: "productId" });
+OrderItem.belongsTo(InventoryProduct, { foreignKey: "productId", as: "ERP_inventory_product" });
 
 CashShift.hasMany(Order, { foreignKey: 'shiftId', as: 'orders' });
 Order.belongsTo(CashShift, { foreignKey: 'shiftId', as: 'shift' });

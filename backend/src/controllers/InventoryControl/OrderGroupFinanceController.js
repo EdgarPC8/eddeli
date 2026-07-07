@@ -10,6 +10,10 @@ import { InventoryProduct } from "../../models/Inventory.js"; // ajusta
 import { ItemGroup, ItemGroupItem, Payment,Income } from "../../models/Finance.js"; // ajusta
 import { getHeaderToken,verifyJWT} from "../../libs/jwt.js";
 import { toFinanceDateTime } from "../../utils/financeDateTime.js";
+import {
+  isWalkInPosOrder,
+  walkInPosOrderExcludeWhere,
+} from "../../utils/posOrderUtils.js";
 const toNum = (v, def = 0) => {
     const n = Number(v ?? def);
     return Number.isFinite(n) ? n : def;
@@ -814,7 +818,9 @@ export const getFinanceWorkbenchAll = async (req, res) => {
           {
             model: Order,
             as: "ERP_orders",
-            attributes: ["id", "customerId", "date", "createdAt"],
+            required: false,
+            where: walkInPosOrderExcludeWhere(Op),
+            attributes: ["id", "customerId", "date", "createdAt", "notes", "documentType"],
             include: [
               {
                 model: OrderItem,
@@ -1010,6 +1016,7 @@ export const getFinanceWorkbenchAll = async (req, res) => {
       for (const c of customers) {
         const ordersArr = Array.isArray(c.ERP_orders) ? c.ERP_orders : [];
         for (const o of ordersArr) {
+          if (isWalkInPosOrder(o)) continue;
           const itemsArr = Array.isArray(o.ERP_order_items) ? o.ERP_order_items : [];
           outOrders.push({
             id: o.id,

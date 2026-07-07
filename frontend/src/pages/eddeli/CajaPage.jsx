@@ -50,7 +50,7 @@ import CajaCustomerFormDialog from "./CajaCustomerFormDialog.jsx";
 import CajaQuickProductsDialog from "./CajaQuickProductsDialog.jsx";
 import SearchableSelect from "../../components/SearchableSelect.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
-import { buildCajaOrderNotes } from "../../utils/eddeliPosOrderUtils.js";
+import { buildCajaOrderNotes, findConsumidorFinalCustomer } from "../../utils/eddeliPosOrderUtils.js";
 import { buildCustomerDisplayName, formatCustomerDocument } from "./cajaCustomerUtils.js";
 import { formatMoney } from "../../utils/turnoCashUtils.js";
 import { useBarcodeScanner } from "../../hooks/useBarcodeScanner.js";
@@ -222,8 +222,9 @@ export default function CajaPage() {
     setCustomers(nextCustomers);
     setTierGroups(nextTierGroups);
     setActiveShift(shiftRes.status === "fulfilled" ? shiftRes.value.data : null);
-    if (!customerId && nextCustomers.length > 0) {
-      setCustomerId(String(nextCustomers[0].id));
+    if (!customerId) {
+      const consumidorFinal = findConsumidorFinalCustomer(nextCustomers);
+      if (consumidorFinal) setCustomerId(String(consumidorFinal.id));
     }
     return { products: nextProducts, customers: nextCustomers };
   };
@@ -706,11 +707,7 @@ export default function CajaPage() {
       void toast?.({ message: "Para factura debes seleccionar un cliente.", variant: "warning" });
       return;
     }
-    const fallbackCustomer =
-      customers.find((c) => {
-        const n = String(c.name || "").toLowerCase();
-        return n.includes("consumidor") || n.includes("final");
-      }) || customers[0];
+    const fallbackCustomer = findConsumidorFinalCustomer(customers);
     const resolvedCustomerId = isInvoice || useCustomerData ? customerId : String(fallbackCustomer?.id || "");
     if (!resolvedCustomerId) {
       void toast?.({

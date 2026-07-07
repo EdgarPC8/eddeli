@@ -5,7 +5,11 @@ import { startOfDay, endOfDay, subMonths, format, addDays, differenceInDays, par
 
 import { InventoryMovement, InventoryProduct } from "../../models/Inventory.js";
 
-import { Income, Expense } from "../../models/Finance.js"; 
+import { Income, Expense } from "../../models/Finance.js";
+import {
+  isWalkInPosOrder,
+  walkInPosOrderExcludeWhere,
+} from "../../utils/posOrderUtils.js";
 // controllers/FinanceController.js
 
 export const getExpensesForChart = async (req, res) => {
@@ -152,13 +156,18 @@ export const getCustomerSalesSummary = async (req, res) => {
       include: [
         {
           model: Order,
+          as: "ERP_orders",
+          required: false,
+          where: walkInPosOrderExcludeWhere(Op),
           include: [
             {
               model: OrderItem,
+              as: "ERP_order_items",
               include: [
                 {
                   model: InventoryProduct,
-                  attributes: ['id', 'name'],
+                  as: "ERP_inventory_product",
+                  attributes: ["id", "name"],
                 },
               ],
             },
@@ -168,7 +177,9 @@ export const getCustomerSalesSummary = async (req, res) => {
     });
 
     const data = customers.map((c) => {
-      const orders = Array.isArray(c.ERP_orders) ? c.ERP_orders : [];
+      const orders = (Array.isArray(c.ERP_orders) ? c.ERP_orders : []).filter(
+        (o) => !isWalkInPosOrder(o),
+      );
 
       let totalQuantity = 0;
       let totalPrice = 0;

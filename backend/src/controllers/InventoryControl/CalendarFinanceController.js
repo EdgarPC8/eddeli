@@ -1,6 +1,7 @@
 import { Customer, Order, OrderItem } from "../../models/Orders.js";
 import { Expense, Payment, ItemGroup, ItemGroupItem } from "../../models/Finance.js";
 import { InventoryProduct, InventoryMovement } from "../../models/Inventory.js";
+import { CashShiftMovement } from "../../models/CashShiftMovement.js";
 import { Op } from "sequelize";
 import {
   startOfMonth,
@@ -252,16 +253,77 @@ async function fetchPaymentsInRange(start, end) {
 async function fetchExpensesInRange(start, end) {
   return Expense.findAll({
     where: { date: { [Op.between]: [start, end] } },
-    include: [
-      {
-        model: InventoryProduct,
-        as: "ERP_inventory_product",
-        attributes: ["name"],
-        required: false,
-      },
+    attributes: [
+      "id",
+      "date",
+      "amount",
+      "concept",
+      "category",
+      "referenceId",
+      "referenceType",
     ],
     order: [["date", "ASC"]],
   });
+}
+
+/**
+ * Resuelve nombre de producto por gasto según referenceType.
+ * - inventory_entry → referenceId es productId
+ * - cash_shift_movement → referenceId es movimiento de caja; producto en CashShiftMovement.productId
+ */
+async function buildExpenseProductNameResolver(expenses) {
+  const inventoryProductIds = new Set();
+  const shiftMovementIds = new Set();
+
+  for (const e of expenses) {
+    if (!e.referenceId) continue;
+    if (e.referenceType === "inventory_entry") {
+      inventoryProductIds.add(e.referenceId);
+    } else if (e.referenceType === "cash_shift_movement") {
+      shiftMovementIds.add(e.referenceId);
+    }
+  }
+
+  const shiftMovements =
+    shiftMovementIds.size > 0
+      ? await CashShiftMovement.findAll({
+          where: { id: { [Op.in]: [...shiftMovementIds] } },
+          attributes: ["id", "productId"],
+        })
+      : [];
+
+  const shiftProductByMovementId = new Map(
+    shiftMovements.map((m) => [m.id, m.productId ?? null]),
+  );
+
+  for (const productId of shiftMovements.map((m) => m.productId).filter(Boolean)) {
+    inventoryProductIds.add(productId);
+  }
+
+  const products =
+    inventoryProductIds.size > 0
+      ? await InventoryProduct.findAll({
+          where: { id: { [Op.in]: [...inventoryProductIds] } },
+          attributes: ["id", "name"],
+        })
+      : [];
+
+  const productNameById = new Map(products.map((p) => [p.id, p.name]));
+
+  return (expense) => {
+    if (!expense.referenceId) return null;
+
+    if (expense.referenceType === "inventory_entry") {
+      return productNameById.get(expense.referenceId) ?? null;
+    }
+
+    if (expense.referenceType === "cash_shift_movement") {
+      const productId = shiftProductByMovementId.get(expense.referenceId);
+      return productId ? productNameById.get(productId) ?? null : null;
+    }
+
+    return null;
+  };
 }
 
 async function fetchMermaMovementsInRange(start, end) {
@@ -493,12 +555,14 @@ async function buildPeriodDetail(range) {
     };
   });
 
+  const expenseProductName = await buildExpenseProductNameResolver(expenses);
+
   const shapedExpenses = [
     ...expenses.map((e) => ({
       id: e.id,
       concept: e.concept,
       category: e.category,
-      productName: e.ERP_inventory_product?.name || null,
+      productName: expenseProductName(e),
       amount: round2(e.amount),
     })),
     ...mermaMovements.map((m) => ({
