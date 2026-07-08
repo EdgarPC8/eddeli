@@ -59,6 +59,7 @@ import PublicidadDevicesPage from "./pages/eddeli/publicidad/PublicidadDevicesPa
 import AppSettingsPage from "./pages/AppSettingsPage.jsx";
 import SubscriptionExpiredPage from "./pages/SubscriptionExpiredPage.jsx";
 import NoSubscriptionPage from "./pages/NoSubscriptionPage.jsx";
+import MaintenancePage from "./pages/MaintenancePage.jsx";
 
 const AUTH_ROLES = ["Programador", "Administrador", "Empleado"];
 
@@ -93,6 +94,7 @@ export default function App() {
             element={<SubscriptionExpiredPage />}
           />
           <Route path="/no-subscription" element={<NoSubscriptionPage />} />
+          <Route path="/mantenimiento" element={<MaintenancePage />} />
           <Route path="/catalogo" element={<CatalogoPage />} />
           <Route path="/punto_venta" element={<StoresPublicPage />} />
 

@@ -54,6 +54,7 @@ export const useSubscriptions = () => {
 
   useEffect(() => {
     if (!SUBSCRIPTIONS_ENABLED) return;
+
     fetchSub();
   }, []);
 

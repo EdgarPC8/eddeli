@@ -72,7 +72,7 @@ export default function ProtectedRoute({ requiredRol }) {
   }
 
   const hasAccess = subscription.subscription.modules.find((m) =>
-    m.sections.includes(location.pathname),
+    m.sections.some((s) => s.key === location.pathname),
   );
 
   if (!hasAccess) {
