@@ -67,6 +67,10 @@ export default function ProtectedRoute({ requiredRol }) {
   //   return <Outlet />;
   // }
 
+  if (subscription?.maintenance) {
+    return <Navigate to="/mantenimiento" replace />;
+  }
+
   if (!subscription?.subscribed || expired) {
     return <Navigate to="/subscription-expired" replace />;
   }

@@ -138,8 +138,14 @@ export default function App() {
               element={<TurnoSupervisionPage />}
             />
             <Route path="/panel_control" element={<PanelControlPage />} />
-            <Route path="/sistema/configuracion" element={<AppSettingsPage />} />
-            <Route path="/app-settings" element={<Navigate to="/sistema/configuracion" replace />} />
+            <Route
+              path="/sistema/configuracion"
+              element={<AppSettingsPage />}
+            />
+            <Route
+              path="/app-settings"
+              element={<Navigate to="/sistema/configuracion" replace />}
+            />
             {/* Ruta reservada; menú oculto hasta API backend (NotificationProgramsPage) */}
             <Route
               path="/notification-programs"
