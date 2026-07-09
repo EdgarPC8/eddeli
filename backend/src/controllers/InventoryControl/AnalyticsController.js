@@ -10,31 +10,22 @@ import {
   isWalkInPosOrder,
   walkInPosOrderExcludeWhere,
 } from "../../utils/posOrderUtils.js";
-// controllers/FinanceController.js
+import { buildFinanceDateWhere, buildFinanceDateColumnWhere } from "../../utils/financeDateUtils.js";
 
 export const getExpensesForChart = async (req, res) => {
   try {
     const { startDate, endDate, referenceId, category, insumosOnly } = req.query;
 
-    const where = {};
+    const andClauses = [];
+    const dateClause = buildFinanceDateColumnWhere(startDate, endDate);
+    if (dateClause) andClauses.push(dateClause);
+
     const onlyInsumos = insumosOnly === "1" || insumosOnly === "true";
 
-    // Filtro de fecha (columna date = DATEONLY)
-    if (startDate || endDate) {
-      const s = startDate && isValidDate(parseISO(startDate)) 
-        ? format(parseISO(startDate), "yyyy-MM-dd") 
-        : null;
-      const e = endDate && isValidDate(parseISO(endDate))
-        ? format(parseISO(endDate), "yyyy-MM-dd")
-        : null;
+    if (referenceId) andClauses.push({ referenceId: Number(referenceId) });
+    if (category) andClauses.push({ category });
 
-      if (s && e) where.date = { [Op.between]: [s, e] };
-      else if (s) where.date = { [Op.gte]: s };
-      else if (e) where.date = { [Op.lte]: e };
-    }
-
-    if (referenceId) where.referenceId = Number(referenceId);
-    if (category) where.category = category;
+    const where = andClauses.length ? { [Op.and]: andClauses } : {};
 
     const expenses = await Expense.findAll({
       where,
@@ -318,20 +309,8 @@ export const getIncomeExpenseBreakdown = async (req, res) => {
   const round2 = (n) => Number.parseFloat(toNum(n).toFixed(2));
 
   try {
-    // --- Filtros opcionales por fecha: ?startDate=YYYY-MM-DD&endDate=YYYY-MM-DD
     const { startDate, endDate } = req.query;
-
-    let dateWhere; // para createdAt
-    if (startDate || endDate) {
-      const start = startDate ? startOfDay(parseISO(startDate)) : undefined;
-      const end = endDate ? endOfDay(parseISO(endDate)) : undefined;
-
-      if (start && end) dateWhere = { [Op.between]: [start, end] };
-      else if (start) dateWhere = { [Op.gte]: start };
-      else if (end) dateWhere = { [Op.lte]: end };
-    }
-
-    const commonWhere = dateWhere ? { createdAt: dateWhere } : {};
+    const commonWhere = buildFinanceDateWhere(startDate, endDate);
 
     // --- Totales globales (crudos)
     const [totalIncomeRaw, totalExpenseRaw] = await Promise.all([

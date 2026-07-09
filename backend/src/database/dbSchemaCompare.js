@@ -34,14 +34,14 @@ function sequelizeColumnFamily(attr) {
 /** Normaliza tipo devuelto por describeTable (MySQL). */
 function mysqlColumnFamily(desc) {
   const raw = String(desc?.type || "").toUpperCase();
-  if (raw.includes("INT") && desc?.autoIncrement) return "INT_AI";
-  if (raw.includes("INT") || raw.includes("BIGINT") || raw.includes("SMALLINT")) return "INT";
-  if (raw.startsWith("TINYINT(1)") || raw === "BOOLEAN") return "BOOL";
   if (raw.startsWith("ENUM")) {
     const inner = raw.slice(raw.indexOf("(") + 1, raw.lastIndexOf(")"));
     const values = inner.split(",").map((v) => v.trim().replace(/^'|'$/g, ""));
     return `ENUM:${values.sort().join(",")}`;
   }
+  if (raw.includes("INT") && desc?.autoIncrement) return "INT_AI";
+  if (raw.includes("INT") || raw.includes("BIGINT") || raw.includes("SMALLINT")) return "INT";
+  if (raw.startsWith("TINYINT(1)") || raw === "BOOLEAN") return "BOOL";
   if (raw.includes("VARCHAR") || raw.includes("CHAR")) return "STRING";
   if (raw.includes("TEXT")) return "TEXT";
   if (raw === "JSON") return "JSON";
@@ -54,11 +54,28 @@ function mysqlColumnFamily(desc) {
   return raw.split("(")[0] || "UNKNOWN";
 }
 
+function normalizeEnumFamily(family) {
+  if (!String(family).startsWith("ENUM:")) return family;
+  const values = family
+    .slice(5)
+    .split(",")
+    .map((v) => v.trim().toLowerCase())
+    .filter(Boolean)
+    .sort();
+  return `ENUM:${values.join(",")}`;
+}
+
 function familiesCompatible(expected, actual) {
+  const exp = normalizeEnumFamily(expected);
+  const act = normalizeEnumFamily(actual);
+  if (exp === act) return true;
   if (expected === actual) return true;
   if (expected === "INT" && actual === "INT_AI") return false;
   if (expected === "INT_AI" && actual === "INT") return false;
   if (expected === "INT" && actual === "INT") return true;
+  if ((expected === "BOOL" && actual === "INT") || (expected === "INT" && actual === "BOOL")) {
+    return true;
+  }
   if (expected === "STRING" && actual === "TEXT") return true;
   if (expected === "TEXT" && actual === "STRING") return true;
   if (expected === "JSON" && actual === "TEXT") return true;

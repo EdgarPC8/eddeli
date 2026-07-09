@@ -248,7 +248,7 @@ export function EditorProvider({ children, designId = null, autoload = true }) {
     return null;
   };
 
-  /** Doc listo para guardar o exportar: sin backgroundSrc, sin __meta*, imágenes con ruta relativa (ej. EdDeli/products/x.png). */
+  /** Doc listo para guardar o exportar: sin backgroundSrc, sin __meta*, imágenes con ruta relativa (ej. sistema/products/x.png). */
   const getDocForExport = () => {
     const doc = state.doc || {};
     const { __metaSource, __metaTemplateId, backgroundSrc, ...docClean } = doc;

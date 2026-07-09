@@ -22,14 +22,20 @@ export const AppSettings = sequelize.define(
     socialInstagram: { type: DataTypes.STRING(255), allowNull: true },
     socialTiktok: { type: DataTypes.STRING(255), allowNull: true },
     socialEmail: { type: DataTypes.STRING(120), allowNull: true },
-    /** Prefijo de carpetas en src/img (ej. EdDeli, MiNegocio). */
-    mediaFolderPrefix: { type: DataTypes.STRING(80), allowNull: false, defaultValue: "app" },
+    /** Prefijo de carpetas en src/img y src/files (ej. sistema). */
+    mediaFolderPrefix: { type: DataTypes.STRING(80), allowNull: false, defaultValue: "sistema" },
     /** Subcadena para filtrar categoría en accesos rápidos de caja (ej. panader). */
     cajaQuickCategoryMatch: { type: DataTypes.STRING(80), allowNull: true },
     walkInCustomerLabel: {
       type: DataTypes.STRING(80),
       allowNull: false,
       defaultValue: "Consumidor Final",
+    },
+    /** Zona horaria IANA (ej. America/Guayaquil) para fechas del sistema. */
+    timezone: {
+      type: DataTypes.STRING(64),
+      allowNull: false,
+      defaultValue: "America/Guayaquil",
     },
   },
   { timestamps: true },

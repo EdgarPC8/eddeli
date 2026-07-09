@@ -1,4 +1,5 @@
 import { isValid, parse } from "date-fns";
+import { formatAppDateTime, getAppTimezone } from "../utils/appDateTime.js";
 
 const BACKEND_DT = "dd/MM/yyyy HH:mm:ss";
 const BACKEND_DT_SHORT = "dd/MM/yyyy HH:mm";
@@ -21,11 +22,15 @@ export function parseAppDate(value) {
   return isValid(iso) ? iso : null;
 }
 
-/** Fecha + hora legible en tablas (es-EC, 12 h con a. m. / p. m.). */
+/** Fecha + hora legible en tablas (zona de la app desde configuración). */
 export function formatDateTime(value, options = {}) {
-  const { showSeconds = false, fallback = "—" } = options;
+  const { showSeconds = false, fallback = "—", timeZone } = options;
   const date = parseAppDate(value);
   if (!date) return fallback;
+
+  if (timeZone || getAppTimezone()) {
+    return formatAppDateTime(date, { showSeconds, fallback, timeZone });
+  }
 
   return date.toLocaleString("es-EC", {
     year: "numeric",

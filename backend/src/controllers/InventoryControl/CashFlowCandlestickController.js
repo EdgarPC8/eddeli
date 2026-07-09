@@ -15,6 +15,7 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import { Income, Expense } from "../../models/Finance.js";
+import { toFinanceDayKey, financeBucketKey, toChartBusinessDay, buildFinanceDateWhere } from "../../utils/financeDateUtils.js";
 
 const VALID_GRANULARITY = new Set(["day", "week", "month"]);
 
@@ -36,7 +37,7 @@ function bucketMeta(date, granularity) {
       label: format(start, "EEE d MMM", { locale: es }),
       start,
       end: addDays(start, 1),
-      time: Math.floor(start.getTime() / 1000),
+      time: toChartBusinessDay(start),
     };
   }
   if (granularity === "week") {
@@ -47,7 +48,7 @@ function bucketMeta(date, granularity) {
       label: `${format(start, "d MMM", { locale: es })} – ${format(weekEnd, "d MMM", { locale: es })}`,
       start,
       end: addWeeks(start, 1),
-      time: Math.floor(start.getTime() / 1000),
+      time: toChartBusinessDay(start),
     };
   }
   const start = startOfMonth(d);
@@ -56,7 +57,7 @@ function bucketMeta(date, granularity) {
     label: format(start, "MMM yyyy", { locale: es }),
     start,
     end: addMonths(start, 1),
-    time: Math.floor(start.getTime() / 1000),
+    time: toChartBusinessDay(start),
   };
 }
 
@@ -104,8 +105,16 @@ function openingBalanceBefore(movements, beforeDate) {
   return balance;
 }
 
-function buildCandles(movements, buckets) {
+function buildCandles(movements, buckets, granularity) {
   if (!buckets.length) return [];
+
+  const movementsByKey = new Map();
+  for (const m of movements) {
+    const key = financeBucketKey(m.ts, granularity);
+    if (!key) continue;
+    if (!movementsByKey.has(key)) movementsByKey.set(key, []);
+    movementsByKey.get(key).push(m);
+  }
 
   let balance = openingBalanceBefore(movements, buckets[0].start);
   const candles = [];
@@ -115,9 +124,7 @@ function buildCandles(movements, buckets) {
     let high = balance;
     let low = balance;
 
-    for (const m of movements) {
-      if (m.ts < bucket.start) continue;
-      if (m.ts >= bucket.end) break;
+    for (const m of movementsByKey.get(bucket.key) || []) {
       balance += m.delta;
       high = Math.max(high, balance);
       low = Math.min(low, balance);
@@ -155,9 +162,19 @@ export const getCashFlowCandles = async (req, res) => {
     ]);
 
     const movements = [
-      ...incomes.map((r) => ({ ts: new Date(r.date), delta: toNum(r.amount) })),
-      ...expenses.map((r) => ({ ts: new Date(r.date), delta: -toNum(r.amount) })),
-    ].sort((a, b) => a.ts - b.ts);
+      ...incomes.map((r) => ({
+        dayKey: toFinanceDayKey(r.date),
+        ts: new Date(r.date),
+        delta: toNum(r.amount),
+      })),
+      ...expenses.map((r) => ({
+        dayKey: toFinanceDayKey(r.date),
+        ts: new Date(r.date),
+        delta: -toNum(r.amount),
+      })),
+    ]
+      .filter((m) => m.dayKey)
+      .sort((a, b) => a.ts - b.ts);
 
     if (!movements.length) {
       return res.json({
@@ -182,7 +199,7 @@ export const getCashFlowCandles = async (req, res) => {
     const sliceEnd = Math.max(0, totalCandles - offset);
     const sliceStart = Math.max(0, sliceEnd - limit);
     const windowBuckets = allBuckets.slice(sliceStart, sliceEnd);
-    const candles = buildCandles(movements, windowBuckets);
+    const candles = buildCandles(movements, windowBuckets, granularity);
 
     const openingBalance = windowBuckets.length
       ? openingBalanceBefore(movements, windowBuckets[0].start)

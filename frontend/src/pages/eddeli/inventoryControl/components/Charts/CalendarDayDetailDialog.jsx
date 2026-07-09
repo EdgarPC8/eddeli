@@ -44,7 +44,7 @@ const TABS = {
   expenses: 'expenses',
 };
 
-function groupOrdersByCustomer(orders) {
+function groupOrdersByCustomer(orders = []) {
   const map = new Map();
   for (const o of orders) {
     const key = o.customer || 'Sin cliente';
@@ -59,7 +59,7 @@ function groupOrdersByCustomer(orders) {
   return [...map.values()].sort((a, b) => b.total - a.total || a.customer.localeCompare(b.customer, 'es'));
 }
 
-function groupCollectionsByCustomer(abonos, directPayments) {
+function groupCollectionsByCustomer(abonos = [], directPayments = []) {
   const map = new Map();
 
   const ensure = (customer) => {
@@ -355,7 +355,19 @@ export default function CalendarDayDetailDialog({
 
   const dayIncomeTotal = useMemo(() => {
     if (!detail?.totals) return 0;
-    return Number(detail.totals.posSalesAmount ?? 0) + Number(detail.totals.collectedAmount ?? 0);
+    return Number(
+      (Number(detail.totals.posIncomeAmount ?? 0) + Number(detail.totals.collectedAmount ?? 0)).toFixed(2)
+    );
+  }, [detail]);
+
+  const cajaIncomes = useMemo(() => {
+    if (!detail?.incomes) return [];
+    return detail.incomes.filter((i) => i.source === 'caja');
+  }, [detail]);
+
+  const cobroIncomes = useMemo(() => {
+    if (!detail?.incomes) return [];
+    return detail.incomes.filter((i) => i.source !== 'caja');
   }, [detail]);
 
   const groupedOrders = useMemo(
@@ -368,10 +380,29 @@ export default function CalendarDayDetailDialog({
     [detail]
   );
 
-  const groupedCollections = useMemo(
-    () => (detail ? groupCollectionsByCustomer(detail.abonos, detail.directPayments) : []),
-    [detail]
-  );
+  const usesIncomeRows = Array.isArray(detail?.incomes);
+
+  const filteredIncomes = useMemo(() => {
+    if (!detail) return [];
+    if (usesIncomeRows) {
+      const base = isIncomeView && tab === TABS.posSales
+        ? cajaIncomes
+        : isIncomeView && tab === TABS.collections
+          ? cobroIncomes
+          : detail.incomes;
+      return filterByText(base, filter, [
+        (i) => i.concept,
+        (i) => i.category,
+        (i) => i.counterparty,
+        (i) => i.source,
+      ]);
+    }
+    return filterByText(
+      groupCollectionsByCustomer(detail.abonos, detail.directPayments),
+      filter,
+      [(g) => g.customer],
+    );
+  }, [detail, filter, usesIncomeRows, isIncomeView, tab, cajaIncomes, cobroIncomes]);
 
   const filteredOrders = useMemo(
     () => filterByText(groupedOrders, filter, [(g) => g.customer]),
@@ -383,14 +414,9 @@ export default function CalendarDayDetailDialog({
     [groupedPosSales, filter]
   );
 
-  const filteredCollections = useMemo(
-    () => filterByText(groupedCollections, filter, [(g) => g.customer]),
-    [groupedCollections, filter]
-  );
-
   const filteredExpenses = useMemo(() => {
     if (!detail) return [];
-    return filterByText(detail.expenses, filter, [
+    return filterByText(detail.expenses ?? [], filter, [
       (e) => e.concept,
       (e) => e.category,
       (e) => e.productName,
@@ -405,7 +431,9 @@ export default function CalendarDayDetailDialog({
         key,
         label: format(parseISO(key), 'EEE d MMM', { locale: es }),
         ...m,
-        incomeTotal: Number(m.posSalesAmount ?? 0) + Number(m.collectedAmount ?? 0),
+        incomeTotal: Number(
+          (Number(m.posIncomeAmount ?? 0) + Number(m.collectedAmount ?? 0)).toFixed(2)
+        ),
       }));
   }, [detail, periodGranularity]);
 
@@ -422,6 +450,7 @@ export default function CalendarDayDetailDialog({
           label: `Sem. ${format(ws, 'd MMM', { locale: es })} – ${format(endOfWeek(ws, { weekStartsOn: 1 }), 'd MMM', { locale: es })}`,
           ordersAmount: 0,
           posSalesAmount: 0,
+          posIncomeAmount: 0,
           collectedAmount: 0,
           expensesAmount: 0,
         });
@@ -429,6 +458,7 @@ export default function CalendarDayDetailDialog({
       const row = weekMap.get(wk);
       row.ordersAmount = Number((row.ordersAmount + Number(m.ordersAmount ?? 0)).toFixed(2));
       row.posSalesAmount = Number((row.posSalesAmount + Number(m.posSalesAmount ?? 0)).toFixed(2));
+      row.posIncomeAmount = Number((row.posIncomeAmount + Number(m.posIncomeAmount ?? 0)).toFixed(2));
       row.collectedAmount = Number((row.collectedAmount + Number(m.collectedAmount ?? 0)).toFixed(2));
       row.expensesAmount = Number((row.expensesAmount + Number(m.expensesAmount ?? 0)).toFixed(2));
     }
@@ -495,15 +525,23 @@ export default function CalendarDayDetailDialog({
               sx={{ bgcolor: alpha(colors.orderMoney, 0.15), color: colors.orderMoney, fontWeight: 700 }}
             />
           )}
+          {!isIncomeView && (
+            <Chip
+              icon={<PointOfSaleIcon />}
+              label={`Caja operativa (fecha pedido): ${moneyFmt(detail.totals?.posSalesAmount ?? 0)}`}
+              size="small"
+              sx={{ bgcolor: alpha(colors.posSales, 0.15), color: colors.posSales, fontWeight: 700 }}
+            />
+          )}
           <Chip
             icon={<PointOfSaleIcon />}
-            label={`Caja: ${moneyFmt(detail.totals?.posSalesAmount ?? 0)}`}
+            label={`Caja (entrada $): ${moneyFmt(detail.totals?.posIncomeAmount ?? 0)}`}
             size="small"
             sx={{ bgcolor: alpha(colors.posSales, 0.15), color: colors.posSales, fontWeight: 700 }}
           />
           <Chip
             icon={<PaymentsIcon />}
-            label={`Cobranzas: ${moneyFmt(detail.totals?.collectedAmount ?? 0)}`}
+            label={`Cobros pedidos: ${moneyFmt(detail.totals?.collectedAmount ?? 0)}`}
             size="small"
             sx={{ bgcolor: alpha(colors.collected, 0.15), color: colors.collected, fontWeight: 700 }}
           />
@@ -532,8 +570,9 @@ export default function CalendarDayDetailDialog({
                 <TableRow>
                   <TableCell sx={{ fontWeight: 700 }}>Semana</TableCell>
                   {!isIncomeView && <TableCell align="right" sx={{ fontWeight: 700 }}>Pedidos</TableCell>}
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Caja</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Cobranzas</TableCell>
+                  {!isIncomeView && <TableCell align="right" sx={{ fontWeight: 700 }}>Caja op.</TableCell>}
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Caja ($)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Cobros</TableCell>
                   {!isIncomeView && <TableCell align="right" sx={{ fontWeight: 700 }}>Gastos</TableCell>}
                 </TableRow>
               </TableHead>
@@ -542,7 +581,8 @@ export default function CalendarDayDetailDialog({
                   <TableRow key={row.key}>
                     <TableCell>{row.label}</TableCell>
                     {!isIncomeView && <TableCell align="right">{moneyFmt(row.ordersAmount)}</TableCell>}
-                    <TableCell align="right">{moneyFmt(row.posSalesAmount)}</TableCell>
+                    {!isIncomeView && <TableCell align="right">{moneyFmt(row.posSalesAmount)}</TableCell>}
+                    <TableCell align="right">{moneyFmt(row.posIncomeAmount ?? 0)}</TableCell>
                     <TableCell align="right">{moneyFmt(row.collectedAmount)}</TableCell>
                     {!isIncomeView && <TableCell align="right">{moneyFmt(row.expensesAmount)}</TableCell>}
                   </TableRow>
@@ -559,8 +599,9 @@ export default function CalendarDayDetailDialog({
                 <TableRow>
                   <TableCell sx={{ fontWeight: 700 }}>Día</TableCell>
                   {!isIncomeView && <TableCell align="right" sx={{ fontWeight: 700 }}>Pedidos</TableCell>}
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Caja</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 700 }}>Cobranzas</TableCell>
+                  {!isIncomeView && <TableCell align="right" sx={{ fontWeight: 700 }}>Caja op.</TableCell>}
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Caja ($)</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 700 }}>Cobros</TableCell>
                   {!isIncomeView && <TableCell align="right" sx={{ fontWeight: 700 }}>Gastos</TableCell>}
                 </TableRow>
               </TableHead>
@@ -569,7 +610,8 @@ export default function CalendarDayDetailDialog({
                   <TableRow key={row.key}>
                     <TableCell sx={{ textTransform: 'capitalize' }}>{row.label}</TableCell>
                     {!isIncomeView && <TableCell align="right">{moneyFmt(row.ordersAmount)}</TableCell>}
-                    <TableCell align="right">{moneyFmt(row.posSalesAmount)}</TableCell>
+                    {!isIncomeView && <TableCell align="right">{moneyFmt(row.posSalesAmount)}</TableCell>}
+                    <TableCell align="right">{moneyFmt(row.posIncomeAmount ?? 0)}</TableCell>
                     <TableCell align="right">{moneyFmt(row.collectedAmount)}</TableCell>
                     {!isIncomeView && <TableCell align="right">{moneyFmt(row.expensesAmount)}</TableCell>}
                   </TableRow>
@@ -601,13 +643,21 @@ export default function CalendarDayDetailDialog({
             value={TABS.posSales}
             icon={<PointOfSaleIcon fontSize="small" />}
             iconPosition="start"
-            label={`Caja (${detail.posSales?.length ?? 0})`}
+            label={
+              isIncomeView && usesIncomeRows
+                ? `Caja (${cajaIncomes.length})`
+                : `Caja (${detail.posSales?.length ?? 0})`
+            }
           />
           <Tab
             value={TABS.collections}
             icon={<PaymentsIcon fontSize="small" />}
             iconPosition="start"
-            label={`Cobranzas (${(detail.abonos?.length ?? 0) + (detail.directPayments?.length ?? 0)})`}
+            label={
+              isIncomeView && usesIncomeRows
+                ? `Cobros (${cobroIncomes.length})`
+                : `Ingresos (${usesIncomeRows ? (detail.incomes?.length ?? 0) : (detail.abonos?.length ?? 0) + (detail.directPayments?.length ?? 0)})`
+            }
           />
           {!isIncomeView && (
             <Tab
@@ -656,7 +706,40 @@ export default function CalendarDayDetailDialog({
 
         {tab === TABS.posSales && (
           <>
-            {!detail.posSales?.length ? (
+            {isIncomeView && usesIncomeRows ? (
+              !cajaIncomes.length ? (
+                <EmptyTab message="No hay ingresos de caja en esta fecha." />
+              ) : filteredIncomes.length === 0 ? (
+                <EmptyTab message="Ningún ingreso de caja coincide con el filtro." />
+              ) : (
+                <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700 }}>Concepto</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Categoría</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Contraparte</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Fecha entrada</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700 }}>Monto</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {filteredIncomes.map((inc) => (
+                        <TableRow key={inc.id} hover>
+                          <TableCell>{inc.concept || '—'}</TableCell>
+                          <TableCell>{inc.category || '—'}</TableCell>
+                          <TableCell>{inc.counterparty || '—'}</TableCell>
+                          <TableCell>{inc.date || '—'}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700, color: colors.posSales }}>
+                            {moneyFmt(inc.amount)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )
+            ) : !detail.posSales?.length ? (
               <EmptyTab message="No hay ventas de caja en esta fecha." />
             ) : filteredPosSales.length === 0 ? (
               <EmptyTab message="Ningún cliente coincide con el filtro." />
@@ -675,12 +758,49 @@ export default function CalendarDayDetailDialog({
 
         {tab === TABS.collections && (
           <>
-            {!detail.abonos?.length && !detail.directPayments?.length ? (
-              <EmptyTab message="No hay cobros en esta fecha." />
-            ) : filteredCollections.length === 0 ? (
+            {usesIncomeRows ? (
+              (isIncomeView ? !cobroIncomes.length : !detail.incomes.length) ? (
+                <EmptyTab message={isIncomeView ? 'No hay cobros de pedidos en esta fecha.' : 'No hay ingresos en esta fecha.'} />
+              ) : filteredIncomes.length === 0 ? (
+                <EmptyTab message="Ningún ingreso coincide con el filtro." />
+              ) : (
+                <TableContainer sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 1 }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ fontWeight: 700 }}>Concepto</TableCell>
+                        {!isIncomeView && <TableCell sx={{ fontWeight: 700 }}>Origen</TableCell>}
+                        <TableCell sx={{ fontWeight: 700 }}>Categoría</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Contraparte</TableCell>
+                        <TableCell sx={{ fontWeight: 700 }}>Fecha entrada</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 700 }}>Monto</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {filteredIncomes.map((inc) => (
+                        <TableRow key={inc.id} hover>
+                          <TableCell>{inc.concept || '—'}</TableCell>
+                          {!isIncomeView && (
+                            <TableCell>{inc.source === 'caja' ? 'Caja' : 'Cobro'}</TableCell>
+                          )}
+                          <TableCell>{inc.category || '—'}</TableCell>
+                          <TableCell>{inc.counterparty || '—'}</TableCell>
+                          <TableCell>{inc.date || '—'}</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 700, color: colors.collected }}>
+                            {moneyFmt(inc.amount)}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )
+            ) : !detail.abonos?.length && !detail.directPayments?.length ? (
+              <EmptyTab message="No hay ingresos en esta fecha." />
+            ) : filteredIncomes.length === 0 ? (
               <EmptyTab message="Ningún cliente coincide con el filtro." />
             ) : (
-              filteredCollections.map((g) => (
+              filteredIncomes.map((g) => (
                 <ClientCollectionsAccordion
                   key={g.customer}
                   group={g}

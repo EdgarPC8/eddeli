@@ -8,7 +8,7 @@ const AppSettingsContext = createContext(null);
 function toActiveApp(settings) {
   const s = settings || APP_SETTINGS_FALLBACK;
   const logoPath = s.logoPath || APP_SETTINGS_FALLBACK.logoPath;
-  const prefix = s.mediaFolderPrefix || APP_SETTINGS_FALLBACK.mediaFolderPrefix || "app";
+  const prefix = s.mediaFolderPrefix || APP_SETTINGS_FALLBACK.mediaFolderPrefix || "sistema";
   return {
     name: s.name,
     alias: s.alias,
@@ -24,6 +24,7 @@ function toActiveApp(settings) {
     qrFolder: s.qrFolder || `${prefix}/qr`,
     cajaQuickCategoryMatch: s.cajaQuickCategoryMatch || "",
     walkInCustomerLabel: s.walkInCustomerLabel || "Consumidor Final",
+    timezone: s.timezone || APP_SETTINGS_FALLBACK.timezone || "America/Guayaquil",
     year: new Date().getFullYear(),
     background: "#fff8f2",
   };

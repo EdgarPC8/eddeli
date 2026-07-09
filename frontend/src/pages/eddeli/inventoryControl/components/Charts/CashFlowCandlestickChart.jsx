@@ -321,7 +321,7 @@ export default function CashFlowCandlestickChart({ onCandleSelect, onDrillReset,
       </Box>
 
       <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>
-        Saldo acumulado (ingresos − gastos). Clic en una vela para desglosar en el gráfico de flujo (día→semana, semana→7 días, mes→semanas del mes).
+        Saldo acumulado (ingresos − gastos según Income/Expense). Clic en una vela para desglosar en el gráfico de flujo.
         {selectedLabel && (
           <> Seleccionada: <strong>{selectedLabel}</strong>.</>
         )}

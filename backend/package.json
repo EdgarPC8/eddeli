@@ -15,6 +15,8 @@
     "db:repair:json-fields": "node scripts/repair-json-fields.js",
     "db:audit:json-fields": "node scripts/audit-json-fields.js --backup",
     "db:verify:backup-json": "node scripts/verify-backup-json.js",
+    "db:patch:backup": "node scripts/patch-backup-schema.js",
+    "db:migrate:paths-to-sistema": "node scripts/migrate-eddeli-paths-to-sistema.js",
     "db:seed:panes-group": "node scripts/seed-panes-pricing-group.js",
     "db:migrate:tramos": "node scripts/migrate-tramos-from-categories.js",
     "db:reset": "node scripts/reset-database.js",

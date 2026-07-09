@@ -128,7 +128,11 @@ export default function IncomeExpenseCategoryChart({ data }) {
   if (!platforms || !groups) {
     return (
       <Paper sx={paperSx}>
-        <ChartBlockHeader title="Ingresos y gastos por categoría" sx={{ mb: 1, flexShrink: 0 }} />
+        <ChartBlockHeader
+          title="Ingresos y gastos por categoría"
+          subtitle="Totales por fecha en Income y Expense (no por fecha de pedido)."
+          sx={{ mb: 1, flexShrink: 0 }}
+        />
         <Box
           sx={{
             height: DASHBOARD_TWIN_PANEL_BODY_HEIGHT,
@@ -153,7 +157,11 @@ export default function IncomeExpenseCategoryChart({ data }) {
           spacing={1}
           sx={{ mb: 1, flexShrink: 0 }}
         >
-          <ChartBlockHeader title="Ingresos y gastos por categoría" sx={{ mb: 0, flex: 1 }} />
+        <ChartBlockHeader
+          title="Ingresos y gastos por categoría"
+          subtitle="Totales por fecha en Income y Expense (no por fecha de pedido)."
+          sx={{ mb: 0, flex: 1 }}
+        />
           <Button
             size="small"
             variant="outlined"

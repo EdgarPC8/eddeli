@@ -17,6 +17,7 @@ export const APP_SETTINGS_FALLBACK = {
   mediaFolderPrefix: "sistema",
   cajaQuickCategoryMatch: "panader",
   walkInCustomerLabel: "Consumidor Final",
+  timezone: "America/Guayaquil",
 };
 
 /** @deprecated Usar useAppSettings() o getActiveAppSettings() */

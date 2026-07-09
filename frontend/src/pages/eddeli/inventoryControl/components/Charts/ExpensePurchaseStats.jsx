@@ -375,7 +375,7 @@ export default function ExpensePurchaseStats() {
       >
         <ChartBlockHeader
           title="Compras de insumos por producto"
-          subtitle="Solo gastos de materia prima e insumos (entradas de compra). Elige el período y el bloque del ranking. Abre el detalle para intervalos y ritmo mensual."
+          subtitle="Gastos por fecha en Expense (materia prima e insumos). Elige el período y el bloque del ranking."
           sx={{ mb: 0, flex: 1 }}
         />
         <Button

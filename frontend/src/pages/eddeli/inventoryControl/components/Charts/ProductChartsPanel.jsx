@@ -94,7 +94,7 @@ export default function ProductChartsPanel() {
       >
         <ChartBlockHeader
           title="Ingresos por producto"
-          subtitle="Productos finales vendidos en pedidos y caja (pagados). Pasa el mouse sobre la gráfica para ver importe y cantidad."
+          subtitle="Por fecha de registro en Income (productos finales pagados). Importe y cantidad al pasar el mouse."
           sx={{ mb: 0, flex: 1 }}
         />
         <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ flexShrink: 0 }}>

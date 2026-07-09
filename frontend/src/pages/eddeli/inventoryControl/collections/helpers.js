@@ -1,6 +1,14 @@
 /**
  * Utilidades para el módulo de Cobranzas (CollectionsWorkbench).
  */
+export {
+  nowLocalDateTime,
+  toLocalDateTimeInput,
+  nowAppDateTimeInput,
+  toAppDateTimeInput,
+  formatAppDateTime,
+  getAppTimezone,
+} from "../../../../utils/appDateTime.js";
 
 export const safeFileName = (s = "") =>
   String(s)
@@ -50,21 +58,6 @@ export const todayISO = () => {
   const mm = String(d.getMonth() + 1).padStart(2, "0");
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
-};
-
-/** Valor para <input type="datetime-local"> (hora local). */
-export const nowLocalDateTime = () => {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
-};
-
-export const toLocalDateTimeInput = (value) => {
-  if (!value) return nowLocalDateTime();
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return nowLocalDateTime();
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 16);
 };
 
 export const sum = (arr, fn) =>

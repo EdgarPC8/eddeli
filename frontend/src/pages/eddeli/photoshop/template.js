@@ -36,14 +36,14 @@ export const template = {
       "h": 958,
       "zIndex": 10,
       "props": {
-        "src": "EdDeli/conos-frgou.jpg",
+        "src": "sistema/conos-frgou.jpg",
         "fit": "cover",
         "borderRadius": 30
       },
       "bind": {
         "srcFrom": "imageUrl",
         "srcPrefix": "",
-        "fallbackSrc": "EdDeli/conos-frgou.jpg"
+        "fallbackSrc": "sistema/conos-frgou.jpg"
       },
       "name": "product_image",
       "visible": true,
@@ -214,7 +214,7 @@ export const template = {
       "h": 308,
       "zIndex": 69,
       "props": {
-        "src": "EdDeli/ads/badges/estrella_badge_dorada.png",
+        "src": "sistema/ads/badges/estrella_badge_dorada.png",
         "fit": "cover",
         "borderRadius": 20
       },
@@ -233,7 +233,7 @@ export const template = {
       "h": 431,
       "zIndex": 72,
       "props": {
-        "src": "EdDeli/ads/badges/etiqueta_dorada.png",
+        "src": "sistema/ads/badges/etiqueta_dorada.png",
         "fit": "cover",
         "borderRadius": 20
       },
@@ -247,7 +247,7 @@ export const template = {
     "product": {
       "id": 65,
       "name": "Yoyos",
-      "primaryImageUrl": "EdDeli/yoyos-jnw46.png",
+      "primaryImageUrl": "sistema/yoyos-jnw46.png",
       "unitAbbr": "un",
       "desc": null,
       "standardWeightGrams": 0,
@@ -263,7 +263,7 @@ export const template = {
       "id": 40,
       "section": "home",
       "badge": "Bajo Pedido",
-      "imageUrl": "EdDeli/yoyos-jnw46.png",
+      "imageUrl": "sistema/yoyos-jnw46.png",
       "position": 0,
       "isActive": true,
       "title": "Yoyos",
@@ -275,7 +275,7 @@ export const template = {
       "product": {
         "id": 65,
         "name": "Yoyos",
-        "primaryImageUrl": "EdDeli/yoyos-jnw46.png",
+        "primaryImageUrl": "sistema/yoyos-jnw46.png",
         "unitAbbr": "un",
         "desc": null,
         "standardWeightGrams": 0,
@@ -292,7 +292,7 @@ export const template = {
       "id": 40,
       "section": "home",
       "badge": "Bajo Pedido",
-      "imageUrl": "EdDeli/yoyos-jnw46.png",
+      "imageUrl": "sistema/yoyos-jnw46.png",
       "position": 0,
       "isActive": true,
       "title": "Yoyos",
@@ -304,7 +304,7 @@ export const template = {
       "product": {
         "id": 65,
         "name": "Yoyos",
-        "primaryImageUrl": "EdDeli/yoyos-jnw46.png",
+        "primaryImageUrl": "sistema/yoyos-jnw46.png",
         "unitAbbr": "un",
         "desc": null,
         "standardWeightGrams": 0,

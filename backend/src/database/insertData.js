@@ -430,6 +430,15 @@ export function prepareBackupForRestore(jsonData) {
     });
   }
 
+  if (Array.isArray(data.AppSettings)) {
+    data.AppSettings = data.AppSettings.map((row) => {
+      if (!row || typeof row !== "object") return row;
+      const tz = row.timezone != null ? String(row.timezone).trim() : "";
+      if (tz) return row;
+      return { ...row, timezone: "America/Guayaquil" };
+    });
+  }
+
   return data;
 }
 

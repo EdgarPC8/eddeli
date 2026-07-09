@@ -17,7 +17,7 @@ export const img = (p = "") =>
 
 /**
  * Convierte una URL absoluta de imagen (base pathImg) a ruta relativa para guardar.
- * Ej: "http://host/eddeliapi/img/EdDeli/products/x.png" -> "EdDeli/products/x.png"
+ * Ej: "http://host/eddeliapi/img/sistema/products/x.png" -> "sistema/products/x.png"
  * Si ya es relativa o data:/blob:, la devuelve tal cual.
  */
 export const toRelativeImagePath = (value) => {

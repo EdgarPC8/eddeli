@@ -1,6 +1,6 @@
 import { Customer, Order, OrderItem } from "../../models/Orders.js";
-import { Expense, Payment, ItemGroup, ItemGroupItem } from "../../models/Finance.js";
-import { InventoryProduct, InventoryMovement } from "../../models/Inventory.js";
+import { Expense, Income } from "../../models/Finance.js";
+import { InventoryProduct } from "../../models/Inventory.js";
 import { CashShiftMovement } from "../../models/CashShiftMovement.js";
 import { Op } from "sequelize";
 import {
@@ -12,11 +12,12 @@ import {
   parseISO,
   isValid as isValidDate,
 } from "date-fns";
+import { toFinanceDayKey, buildFinanceDateColumnWhere } from "../../utils/financeDateUtils.js";
+import { formatAppDateTime } from "../../utils/appDateTime.js";
 
 const CAJA_POS_TAG = "[CAJA_POS]";
-const MERMA_REASONS = ["SALIDA_MERMA", "SALIDA_DANIADO", "SALIDA_CADUCADO"];
 const round2 = (n) => Number(Number(n ?? 0).toFixed(2));
-const dayKey = (d) => format(d, "yyyy-MM-dd");
+const dayKey = (d) => toFinanceDayKey(d);
 
 function isPosOrder(order) {
   return String(order?.notes || "").includes(CAJA_POS_TAG);
@@ -35,6 +36,8 @@ function emptyDayMetrics() {
     deliveredUnits: 0,
     posSalesAmount: 0,
     posSalesCount: 0,
+    posIncomeAmount: 0,
+    posIncomeCount: 0,
     collectedAmount: 0,
     expensesAmount: 0,
   };
@@ -75,21 +78,6 @@ function parseDayQuery(req) {
   };
 }
 
-async function loadGroupedItemIds() {
-  const links = await ItemGroupItem.findAll({ attributes: ["orderItemId"] });
-  return new Set(links.map((x) => x.orderItemId));
-}
-
-async function loadCustomerAndGroupMaps() {
-  const [customers, groups] = await Promise.all([
-    Customer.findAll({ attributes: ["id", "name"] }),
-    ItemGroup.findAll({ attributes: ["id", "concept"] }),
-  ]);
-  const customerName = new Map(customers.map((c) => [c.id, c.name]));
-  const groupConcept = new Map(groups.map((g) => [g.id, g.concept]));
-  return { customerName, groupConcept };
-}
-
 function addOrdersToDays(daysMap, orders) {
   for (const o of orders) {
     if (isPosOrder(o)) continue;
@@ -108,15 +96,55 @@ function addOrdersToDays(daysMap, orders) {
   }
 }
 
-function addPaymentsToDays(daysMap, payments) {
-  for (const p of payments) {
-    if (p.status && p.status !== "completed") continue;
-    const d = p.date ? new Date(p.date) : null;
-    if (!d || Number.isNaN(d.getTime())) continue;
-    const key = dayKey(d);
+function addIncomesSplitToDays(daysMap, incomes, posOrderItemIds) {
+  for (const inc of incomes) {
+    const key = dayKey(inc.date);
+    if (!key) continue;
     const bucket = ensureDay(daysMap, key);
-    bucket.collectedAmount = round2(bucket.collectedAmount + Number(p.amount ?? 0));
+    const amt = Number(inc.amount ?? 0);
+    const isCaja =
+      inc.referenceType === "order_item" &&
+      inc.referenceId != null &&
+      posOrderItemIds.has(Number(inc.referenceId));
+
+    if (isCaja) {
+      bucket.posIncomeAmount = round2(bucket.posIncomeAmount + amt);
+      bucket.posIncomeCount += 1;
+    } else {
+      bucket.collectedAmount = round2(bucket.collectedAmount + amt);
+    }
   }
+}
+
+async function buildPosOrderItemIdSet(incomes) {
+  const itemIds = [
+    ...new Set(
+      incomes
+        .filter((inc) => inc.referenceType === "order_item" && inc.referenceId != null)
+        .map((inc) => Number(inc.referenceId))
+        .filter((id) => Number.isFinite(id)),
+    ),
+  ];
+  if (!itemIds.length) return new Set();
+
+  const items = await OrderItem.findAll({
+    where: { id: { [Op.in]: itemIds } },
+    attributes: ["id"],
+    include: [{ model: Order, as: "ERP_order", attributes: ["notes"], required: true }],
+  });
+
+  const posIds = new Set();
+  for (const it of items) {
+    if (isPosOrder(it.ERP_order)) posIds.add(it.id);
+  }
+  return posIds;
+}
+
+async function applyCalendarIncomeDays(daysMap, start, end) {
+  const incomes = await fetchIncomesInRange(start, end);
+  const posOrderItemIds = await buildPosOrderItemIdSet(incomes);
+  addIncomesSplitToDays(daysMap, incomes, posOrderItemIds);
+  return { incomes, posOrderItemIds };
 }
 
 function addPosSalesToDays(daysMap, orders) {
@@ -134,53 +162,23 @@ function addPosSalesToDays(daysMap, orders) {
   }
 }
 
-function addDirectPaymentsToDays(daysMap, items, groupedItemIds) {
-  for (const it of items) {
-    if (!it.paidAt || groupedItemIds.has(it.id)) continue;
-    if (isPosOrder(it.ERP_order)) continue;
-    const d = new Date(it.paidAt);
-    if (Number.isNaN(d.getTime())) continue;
-    const key = dayKey(d);
-    const bucket = ensureDay(daysMap, key);
-    const sub = Number(it.quantity ?? 0) * Number(it.price ?? 0);
-    bucket.collectedAmount = round2(bucket.collectedAmount + sub);
-  }
-}
-
 function addExpensesToDays(daysMap, expenses) {
   for (const e of expenses) {
-    const d = e.date ? new Date(e.date) : null;
-    if (!d || Number.isNaN(d.getTime())) continue;
-    const key = dayKey(d);
+    const key = dayKey(e.date);
+    if (!key) continue;
     const bucket = ensureDay(daysMap, key);
     bucket.expensesAmount = round2(bucket.expensesAmount + Number(e.amount ?? 0));
   }
 }
 
-function mermaMovementCost(m) {
-  const qty = Math.abs(Number(m.quantity ?? 0));
-  const unitCost =
-    Number(m.price) || Number(m.ERP_inventory_product?.supplierPrice) || 0;
-  return round2(qty * unitCost);
-}
-
-function addMermaToDays(daysMap, movements) {
-  for (const m of movements) {
-    const d = m.date ? new Date(m.date) : null;
-    if (!d || Number.isNaN(d.getTime())) continue;
-    const key = dayKey(d);
-    const bucket = ensureDay(daysMap, key);
-    bucket.expensesAmount = round2(bucket.expensesAmount + mermaMovementCost(m));
-  }
-}
-
 function sumMonthTotals(daysMap, monthStart, monthEnd) {
-  const totals = { orders: 0, posSales: 0, collected: 0, expenses: 0 };
+  const totals = { orders: 0, posSales: 0, posIncome: 0, collected: 0, expenses: 0 };
   for (const [key, m] of Object.entries(daysMap)) {
     const d = parseISO(key);
     if (d < monthStart || d > monthEnd) continue;
     totals.orders = round2(totals.orders + m.ordersAmount);
     totals.posSales = round2(totals.posSales + m.posSalesAmount);
+    totals.posIncome = round2(totals.posIncome + m.posIncomeAmount);
     totals.collected = round2(totals.collected + m.collectedAmount);
     totals.expenses = round2(totals.expenses + m.expensesAmount);
   }
@@ -193,6 +191,8 @@ function emptyMonthMetrics() {
     ordersCount: 0,
     posSalesAmount: 0,
     posSalesCount: 0,
+    posIncomeAmount: 0,
+    posIncomeCount: 0,
     collectedAmount: 0,
     expensesAmount: 0,
   };
@@ -212,6 +212,8 @@ function aggregateDaysToMonths(daysMap) {
     bucket.ordersCount += m.ordersCount;
     bucket.posSalesAmount = round2(bucket.posSalesAmount + m.posSalesAmount);
     bucket.posSalesCount += m.posSalesCount;
+    bucket.posIncomeAmount = round2(bucket.posIncomeAmount + m.posIncomeAmount);
+    bucket.posIncomeCount += m.posIncomeCount;
     bucket.collectedAmount = round2(bucket.collectedAmount + m.collectedAmount);
     bucket.expensesAmount = round2(bucket.expensesAmount + m.expensesAmount);
   }
@@ -219,10 +221,11 @@ function aggregateDaysToMonths(daysMap) {
 }
 
 function sumYearTotals(monthsMap) {
-  const totals = { orders: 0, posSales: 0, collected: 0, expenses: 0 };
+  const totals = { orders: 0, posSales: 0, posIncome: 0, collected: 0, expenses: 0 };
   for (const m of Object.values(monthsMap)) {
     totals.orders = round2(totals.orders + m.ordersAmount);
     totals.posSales = round2(totals.posSales + m.posSalesAmount);
+    totals.posIncome = round2(totals.posIncome + m.posIncomeAmount);
     totals.collected = round2(totals.collected + m.collectedAmount);
     totals.expenses = round2(totals.expenses + m.expensesAmount);
   }
@@ -240,19 +243,31 @@ async function fetchOrdersInRange(start, end) {
   });
 }
 
-async function fetchPaymentsInRange(start, end) {
-  return Payment.findAll({
-    where: {
-      date: { [Op.between]: [start, end] },
-      status: "completed",
-    },
+function financeRangeWhere(start, end) {
+  const clause = buildFinanceDateColumnWhere(start, end);
+  return clause ? { [Op.and]: [clause] } : {};
+}
+
+async function fetchIncomesInRange(start, end) {
+  return Income.findAll({
+    where: financeRangeWhere(start, end),
+    attributes: [
+      "id",
+      "date",
+      "amount",
+      "concept",
+      "category",
+      "referenceType",
+      "referenceId",
+      "counterpartyName",
+    ],
     order: [["date", "ASC"]],
   });
 }
 
 async function fetchExpensesInRange(start, end) {
   return Expense.findAll({
-    where: { date: { [Op.between]: [start, end] } },
+    where: financeRangeWhere(start, end),
     attributes: [
       "id",
       "date",
@@ -326,41 +341,22 @@ async function buildExpenseProductNameResolver(expenses) {
   };
 }
 
-async function fetchMermaMovementsInRange(start, end) {
-  return InventoryMovement.findAll({
-    where: {
-      type: "salida",
-      reason: { [Op.in]: MERMA_REASONS },
-      date: { [Op.between]: [start, end] },
-    },
-    include: [
-      {
-        model: InventoryProduct,
-        attributes: ["name", "supplierPrice"],
-        required: false,
-      },
-    ],
-    order: [["date", "ASC"]],
-  });
-}
+function shapeIncomeDetail(inc, posOrderItemIds) {
+  const isCaja =
+    inc.referenceType === "order_item" &&
+    inc.referenceId != null &&
+    posOrderItemIds.has(Number(inc.referenceId));
 
-async function fetchDirectPaidItemsInRange(start, end, groupedItemIds) {
-  const where = { paidAt: { [Op.between]: [start, end] } };
-  if (groupedItemIds.size > 0) {
-    where.id = { [Op.notIn]: [...groupedItemIds] };
-  }
-
-  return OrderItem.findAll({
-    where,
-    include: [
-      {
-        model: Order,
-        as: "ERP_order",
-        attributes: ["id", "customerId", "date", "notes"],
-        include: [{ model: Customer, as: "ERP_customer", attributes: ["id", "name"] }],
-      },
-    ],
-  });
+  return {
+    id: inc.id,
+    amount: round2(inc.amount),
+    concept: inc.concept,
+    category: inc.category,
+    counterparty: inc.counterpartyName || null,
+    referenceType: inc.referenceType || null,
+    source: isCaja ? "caja" : "cobro",
+    date: inc.date ? formatAppDateTime(inc.date) : null,
+  };
 }
 
 function shapeOrderDetail(o) {
@@ -416,23 +412,16 @@ export const getCalendarYearSummary = async (req, res) => {
     const start = startOfMonth(new Date(year, 0, 1));
     const end = endOfDay(endOfMonth(new Date(year, 11, 1)));
 
-    const groupedItemIds = await loadGroupedItemIds();
-
-    const [orders, payments, expenses, directItems, mermaMovements] = await Promise.all([
+    const [orders, expenses] = await Promise.all([
       fetchOrdersInRange(start, end),
-      fetchPaymentsInRange(start, end),
       fetchExpensesInRange(start, end),
-      fetchDirectPaidItemsInRange(start, end, groupedItemIds),
-      fetchMermaMovementsInRange(start, end),
     ]);
 
     const days = {};
     addOrdersToDays(days, orders);
     addPosSalesToDays(days, orders);
-    addPaymentsToDays(days, payments);
-    addDirectPaymentsToDays(days, directItems, groupedItemIds);
+    await applyCalendarIncomeDays(days, start, end);
     addExpensesToDays(days, expenses);
-    addMermaToDays(days, mermaMovements);
 
     const monthsRaw = aggregateDaysToMonths(days);
 
@@ -464,23 +453,16 @@ export const getCalendarMonthSummary = async (req, res) => {
       return res.status(400).json({ message: "Parámetros year y month (1-12) requeridos" });
     }
 
-    const groupedItemIds = await loadGroupedItemIds();
-
-    const [orders, payments, expenses, directItems, mermaMovements] = await Promise.all([
+    const [orders, expenses] = await Promise.all([
       fetchOrdersInRange(range.start, range.end),
-      fetchPaymentsInRange(range.start, range.end),
       fetchExpensesInRange(range.start, range.end),
-      fetchDirectPaidItemsInRange(range.start, range.end, groupedItemIds),
-      fetchMermaMovementsInRange(range.start, range.end),
     ]);
 
     const days = {};
     addOrdersToDays(days, orders);
     addPosSalesToDays(days, orders);
-    addPaymentsToDays(days, payments);
-    addDirectPaymentsToDays(days, directItems, groupedItemIds);
+    await applyCalendarIncomeDays(days, range.start, range.end);
     addExpensesToDays(days, expenses);
-    addMermaToDays(days, mermaMovements);
 
     return res.json({
       days,
@@ -510,77 +492,34 @@ function parseRangeQuery(req) {
 }
 
 async function buildPeriodDetail(range) {
-  const [groupedItemIds, maps] = await Promise.all([
-    loadGroupedItemIds(),
-    loadCustomerAndGroupMaps(),
-  ]);
-
-  const [orders, payments, expenses, directItems, mermaMovements] = await Promise.all([
+  const [orders, expenses] = await Promise.all([
     fetchOrdersInRange(range.start, range.end),
-    fetchPaymentsInRange(range.start, range.end),
     fetchExpensesInRange(range.start, range.end),
-    fetchDirectPaidItemsInRange(range.start, range.end, groupedItemIds),
-    fetchMermaMovementsInRange(range.start, range.end),
   ]);
-
-  const { customerName, groupConcept } = maps;
 
   const regularOrders = orders.filter((o) => !isPosOrder(o));
   const posOrders = orders.filter(isPosOrder);
   const shapedOrders = regularOrders.map(shapeOrderDetail);
   const posSales = posOrders.map(shapePosSaleDetail);
 
-  const abonos = payments.map((p) => ({
-    id: p.id,
-    amount: round2(p.amount),
-    customer: customerName.get(p.customerId) || `Cliente #${p.customerId}`,
-    group: groupConcept.get(p.groupId) || `Grupo #${p.groupId}`,
-    method: p.method,
-    note: p.note,
-  }));
-
-  const directPayments = directItems.map((it) => {
-    const order = it.ERP_order;
-    const customer = order?.ERP_customer?.name ?? "Cliente";
-    const qty = Number(it.quantity ?? 0);
-    const price = Number(it.price ?? 0);
-    return {
-      orderId: order?.id ?? it.orderId,
-      itemId: it.id,
-      customer,
-      qty,
-      price,
-      subtotal: round2(qty * price),
-      paidAt: it.paidAt ? format(new Date(it.paidAt), "dd/MM/yyyy HH:mm:ss") : null,
-    };
-  });
-
-  const expenseProductName = await buildExpenseProductNameResolver(expenses);
-
-  const shapedExpenses = [
-    ...expenses.map((e) => ({
-      id: e.id,
-      concept: e.concept,
-      category: e.category,
-      productName: expenseProductName(e),
-      amount: round2(e.amount),
-    })),
-    ...mermaMovements.map((m) => ({
-      id: `merma-${m.id}`,
-      concept: `Merma (${m.reason || "salida"})`,
-      category: "Merma",
-      productName: m.ERP_inventory_product?.name || null,
-      amount: mermaMovementCost(m),
-    })),
-  ];
-
   const days = {};
   addOrdersToDays(days, orders);
   addPosSalesToDays(days, orders);
-  addPaymentsToDays(days, payments);
-  addDirectPaymentsToDays(days, directItems, groupedItemIds);
+  const { incomes, posOrderItemIds } = await applyCalendarIncomeDays(days, range.start, range.end);
   addExpensesToDays(days, expenses);
-  addMermaToDays(days, mermaMovements);
+
+  const incomeRows = incomes.map((inc) => shapeIncomeDetail(inc, posOrderItemIds));
+
+  const expenseProductName = await buildExpenseProductNameResolver(expenses);
+
+  const shapedExpenses = expenses.map((e) => ({
+    id: e.id,
+    concept: e.concept,
+    category: e.category,
+    productName: expenseProductName(e),
+    amount: round2(e.amount),
+    date: e.date ? formatAppDateTime(e.date) : null,
+  }));
 
   const totals = emptyDayMetrics();
   for (const m of Object.values(days)) {
@@ -589,6 +528,8 @@ async function buildPeriodDetail(range) {
     totals.deliveredUnits += m.deliveredUnits;
     totals.posSalesAmount = round2(totals.posSalesAmount + m.posSalesAmount);
     totals.posSalesCount += m.posSalesCount;
+    totals.posIncomeAmount = round2(totals.posIncomeAmount + m.posIncomeAmount);
+    totals.posIncomeCount += m.posIncomeCount;
     totals.collectedAmount = round2(totals.collectedAmount + m.collectedAmount);
     totals.expensesAmount = round2(totals.expensesAmount + m.expensesAmount);
   }
@@ -596,8 +537,9 @@ async function buildPeriodDetail(range) {
   return {
     orders: shapedOrders,
     posSales,
-    abonos,
-    directPayments,
+    incomes: incomeRows,
+    abonos: [],
+    directPayments: [],
     expenses: shapedExpenses,
     totals,
     dailyBreakdown: days,

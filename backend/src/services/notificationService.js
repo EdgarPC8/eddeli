@@ -9,25 +9,22 @@ import { Account } from "../models/Account.js";
 import { Roles } from "../models/Roles.js";
 import { InventoryProduct } from "../models/Inventory.js";
 import { sendNotificationToUser } from "../sockets/notificationSocket.js";
+import { getAppTimezone, getZonedParts, nowApp } from "../utils/appDateTime.js";
 
-const TZ = "America/Guayaquil";
 const ADMIN_ROLE_NAMES = ["Administrador", "Programador"];
 
 function nowInBusinessTz() {
-  return new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
+  return nowApp();
 }
 
 function todayDateOnly() {
-  const d = nowInBusinessTz();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  const p = getZonedParts(nowApp(), getAppTimezone());
+  return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
 }
 
 function currentHm() {
-  const d = nowInBusinessTz();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const p = getZonedParts(nowApp(), getAppTimezone());
+  return `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
 }
 
 function parseRoleIds(raw) {

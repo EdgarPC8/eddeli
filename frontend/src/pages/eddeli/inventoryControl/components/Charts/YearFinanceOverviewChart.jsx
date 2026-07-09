@@ -32,9 +32,19 @@ const emptyMetrics = () => ({
   ordersCount: 0,
   posSalesAmount: 0,
   posSalesCount: 0,
+  posIncomeAmount: 0,
+  posIncomeCount: 0,
   collectedAmount: 0,
   expensesAmount: 0,
 });
+
+function incomeCajaAmount(m) {
+  return Number(m.posIncomeAmount ?? 0);
+}
+
+function incomeCobrosAmount(m) {
+  return Number(m.collectedAmount ?? 0);
+}
 
 function roundMoney(n) {
   return Number(Number(n ?? 0).toFixed(2));
@@ -45,18 +55,15 @@ function pct(value, max) {
   return Math.min(100, (Number(value) / max) * 100);
 }
 
-function incomeTotal(m) {
-  return Number(m.posSalesAmount ?? 0) + Number(m.collectedAmount ?? 0);
-}
-
 function hasMonthData(m, isIncomeView) {
   if (isIncomeView) {
-    return m.posSalesCount > 0 || m.collectedAmount > 0;
+    return incomeCajaAmount(m) > 0 || incomeCobrosAmount(m) > 0;
   }
   return (
     m.ordersCount > 0 ||
     m.posSalesCount > 0 ||
-    m.collectedAmount > 0 ||
+    incomeCajaAmount(m) > 0 ||
+    incomeCobrosAmount(m) > 0 ||
     m.expensesAmount > 0
   );
 }
@@ -112,7 +119,7 @@ export default function YearFinanceOverviewChart({
   const theme = useTheme();
   const [year, setYear] = useState(initialYear);
   const [months, setMonths] = useState({});
-  const [totals, setTotals] = useState({ orders: 0, posSales: 0, collected: 0, expenses: 0 });
+  const [totals, setTotals] = useState({ orders: 0, posSales: 0, posIncome: 0, collected: 0, expenses: 0 });
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState(VIEW_ALL);
 
@@ -167,13 +174,13 @@ export default function YearFinanceOverviewChart({
   );
 
   const maxOA = Math.max(1, ...metricsList.map((m) => m.ordersAmount));
-  const maxPA = Math.max(1, ...metricsList.map((m) => m.posSalesAmount));
-  const maxCA = Math.max(1, ...metricsList.map((m) => m.collectedAmount));
-  const maxIA = Math.max(1, ...metricsList.map((m) => incomeTotal(m)));
+  const maxOpPos = isIncomeView ? 1 : Math.max(1, ...metricsList.map((m) => m.posSalesAmount));
+  const maxCajaIncome = Math.max(1, ...metricsList.map((m) => incomeCajaAmount(m)));
+  const maxCA = Math.max(1, ...metricsList.map((m) => incomeCobrosAmount(m)));
   const maxEA = Math.max(1, ...metricsList.map((m) => m.expensesAmount));
 
   const yearIncomeTotal = useMemo(
-    () => roundMoney((totals.posSales ?? 0) + (totals.collected ?? 0)),
+    () => roundMoney((totals.posIncome ?? 0) + (totals.collected ?? 0)),
     [totals]
   );
 
@@ -185,13 +192,13 @@ export default function YearFinanceOverviewChart({
         const { data } = await getCalendarYearSummaryRequest(year);
         if (!cancelled) {
           setMonths(data?.months ?? {});
-          setTotals(data?.totals ?? { orders: 0, posSales: 0, collected: 0, expenses: 0 });
+          setTotals(data?.totals ?? { orders: 0, posSales: 0, posIncome: 0, collected: 0, expenses: 0 });
         }
       } catch (err) {
         console.error('Error resumen anual:', err);
         if (!cancelled) {
           setMonths({});
-          setTotals({ orders: 0, posSales: 0, collected: 0, expenses: 0 });
+          setTotals({ orders: 0, posSales: 0, posIncome: 0, collected: 0, expenses: 0 });
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -233,8 +240,8 @@ export default function YearFinanceOverviewChart({
         title="Resumen anual por mes"
         subtitle={
           isIncomeView
-            ? 'Vista ingresos: caja, cobranzas y total por mes. Clic en un mes para ver el calendario abajo.'
-            : 'Pedidos, caja, cobranzas y gastos por mes. Clic en un mes para abrirlo en el calendario.'
+            ? 'Caja y cobros por mes según fecha en que entró el dinero (Income). Misma fecha; solo cambia el origen.'
+            : 'Pedidos/caja por fecha de pedido; ingresos y gastos por Income/Expense. Clic en un mes para el calendario.'
         }
         sx={{ mb: 0.75 }}
       />
@@ -298,9 +305,13 @@ export default function YearFinanceOverviewChart({
           {!isIncomeView && (
             <Chip size="small" label="$ pedido" sx={{ bgcolor: chartColors.orderMoney, color: theme.palette.getContrastText(chartColors.orderMoney) }} />
           )}
-          <Chip size="small" label="$ caja" sx={{ bgcolor: chartColors.posSales, color: theme.palette.getContrastText(chartColors.posSales) }} />
-          <Chip size="small" label="$ cobranzas" sx={{ bgcolor: chartColors.collected, color: theme.palette.getContrastText(chartColors.collected) }} />
-          <Chip size="small" label="$ total" sx={{ bgcolor: chartColors.incomeTotal, color: theme.palette.getContrastText(chartColors.incomeTotal) }} />
+          {!isIncomeView && (
+            <Chip size="small" label="$ caja" sx={{ bgcolor: chartColors.posSales, color: theme.palette.getContrastText(chartColors.posSales) }} />
+          )}
+          {isIncomeView && (
+            <Chip size="small" label="$ caja" sx={{ bgcolor: chartColors.posSales, color: theme.palette.getContrastText(chartColors.posSales) }} />
+          )}
+          <Chip size="small" label={isIncomeView ? '$ cobros' : '$ ingresos'} sx={{ bgcolor: chartColors.collected, color: theme.palette.getContrastText(chartColors.collected) }} />
           {!isIncomeView && (
             <Chip size="small" label="$ gastos" sx={{ bgcolor: chartColors.expense, color: theme.palette.getContrastText(chartColors.expense) }} />
           )}
@@ -325,18 +336,16 @@ export default function YearFinanceOverviewChart({
         {metricsList.map((m) => {
           const isCurrent = isSameMonth(m.date, now) && year === now.getFullYear();
           const data = hasMonthData(m, isIncomeView);
-          const monthIncome = incomeTotal(m);
           const tip = isIncomeView
             ? `${format(m.date, 'MMMM yyyy', { locale: es })}\n` +
-              `Caja: ${m.posSalesCount} · ${moneyFmt(m.posSalesAmount)}\n` +
-              `Cobranzas: ${moneyFmt(m.collectedAmount)}\n` +
-              `Total ingresos: ${moneyFmt(monthIncome)}`
+              `Caja (entrada del dinero): ${moneyFmt(incomeCajaAmount(m))}\n` +
+              `Cobros pedidos: ${moneyFmt(incomeCobrosAmount(m))}\n` +
+              `Total: ${moneyFmt(incomeCajaAmount(m) + incomeCobrosAmount(m))}`
             : `${format(m.date, 'MMMM yyyy', { locale: es })}\n` +
-              `Pedidos: ${m.ordersCount} · ${moneyFmt(m.ordersAmount)}\n` +
-              `Caja: ${m.posSalesCount} · ${moneyFmt(m.posSalesAmount)}\n` +
-              `Cobranzas: ${moneyFmt(m.collectedAmount)}\n` +
-              `Ingresos: ${moneyFmt(monthIncome)}\n` +
-              `Gastos: ${moneyFmt(m.expensesAmount)}`;
+              `Pedidos (fecha pedido): ${m.ordersCount} · ${moneyFmt(m.ordersAmount)}\n` +
+              `Caja (fecha pedido): ${m.posSalesCount} · ${moneyFmt(m.posSalesAmount)}\n` +
+              `Cobros pedidos (entrada $): ${moneyFmt(incomeCobrosAmount(m))}\n` +
+              `Gastos (Expense): ${moneyFmt(m.expensesAmount)}`;
 
           return (
             <Grid item xs={6} sm={4} md={2} key={m.key}>
@@ -400,32 +409,32 @@ export default function YearFinanceOverviewChart({
                         theme={theme}
                       />
                     )}
-                    {m.posSalesAmount > 0 && (
+                    {!isIncomeView && m.posSalesAmount > 0 && (
                       <ValueStrip
                         valueText={moneyFmtCompact(m.posSalesAmount)}
-                        barPercent={pct(m.posSalesAmount, maxPA)}
+                        barPercent={pct(m.posSalesAmount, maxOpPos)}
                         accentBorder={chartColors.posSales}
                         accentValue={chartColors.posSales}
                         track={chartColors.track}
                         theme={theme}
                       />
                     )}
-                    {m.collectedAmount > 0 && (
+                    {isIncomeView && incomeCajaAmount(m) > 0 && (
                       <ValueStrip
-                        valueText={moneyFmtCompact(m.collectedAmount)}
-                        barPercent={pct(m.collectedAmount, maxCA)}
-                        accentBorder={chartColors.collected}
-                        accentValue={chartColors.collected}
+                        valueText={moneyFmtCompact(incomeCajaAmount(m))}
+                        barPercent={pct(incomeCajaAmount(m), maxCajaIncome)}
+                        accentBorder={chartColors.posSales}
+                        accentValue={chartColors.posSales}
                         track={chartColors.track}
                         theme={theme}
                       />
                     )}
-                    {isIncomeView && monthIncome > 0 && (
+                    {incomeCobrosAmount(m) > 0 && (
                       <ValueStrip
-                        valueText={moneyFmtCompact(monthIncome)}
-                        barPercent={pct(monthIncome, maxIA)}
-                        accentBorder={chartColors.incomeTotal}
-                        accentValue={chartColors.incomeTotal}
+                        valueText={moneyFmtCompact(incomeCobrosAmount(m))}
+                        barPercent={pct(incomeCobrosAmount(m), maxCA)}
+                        accentBorder={chartColors.collected}
+                        accentValue={chartColors.collected}
                         track={chartColors.track}
                         theme={theme}
                       />
@@ -459,18 +468,28 @@ export default function YearFinanceOverviewChart({
             <Typography variant="body2" sx={{ fontWeight: 800, color: chartColors.orderMoney }}>{moneyFmt(totals.orders)}</Typography>
           </Paper>
         )}
+        {!isIncomeView && (
         <Paper elevation={0} sx={{ px: 1.5, py: 0.75, borderRadius: 1.5, bgcolor: alpha(chartColors.posSales, 0.08), border: '1px solid', borderColor: alpha(chartColors.posSales, 0.35) }}>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Caja en el año</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Caja en el año (fecha pedido)</Typography>
           <Typography variant="body2" sx={{ fontWeight: 800, color: chartColors.posSales }}>{moneyFmt(totals.posSales)}</Typography>
         </Paper>
+        )}
+        {isIncomeView && (
+        <Paper elevation={0} sx={{ px: 1.5, py: 0.75, borderRadius: 1.5, bgcolor: alpha(chartColors.posSales, 0.08), border: '1px solid', borderColor: alpha(chartColors.posSales, 0.35) }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Caja en el año (entrada del dinero)</Typography>
+          <Typography variant="body2" sx={{ fontWeight: 800, color: chartColors.posSales }}>{moneyFmt(totals.posIncome)}</Typography>
+        </Paper>
+        )}
         <Paper elevation={0} sx={{ px: 1.5, py: 0.75, borderRadius: 1.5, bgcolor: alpha(chartColors.collected, 0.08), border: '1px solid', borderColor: alpha(chartColors.collected, 0.35) }}>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Cobranzas en el año</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{isIncomeView ? 'Cobros pedidos en el año' : 'Ingresos en el año (Income)'}</Typography>
           <Typography variant="body2" sx={{ fontWeight: 800, color: chartColors.collected }}>{moneyFmt(totals.collected)}</Typography>
         </Paper>
-        <Paper elevation={0} sx={{ px: 1.5, py: 0.75, borderRadius: 1.5, bgcolor: alpha(chartColors.incomeTotal, 0.08), border: '1px solid', borderColor: alpha(chartColors.incomeTotal, 0.35) }}>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Total ingresos</Typography>
-          <Typography variant="body2" sx={{ fontWeight: 800, color: chartColors.incomeTotal }}>{moneyFmt(yearIncomeTotal)}</Typography>
-        </Paper>
+        {isIncomeView && (
+          <Paper elevation={0} sx={{ px: 1.5, py: 0.75, borderRadius: 1.5, bgcolor: alpha(chartColors.incomeTotal, 0.08), border: '1px solid', borderColor: alpha(chartColors.incomeTotal, 0.35) }}>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Total ingresos del año</Typography>
+            <Typography variant="body2" sx={{ fontWeight: 800, color: chartColors.incomeTotal }}>{moneyFmt(yearIncomeTotal)}</Typography>
+          </Paper>
+        )}
         {!isIncomeView && (
           <Paper elevation={0} sx={{ px: 1.5, py: 0.75, borderRadius: 1.5, bgcolor: alpha(chartColors.expense, 0.08), border: '1px solid', borderColor: alpha(chartColors.expense, 0.35) }}>
             <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Gastos en el año</Typography>

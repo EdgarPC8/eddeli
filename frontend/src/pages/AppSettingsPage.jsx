@@ -12,6 +12,8 @@ import {
   CircularProgress,
   Divider,
   Avatar,
+  MenuItem,
+  Alert,
 } from "@mui/material";
 import SaveIcon from "@mui/icons-material/Save";
 import UploadIcon from "@mui/icons-material/Upload";
@@ -21,6 +23,8 @@ import { useAppSettings } from "../context/AppSettingsContext.jsx";
 import { updateAppSettings } from "../api/appSettingsRequest.js";
 import { uploadImageRequest, deleteImageRequest } from "../api/imgRequest.js";
 import { buildImageUrl } from "../api/axios.js";
+import AppTimeClockPanel from "../components/AppTimeClockPanel.jsx";
+import { APP_TIMEZONE_OPTIONS } from "../utils/appDateTime.js";
 
 const ALLOWED = new Set(["Administrador", "Programador"]);
 
@@ -47,9 +51,10 @@ export default function AppSettingsPage() {
         socialInstagram: settings.socials?.instagram || "",
         socialTiktok: settings.socials?.tiktok || "",
         socialEmail: settings.socials?.email || "",
-        mediaFolderPrefix: settings.mediaFolderPrefix || "app",
+        mediaFolderPrefix: settings.mediaFolderPrefix || "sistema",
         cajaQuickCategoryMatch: settings.cajaQuickCategoryMatch || "",
         walkInCustomerLabel: settings.walkInCustomerLabel || "Consumidor Final",
+        timezone: settings.timezone || "America/Guayaquil",
       });
     }
   }, [settings]);
@@ -94,7 +99,7 @@ export default function AppSettingsPage() {
 
     setLogoBusy(true);
     try {
-      const prefix = String(form.mediaFolderPrefix || "app").trim() || "app";
+      const prefix = String(form.mediaFolderPrefix || "sistema").trim() || "sistema";
       const res = await toast({
         promise: uploadImageRequest({
           file,
@@ -237,6 +242,36 @@ export default function AppSettingsPage() {
               <TextField label="Teléfono" fullWidth value={form.phone} onChange={onChange("phone")} />
             </Grid>
           </Grid>
+
+          <Divider />
+          <Typography variant="subtitle2" fontWeight={700}>
+            Hora y zona horaria
+          </Typography>
+          <Alert severity="info" sx={{ py: 0.75 }}>
+            Todas las fechas del sistema (ingresos, gastos, pedidos pagados, etc.) se guardan con
+            fecha y hora usando esta zona. Si solo eliges un día, se completa con la hora actual.
+          </Alert>
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                select
+                label="Zona horaria (IANA)"
+                fullWidth
+                value={form.timezone}
+                onChange={onChange("timezone")}
+                helperText="Ej. America/Guayaquil para Ecuador"
+              >
+                {APP_TIMEZONE_OPTIONS.map((opt) => (
+                  <MenuItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+          </Grid>
+          <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, bgcolor: "action.hover" }}>
+            <AppTimeClockPanel timezone={form.timezone} />
+          </Paper>
 
           <Divider />
           <Typography variant="subtitle2" fontWeight={700}>

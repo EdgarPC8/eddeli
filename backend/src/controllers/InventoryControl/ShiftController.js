@@ -6,6 +6,7 @@ import { Order, OrderItem, Customer } from "../../models/Orders.js";
 import { Users } from "../../models/Users.js";
 import { InventoryProduct, InventoryMovement } from "../../models/Inventory.js";
 import { Expense } from "../../models/Finance.js";
+import { toAppDateTime, nowApp } from "../../utils/appDateTime.js";
 import {
   computeCashTotal,
   emptyCashCounts,
@@ -203,7 +204,7 @@ async function registerInventoryPurchase({ productId, quantity, amount, concept,
       referenceType: "cash_shift_movement",
       referenceId: shiftMovementId,
       createdBy: accountId,
-      date: new Date(),
+      date: nowApp(),
     },
     { transaction },
   );
@@ -225,7 +226,7 @@ async function registerExpenseForMovement({
 
   return Expense.create(
     {
-      date: date || new Date(),
+      date: toAppDateTime(date) || nowApp(),
       amount,
       concept,
       category: CATEGORY_EXPENSE_LABEL[category] || "Gastos",

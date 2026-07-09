@@ -17,9 +17,7 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import { Income, Expense } from "../../models/Finance.js";
-import { InventoryMovement, InventoryProduct } from "../../models/Inventory.js";
-
-const MERMA_REASONS = ["SALIDA_MERMA", "SALIDA_DANIADO", "SALIDA_CADUCADO"];
+import { financeBucketKey, buildFinanceDateColumnWhere } from "../../utils/financeDateUtils.js";
 const VALID_GRANULARITY = new Set(["day", "week", "month"]);
 
 function round2(n) {
@@ -57,12 +55,7 @@ function getDefaultRange(granularity) {
 }
 
 function bucketKeyFromDate(date, granularity) {
-  const d = new Date(date);
-  if (granularity === "day") return format(d, "yyyy-MM-dd");
-  if (granularity === "week") {
-    return format(startOfWeek(d, { weekStartsOn: 1 }), "yyyy-MM-dd");
-  }
-  return format(startOfMonth(d), "yyyy-MM");
+  return financeBucketKey(date, granularity);
 }
 
 function buildEmptyBuckets(granularity, start, end) {
@@ -106,14 +99,14 @@ function buildEmptyBuckets(granularity, start, end) {
 
 function finalizeBuckets(map) {
   const buckets = [...map.values()].map((b) => {
-    const expenseTotal = round2(b.expense + b.merma);
+    const expenseTotal = round2(b.expense);
     const netBalance = round2(b.income - expenseTotal);
     const marginPct = b.income > 0 ? round2((netBalance / b.income) * 100) : 0;
     return {
       ...b,
       income: round2(b.income),
       expense: round2(b.expense),
-      merma: round2(b.merma),
+      merma: 0,
       expenseTotal,
       netBalance,
       marginPct,
@@ -124,16 +117,15 @@ function finalizeBuckets(map) {
     (acc, b) => {
       acc.income += b.income;
       acc.expense += b.expense;
-      acc.merma += b.merma;
       acc.expenseTotal += b.expenseTotal;
       return acc;
     },
-    { income: 0, expense: 0, merma: 0, expenseTotal: 0 }
+    { income: 0, expense: 0, expenseTotal: 0 }
   );
 
   totals.income = round2(totals.income);
   totals.expense = round2(totals.expense);
-  totals.merma = round2(totals.merma);
+  totals.merma = 0;
   totals.expenseTotal = round2(totals.expenseTotal);
   totals.netBalance = round2(totals.income - totals.expenseTotal);
   totals.marginPct = totals.income > 0 ? round2((totals.netBalance / totals.income) * 100) : 0;
@@ -164,31 +156,19 @@ export const getCashFlowMirror = async (req, res) => {
 
     const bucketMap = buildEmptyBuckets(granularity, start, end);
 
-    const [incomes, expenses, mermaMovements] = await Promise.all([
+    const rangeWhere = buildFinanceDateColumnWhere(start, end);
+    const dateClause = rangeWhere ? { [Op.and]: [rangeWhere] } : {};
+
+    const [incomes, expenses] = await Promise.all([
       Income.findAll({
-        where: { date: { [Op.between]: [start, end] } },
+        where: dateClause,
         attributes: ["date", "amount"],
         raw: true,
       }),
       Expense.findAll({
-        where: { date: { [Op.between]: [start, end] } },
+        where: dateClause,
         attributes: ["date", "amount"],
         raw: true,
-      }),
-      InventoryMovement.findAll({
-        where: {
-          type: "salida",
-          reason: { [Op.in]: MERMA_REASONS },
-          date: { [Op.between]: [start, end] },
-        },
-        attributes: ["date", "quantity", "price", "productId"],
-        include: [
-          {
-            model: InventoryProduct,
-            attributes: ["supplierPrice"],
-            required: false,
-          },
-        ],
       }),
     ]);
 
@@ -198,16 +178,6 @@ export const getCashFlowMirror = async (req, res) => {
 
     for (const row of expenses) {
       addToBucket(bucketMap, row.date, granularity, "expense", row.amount);
-    }
-
-    for (const m of mermaMovements) {
-      const qty = Math.abs(toNum(m.quantity));
-      const unitCost =
-        toNum(m.price) ||
-        toNum(m.ERP_inventory_product?.supplierPrice) ||
-        0;
-      const cost = qty * unitCost;
-      addToBucket(bucketMap, m.date, granularity, "merma", cost);
     }
 
     const { buckets, totals } = finalizeBuckets(bucketMap);

@@ -1,5 +1,6 @@
 import { Op } from "sequelize";
 import { format } from "date-fns";
+import { toAppDateTime, nowApp } from "../../utils/appDateTime.js";
 import { es } from "date-fns/locale";
 import { sequelize } from "../../database/connection.js";
 import {
@@ -335,14 +336,14 @@ export const markSupplierOrderPaid = async (req, res) => {
       return res.status(400).json({ message: "El pedido ya fue marcado como pagado" });
     }
 
-    const payDate = paidAt ? new Date(paidAt) : new Date();
+    const payDate = paidAt ? toAppDateTime(paidAt) : nowApp();
     const total = orderTotal(order.ERP_supplier_order_items || []);
     const supplierName = order.ERP_supplier?.name || "Proveedor";
 
     await sequelize.transaction(async (t) => {
       const expense = await Expense.create(
         {
-          date: format(payDate, "yyyy-MM-dd"),
+          date: payDate,
           amount: Number(total.toFixed(2)),
           concept: `Pago pedido proveedor #${order.id} — ${supplierName}`,
           category: "Compras",

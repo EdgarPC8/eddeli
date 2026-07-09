@@ -1,5 +1,5 @@
 /**
- * Selector de contenido del backend + subida de imágenes a EdDeli/publicidad.
+ * Selector de contenido del backend + subida de imágenes a sistema/publicidad.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {

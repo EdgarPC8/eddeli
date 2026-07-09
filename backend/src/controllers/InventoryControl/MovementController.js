@@ -4,6 +4,7 @@ import { sequelize } from "../../database/connection.js";
 import { onInventoryStockChanged } from "../../services/notificationService.js";
 import { verifyJWT, getHeaderToken } from "../../libs/jwt.js";
 import { Expense } from "../../models/Finance.js";
+import { nowApp, toAppDateTime } from "../../utils/appDateTime.js";
 
 
 
@@ -639,7 +640,7 @@ async function registerExpenseCompraSiAplica({ product, reason, priceTotal, acco
   }
   const expense = await Expense.create(
     {
-      date: new Date(),
+      date: nowApp(),
       amount: priceTotal,
       concept: `Compra de ${product.name}`,
       category: "Compras",
@@ -682,7 +683,7 @@ async function createInventoryMovementRow(
       referenceType: referenceType ?? null,
       referenceId: referenceId ?? null,
       createdBy,
-      date: date ?? new Date(),
+      date: date != null ? toAppDateTime(date) : nowApp(),
     },
     { transaction },
   );

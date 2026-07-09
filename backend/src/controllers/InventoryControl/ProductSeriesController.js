@@ -12,8 +12,10 @@ import {
   endOfDay,
   format,
 } from "date-fns";
-import { Order, OrderItem } from "../../models/Orders.js";
+import { OrderItem } from "../../models/Orders.js";
+import { Income } from "../../models/Finance.js";
 import { InventoryProduct } from "../../models/Inventory.js";
+import { buildFinanceDateColumnWhere, financeBucketKey, toFinanceDayKey } from "../../utils/financeDateUtils.js";
 
 const RANK_BAND_SIZE = 10;
 
@@ -132,8 +134,11 @@ function buildBundle(rows, periodConfig, rankBand, { getProductId, getDate, getQ
     let bucketTotal = 0;
 
     for (const row of rows) {
-      const d = new Date(getDate(row));
-      if (Number.isNaN(d.getTime()) || d < bucket.start || d > bucket.end) continue;
+      const rowBucketKey =
+        periodConfig.granularity === "day"
+          ? toFinanceDayKey(getDate(row))
+          : financeBucketKey(getDate(row), periodConfig.granularity);
+      if (!rowBucketKey || rowBucketKey !== bucket.key) continue;
       const pid = getProductId(row);
       if (!topIdSet.has(pid)) continue;
       const qty = getQty(row);
@@ -185,19 +190,35 @@ async function finalizeBundle(partial) {
 
 async function buildSalesBundle(periodConfig, rankBand) {
   const { start, end } = periodConfig;
+
+  const dateClause = buildFinanceDateColumnWhere(start, end);
+  const incomeWhere = {
+    referenceType: "order_item",
+    referenceId: { [Op.ne]: null },
+    ...(dateClause ? { [Op.and]: [dateClause] } : {}),
+  };
+
+  const incomes = await Income.findAll({
+    where: incomeWhere,
+    attributes: ["date", "amount", "referenceId"],
+    raw: true,
+  });
+
+  if (!incomes.length) {
+    const partial = buildBundle([], periodConfig, rankBand, {
+      getProductId: () => null,
+      getDate: () => null,
+      getQty: () => 0,
+      getAmount: () => 0,
+    });
+    return finalizeBundle(partial);
+  }
+
+  const itemIds = [...new Set(incomes.map((i) => i.referenceId))];
   const items = await OrderItem.findAll({
-    attributes: ["productId", "quantity", "price", "paidAt"],
-    where: {
-      paidAt: { [Op.between]: [start, end] },
-    },
+    where: { id: { [Op.in]: itemIds } },
+    attributes: ["id", "productId", "quantity", "price"],
     include: [
-      {
-        model: Order,
-        as: "ERP_order",
-        attributes: [],
-        required: true,
-        where: { status: "pagado" },
-      },
       {
         model: InventoryProduct,
         as: "ERP_inventory_product",
@@ -207,12 +228,25 @@ async function buildSalesBundle(periodConfig, rankBand) {
       },
     ],
   });
+  const itemById = new Map(items.map((it) => [it.id, it]));
 
-  const partial = buildBundle(items, periodConfig, rankBand, {
+  const rows = [];
+  for (const inc of incomes) {
+    const item = itemById.get(inc.referenceId);
+    if (!item) continue;
+    rows.push({
+      productId: item.productId,
+      date: inc.date,
+      quantity: item.quantity,
+      amount: Number(inc.amount ?? 0),
+    });
+  }
+
+  const partial = buildBundle(rows, periodConfig, rankBand, {
     getProductId: (r) => r.productId,
-    getDate: (r) => r.paidAt,
+    getDate: (r) => r.date,
     getQty: (r) => Number(r.quantity || 0),
-    getAmount: (r) => Number(r.quantity || 0) * Number(r.price || 0),
+    getAmount: (r) => Number(r.amount || 0),
   });
 
   return finalizeBundle(partial);

@@ -1,4 +1,4 @@
-const TZ = "America/Guayaquil";
+import { getAppTimezone, getZonedParts, nowApp } from "./appDateTime.js";
 
 const CATEGORY_EXPENSE = {
   arriendo: "Arriendo",
@@ -30,7 +30,7 @@ export function expenseCategoryFor(templateCategory) {
 }
 
 function nowBusiness() {
-  return new Date(new Date().toLocaleString("en-US", { timeZone: TZ }));
+  return nowApp();
 }
 
 function pad2(n) {

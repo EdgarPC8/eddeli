@@ -46,6 +46,8 @@ const emptyMetrics = () => ({
   ordersCount: 0,
   posSalesAmount: 0,
   posSalesCount: 0,
+  posIncomeAmount: 0,
+  posIncomeCount: 0,
   collectedAmount: 0,
   expensesAmount: 0,
 });
@@ -53,12 +55,23 @@ const emptyMetrics = () => ({
 const VIEW_ALL = 'all';
 const VIEW_INCOME = 'income';
 
-function incomeTotal(m) {
-  return Number(m.posSalesAmount ?? 0) + Number(m.collectedAmount ?? 0);
-}
-
 function roundMoney(n) {
   return Number(Number(n ?? 0).toFixed(2));
+}
+
+/** Caja: Income de venta POS, por fecha de entrada del dinero. */
+function incomeCajaAmount(m) {
+  return Number(m.posIncomeAmount ?? 0);
+}
+
+/** Cobros de pedidos y otros ingresos no-caja, por Income.date. */
+function incomeCobrosAmount(m) {
+  return Number(m.collectedAmount ?? 0);
+}
+
+/** Ingresos en vista dedicada: caja + cobros (misma fecha Income). */
+function incomeViewTotal(m) {
+  return roundMoney(incomeCajaAmount(m) + incomeCobrosAmount(m));
 }
 
 function pct(value, max) {
@@ -126,7 +139,7 @@ export default function ChartCalendaryInfo({
   const [currentDate, setCurrentDate] = useState(initialDate);
   const [monthData, setMonthData] = useState({
     days: {},
-    totals: { orders: 0, posSales: 0, collected: 0, expenses: 0 },
+    totals: { orders: 0, posSales: 0, posIncome: 0, collected: 0, expenses: 0 },
   });
   const [monthLoading, setMonthLoading] = useState(true);
   const [viewMode, setViewMode] = useState(VIEW_ALL);
@@ -187,7 +200,7 @@ export default function ChartCalendaryInfo({
         if (!cancelled) {
           setMonthData({
             days: data?.days ?? {},
-            totals: data?.totals ?? { orders: 0, posSales: 0, collected: 0, expenses: 0 },
+            totals: data?.totals ?? { orders: 0, posSales: 0, posIncome: 0, collected: 0, expenses: 0 },
           });
         }
       } catch (err) {
@@ -217,6 +230,7 @@ export default function ChartCalendaryInfo({
       setDayDetail({
         orders: [],
         posSales: [],
+        incomes: [],
         abonos: [],
         directPayments: [],
         expenses: [],
@@ -244,6 +258,7 @@ export default function ChartCalendaryInfo({
       setDayDetail({
         orders: [],
         posSales: [],
+        incomes: [],
         abonos: [],
         directPayments: [],
         expenses: [],
@@ -268,7 +283,7 @@ export default function ChartCalendaryInfo({
   }, []);
 
   const monthIncomeTotal = useMemo(
-    () => roundMoney((monthData.totals.posSales ?? 0) + (monthData.totals.collected ?? 0)),
+    () => roundMoney((monthData.totals.posIncome ?? 0) + (monthData.totals.collected ?? 0)),
     [monthData.totals]
   );
 
@@ -300,8 +315,8 @@ export default function ChartCalendaryInfo({
         title="Calendario de pedidos y cobros"
         subtitle={
           isIncomeView
-            ? 'Vista ingresos: ventas de caja y cobranzas por día, semana y mes.'
-            : 'Por día: pedidos, ventas de caja, cobros y gastos. Clic en un día para el detalle.'
+            ? 'Caja y cobros de pedidos por fecha en que entró el dinero (Income). Misma fecha; solo cambia el origen.'
+            : 'Pedidos y caja por fecha del pedido; cobros y gastos por fecha en Income/Expense (igual que velas). Clic en un día para detalle.'
         }
         sx={{ mb: 0.5 }}
       />
@@ -365,9 +380,13 @@ export default function ChartCalendaryInfo({
           {!isIncomeView && (
             <Chip size="small" label="$ pedido" sx={{ bgcolor: chartColors.orderMoney, color: theme.palette.getContrastText(chartColors.orderMoney) }} />
           )}
-          <Chip size="small" label="$ caja" sx={{ bgcolor: chartColors.posSales, color: theme.palette.getContrastText(chartColors.posSales) }} />
-          <Chip size="small" label="$ cobranzas" sx={{ bgcolor: chartColors.collected, color: theme.palette.getContrastText(chartColors.collected) }} />
-          <Chip size="small" label="$ total" sx={{ bgcolor: chartColors.incomeTotal, color: theme.palette.getContrastText(chartColors.incomeTotal) }} />
+          {!isIncomeView && (
+            <Chip size="small" label="$ caja" sx={{ bgcolor: chartColors.posSales, color: theme.palette.getContrastText(chartColors.posSales) }} />
+          )}
+          {isIncomeView && (
+            <Chip size="small" label="$ caja" sx={{ bgcolor: chartColors.posSales, color: theme.palette.getContrastText(chartColors.posSales) }} />
+          )}
+          <Chip size="small" label={isIncomeView ? '$ cobros' : '$ ingresos'} sx={{ bgcolor: chartColors.collected, color: theme.palette.getContrastText(chartColors.collected) }} />
           {!isIncomeView && (
             <Chip size="small" label="$ gastos" sx={{ bgcolor: chartColors.expense, color: theme.palette.getContrastText(chartColors.expense) }} />
           )}
@@ -408,15 +427,15 @@ export default function ChartCalendaryInfo({
         const metricsList = monthDays.map((date) => ({ date, ...getMetrics(date) }));
 
         const maxOA = isIncomeView ? 1 : Math.max(1, ...metricsList.map((m) => m.ordersAmount));
-        const maxPA = Math.max(1, ...metricsList.map((m) => m.posSalesAmount));
-        const maxCA = Math.max(1, ...metricsList.map((m) => m.collectedAmount));
-        const maxIA = Math.max(1, ...metricsList.map((m) => incomeTotal(m)));
+        const maxOpPos = isIncomeView ? 1 : Math.max(1, ...metricsList.map((m) => m.posSalesAmount));
+        const maxCajaIncome = Math.max(1, ...metricsList.map((m) => incomeCajaAmount(m)));
+        const maxCA = Math.max(1, ...metricsList.map((m) => incomeCobrosAmount(m)));
         const maxEA = isIncomeView ? 1 : Math.max(1, ...metricsList.map((m) => m.expensesAmount));
 
         let weekOrdersAmount = 0;
         let weekPosSalesAmount = 0;
+        let weekPosIncomeAmount = 0;
         let weekCollectedAmount = 0;
-        let weekIncomeAmount = 0;
         let weekExpensesAmount = 0;
 
         return (
@@ -427,33 +446,30 @@ export default function ChartCalendaryInfo({
               if (isCurrentMonth) {
                 weekOrdersAmount += m.ordersAmount;
                 weekPosSalesAmount += m.posSalesAmount;
-                weekCollectedAmount += m.collectedAmount;
-                weekIncomeAmount += incomeTotal(m);
+                weekPosIncomeAmount += incomeCajaAmount(m);
+                weekCollectedAmount += incomeCobrosAmount(m);
                 weekExpensesAmount += m.expensesAmount;
               }
 
-              const dayIncome = incomeTotal(m);
-
               const hasData = isCurrentMonth && (
                 isIncomeView
-                  ? m.posSalesCount > 0 || m.collectedAmount > 0
+                  ? incomeCajaAmount(m) > 0 || incomeCobrosAmount(m) > 0
                   : m.ordersCount > 0 ||
                     m.posSalesCount > 0 ||
-                    m.collectedAmount > 0 ||
+                    incomeCobrosAmount(m) > 0 ||
                     m.expensesAmount > 0
               );
 
               const tip = isIncomeView
                 ? `${format(date, 'dd/MM/yyyy')}\n` +
-                  `Caja: ${m.posSalesCount} · ${moneyFmt(m.posSalesAmount)}\n` +
-                  `Cobranzas: ${moneyFmt(m.collectedAmount)}\n` +
-                  `Total ingresos: ${moneyFmt(dayIncome)}`
+                  `Caja (entrada del dinero): ${moneyFmt(incomeCajaAmount(m))}\n` +
+                  `Cobros pedidos: ${moneyFmt(incomeCobrosAmount(m))}\n` +
+                  `Total ingresos: ${moneyFmt(incomeViewTotal(m))}`
                 : `${format(date, 'dd/MM/yyyy')}\n` +
-                  `Pedidos: ${m.ordersCount} · ${moneyFmt(m.ordersAmount)}\n` +
-                  `Caja: ${m.posSalesCount} · ${moneyFmt(m.posSalesAmount)}\n` +
-                  `Cobranzas: ${moneyFmt(m.collectedAmount)}\n` +
-                  `Total ingresos: ${moneyFmt(dayIncome)}\n` +
-                  `Gastos: ${moneyFmt(m.expensesAmount)}`;
+                  `Pedidos (fecha pedido): ${m.ordersCount} · ${moneyFmt(m.ordersAmount)}\n` +
+                  `Caja (fecha pedido): ${m.posSalesCount} · ${moneyFmt(m.posSalesAmount)}\n` +
+                  `Cobros pedidos (entrada $): ${moneyFmt(incomeCobrosAmount(m))}\n` +
+                  `Gastos (Expense): ${moneyFmt(m.expensesAmount)}`;
 
               return (
                 <Grid item xs={1} key={date.toISOString()}>
@@ -510,32 +526,32 @@ export default function ChartCalendaryInfo({
                             theme={theme}
                           />
                         )}
-                        {m.posSalesAmount > 0 && (
+                        {!isIncomeView && m.posSalesAmount > 0 && (
                           <DayValueStrip
                             valueText={moneyFmt(m.posSalesAmount)}
-                            barPercent={pct(m.posSalesAmount, maxPA)}
+                            barPercent={pct(m.posSalesAmount, maxOpPos)}
                             accentBorder={chartColors.posSales}
                             accentValue={chartColors.posSales}
                             track={chartColors.track}
                             theme={theme}
                           />
                         )}
-                        {m.collectedAmount > 0 && (
+                        {isIncomeView && incomeCajaAmount(m) > 0 && (
                           <DayValueStrip
-                            valueText={moneyFmt(m.collectedAmount)}
-                            barPercent={pct(m.collectedAmount, maxCA)}
-                            accentBorder={chartColors.collected}
-                            accentValue={chartColors.collected}
+                            valueText={moneyFmt(incomeCajaAmount(m))}
+                            barPercent={pct(incomeCajaAmount(m), maxCajaIncome)}
+                            accentBorder={chartColors.posSales}
+                            accentValue={chartColors.posSales}
                             track={chartColors.track}
                             theme={theme}
                           />
                         )}
-                        {dayIncome > 0 && (
+                        {incomeCobrosAmount(m) > 0 && (
                           <DayValueStrip
-                            valueText={moneyFmt(dayIncome)}
-                            barPercent={pct(dayIncome, maxIA)}
-                            accentBorder={chartColors.incomeTotal}
-                            accentValue={chartColors.incomeTotal}
+                            valueText={moneyFmt(incomeCobrosAmount(m))}
+                            barPercent={pct(incomeCobrosAmount(m), maxCA)}
+                            accentBorder={chartColors.collected}
+                            accentValue={chartColors.collected}
                             track={chartColors.track}
                             theme={theme}
                           />
@@ -568,8 +584,8 @@ export default function ChartCalendaryInfo({
                 elevation={0}
                 title={
                   isIncomeView
-                    ? `Caja: ${moneyFmt(weekPosSalesAmount)} · Cobranzas: ${moneyFmt(weekCollectedAmount)} · Total: ${moneyFmt(weekIncomeAmount)}`
-                    : `Ped: ${moneyFmt(weekOrdersAmount)} · Caja: ${moneyFmt(weekPosSalesAmount)} · Cob: ${moneyFmt(weekCollectedAmount)} · Gas: ${moneyFmt(weekExpensesAmount)}`
+                    ? `Caja: ${moneyFmt(weekPosIncomeAmount)} · Cobros: ${moneyFmt(weekCollectedAmount)} · Total: ${moneyFmt(weekPosIncomeAmount + weekCollectedAmount)}`
+                    : `Ped: ${moneyFmt(weekOrdersAmount)} · Caja: ${moneyFmt(weekPosSalesAmount)} · Cobros: ${moneyFmt(weekCollectedAmount)} · Gas: ${moneyFmt(weekExpensesAmount)}`
                 }
                 sx={{
                   p: 0.5,
@@ -590,17 +606,25 @@ export default function ChartCalendaryInfo({
                     {moneyFmt(weekOrdersAmount)}
                   </Typography>
                 )}
-                <Typography variant="body2" sx={{ fontWeight: 800, fontSize: '0.62rem', color: chartColors.posSales, lineHeight: 1.1 }}>
-                  {moneyFmt(weekPosSalesAmount)}
-                </Typography>
+                {!isIncomeView && (
+                  <Typography variant="body2" sx={{ fontWeight: 800, fontSize: '0.62rem', color: chartColors.posSales, lineHeight: 1.1 }}>
+                    {moneyFmt(weekPosSalesAmount)}
+                  </Typography>
+                )}
+                {isIncomeView && (
+                  <Typography variant="body2" sx={{ fontWeight: 800, fontSize: '0.62rem', color: chartColors.posSales, lineHeight: 1.1 }}>
+                    {moneyFmt(weekPosIncomeAmount)}
+                  </Typography>
+                )}
                 <Typography variant="body2" sx={{ fontWeight: 800, fontSize: '0.62rem', color: chartColors.collected, lineHeight: 1.1 }}>
                   {moneyFmt(weekCollectedAmount)}
                 </Typography>
-                {isIncomeView ? (
+                {isIncomeView && (
                   <Typography variant="body2" sx={{ fontWeight: 800, fontSize: '0.62rem', color: chartColors.incomeTotal, lineHeight: 1.1, pt: 0.25, borderTop: '1px solid', borderColor: 'divider', width: '100%', textAlign: 'center' }}>
-                    {moneyFmt(weekIncomeAmount)}
+                    {moneyFmt(weekPosIncomeAmount + weekCollectedAmount)}
                   </Typography>
-                ) : (
+                )}
+                {isIncomeView ? null : (
                   <Typography variant="body2" sx={{ fontWeight: 800, fontSize: '0.62rem', color: chartColors.expense, lineHeight: 1.1 }}>
                     {moneyFmt(weekExpensesAmount)}
                   </Typography>
@@ -618,12 +642,20 @@ export default function ChartCalendaryInfo({
             <Typography variant="body2" sx={{ fontWeight: 800, color: chartColors.orderMoney }}>{moneyFmt(monthData.totals.orders)}</Typography>
           </Paper>
         )}
+        {!isIncomeView && (
         <Paper elevation={0} sx={{ px: 1.5, py: 0.75, borderRadius: 1.5, bgcolor: alpha(chartColors.posSales, 0.08), border: '1px solid', borderColor: alpha(chartColors.posSales, 0.35) }}>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Caja en el mes</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Caja en el mes (fecha pedido)</Typography>
           <Typography variant="body2" sx={{ fontWeight: 800, color: chartColors.posSales }}>{moneyFmt(monthData.totals.posSales)}</Typography>
         </Paper>
+        )}
+        {isIncomeView && (
+        <Paper elevation={0} sx={{ px: 1.5, py: 0.75, borderRadius: 1.5, bgcolor: alpha(chartColors.posSales, 0.08), border: '1px solid', borderColor: alpha(chartColors.posSales, 0.35) }}>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Caja en el mes (entrada del dinero)</Typography>
+          <Typography variant="body2" sx={{ fontWeight: 800, color: chartColors.posSales }}>{moneyFmt(monthData.totals.posIncome)}</Typography>
+        </Paper>
+        )}
         <Paper elevation={0} sx={{ px: 1.5, py: 0.75, borderRadius: 1.5, bgcolor: alpha(chartColors.collected, 0.08), border: '1px solid', borderColor: alpha(chartColors.collected, 0.35) }}>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>Cobranzas en el mes</Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>{isIncomeView ? 'Cobros pedidos en el mes' : 'Ingresos en el mes (Income)'}</Typography>
           <Typography variant="body2" sx={{ fontWeight: 800, color: chartColors.collected }}>{moneyFmt(monthData.totals.collected)}</Typography>
         </Paper>
         {isIncomeView && (

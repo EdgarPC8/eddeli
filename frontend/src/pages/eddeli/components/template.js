@@ -25,7 +25,7 @@ export const template = {
         "weightText": ""
       }
     },
-    "backgroundSrc": "EdDeli/ads/backgrounds/banner/plantilla_16_9.png",
+    "backgroundSrc": "sistema/ads/backgrounds/banner/plantilla_16_9.png",
     "groups": [
       {
         "id": "group_product",
@@ -59,14 +59,14 @@ export const template = {
         "h": 958,
         "zIndex": 10,
         "props": {
-          "src": "EdDeli/funda-de-suspiros-grandes-mne29.png",
+          "src": "sistema/funda-de-suspiros-grandes-mne29.png",
           "fit": "cover",
           "borderRadius": 30
         },
         "bind": {
           "srcFrom": "data.product.primaryImageUrl",
           "srcPrefix": "",
-          "fallbackSrc": "EdDeli/ads/placeholders/no_image.png"
+          "fallbackSrc": "sistema/ads/placeholders/no_image.png"
         },
         "name": "product_image",
         "visible": true,
@@ -235,7 +235,7 @@ export const template = {
         "h": 308,
         "zIndex": 69,
         "props": {
-          "src": "EdDeli/ads/badges/estrella_badge_dorada.png",
+          "src": "sistema/ads/badges/estrella_badge_dorada.png",
           "fit": "cover",
           "borderRadius": 20
         },
@@ -254,7 +254,7 @@ export const template = {
         "h": 431,
         "zIndex": 72,
         "props": {
-          "src": "EdDeli/ads/badges/etiqueta_dorada.png",
+          "src": "sistema/ads/badges/etiqueta_dorada.png",
           "fit": "cover",
           "borderRadius": 20
         },

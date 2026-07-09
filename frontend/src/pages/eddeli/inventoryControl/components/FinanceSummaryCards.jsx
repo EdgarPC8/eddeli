@@ -91,14 +91,14 @@ export default function FinanceSummaryCards({ summary, pendingTotal, obligations
     {
       title: "Ingresos",
       value: money(totalIncome),
-      subtitle: "Todo lo cobrado y registrado",
+      subtitle: "Suma histórica en tabla Income",
       icon: TrendingUpIcon,
       color: "success",
     },
     {
       title: "Gastos",
       value: money(totalExpense),
-      subtitle: "Egresos registrados",
+      subtitle: "Suma histórica en tabla Expense",
       icon: TrendingDownIcon,
       color: "error",
     },

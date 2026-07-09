@@ -1,4 +1,6 @@
 import { AppSettings } from "../models/AppSettings.js";
+import { sequelize } from "../database/connection.js";
+import { DataTypes } from "sequelize";
 import fs from "fs";
 import path from "path";
 import fileDirName from "../libs/file-dirname.js";
@@ -23,6 +25,7 @@ export const DEFAULT_APP_SETTINGS = {
   mediaFolderPrefix: "sistema",
   cajaQuickCategoryMatch: "panader",
   walkInCustomerLabel: "Consumidor Final",
+  timezone: "America/Guayaquil",
 };
 
 let cache = { ...DEFAULT_APP_SETTINGS };
@@ -32,7 +35,7 @@ export function getAppSettingsSync() {
 }
 
 export function mediaFolderPrefix() {
-  const p = String(cache.mediaFolderPrefix || "app").trim() || "app";
+  const p = String(cache.mediaFolderPrefix || "sistema").trim() || "sistema";
   return p.replace(/\/+$/, "");
 }
 
@@ -65,12 +68,22 @@ export function ensureStandardAssetDirs(prefix = mediaFolderPrefix()) {
 }
 
 async function migrateSettingsRow(row) {
-  const prefix = String(row.mediaFolderPrefix || "app").trim() || "app";
+  const prefix = String(row.mediaFolderPrefix || "sistema").trim() || "sistema";
   const canonicalLogo = `${prefix}/logos/logo.jpeg`;
   const patch = {};
 
-  if (!row.logoPath || row.logoPath === `${prefix}/logo.jpeg` || row.logoPath === "EdDeli/logo.jpeg") {
+  if (
+    !row.logoPath ||
+    row.logoPath === `${prefix}/logo.jpeg` ||
+    row.logoPath === "EdDeli/logo.jpeg" ||
+    row.logoPath === "EdDeli/logos/logo.jpeg"
+  ) {
     patch.logoPath = canonicalLogo;
+  }
+
+  const tz = row.timezone != null ? String(row.timezone).trim() : "";
+  if (!tz) {
+    patch.timezone = DEFAULT_APP_SETTINGS.timezone;
   }
 
   if (Object.keys(patch).length) {
@@ -85,13 +98,31 @@ async function migrateSettingsRow(row) {
 export function getMediaFolders() {
   const p = mediaFolderPrefix();
   return {
-    video: [`${p}/videos`, "videos", "publicidad/videos"],
-    audio: [`${p}/audio`, `${p}/music`, "publicidad/audio"],
+    video: [`${p}/media`, `${p}/videos`, "videos", "publicidad/videos"],
+    audio: [`${p}/media`, `${p}/audio`, `${p}/music`, "publicidad/audio"],
     image: [`${p}/publicidad`, `${p}/ads`, `${p}/banners`],
   };
 }
 
+async function ensureAppSettingsSchema() {
+  const qi = sequelize.getQueryInterface();
+  let table;
+  try {
+    table = await qi.describeTable("app_settings");
+  } catch {
+    return;
+  }
+  if (!table.timezone) {
+    await qi.addColumn("app_settings", "timezone", {
+      type: DataTypes.STRING(64),
+      allowNull: false,
+      defaultValue: "America/Guayaquil",
+    });
+  }
+}
+
 export async function loadAppSettings() {
+  await ensureAppSettingsSchema();
   await AppSettings.sync();
   let row = await AppSettings.findByPk(1);
   if (!row) {
@@ -135,5 +166,6 @@ export function toPublicSettings(data = cache) {
     qrFolder: qrFolder(),
     cajaQuickCategoryMatch: data.cajaQuickCategoryMatch || "",
     walkInCustomerLabel: data.walkInCustomerLabel || "Consumidor Final",
+    timezone: data.timezone || "America/Guayaquil",
   };
 }

@@ -173,6 +173,7 @@ export default function CashFlowMirrorChart({ focus = null, onClearFocus }) {
         setModalDetail({
           orders: [],
           posSales: [],
+          incomes: [],
           abonos: [],
           directPayments: [],
           expenses: [],
@@ -205,7 +206,7 @@ export default function CashFlowMirrorChart({ focus = null, onClearFocus }) {
       >
         <ChartBlockHeader
           title="Flujo de ingresos y gastos"
-          subtitle="Clic en una barra para ver pedidos, caja, cobranzas y gastos."
+          subtitle="Ingresos (Income.date) y gastos (Expense.date). Clic en una barra para ver el detalle del período."
           sx={{ mb: 0, flex: 1, minWidth: 0 }}
         />
         <ToggleButtonGroup
@@ -321,14 +322,14 @@ export default function CashFlowMirrorChart({ focus = null, onClearFocus }) {
                 id: 'income',
                 type: 'bar',
                 dataKey: 'income',
-                label: 'Ingresos (ventas)',
+                label: 'Ingresos',
                 color: cIncome,
                 valueFormatter: (v, ctx) => {
                   const row = dataset[ctx?.dataIndex ?? 0];
                   if (!row) return moneyFmt(v);
                   return [
                     `Ingresos: ${moneyFmt(row.income)}`,
-                    `Gastos: ${moneyFmt(row.expenseTotal)} (merma ${moneyFmt(row.merma)})`,
+                    `Gastos: ${moneyFmt(row.expenseTotal)}`,
                     `Balance: ${moneyFmt(row.netBalance)}`,
                     `Margen: ${pctFmt(row.marginPct)}`,
                   ].join(' · ');
@@ -338,15 +339,13 @@ export default function CashFlowMirrorChart({ focus = null, onClearFocus }) {
                 id: 'expense',
                 type: 'bar',
                 dataKey: 'expenseMirror',
-                label: 'Gastos (+ merma)',
+                label: 'Gastos',
                 color: cExpense,
                 valueFormatter: (v, ctx) => {
                   const row = dataset[ctx?.dataIndex ?? 0];
                   if (!row) return moneyFmt(Math.abs(v));
                   return [
-                    `Gastos operativos: ${moneyFmt(row.expense)}`,
-                    `Merma: ${moneyFmt(row.merma)}`,
-                    `Total gastos: ${moneyFmt(row.expenseTotal)}`,
+                    `Gastos: ${moneyFmt(row.expense)}`,
                     `Balance: ${moneyFmt(row.netBalance)}`,
                     `Margen: ${pctFmt(row.marginPct)}`,
                   ].join(' · ');
