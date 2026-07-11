@@ -37,11 +37,17 @@ export default function ImgManagerPage() {
   const [openUpload, setOpenUpload] = useState(false);
   const [openDelete, setOpenDelete] = useState(false);
   const [rowToDelete, setRowToDelete] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const fetchScan = async () => {
-    const { data } = await scanImagesRequest({ folder, maxDepth });
-    setRows(data?.files || []);
-    setTotals(data?.totals || null);
+    setLoading(true);
+    try {
+      const { data } = await scanImagesRequest({ folder, maxDepth });
+      setRows(data?.files || []);
+      setTotals(data?.totals || null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -160,7 +166,7 @@ export default function ImgManagerPage() {
       <Chip size="small" label={`Archivos: ${totals?.totalFiles ?? 0}`} sx={{ mb: 1 }} />
       <Chip size="small" label={`Tamaño: ${totals?.totalSizeHuman ?? "0 B"}`} sx={{ mb: 2, ml: 1 }} />
 
-      <TablePro title="Imágenes" rows={rows} columns={columns} showSearch showPagination defaultRowsPerPage={10} />
+      <TablePro title="Imágenes" rows={rows} columns={columns} showSearch showPagination defaultRowsPerPage={10} loading={loading} />
 
       <SimpleDialog open={openUpload} onClose={() => setOpenUpload(false)} title="Subir imagen" maxWidth="sm" fullWidth>
         <UploadImageForm

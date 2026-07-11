@@ -20,10 +20,16 @@ function SupplierPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [datos, setDatos] = useState([]);
   const [titleDialog, setTitleDialog] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
-    const { data: rows } = await getAllSuppliersRequest();
-    setData(rows);
+    setLoading(true);
+    try {
+      const { data: rows } = await getAllSuppliersRequest();
+      setData(rows);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDialog = () => setOpen(!open);
@@ -130,6 +136,7 @@ function SupplierPage() {
         showIndex
         defaultRowsPerPage={25}
         rowsPerPageOptions={[25, 50, 100, 200]}
+        loading={loading}
       />
     </Container>
   );

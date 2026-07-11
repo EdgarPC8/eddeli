@@ -1,8 +1,8 @@
 import { createLicenseToken } from "../libs/jwt.js";
 import { License } from "../models/License.js";
+import { Op } from "sequelize";
 import { Logs } from "../models/Logs.js";
 import { promises as fs } from "fs";
-import { Op } from "sequelize";
 import "../database/registerEdDeliModels.js";
 import { Users } from "../models/Users.js";
 import { Account } from "../models/Account.js";
@@ -148,11 +148,89 @@ export const reloadBdController = async (req, res) => {
 
 export const getLogs = async (req, res) => {
   try {
-    const data = await Logs.findAll();
+    const data = await Logs.findAll({
+      order: [
+        ["date", "DESC"],
+        ["id", "DESC"],
+      ],
+      limit: Math.min(Number(req.query.limit) || 2000, 5000),
+    });
     res.json(data);
   } catch (error) {
     console.error("Error al obtener logs:", error);
     res.status(500).json({ message: "Error en el servidor." });
+  }
+};
+
+/**
+ * Borrar logs.
+ * Body:
+ *  - all: true → todos
+ *  - method: "POST"|"PUT"|"DELETE"|… → por método
+ *  - methods: ["POST","PUT"] → varios métodos
+ *  - ids: [1,2,3] → por id
+ *  - systemContains: "Mozilla" → user-agent contiene
+ *  - endPointContains: "/orders" → URL contiene
+ */
+export const deleteLogs = async (req, res) => {
+  try {
+    const b = req.body || {};
+    const where = {};
+
+    if (b.all === true) {
+      const count = await Logs.destroy({ where: {}, truncate: false });
+      return res.json({ message: "Todos los logs eliminados", deleted: count });
+    }
+
+    if (Array.isArray(b.ids) && b.ids.length > 0) {
+      where.id = { [Op.in]: b.ids.map(Number).filter(Number.isFinite) };
+    }
+
+    if (b.method) {
+      where.httpMethod = String(b.method).toUpperCase();
+    } else if (Array.isArray(b.methods) && b.methods.length > 0) {
+      where.httpMethod = {
+        [Op.in]: b.methods.map((m) => String(m).toUpperCase()),
+      };
+    }
+
+    if (b.systemContains) {
+      where.system = { [Op.like]: `%${String(b.systemContains).trim()}%` };
+    }
+    if (b.endPointContains) {
+      where.endPoint = { [Op.like]: `%${String(b.endPointContains).trim()}%` };
+    }
+    if (b.actionContains) {
+      where.action = { [Op.like]: `%${String(b.actionContains).trim()}%` };
+    }
+
+    if (Object.keys(where).length === 0) {
+      return res.status(400).json({
+        message:
+          "Indica all, method/methods, ids o filtros (systemContains, endPointContains, actionContains).",
+      });
+    }
+
+    const deleted = await Logs.destroy({ where });
+    res.json({ message: "Logs eliminados", deleted });
+  } catch (error) {
+    console.error("Error al eliminar logs:", error);
+    res.status(500).json({ message: "Error al eliminar logs." });
+  }
+};
+
+export const deleteLogById = async (req, res) => {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isFinite(id)) {
+      return res.status(400).json({ message: "Id inválido" });
+    }
+    const deleted = await Logs.destroy({ where: { id } });
+    if (!deleted) return res.status(404).json({ message: "Log no encontrado" });
+    res.json({ message: "Log eliminado", deleted: 1 });
+  } catch (error) {
+    console.error("Error al eliminar log:", error);
+    res.status(500).json({ message: "Error al eliminar log." });
   }
 };
 

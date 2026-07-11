@@ -25,6 +25,8 @@ import {
   Checkbox,
   CircularProgress,
   InputAdornment,
+  Chip,
+  Alert,
 } from "@mui/material";
 import { useEffect, useMemo, useState, useRef } from "react";
 import {
@@ -41,6 +43,8 @@ import {
 } from "@mui/icons-material";
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
 import TablePro from "../../../components/Tables/TablePro";
+import { storeSriStatus } from "../../../components/OpenShiftStoreDialog.jsx";
+import { fetchSriBillingSettings } from "../../../api/sriBillingRequest.js";
 
 import {
   getStoresRequest,
@@ -59,6 +63,11 @@ import { pathImg, buildImageUrl } from "../../../api/axios";
 import { mediaStoragePath } from "../../../utils/mediaPaths.js";
 import { useAuth } from "../../../context/AuthContext";
 import Cropper from "react-easy-crop";
+import {
+  locationKindLabel,
+  normalizeLocationKind,
+  sortStoresByKind,
+} from "../../../utils/storeLocationKind.js";
 
 /* ===========================
    Helpers de imagen / crop
@@ -798,12 +807,29 @@ function StoreForm({ value, onChange }) {
     <DialogContent dividers>
       <Stack spacing={2}>
         <TextField
-          label="Nombre del punto de venta"
+          label="Nombre del local"
           value={value.name || ""}
           onChange={(e) => set("name", e.target.value)}
           required
           fullWidth
         />
+
+        <TextField
+          select
+          label="Tipo de local"
+          value={value.locationKind || "vitrina"}
+          onChange={(e) => set("locationKind", e.target.value)}
+          fullWidth
+          helperText={
+            value.locationKind === "propia"
+              ? "Sucursal propia: punto de venta tuyo (caja + códigos SRI 001, 002…)."
+              : "Vitrina: local ajeno donde entregas producto para que vendan (sin abrir caja)."
+          }
+        >
+          <MenuItem value="propia">Sucursal propia — punto de venta mío</MenuItem>
+          <MenuItem value="vitrina">Vitrina — entrega para que vendan</MenuItem>
+        </TextField>
+
         <TextField
           label="Dirección"
           value={value.address || ""}
@@ -811,6 +837,36 @@ function StoreForm({ value, onChange }) {
           required
           fullWidth
         />
+
+        {value.locationKind === "propia" && (
+          <>
+            <Typography variant="subtitle2" fontWeight={700}>
+              Emisión (SRI / caja)
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Cada sucursal propia usa su establecimiento. Ej. local A = 001, local B = 002.
+            </Typography>
+            <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
+              <TextField
+                label="Establecimiento"
+                value={value.establishmentCode || "001"}
+                onChange={(e) => set("establishmentCode", e.target.value)}
+                fullWidth
+                inputProps={{ maxLength: 3 }}
+                helperText="Ej. 001, 002"
+              />
+              <TextField
+                label="Punto de emisión"
+                value={value.emissionPointCode || "001"}
+                onChange={(e) => set("emissionPointCode", e.target.value)}
+                fullWidth
+                inputProps={{ maxLength: 3 }}
+                helperText="Ej. 001"
+              />
+            </Stack>
+          </>
+        )}
+
         <TextField
           label="Descripción"
           value={value.description || ""}
@@ -989,7 +1045,9 @@ function StoreForm({ value, onChange }) {
 =========================== */
 function StoresPage() {
   const [rows, setRows] = useState([]);
+  const [kindFilter, setKindFilter] = useState("all"); // all | propia | vitrina
   const [loading, setLoading] = useState(false);
+  const [sriSettings, setSriSettings] = useState(null);
   const { toast: toastAuth } = useAuth();
 
   const [openDelete, setOpenDelete] = useState(false);
@@ -1010,6 +1068,9 @@ function StoresPage() {
     longitude: "",
     position: 0,
     isActive: true,
+    locationKind: "vitrina",
+    establishmentCode: "001",
+    emissionPointCode: "001",
     imageUrl: "",
     imageFile: null,
     customFileName: "",
@@ -1019,33 +1080,43 @@ function StoresPage() {
   const [openProducts, setOpenProducts] = useState(false);
 
   const titleDialog = useMemo(
-    () => (isEditing ? "Editar punto de venta" : "Agregar punto de venta"),
+    () => (isEditing ? "Editar sucursal / local" : "Agregar sucursal / local"),
     [isEditing]
   );
+
+  const kindCounts = useMemo(() => {
+    let propia = 0;
+    let vitrina = 0;
+    for (const r of rows) {
+      if (normalizeLocationKind(r.locationKind) === "propia") propia += 1;
+      else vitrina += 1;
+    }
+    return { all: rows.length, propia, vitrina };
+  }, [rows]);
+
+  const visibleRows = useMemo(() => {
+    const sorted = sortStoresByKind(rows);
+    if (kindFilter === "all") return sorted;
+    return sorted.filter(
+      (r) => normalizeLocationKind(r.locationKind) === kindFilter,
+    );
+  }, [rows, kindFilter]);
 
   const fetchRows = async () => {
     try {
       setLoading(true);
-      const { data } = await getStoresRequest();
+      const [{ data }, sri] = await Promise.all([
+        getStoresRequest(),
+        fetchSriBillingSettings().catch(() => null),
+      ]);
       const stores = Array.isArray(data) ? data : [];
-      
-      // Debug: verificar qué datos llegan del backend
-      console.log("📦 Stores recibidos del backend:", stores.length);
-      stores.forEach((store, idx) => {
-        console.log(`  Store ${idx + 1}:`, {
-          id: store.id,
-          name: store.name,
-          imageUrl: store.imageUrl,
-          hasImageUrl: !!store.imageUrl
-        });
-      });
-      
       setRows(stores);
+      setSriSettings(sri);
     } catch (err) {
       toastAuth({
         promise: Promise.reject(err),
         onError: (res) => ({
-          title: "Puntos de venta",
+          title: "Sucursales",
           description: res?.response?.data?.message || "No se pudo cargar la lista",
         }),
       });
@@ -1073,6 +1144,9 @@ function StoresPage() {
       longitude: "",
       position: 0,
       isActive: true,
+      locationKind: "vitrina",
+      establishmentCode: "001",
+      emissionPointCode: "001",
       imageUrl: "",
       imageFile: null,
       customFileName: "",
@@ -1097,6 +1171,9 @@ function StoresPage() {
       longitude: typeof row.longitude === "number" ? row.longitude : row.longitude ?? "",
       position: Number.isFinite(row.position) ? row.position : 0,
       isActive: Boolean(row.isActive),
+      locationKind: row.locationKind === "propia" ? "propia" : "vitrina",
+      establishmentCode: row.establishmentCode || "001",
+      emissionPointCode: row.emissionPointCode || "001",
       imageUrl: row.imageUrl || "",
       imageFile: null,
       imageSubfolder: row.imageUrl?.includes("/")
@@ -1132,6 +1209,9 @@ function StoresPage() {
 
     fd.append("position", String(Number.isFinite(formValue.position) ? formValue.position : 0));
     fd.append("isActive", String(Boolean(formValue.isActive)));
+    fd.append("locationKind", formValue.locationKind === "propia" ? "propia" : "vitrina");
+    fd.append("establishmentCode", String(formValue.establishmentCode || "001").trim());
+    fd.append("emissionPointCode", String(formValue.emissionPointCode || "001").trim());
 
     const lat = formValue.latitude;
     const lng = formValue.longitude;
@@ -1232,8 +1312,40 @@ function StoresPage() {
         );
       },
     },
-    { label: "Nombre", id: "name", width: 240 },
-    { label: "Ciudad", id: "city", width: 140 },
+    { label: "Nombre", id: "name", width: 180 },
+    {
+      label: "Tipo",
+      id: "locationKind",
+      width: 130,
+      render: (row) =>
+        row.locationKind === "propia" ? (
+          <Chip size="small" color="primary" label="Sucursal propia" />
+        ) : (
+          <Chip size="small" variant="outlined" label="Vitrina" />
+        ),
+    },
+    {
+      label: "Emisión",
+      id: "emission",
+      width: 100,
+      render: (row) =>
+        row.locationKind === "propia"
+          ? `${row.establishmentCode || "001"}-${row.emissionPointCode || "001"}`
+          : "—",
+    },
+    {
+      label: "Estado SRI",
+      id: "sriStatus",
+      width: 150,
+      render: (row) => {
+        if (row.locationKind !== "propia") {
+          return <Chip size="small" variant="outlined" label="No aplica" />;
+        }
+        const st = storeSriStatus(row, sriSettings);
+        return <Chip size="small" color={st.color} label={st.label} title={st.detail} />;
+      },
+    },
+    { label: "Ciudad", id: "city", width: 120 },
     { label: "Provincia", id: "province", width: 140 },
     { label: "Posición", id: "position", width: 90, align: "right" },
     {
@@ -1270,19 +1382,81 @@ function StoresPage() {
 
   return (
     <Container sx={{ py: 2 }}>
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-        <Typography variant="h6">Puntos de venta</Typography>
+      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }} flexWrap="wrap" gap={1}>
+        <Box>
+          <Typography variant="h6" fontWeight={800}>
+            Sucursales / locales
+          </Typography>
+          <Typography variant="body2" color="text.secondary">
+            <strong>Sucursal propia</strong>: tu panadería (caja + SRI).{" "}
+            <strong>Vitrina</strong>: entregas producto para que otros vendan.
+          </Typography>
+        </Box>
         <Button variant="contained" startIcon={<Add />} onClick={handleOpenCreate}>
-          Agregar punto de venta
+          Agregar local
         </Button>
       </Stack>
 
+      <Alert severity="info" sx={{ mb: 2, py: 0.75 }}>
+        Al abrir turno solo aparecen las <strong>sucursales propias</strong>. Las vitrinas siguen
+        sirviendo para surtido y mapa público, sin abrir caja ahí.
+      </Alert>
+
+      <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+        <Chip
+          clickable
+          size="small"
+          color={kindFilter === "all" ? "primary" : "default"}
+          variant={kindFilter === "all" ? "filled" : "outlined"}
+          label={`Todos (${kindCounts.all})`}
+          onClick={() => setKindFilter("all")}
+          sx={{ fontWeight: 700 }}
+        />
+        <Chip
+          clickable
+          size="small"
+          color={kindFilter === "propia" ? "primary" : "default"}
+          variant={kindFilter === "propia" ? "filled" : "outlined"}
+          label={`${locationKindLabel("propia")} (${kindCounts.propia})`}
+          onClick={() => setKindFilter("propia")}
+          sx={{ fontWeight: 700 }}
+        />
+        <Chip
+          clickable
+          size="small"
+          color={kindFilter === "vitrina" ? "primary" : "default"}
+          variant={kindFilter === "vitrina" ? "filled" : "outlined"}
+          label={`${locationKindLabel("vitrina")} (${kindCounts.vitrina})`}
+          onClick={() => setKindFilter("vitrina")}
+          sx={{ fontWeight: 700 }}
+        />
+      </Stack>
+
+      {sriSettings && (
+        <Alert
+          severity={sriSettings.readyForInvoicing ? "success" : "info"}
+          sx={{ mb: 2, py: 0.5 }}
+        >
+          {sriSettings.readyForInvoicing
+            ? `Emisor SRI listo (${sriSettings.environment}). Firma y datos fiscales configurados.`
+            : sriSettings.hasCertificate
+              ? "Hay firma cargada, pero faltan datos fiscales o activación en Configuración → Facturación electrónica."
+              : "Aún no hay firma SRI. Puedes operar caja igual; la facturación electrónica se completa en Sistema → Configuración."}
+        </Alert>
+      )}
+
       <TablePro
-        rows={rows}
+        rows={visibleRows}
         columns={columns}
         loading={loading}
         defaultRowsPerPage={10}
-        title="Listado de puntos de venta"
+        title={
+          kindFilter === "propia"
+            ? "Sucursales propias"
+            : kindFilter === "vitrina"
+              ? "Vitrinas"
+              : "Sucursales propias y vitrinas"
+        }
       />
 
       {/* Form create/edit */}

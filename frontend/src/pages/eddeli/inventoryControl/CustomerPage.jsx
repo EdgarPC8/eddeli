@@ -29,10 +29,16 @@ function CustomerPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [datos, setDatos] = useState([]);
   const [titleUserDialog, setTitleUserDialog] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
-    const { data } = await getAllCustomersRequest();
-    setData(Array.isArray(data) ? data : []);
+    setLoading(true);
+    try {
+      const { data } = await getAllCustomersRequest();
+      setData(Array.isArray(data) ? data : []);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDialog = () => setOpen(!open);
@@ -132,6 +138,7 @@ function CustomerPage() {
         showIndex
         defaultRowsPerPage={10}
         rowsPerPageOptions={[5, 10, 25, 50]}
+        loading={loading}
       />
     </Container>
   );

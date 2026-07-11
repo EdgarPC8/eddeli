@@ -26,7 +26,7 @@ import {
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
 
 export default function EditorTemplatesView({
-  editorBasePath = "/editor", // ✅ ruta del editor
+  editorBasePath = "/diseno-promocional/editor", // ruta canónica del editor
   defaultApp = "EdDeli",
   defaultFormat = "16:9",
 } = {}) {

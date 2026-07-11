@@ -15,6 +15,12 @@ export const getPanelStats = () => axios.get("/comands/panel-stats", auth());
 
 export const getLogs = () => axios.get("/comands/getLogs", auth());
 
+export const deleteLogsRequest = (payload) =>
+  axios.delete("/comands/logs", { ...auth(), data: payload });
+
+export const deleteLogByIdRequest = (id) =>
+  axios.delete(`/comands/logs/${id}`, auth());
+
 export const downloadBackup = async () => {
   const response = await axios.get("/comands/downloadBackup", {
     ...auth(),

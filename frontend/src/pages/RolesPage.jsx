@@ -24,6 +24,7 @@ import UserForm from "../components/Forms/UserForm.jsx";
     const [datos, setDatos] = useState([]);
     const [id, setId] = useState(0);
     const [titleUserDialog, settitleUserDialog] = useState("");
+    const [loading, setLoading] = useState(true);
   const { toast} = useAuth();
 
     const {
@@ -112,8 +113,13 @@ import UserForm from "../components/Forms/UserForm.jsx";
       },
     ];
      const fetchdata = async () => {
-      const { data } = await getRolRequest();
-      setData(data);
+      setLoading(true);
+      try {
+        const { data } = await getRolRequest();
+        setData(data);
+      } finally {
+        setLoading(false);
+      }
     };
   
     useEffect(() => {
@@ -178,6 +184,7 @@ import UserForm from "../components/Forms/UserForm.jsx";
               defaultRowsPerPage={5}
               showIndex
               indexHeader="#"
+              loading={loading}
             />
       </Container>
     );

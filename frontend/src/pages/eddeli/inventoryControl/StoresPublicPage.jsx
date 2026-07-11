@@ -7,16 +7,26 @@ import {
   getStoresRequest,
   getStoreProductsPublicRequest,
 } from "../../../api/inventoryControlRequest.js";
+import { useAppSettings } from "../../../context/AppSettingsContext.jsx";
 
 /**
  * Vista pública de locales (/punto_venta): misma idea que la sección del home sin sesión;
  * tarjetas, detalle y productos por local. La administración va en /inventory/puntos-venta.
  */
 export default function StoresPublicPage() {
+  const { activeApp } = useAppSettings();
+  const showPropia = activeApp?.showPublicStoresPropia !== false;
+  const showVitrina = activeApp?.showPublicStoresVitrina !== false;
+  const showStores = showPropia || showVitrina;
+
   const [stores, setStores] = useState([]);
   const [err, setErr] = useState("");
 
   useEffect(() => {
+    if (!showStores) {
+      setStores([]);
+      return;
+    }
     let alive = true;
     (async () => {
       try {
@@ -38,6 +48,7 @@ export default function StoresPublicPage() {
           isActive: s.isActive,
           latitude: s.latitude,
           longitude: s.longitude,
+          locationKind: s.locationKind === "propia" ? "propia" : "vitrina",
         }));
 
         if (alive) setStores(mapped);
@@ -51,12 +62,22 @@ export default function StoresPublicPage() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [showStores]);
 
   const loadStoreProducts = useCallback(async (storeId) => {
     const res = await getStoreProductsPublicRequest(storeId);
     return res;
   }, []);
+
+  if (!showStores) {
+    return (
+      <Container sx={{ pb: 6, pt: 4 }}>
+        <Alert severity="info">
+          La vista de locales no está disponible en este momento.
+        </Alert>
+      </Container>
+    );
+  }
 
   return (
     <Container sx={{ pb: 6, pt: 2 }}>
@@ -71,6 +92,9 @@ export default function StoresPublicPage() {
           items={stores}
           maxVisible={stores.length}
           loadStoreProducts={loadStoreProducts}
+          publicFacing
+          showPropia={showPropia}
+          showVitrina={showVitrina}
         />
       </Box>
     </Container>

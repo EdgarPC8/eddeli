@@ -68,6 +68,7 @@ import { formatDateTime } from "../helpers/functions.js";
     // ✅ borrar carpeta
     const [openDeleteFolder, setOpenDeleteFolder] = useState(false);
     const [forceDeleteFolder, setForceDeleteFolder] = useState(false);
+    const [loading, setLoading] = useState(true);
   
     const handleUploadDialog = () => setOpenUpload((p) => !p);
     const handleDeleteDialog = () => setOpenDelete((p) => !p);
@@ -78,6 +79,7 @@ import { formatDateTime } from "../helpers/functions.js";
     };
   
     const fetchScan = async () => {
+      setLoading(true);
       try {
         const { data } = await scanFilesRequest({
           folder,
@@ -89,6 +91,8 @@ import { formatDateTime } from "../helpers/functions.js";
         setTotals(data?.totals || null);
       } catch (e) {
         toast.error(e?.response?.data?.message || "Error al escanear archivos");
+      } finally {
+        setLoading(false);
       }
     };
   
@@ -334,6 +338,7 @@ import { formatDateTime } from "../helpers/functions.js";
           defaultRowsPerPage={10}
           title="ARCHIVOS"
           showIndex={true}
+          loading={loading}
         />
   
         {/* Dialog subir */}

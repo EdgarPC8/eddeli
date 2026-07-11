@@ -1,70 +1,79 @@
 // loggerMiddleware.js
 import { getHeaderToken, verifyJWT } from "../libs/jwt.js";
 import { logger } from "../log/LogActivity.js";
-import { sequelize } from "../database/connection.js";
+import { resolveLogAction } from "../log/logActionCatalog.js";
 import { Account } from "../models/Account.js";
 import { Roles } from "../models/Roles.js";
 import { Users } from "../models/Users.js";
 
-const methodsToFilter = ["GET","OPTIONS"];
-const urlFilter = ["/getMatrizFilter"];
-const actions = [
-  {
-    url: "/api/matriz/editCareer/:careerId",
-    action: "Se editó una Carrera",
-    method: "PUT"
-  },
-];
+const methodsToFilter = ["GET", "OPTIONS", "HEAD"];
 
 export const loggerMiddleware = async (req, res, next) => {
   const authHeader = req.headers["authorization"];
-  const system = req.headers['user-agent'];
+  const system = req.headers["user-agent"];
+  const method = req.method;
+  const endPoint = req.originalUrl || req.url || "";
 
-  if (
-    authHeader &&
-    authHeader !== "Bearer null" &&
-    !methodsToFilter.includes(req.method) &&
-    !urlFilter.includes(req.method)
-  ) {
+  if (methodsToFilter.includes(method)) {
+    return next();
+  }
+
+  const action = resolveLogAction(method, endPoint);
+  const isLogin = action === "Login";
+
+  // Login: registrar aunque aún no haya token
+  if (isLogin) {
+    try {
+      logger({
+        httpMethod: method,
+        endPoint,
+        action,
+        description: "Intento de inicio de sesión",
+        system,
+      });
+    } catch (error) {
+      console.error("Error al registrar log de login:", error);
+    }
+    return next();
+  }
+
+  if (!authHeader || authHeader === "Bearer null") {
+    return next();
+  }
+
+  try {
     const token = getHeaderToken(req);
     const user = await verifyJWT(token);
 
-    try {
-      const account = await Account.findOne({
-        include: [
-          {
-            model: Roles,
-            as: 'roles',
-            through: { attributes: [] },
-          },
-          {
-            model: Users,
-            as: 'user',
-          },
-        ],
-        where: { id: user.accountId },
-      });
+    const account = await Account.findOne({
+      include: [
+        {
+          model: Roles,
+          as: "roles",
+          through: { attributes: [] },
+        },
+        {
+          model: Users,
+          as: "user",
+        },
+      ],
+      where: { id: user.accountId },
+    });
 
-      const rolName = account.roles?.[0]?.name || "Rol desconocido";
+    const rolName = account?.roles?.[0]?.name || user.loginRol || "Rol desconocido";
+    const firstName = account?.user?.firstName || "";
+    const lastName = account?.user?.firstLastName || "";
+    const who = [firstName, lastName].filter(Boolean).join(" ") || `cuenta #${user.accountId}`;
 
-      const matchedAction = actions.find(action => {
-        const pattern = action.url.replace(/:[a-zA-Z0-9]+/g, '[a-zA-Z0-9]+');
-        const regex = new RegExp(`^${pattern}$`);
-        return regex.test(req.originalUrl) && action.method === req.method;
-      });
-
-      const actionText = matchedAction ? matchedAction.action : "Acción desconocida";
-
-      logger({
-        httpMethod: req.method,
-        endPoint: req.originalUrl,
-        action: actionText,
-        description: `EL ${rolName} ${account.user.firstName} ${account.user.firstLastName} realizó una acción`,
-        system: system
-      });
-    } catch (error) {
-      console.error("Error al procesar la solicitud:", error);
-    }
+    logger({
+      httpMethod: method,
+      endPoint,
+      action,
+      description: `El ${rolName} ${who} realizó: ${action}`,
+      system,
+    });
+  } catch (error) {
+    console.error("Error al procesar la solicitud (logger):", error);
   }
 
   next();

@@ -18,6 +18,7 @@ import {
   DialogActions,
   TablePagination,
 } from "@mui/material";
+import { ListSkeleton, PanelSkeleton } from "../../../../components/ContentSkeleton.jsx";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import EditIcon from "@mui/icons-material/Edit";
 import DeleteIcon from "@mui/icons-material/Delete";
@@ -125,6 +126,7 @@ function useMovementColumns(isProgrammer, onEdit, onDelete) {
 
 export default function MovementsListPanel({
   movements,
+  loading = false,
   isProgrammer,
   onEdit,
   onDelete,
@@ -220,94 +222,104 @@ export default function MovementsListPanel({
           setSearch(e.target.value);
           setGroupsPage(0);
         }}
+        disabled={loading}
         sx={{ mb: 2 }}
       />
 
-      {productionGroups.length > 0 && (
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
-            Producciones agrupadas
-          </Typography>
-          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
-            Pasa de página entre operaciones; dentro de cada una, otra tabla con sus propias páginas.
-          </Typography>
+      {loading ? (
+        <Stack spacing={2}>
+          <PanelSkeleton height={160} />
+          <ListSkeleton count={4} itemHeight={56} />
+        </Stack>
+      ) : (
+        <>
+          {productionGroups.length > 0 && (
+            <Box sx={{ mb: 2 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+                Producciones agrupadas
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
+                Pasa de página entre operaciones; dentro de cada una, otra tabla con sus propias páginas.
+              </Typography>
 
-          <Stack spacing={1.5}>
-            {groupsSlice.map((group) => (
-              <Accordion key={group.opId} variant="outlined" disableGutters>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    alignItems="center"
-                    flexWrap="wrap"
-                    sx={{ width: "100%", pr: 1 }}
-                  >
-                    <Typography sx={{ fontWeight: 800 }}>{group.label}</Typography>
-                    <Chip size="small" label={group.opId} variant="outlined" />
-                    <Chip size="small" label={`${group.items.length} mov.`} />
-                    <Chip size="small" label={formatDateTime(group.date)} color="primary" variant="outlined" />
-                    {isProgrammer && (
-                      <Button
-                        size="small"
-                        startIcon={<CalendarMonthIcon />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          openGroupDate(group);
-                        }}
-                        sx={{ ml: "auto" }}
+              <Stack spacing={1.5}>
+                {groupsSlice.map((group) => (
+                  <Accordion key={group.opId} variant="outlined" disableGutters>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Stack
+                        direction="row"
+                        spacing={1}
+                        alignItems="center"
+                        flexWrap="wrap"
+                        sx={{ width: "100%", pr: 1 }}
                       >
-                        Fecha grupal
-                      </Button>
-                    )}
-                  </Stack>
-                </AccordionSummary>
-                <AccordionDetails sx={{ p: 1, pt: 0 }}>
-                  <PaginatedMovementTable
-                    title={`Movimientos · ${group.opId}`}
-                    rows={group.items}
-                    columns={columns}
-                    defaultRowsPerPage={10}
-                  />
-                </AccordionDetails>
-              </Accordion>
-            ))}
-          </Stack>
+                        <Typography sx={{ fontWeight: 800 }}>{group.label}</Typography>
+                        <Chip size="small" label={group.opId} variant="outlined" />
+                        <Chip size="small" label={`${group.items.length} mov.`} />
+                        <Chip size="small" label={formatDateTime(group.date)} color="primary" variant="outlined" />
+                        {isProgrammer && (
+                          <Button
+                            size="small"
+                            startIcon={<CalendarMonthIcon />}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openGroupDate(group);
+                            }}
+                            sx={{ ml: "auto" }}
+                          >
+                            Fecha grupal
+                          </Button>
+                        )}
+                      </Stack>
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ p: 1, pt: 0 }}>
+                      <PaginatedMovementTable
+                        title={`Movimientos · ${group.opId}`}
+                        rows={group.items}
+                        columns={columns}
+                        defaultRowsPerPage={10}
+                      />
+                    </AccordionDetails>
+                  </Accordion>
+                ))}
+              </Stack>
 
-          <TablePagination
-            component="div"
-            count={productionGroups.length}
-            page={groupsPage}
-            onPageChange={handleGroupsPageChange}
-            rowsPerPage={groupsPerPage}
-            onRowsPerPageChange={handleGroupsPerPageChange}
-            rowsPerPageOptions={[3, 5, 10, 15]}
-            labelRowsPerPage="Producciones por página"
-            labelDisplayedRows={({ from, to, count }) =>
-              `${from}–${to} de ${count !== -1 ? count : `más de ${to}`} operaciones`
-            }
-          />
-        </Box>
-      )}
+              <TablePagination
+                component="div"
+                count={productionGroups.length}
+                page={groupsPage}
+                onPageChange={handleGroupsPageChange}
+                rowsPerPage={groupsPerPage}
+                onRowsPerPageChange={handleGroupsPerPageChange}
+                rowsPerPageOptions={[3, 5, 10, 15]}
+                labelRowsPerPage="Producciones por página"
+                labelDisplayedRows={({ from, to, count }) =>
+                  `${from}–${to} de ${count !== -1 ? count : `más de ${to}`} operaciones`
+                }
+              />
+            </Box>
+          )}
 
-      {standalone.length > 0 && (
-        <Box>
-          <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
-            {productionGroups.length > 0 ? "Otros movimientos" : "Listado"}
-          </Typography>
-          <PaginatedMovementTable
-            title="Movimientos"
-            rows={standalone}
-            columns={columns}
-            defaultRowsPerPage={10}
-          />
-        </Box>
-      )}
+          {standalone.length > 0 && (
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+                {productionGroups.length > 0 ? "Otros movimientos" : "Listado"}
+              </Typography>
+              <PaginatedMovementTable
+                title="Movimientos"
+                rows={standalone}
+                columns={columns}
+                defaultRowsPerPage={10}
+              />
+            </Box>
+          )}
 
-      {filtered.length === 0 && (
-        <Typography color="text.secondary" align="center" sx={{ py: 3 }}>
-          No hay movimientos.
-        </Typography>
+          {filtered.length === 0 && (
+            <Typography color="text.secondary" align="center" sx={{ py: 3 }}>
+              No hay movimientos.
+            </Typography>
+          )}
+        </>
       )}
 
       <Dialog open={groupDateOpen} onClose={() => setGroupDateOpen(false)} maxWidth="xs" fullWidth>

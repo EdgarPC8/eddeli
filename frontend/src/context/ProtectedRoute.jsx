@@ -8,6 +8,11 @@ import {
   useSubscriptions,
   SUBSCRIPTIONS_ENABLED,
 } from "../hooks/useSubscriptions.js";
+import {
+  findMaintenanceSectionForPath,
+  shouldBlockMaintenancePath,
+} from "../config/sectionMaintenanceAccess.js";
+import SectionMaintenanceBlocked from "../pages/SectionMaintenanceBlocked.jsx";
 
 export default function ProtectedRoute({ requiredRol }) {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -59,13 +64,16 @@ export default function ProtectedRoute({ requiredRol }) {
     );
   }
 
+  if (shouldBlockMaintenancePath(location.pathname, user.loginRol)) {
+    return (
+      <SectionMaintenanceBlocked
+        section={findMaintenanceSectionForPath(location.pathname)}
+      />
+    );
+  }
+
   // Licencias desactivadas (desarrollo): acceso solo por rol, sin gestor.
   if (!SUBSCRIPTIONS_ENABLED) return <Outlet />;
-
-  // Gestor caído o timeout: no bloquear el acceso
-  // if (checkFailed) {
-  //   return <Outlet />;
-  // }
 
   if (subscription?.maintenance) {
     return <Navigate to="/mantenimiento" replace />;

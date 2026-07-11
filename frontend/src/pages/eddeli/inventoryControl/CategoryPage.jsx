@@ -42,16 +42,22 @@ function CategoryPage() {
   const [titleUserDialog, settitleUserDialog] = useState("");
   const [presetParentId, setPresetParentId] = useState(null);
   const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const fecthData = async () => {
-    const { data: rows } = await getCategories();
-    const list = rows || [];
-    setData(list);
-    setSelectedRootId((prev) => {
-      const roots = getRootCategories(list);
-      if (prev && roots.some((r) => Number(r.id) === Number(prev))) return prev;
-      return roots[0]?.id ?? null;
-    });
+    setLoading(true);
+    try {
+      const { data: rows } = await getCategories();
+      const list = rows || [];
+      setData(list);
+      setSelectedRootId((prev) => {
+        const roots = getRootCategories(list);
+        if (prev && roots.some((r) => Number(r.id) === Number(prev))) return prev;
+        return roots[0]?.id ?? null;
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const rootCategories = useMemo(
@@ -321,6 +327,7 @@ function CategoryPage() {
             tableMaxHeight={TABLE_HEIGHT}
             onRowClick={(row) => setSelectedRootId(row.id)}
             selectedRowId={selectedRootId}
+            loading={loading}
           />
         </Grid>
 
@@ -359,6 +366,7 @@ function CategoryPage() {
               defaultRowsPerPage={10}
               rowsPerPageOptions={[5, 10, 25, 50]}
               tableMaxHeight={TABLE_HEIGHT}
+              loading={loading}
             />
           ) : (
             <Paper

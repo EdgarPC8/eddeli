@@ -26,6 +26,9 @@ export const DEFAULT_APP_SETTINGS = {
   cajaQuickCategoryMatch: "panader",
   walkInCustomerLabel: "Consumidor Final",
   timezone: "America/Guayaquil",
+  showPublicCatalog: true,
+  showPublicStoresPropia: true,
+  showPublicStoresVitrina: true,
 };
 
 let cache = { ...DEFAULT_APP_SETTINGS };
@@ -119,6 +122,30 @@ async function ensureAppSettingsSchema() {
       defaultValue: "America/Guayaquil",
     });
   }
+  const boolCols = [
+    ["showPublicCatalog", true],
+    ["showPublicStoresPropia", true],
+    ["showPublicStoresVitrina", true],
+  ];
+  for (const [col, def] of boolCols) {
+    if (!table[col]) {
+      await qi.addColumn("app_settings", col, {
+        type: DataTypes.BOOLEAN,
+        allowNull: false,
+        defaultValue: def,
+      });
+    }
+  }
+}
+
+function asBool(value, fallback = true) {
+  if (value === undefined || value === null) return fallback;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "number") return value !== 0;
+  const s = String(value).trim().toLowerCase();
+  if (["0", "false", "no", "off"].includes(s)) return false;
+  if (["1", "true", "yes", "on"].includes(s)) return true;
+  return fallback;
 }
 
 export async function loadAppSettings() {
@@ -129,19 +156,41 @@ export async function loadAppSettings() {
     row = await AppSettings.create({ id: 1, ...DEFAULT_APP_SETTINGS });
   }
   row = await migrateSettingsRow(row);
-  cache = { ...DEFAULT_APP_SETTINGS, ...row.toJSON() };
+  const raw = row.toJSON();
+  cache = {
+    ...DEFAULT_APP_SETTINGS,
+    ...raw,
+    showPublicCatalog: asBool(raw.showPublicCatalog, true),
+    showPublicStoresPropia: asBool(raw.showPublicStoresPropia, true),
+    showPublicStoresVitrina: asBool(raw.showPublicStoresVitrina, true),
+  };
   ensureStandardAssetDirs(cache.mediaFolderPrefix);
   return cache;
 }
 
 export async function updateAppSettings(payload) {
+  const patch = { ...payload };
+  for (const key of [
+    "showPublicCatalog",
+    "showPublicStoresPropia",
+    "showPublicStoresVitrina",
+  ]) {
+    if (key in patch) patch[key] = asBool(patch[key], true);
+  }
   let row = await AppSettings.findByPk(1);
   if (!row) {
-    row = await AppSettings.create({ id: 1, ...DEFAULT_APP_SETTINGS, ...payload });
+    row = await AppSettings.create({ id: 1, ...DEFAULT_APP_SETTINGS, ...patch });
   } else {
-    await row.update(payload);
+    await row.update(patch);
   }
-  cache = { ...DEFAULT_APP_SETTINGS, ...row.toJSON() };
+  const raw = row.toJSON();
+  cache = {
+    ...DEFAULT_APP_SETTINGS,
+    ...raw,
+    showPublicCatalog: asBool(raw.showPublicCatalog, true),
+    showPublicStoresPropia: asBool(raw.showPublicStoresPropia, true),
+    showPublicStoresVitrina: asBool(raw.showPublicStoresVitrina, true),
+  };
   return cache;
 }
 
@@ -167,5 +216,8 @@ export function toPublicSettings(data = cache) {
     cajaQuickCategoryMatch: data.cajaQuickCategoryMatch || "",
     walkInCustomerLabel: data.walkInCustomerLabel || "Consumidor Final",
     timezone: data.timezone || "America/Guayaquil",
+    showPublicCatalog: asBool(data.showPublicCatalog, true),
+    showPublicStoresPropia: asBool(data.showPublicStoresPropia, true),
+    showPublicStoresVitrina: asBool(data.showPublicStoresVitrina, true),
   };
 }

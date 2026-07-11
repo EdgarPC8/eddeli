@@ -31,6 +31,7 @@ import { BarChart } from '@mui/x-charts/BarChart';
 import TableRowsIcon from '@mui/icons-material/TableRows';
 import CloseIcon from '@mui/icons-material/Close';
 import ChartBlockHeader from '../../../../../components/Charts/ChartBlockHeader';
+import { ChartSkeleton } from '../../../../../components/ContentSkeleton.jsx';
 import { getExpensesForChart } from '../../../../../api/financeRequest';
 import { getChartSeriesColors, CHART_SEMANTIC_INDEX } from '../../../../../theme/chartPalette';
 import {
@@ -480,9 +481,7 @@ export default function ExpensePurchaseStats() {
         </Typography>
 
         {loading ? (
-          <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
-            Cargando gráfico…
-          </Typography>
+          <ChartSkeleton height={220} />
         ) : chartDataset.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ py: 4, textAlign: 'center' }}>
             No hay compras de insumos en este período.

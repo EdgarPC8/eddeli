@@ -1,7 +1,9 @@
 /**
- * Información del sistema (metadatos de la app EdDeli) y mapa de módulos.
+ * Información del sistema: pestaña App (logo, datos, plan) y pestaña Módulos
+ * (clic en módulo → secciones con conteo de funciones).
  */
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Link as RouterLink, useSearchParams } from "react-router-dom";
 import {
   Box,
   Typography,
@@ -9,36 +11,65 @@ import {
   Divider,
   Stack,
   Chip,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   Grid,
-  Fab,
-  Tooltip,
-  Zoom,
-  keyframes,
+  Tabs,
+  Tab,
+  ListItemButton,
+  ListItemText,
+  Collapse,
+  Button,
+  IconButton,
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import PictureAsPdfIcon from "@mui/icons-material/PictureAsPdf";
+import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import { useAppSettings } from "../context/AppSettingsContext.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
+import { useSubscriptions } from "../hooks/useSubscriptions.js";
 import {
   APP_ROLES_LEGEND,
   APP_MODULE_GROUPS,
   APP_ACCOUNT_SECTIONS,
   APP_PUBLIC_SECTIONS,
+  MODULE_STATUS_META,
+  resolveModuleStatus,
 } from "../config/appModulesCatalog.js";
+import { resolveActiveSystemPlan } from "../config/systemPlansCatalog.js";
 import { downloadAppModulesPdf } from "../utils/appModulesPdfExport.js";
 
-const bounceDown = keyframes`
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(6px); }
-`;
+function countFunctions(section) {
+  return section?.functions?.length || 0;
+}
+
+function countGroupFunctions(group) {
+  return (group.sections || []).reduce((n, s) => n + countFunctions(s), 0);
+}
+
+function countPlannedSections(group) {
+  return (group.sections || []).filter((s) => resolveModuleStatus(s) === "planned").length;
+}
+
+function countMaintenanceSections(group) {
+  return (group.sections || []).filter((s) => resolveModuleStatus(s) === "maintenance").length;
+}
+
+function orderSectionsForPreview(sections = []) {
+  const planned = sections.filter((s) => resolveModuleStatus(s) === "planned");
+  const maintenance = sections.filter((s) => resolveModuleStatus(s) === "maintenance");
+  const other = sections.filter((s) => {
+    const st = resolveModuleStatus(s);
+    return st !== "planned" && st !== "maintenance";
+  });
+  return [...planned, ...maintenance, ...other];
+}
 
 function RoleChips({ roles }) {
   if (!roles?.length) return null;
   return (
-    <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.75 }}>
+    <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
       {roles.map((role) => (
         <Chip key={role} label={role} size="small" variant="outlined" sx={{ height: 22 }} />
       ))}
@@ -46,156 +77,128 @@ function RoleChips({ roles }) {
   );
 }
 
-function SectionFunctions({ functions }) {
-  if (!functions?.length) return null;
+function SectionDetail({ section, expanded, onToggle }) {
+  const fnCount = countFunctions(section);
+  const status = resolveModuleStatus(section);
+  const statusMeta = MODULE_STATUS_META[status];
+  const isPlanned = status === "planned";
+  const isMaintenance = status === "maintenance";
+  const highlight = isPlanned || isMaintenance;
+
   return (
     <Box
-      sx={{
-        mt: 1.25,
-        pl: 1.25,
-        borderLeft: 2,
-        borderColor: "primary.light",
-      }}
-    >
-      <Typography variant="caption" fontWeight={700} color="primary.main" sx={{ display: "block", mb: 0.75 }}>
-        Funciones ({functions.length})
-      </Typography>
-      <Stack spacing={0.85}>
-        {functions.map((fn) => (
-          <Box key={fn.name}>
-            <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.82rem", lineHeight: 1.4 }}>
-              {fn.name}
-            </Typography>
-            <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.45, display: "block" }}>
-              {fn.description}
-            </Typography>
-          </Box>
-        ))}
-      </Stack>
-    </Box>
-  );
-}
-
-function SectionRow({ section }) {
-  return (
-    <Box
-      sx={{
-        py: 1.25,
-        borderBottom: "1px solid",
-        borderColor: "divider",
-        "&:last-child": { borderBottom: 0, pb: 0 },
-      }}
-    >
-      <Typography variant="subtitle2" fontWeight={700}>
-        {section.name}
-      </Typography>
-      <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.25 }}>
-        {section.path}
-      </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, lineHeight: 1.55 }}>
-        {section.description}
-      </Typography>
-      <RoleChips roles={section.roles} />
-      <SectionFunctions functions={section.functions} />
-    </Box>
-  );
-}
-
-function ModuleGroupAccordion({ group, defaultExpanded = false }) {
-  return (
-    <Accordion
-      disableGutters
-      elevation={0}
-      defaultExpanded={defaultExpanded}
       sx={{
         border: "1px solid",
-        borderColor: "divider",
-        borderRadius: "12px !important",
+        borderColor: isPlanned
+          ? "warning.light"
+          : isMaintenance
+            ? "error.light"
+            : "divider",
+        borderRadius: 2,
         mb: 1,
-        "&:before": { display: "none" },
         overflow: "hidden",
+        opacity: highlight ? 0.92 : 1,
       }}
     >
-      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Box>
-          <Typography variant="subtitle1" fontWeight={700}>
-            {group.label}
-          </Typography>
-          <Typography variant="caption" color="text.secondary">
-            {group.summary} · {group.sections.length} sección(es)
-          </Typography>
+      <ListItemButton onClick={onToggle} sx={{ py: 1.25, alignItems: "flex-start" }}>
+        <ListItemText
+          primary={
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" useFlexGap>
+              <Typography variant="subtitle2" fontWeight={700}>
+                {section.name}
+              </Typography>
+              {isPlanned ? (
+                <Chip
+                  size="small"
+                  color="warning"
+                  label="Próximamente"
+                  sx={{ height: 22, fontWeight: 700 }}
+                />
+              ) : null}
+              {isMaintenance ? (
+                <Chip
+                  size="small"
+                  color="error"
+                  label="Mantenimiento"
+                  sx={{ height: 22, fontWeight: 700 }}
+                />
+              ) : null}
+              <Chip
+                size="small"
+                label={`${fnCount} función${fnCount === 1 ? "" : "es"}`}
+                color={fnCount ? "primary" : "default"}
+                variant="outlined"
+                sx={{ height: 22, fontWeight: 700 }}
+              />
+              {!highlight && status !== "active" && statusMeta ? (
+                <Chip
+                  size="small"
+                  color={statusMeta.color}
+                  label={statusMeta.label}
+                  sx={{ height: 22, fontWeight: 700 }}
+                />
+              ) : null}
+            </Stack>
+          }
+          secondary={
+            <>
+              <Typography variant="caption" color="text.secondary" display="block">
+                {section.path}
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, lineHeight: 1.5 }}>
+                {section.description}
+              </Typography>
+              <RoleChips roles={section.roles} />
+            </>
+          }
+        />
+        {fnCount > 0 ? (expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />) : null}
+      </ListItemButton>
+      <Collapse in={expanded && fnCount > 0} timeout="auto" unmountOnExit>
+        <Box sx={{ px: 2, pb: 1.5, pt: 0 }}>
+          <Stack
+            spacing={1}
+            sx={{
+              pl: 1.5,
+              borderLeft: 2,
+              borderColor: isPlanned
+                ? "warning.light"
+                : isMaintenance
+                  ? "error.light"
+                  : "primary.light",
+            }}
+          >
+            {section.functions.map((fn) => (
+              <Box key={fn.name}>
+                <Typography variant="body2" fontWeight={600} sx={{ fontSize: "0.82rem" }}>
+                  {fn.name}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  {fn.description}
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
         </Box>
-      </AccordionSummary>
-      <AccordionDetails sx={{ pt: 0, px: 2, pb: 2 }}>
-        {group.sections.map((section) => (
-          <SectionRow key={`${group.id}-${section.path}`} section={section} />
-        ))}
-      </AccordionDetails>
-    </Accordion>
+      </Collapse>
+    </Box>
   );
 }
 
-export default function InfoPage() {
-  const { activeApp } = useAppSettings();
+function AppInfoTab({ activeApp, plan, canSeePlans }) {
   const year = new Date().getFullYear();
-  const modulesRef = useRef(null);
-  const [fabVisible, setFabVisible] = useState(false);
-  const [pdfReady, setPdfReady] = useState(false);
-  const [downloading, setDownloading] = useState(false);
-
-  const updateFabState = useCallback(() => {
-    const scrollY = window.scrollY || document.documentElement.scrollTop;
-    setFabVisible(scrollY > 100);
-
-    const el = modulesRef.current;
-    if (!el) {
-      setPdfReady(false);
-      return;
-    }
-    const rect = el.getBoundingClientRect();
-    setPdfReady(rect.top < window.innerHeight * 0.55);
-  }, []);
-
-  useEffect(() => {
-    updateFabState();
-    window.addEventListener("scroll", updateFabState, { passive: true });
-    window.addEventListener("resize", updateFabState);
-    return () => {
-      window.removeEventListener("scroll", updateFabState);
-      window.removeEventListener("resize", updateFabState);
-    };
-  }, [updateFabState]);
-
-  const handleFabClick = async () => {
-    if (!pdfReady) {
-      modulesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      return;
-    }
-    try {
-      setDownloading(true);
-      downloadAppModulesPdf();
-    } finally {
-      setDownloading(false);
-    }
-  };
-
-  const fabLabel = pdfReady
-    ? downloading
-      ? "Generando PDF…"
-      : "Descargar módulos (PDF)"
-    : "Ir a módulos y secciones";
 
   return (
-    <Box sx={{ maxWidth: 920, mx: "auto", py: 4, px: { xs: 1, sm: 2 }, pb: 10 }}>
-      <Paper elevation={3} sx={{ p: 4, borderRadius: 3, mb: 3 }}>
+    <Stack spacing={2.5}>
+      <Paper elevation={2} sx={{ p: { xs: 2.5, sm: 3.5 }, borderRadius: 3 }}>
         <Box display="flex" flexDirection="column" alignItems="center" textAlign="center">
           <Box
             component="img"
             src={activeApp.logoUrl}
             alt={activeApp.name}
             sx={{
-              width: 100,
-              height: 100,
+              width: 104,
+              height: 104,
               mb: 2,
               borderRadius: "50%",
               objectFit: "cover",
@@ -204,115 +207,433 @@ export default function InfoPage() {
               boxShadow: 2,
             }}
           />
-
-          <Typography variant="h5" fontWeight="bold" gutterBottom>
+          <Typography variant="h5" fontWeight={800} gutterBottom>
             {activeApp.name}
           </Typography>
-
           <Typography variant="subtitle1" color="text.secondary" gutterBottom>
             Versión {activeApp.version}
           </Typography>
-
           <Divider sx={{ my: 2, width: "100%" }} />
-
-          <Typography variant="body1" gutterBottom sx={{ lineHeight: 1.7 }}>
+          <Typography variant="body1" sx={{ lineHeight: 1.7 }}>
             {activeApp.description}
           </Typography>
-
           <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
             Desarrollado por {activeApp.author}
           </Typography>
-
-          <Typography variant="body2" color="text.secondary" mt={2}>
+          <Typography variant="body2" color="text.secondary" mt={1}>
             © {year} {activeApp.author} — Todos los derechos reservados.
           </Typography>
         </Box>
       </Paper>
 
       <Paper
-        ref={modulesRef}
-        id="info-modulos"
         elevation={2}
-        sx={{ p: { xs: 2, sm: 3 }, borderRadius: 3, scrollMarginTop: 88 }}
+        sx={{
+          p: { xs: 2, sm: 2.5 },
+          borderRadius: 3,
+          border: "1px solid",
+          borderColor: "primary.light",
+        }}
       >
-        <Typography variant="h6" fontWeight={800} gutterBottom>
-          Módulos y secciones
-        </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2.5, lineHeight: 1.6 }}>
-          Referencia de las áreas del sistema según el menú lateral. Cada sección incluye sus
-          funciones concretas (botones, checks, diálogos y flujos). Los chips indican qué roles
-          pueden acceder. Desplázate hacia abajo y usa el botón flotante para descargar esta guía en PDF.
-        </Typography>
-
-        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-          Roles
-        </Typography>
-        <Grid container spacing={1.5} sx={{ mb: 3 }}>
-          {APP_ROLES_LEGEND.map((role) => (
-            <Grid item xs={12} md={4} key={role.name}>
-              <Box
-                sx={{
-                  p: 1.5,
-                  borderRadius: 2,
-                  border: "1px solid",
-                  borderColor: "divider",
-                  height: "100%",
-                }}
+        <Stack direction="row" spacing={1.5} alignItems="flex-start">
+          <WorkspacePremiumIcon color="primary" sx={{ mt: 0.25 }} />
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="overline" color="text.secondary" fontWeight={700}>
+              Plan en uso
+            </Typography>
+            <Typography variant="h6" fontWeight={800} lineHeight={1.2}>
+              {plan.name}
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, mb: 1.5 }}>
+              {plan.tagline}
+            </Typography>
+            <Stack spacing={0.5}>
+              {plan.features.slice(0, 4).map((f) => (
+                <Stack key={f} direction="row" spacing={0.75} alignItems="center">
+                  <CheckCircleOutlineIcon color="success" sx={{ fontSize: 18 }} />
+                  <Typography variant="body2">{f}</Typography>
+                </Stack>
+              ))}
+            </Stack>
+            {canSeePlans ? (
+              <Button
+                component={RouterLink}
+                to="/sistema/planes"
+                size="small"
+                sx={{ mt: 1.5, textTransform: "none", fontWeight: 700 }}
               >
-                <Chip label={role.name} size="small" color="primary" variant="outlined" sx={{ mb: 0.75 }} />
-                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.5 }}>
-                  {role.description}
-                </Typography>
-              </Box>
-            </Grid>
-          ))}
-        </Grid>
-
-        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-          Módulos del menú
-        </Typography>
-        {APP_MODULE_GROUPS.map((group, index) => (
-          <ModuleGroupAccordion key={group.id} group={group} defaultExpanded={index === 0} />
-        ))}
-
-        <Typography variant="subtitle2" fontWeight={700} sx={{ mt: 3, mb: 1 }}>
-          Cuenta de usuario
-        </Typography>
-        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2, mb: 3 }}>
-          {APP_ACCOUNT_SECTIONS.map((section) => (
-            <SectionRow key={section.path} section={section} />
-          ))}
-        </Paper>
-
-        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-          Acceso público (sin login)
-        </Typography>
-        <Paper variant="outlined" sx={{ p: 2, borderRadius: 2 }}>
-          {APP_PUBLIC_SECTIONS.map((section) => (
-            <SectionRow key={section.path} section={section} />
-          ))}
-        </Paper>
+                Ver todos los planes
+              </Button>
+            ) : null}
+          </Box>
+          <Chip label={plan.priceLabel} color="primary" sx={{ fontWeight: 800 }} />
+        </Stack>
       </Paper>
 
-      <Zoom in={fabVisible}>
-        <Tooltip title={fabLabel} placement="left">
-          <Fab
-            color={pdfReady ? "primary" : "secondary"}
-            aria-label={fabLabel}
-            onClick={handleFabClick}
+      <Typography variant="subtitle2" fontWeight={700}>
+        Roles del sistema
+      </Typography>
+      <Grid container spacing={1.5}>
+        {APP_ROLES_LEGEND.map((role) => (
+          <Grid item xs={12} md={4} key={role.name}>
+            <Box
+              sx={{
+                p: 1.5,
+                borderRadius: 2,
+                border: "1px solid",
+                borderColor: "divider",
+                height: "100%",
+              }}
+            >
+              <Chip label={role.name} size="small" color="primary" variant="outlined" sx={{ mb: 0.75 }} />
+              <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.5 }}>
+                {role.description}
+              </Typography>
+            </Box>
+          </Grid>
+        ))}
+      </Grid>
+    </Stack>
+  );
+}
+
+function ModulesInfoTab({ initialModuleId = null, onClearModule = null, onSelectModule = null }) {
+  const catalogBlocks = useMemo(
+    () => [
+      ...APP_MODULE_GROUPS.map((g) => ({
+        id: g.id,
+        label: g.label,
+        summary: g.summary,
+        sections: g.sections,
+        kind: "menu",
+      })),
+      {
+        id: "cuenta",
+        label: "Cuenta de usuario",
+        summary: "Perfil, información y donaciones.",
+        sections: APP_ACCOUNT_SECTIONS,
+        kind: "account",
+      },
+      {
+        id: "publico",
+        label: "Acceso público",
+        summary: "Vistas sin iniciar sesión.",
+        sections: APP_PUBLIC_SECTIONS,
+        kind: "public",
+      },
+    ],
+    [],
+  );
+
+  const [selectedId, setSelectedId] = useState(() => {
+    if (!initialModuleId) return null;
+    return catalogBlocks.some((b) => b.id === initialModuleId)
+      ? initialModuleId
+      : null;
+  });
+  const [openSectionPath, setOpenSectionPath] = useState(null);
+  const [downloading, setDownloading] = useState(false);
+
+  useEffect(() => {
+    if (!initialModuleId) {
+      setSelectedId(null);
+      return;
+    }
+    if (catalogBlocks.some((b) => b.id === initialModuleId)) {
+      setSelectedId(initialModuleId);
+      setOpenSectionPath(null);
+    }
+  }, [initialModuleId, catalogBlocks]);
+
+  const selected = catalogBlocks.find((b) => b.id === selectedId) || null;
+
+  const handleSelectModule = (id) => {
+    setSelectedId(id);
+    setOpenSectionPath(null);
+    onSelectModule?.(id);
+  };
+
+  const handleBack = () => {
+    setSelectedId(null);
+    setOpenSectionPath(null);
+    onClearModule?.();
+  };
+
+  const handlePdf = () => {
+    setDownloading(true);
+    try {
+      downloadAppModulesPdf();
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  if (selected) {
+    const sectionCount = selected.sections.length;
+    const fnTotal = countGroupFunctions(selected);
+
+    return (
+      <Box>
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1}
+          sx={{ mb: 2 }}
+          flexWrap="wrap"
+          useFlexGap
+        >
+          <IconButton size="small" onClick={handleBack} aria-label="Volver a módulos">
+            <ArrowBackIcon />
+          </IconButton>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography variant="h6" fontWeight={800} lineHeight={1.2}>
+              {selected.label}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {selected.summary} · {sectionCount} sección(es) · {fnTotal} funciones
+            </Typography>
+          </Box>
+          <Button
+            size="small"
+            startIcon={<PictureAsPdfIcon />}
+            onClick={handlePdf}
             disabled={downloading}
-            sx={{
-              position: "fixed",
-              right: { xs: 16, sm: 24 },
-              bottom: { xs: 16, sm: 24 },
-              zIndex: (theme) => theme.zIndex.speedDial,
-              animation: pdfReady ? "none" : `${bounceDown} 1.6s ease-in-out infinite`,
-            }}
+            sx={{ textTransform: "none", fontWeight: 700 }}
           >
-            {pdfReady ? <PictureAsPdfIcon /> : <KeyboardArrowDownIcon />}
-          </Fab>
-        </Tooltip>
-      </Zoom>
+            PDF
+          </Button>
+        </Stack>
+
+        {orderSectionsForPreview(selected.sections).map((section) => {
+          const key = `${selected.id}-${section.path}-${section.name}`;
+          return (
+            <SectionDetail
+              key={key}
+              section={section}
+              expanded={openSectionPath === key}
+              onToggle={() =>
+                setOpenSectionPath((prev) => (prev === key ? null : key))
+              }
+            />
+          );
+        })}
+      </Box>
+    );
+  }
+
+  return (
+    <Box>
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        justifyContent="space-between"
+        alignItems={{ sm: "center" }}
+        spacing={1}
+        sx={{ mb: 2 }}
+      >
+        <Typography variant="body2" color="text.secondary">
+          Elige un módulo para ver sus secciones y cuántas funciones tiene cada una.
+        </Typography>
+        <Button
+          size="small"
+          startIcon={<PictureAsPdfIcon />}
+          onClick={handlePdf}
+          disabled={downloading}
+          sx={{ textTransform: "none", fontWeight: 700, alignSelf: "flex-start" }}
+        >
+          Descargar PDF
+        </Button>
+      </Stack>
+
+      <Grid container spacing={1.5}>
+        {catalogBlocks.map((block) => {
+          const sections = block.sections.length;
+          const functions = countGroupFunctions(block);
+          const planned = countPlannedSections(block);
+          const maintenance = countMaintenanceSections(block);
+          const ordered = orderSectionsForPreview(block.sections || []);
+          const preview = ordered.slice(0, 5);
+          const more = Math.max(0, ordered.length - preview.length);
+          return (
+            <Grid item xs={12} sm={6} md={3} key={block.id}>
+              <Paper
+                variant="outlined"
+                sx={{
+                  height: "100%",
+                  borderRadius: 2.5,
+                  overflow: "hidden",
+                  cursor: "pointer",
+                  transition: "border-color 0.15s, box-shadow 0.15s, transform 0.15s",
+                  "&:hover": {
+                    borderColor: "primary.main",
+                    boxShadow: 2,
+                    transform: "translateY(-2px)",
+                  },
+                }}
+                onClick={() => handleSelectModule(block.id)}
+              >
+                <Box sx={{ p: 1.75 }}>
+                  <Typography variant="subtitle1" fontWeight={800} gutterBottom>
+                    {block.label}
+                  </Typography>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{
+                      mb: 1.25,
+                      minHeight: 40,
+                      display: "-webkit-box",
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: "vertical",
+                      overflow: "hidden",
+                    }}
+                  >
+                    {block.summary}
+                  </Typography>
+                  <Stack
+                    direction="row"
+                    spacing={0.5}
+                    flexWrap="wrap"
+                    useFlexGap
+                    sx={{ mb: 1.25, minHeight: 48, alignContent: "flex-start" }}
+                  >
+                    {preview.map((sec) => {
+                      const st = resolveModuleStatus(sec);
+                      const isPlanned = st === "planned";
+                      const isMaintenance = st === "maintenance";
+                      const highlight = isPlanned || isMaintenance;
+                      return (
+                        <Chip
+                          key={`${block.id}-${sec.path}-${sec.name}`}
+                          size="small"
+                          label={
+                            isPlanned
+                              ? `${sec.name} · Próximamente`
+                              : isMaintenance
+                                ? `${sec.name} · Mantenimiento`
+                                : sec.name
+                          }
+                          color={isPlanned ? "warning" : isMaintenance ? "error" : "default"}
+                          variant={highlight ? "filled" : "outlined"}
+                          sx={{
+                            height: 22,
+                            maxWidth: "100%",
+                            fontWeight: highlight ? 700 : 500,
+                            fontSize: "0.68rem",
+                            "& .MuiChip-label": {
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            },
+                          }}
+                        />
+                      );
+                    })}
+                    {more > 0 ? (
+                      <Chip
+                        size="small"
+                        label={`+${more}`}
+                        variant="outlined"
+                        sx={{ height: 22, fontWeight: 700, fontSize: "0.68rem" }}
+                      />
+                    ) : null}
+                  </Stack>
+                  <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                    <Chip size="small" label={`${sections} secciones`} sx={{ fontWeight: 700 }} />
+                    {planned > 0 ? (
+                      <Chip
+                        size="small"
+                        color="warning"
+                        label={`${planned} próximamente`}
+                        sx={{ fontWeight: 700 }}
+                      />
+                    ) : null}
+                    {maintenance > 0 ? (
+                      <Chip
+                        size="small"
+                        color="error"
+                        label={`${maintenance} mantenimiento`}
+                        sx={{ fontWeight: 700 }}
+                      />
+                    ) : null}
+                    <Chip
+                      size="small"
+                      color="primary"
+                      variant="outlined"
+                      label={`${functions} funciones`}
+                      sx={{ fontWeight: 700 }}
+                    />
+                  </Stack>
+                </Box>
+              </Paper>
+            </Grid>
+          );
+        })}
+      </Grid>
+    </Box>
+  );
+}
+
+export default function InfoPage() {
+  const { activeApp } = useAppSettings();
+  const { user } = useAuth();
+  const { subscription } = useSubscriptions();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const plan = useMemo(() => resolveActiveSystemPlan(subscription), [subscription]);
+  const canSeePlans = ["Programador", "Administrador"].includes(user?.loginRol);
+
+  const tabParam = searchParams.get("tab");
+  const moduloParam = searchParams.get("modulo");
+  const tab = tabParam === "modulos" ? 1 : 0;
+
+  const handleTabChange = (_e, v) => {
+    if (v === 1) {
+      const next = { tab: "modulos" };
+      if (moduloParam) next.modulo = moduloParam;
+      setSearchParams(next, { replace: true });
+    } else {
+      setSearchParams({}, { replace: true });
+    }
+  };
+
+  const clearModuleParam = () => {
+    setSearchParams({ tab: "modulos" }, { replace: true });
+  };
+
+  const selectModuleParam = (id) => {
+    setSearchParams({ tab: "modulos", modulo: id }, { replace: true });
+  };
+
+  return (
+    <Box sx={{ maxWidth: 1280, mx: "auto", py: 3, px: { xs: 1, sm: 2 }, pb: 6 }}>
+      <Typography variant="h5" fontWeight={800} sx={{ mb: 1.5 }}>
+        Información
+      </Typography>
+
+      <Tabs
+        value={tab}
+        onChange={handleTabChange}
+        sx={{
+          mb: 2.5,
+          borderBottom: 1,
+          borderColor: "divider",
+          minHeight: 42,
+          "& .MuiTab-root": { textTransform: "none", fontWeight: 700, minHeight: 42 },
+        }}
+      >
+        <Tab label="La app" />
+        <Tab label="Módulos" />
+      </Tabs>
+
+      {tab === 0 ? (
+        <AppInfoTab activeApp={activeApp} plan={plan} canSeePlans={canSeePlans} />
+      ) : (
+        <Paper elevation={0} sx={{ p: { xs: 0, sm: 0.5 } }}>
+          <ModulesInfoTab
+            initialModuleId={moduloParam}
+            onClearModule={clearModuleParam}
+            onSelectModule={selectModuleParam}
+          />
+        </Paper>
+      )}
     </Box>
   );
 }

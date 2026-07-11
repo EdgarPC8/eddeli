@@ -61,6 +61,7 @@ function RecipePage() {
   const [costSummary, setCostSummary] = useState(null);
   const [costTreeData, setCostTreeData] = useState(null);
   const [loadingCost, setLoadingCost] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const [uiParams, setUiParams] = useState({
     extrasPercent: 20,
@@ -82,8 +83,13 @@ function RecipePage() {
   };
 
   const fetchRecipe = async (productId) => {
-    const { data } = await getRecipeByProduct(productId);
-    setRecipe(data);
+    setLoading(true);
+    try {
+      const { data } = await getRecipeByProduct(productId);
+      setRecipe(data);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchCostingData = async (productId) => {
@@ -283,6 +289,7 @@ function RecipePage() {
             defaultRowsPerPage={10}
             title="Receta"
             showIndex
+            loading={loading}
           />
         </Grid>
 

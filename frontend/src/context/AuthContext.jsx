@@ -49,6 +49,7 @@ export function AuthProvider({ children }) {
       });
       setProfileImageUser(u.photo ? buildImageUrl(u.photo) : null);
       setIsAuthenticated(true);
+      return session.data.loginRol;
     } finally {
       setIsLoading(false);
     }
@@ -63,8 +64,8 @@ export function AuthProvider({ children }) {
       }
 
       if (setToken(data?.token)) {
-        await loadUserProfile();
-        return { success: true };
+        const loginRol = await loadUserProfile();
+        return { success: true, loginRol };
       }
 
       setErrors({ message: data.message || "No se pudo iniciar sesión", status: "error" });

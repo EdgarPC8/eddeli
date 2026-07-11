@@ -25,6 +25,7 @@ import EditIcon from "@mui/icons-material/Edit";
 import BakeryDiningIcon from "@mui/icons-material/BakeryDining";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
+import TablePro from "../../../components/Tables/TablePro";
 import ProductCompareTable from "../../../components/eddeli/ProductCompareTable";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import { runMutationReload } from "../../../utils/mutationToast.js";
@@ -477,6 +478,7 @@ export default function ProductCompareGroupsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [selectedId, setSelectedId] = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -498,6 +500,11 @@ export default function ProductCompareGroupsPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const selectedGroup = useMemo(
+    () => groups.find((g) => Number(g.id) === Number(selectedId)) || null,
+    [groups, selectedId],
+  );
 
   const openCreate = () => {
     setEditing(null);
@@ -546,6 +553,77 @@ export default function ProductCompareGroupsPage() {
     });
   };
 
+  const columns = useMemo(
+    () => [
+      {
+        label: "Nombre",
+        id: "name",
+        render: (row) => (
+          <Box>
+            <Typography fontWeight={700}>{row.name}</Typography>
+            {row.subtitle ? (
+              <Typography variant="caption" color="text.secondary">
+                {row.subtitle}
+              </Typography>
+            ) : null}
+          </Box>
+        ),
+        getSearchValue: (row) => `${row.name || ""} ${row.subtitle || ""}`,
+      },
+      {
+        label: "Sección",
+        id: "section",
+        render: (row) =>
+          SECTION_OPTIONS.find((s) => s.value === row.section)?.label ||
+          row.section ||
+          "—",
+        getSearchValue: (row) =>
+          SECTION_OPTIONS.find((s) => s.value === row.section)?.label ||
+          row.section ||
+          "",
+      },
+      {
+        label: "Estado",
+        id: "isActive",
+        render: (row) => (
+          <Chip
+            size="small"
+            color={row.isActive ? "success" : "default"}
+            label={row.isActive ? "Activo" : "Inactivo"}
+          />
+        ),
+        getSearchValue: (row) => (row.isActive ? "activo" : "inactivo"),
+      },
+      {
+        label: "Productos",
+        id: "productIds",
+        render: (row) => `${row.productIds?.length || 0}`,
+        getSearchValue: (row) => String(row.productIds?.length || 0),
+      },
+      {
+        label: "Acciones",
+        id: "actions",
+        stopRowClick: true,
+        getSearchValue: () => "",
+        render: (row) => (
+          <Stack direction="row" spacing={0.25}>
+            <Tooltip title="Editar">
+              <IconButton size="small" onClick={() => openEdit(row)}>
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Eliminar">
+              <IconButton size="small" color="error" onClick={() => handleDelete(row)}>
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Stack>
+        ),
+      },
+    ],
+    [],
+  );
+
   return (
     <Container maxWidth="lg" sx={{ py: 3 }}>
       <Stack
@@ -579,10 +657,19 @@ export default function ProductCompareGroupsPage() {
       <Alert severity="info" sx={{ mb: 2 }}>
         Los grupos activos aparecen en el catálogo público como tablas comparativas. Si activas
         &quot;Ocultar productos sueltos&quot;, esos productos no se repiten como tarjetas individuales.
+        Haz clic en una fila para ver la matriz.
       </Alert>
 
       {loading ? (
-        <Typography color="text.secondary">Cargando…</Typography>
+        <TablePro
+          rows={[]}
+          columns={columns}
+          title="GRUPOS"
+          showIndex
+          defaultRowsPerPage={25}
+          rowsPerPageOptions={[10, 25, 50]}
+          loading
+        />
       ) : groups.length === 0 ? (
         <Paper variant="outlined" sx={{ p: 4, textAlign: "center", borderRadius: 3 }}>
           <Typography gutterBottom>No hay grupos comparativos todavía.</Typography>
@@ -591,47 +678,27 @@ export default function ProductCompareGroupsPage() {
           </Button>
         </Paper>
       ) : (
-        <Stack spacing={2}>
-          {groups.map((group) => (
-            <Paper key={group.id} variant="outlined" sx={{ p: 2, borderRadius: 3 }}>
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                alignItems="flex-start"
-                flexWrap="wrap"
-                gap={1}
-                sx={{ mb: 2 }}
-              >
-                <Box>
-                  <Typography variant="h6" fontWeight={800}>
-                    {group.name}
-                  </Typography>
-                  <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
-                    <Chip
-                      size="small"
-                      label={SECTION_OPTIONS.find((s) => s.value === group.section)?.label || group.section}
-                    />
-                    <Chip
-                      size="small"
-                      color={group.isActive ? "success" : "default"}
-                      label={group.isActive ? "Activo" : "Inactivo"}
-                    />
-                    <Chip size="small" label={`${group.productIds?.length || 0} productos`} />
-                  </Stack>
-                </Box>
-                <Stack direction="row" spacing={0.5}>
-                  <IconButton onClick={() => openEdit(group)}>
-                    <EditIcon />
-                  </IconButton>
-                  <IconButton color="error" onClick={() => handleDelete(group)}>
-                    <DeleteIcon />
-                  </IconButton>
-                </Stack>
-              </Stack>
-              <ProductCompareTable group={group} />
+        <>
+          <TablePro
+            rows={groups}
+            columns={columns}
+            title="GRUPOS"
+            showIndex
+            defaultRowsPerPage={25}
+            rowsPerPageOptions={[10, 25, 50]}
+            selectedRowId={selectedId}
+            onRowClick={(row) => setSelectedId(row.id)}
+            loading={false}
+          />
+          {selectedGroup && (
+            <Paper variant="outlined" sx={{ p: 2, mt: 2, borderRadius: 3 }}>
+              <Typography variant="subtitle1" fontWeight={700} gutterBottom>
+                Vista previa — {selectedGroup.name}
+              </Typography>
+              <ProductCompareTable group={selectedGroup} />
             </Paper>
-          ))}
-        </Stack>
+          )}
+        </>
       )}
 
       <GroupForm

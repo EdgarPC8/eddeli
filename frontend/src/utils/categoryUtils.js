@@ -84,14 +84,22 @@ export function getRootCategoryFromProduct(product) {
   return cat.parentId ? null : cat;
 }
 
+/** Categorías raíz para filtros (incluye huérfanas si el padre no está en la lista). */
+export function getFilterRootCategories(categories) {
+  const list = categories || [];
+  const byId = indexCategories(list);
+  return list
+    .filter((c) => !c.parentId || !byId.has(Number(c.parentId)))
+    .sort((a, b) => a.name.localeCompare(b.name, "es"));
+}
+
 /** Opciones para filtro: principal, «todas» de un padre, y subcategorías. */
 export function buildCategoryFilterOptions(categories) {
-  const roots = getRootCategories(categories).sort((a, b) =>
-    a.name.localeCompare(b.name, "es"),
-  );
+  const list = categories || [];
+  const roots = getFilterRootCategories(list);
   const options = [];
   for (const root of roots) {
-    const children = getChildCategories(categories, root.id).sort((a, b) =>
+    const children = getChildCategories(list, root.id).sort((a, b) =>
       a.name.localeCompare(b.name, "es"),
     );
     if (children.length > 0) {
@@ -119,10 +127,18 @@ export function formatProductCategoryName(product) {
   return cat.name || "—";
 }
 
-export function productMatchesCategoryFilter(product, filterValue) {
+/**
+ * @param {object} product
+ * @param {string} filterValue - id, o `parent:id`
+ * @param {Map<number, object>} [byId] - índice opcional para resolver categoría solo con categoryId
+ */
+export function productMatchesCategoryFilter(product, filterValue, byId) {
   if (!filterValue) return true;
-  const cat = product?.ERP_inventory_category;
-  const productCatId = product?.categoryId ?? cat?.id;
+  const productCatId = product?.categoryId ?? product?.ERP_inventory_category?.id;
+  let cat = product?.ERP_inventory_category;
+  if (!cat && byId && productCatId != null) {
+    cat = byId.get(Number(productCatId)) || null;
+  }
 
   if (String(filterValue).startsWith("parent:")) {
     const parentId = Number(filterValue.slice(7));

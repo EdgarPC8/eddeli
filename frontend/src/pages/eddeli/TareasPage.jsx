@@ -12,6 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
+import EditIcon from "@mui/icons-material/Edit";
 import AddIcon from "@mui/icons-material/Add";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import PlayArrowIcon from "@mui/icons-material/PlayArrow";
@@ -19,12 +20,14 @@ import TablePro from "../../components/Tables/TablePro.jsx";
 import SimpleDialog from "../../components/Dialogs/SimpleDialog.jsx";
 import {
   createTaskPlan,
+  deleteTaskPlan,
   executeTaskOpenBox,
   getMyTaskItems,
   getTaskAssignees,
   getTaskPlans,
   publishTaskPlan,
   updateTaskItemStatus,
+  updateTaskPlan,
 } from "../../api/taskRequest.js";
 import { useAuth } from "../../context/AuthContext.jsx";
 
@@ -54,6 +57,52 @@ const emptyItem = () => ({
   actionPayload: { boxProductId: "", unitProductId: "", unitsPerBox: "", boxesToOpen: "1" },
 });
 
+const emptyForm = () => ({
+  title: "",
+  description: "",
+  startDate: new Date().toISOString().slice(0, 10),
+  endDate: new Date().toISOString().slice(0, 10),
+  items: [emptyItem()],
+});
+
+function parseActionPayload(raw) {
+  if (!raw) return emptyItem().actionPayload;
+  if (typeof raw === "object") {
+    return {
+      boxProductId: raw.boxProductId ?? "",
+      unitProductId: raw.unitProductId ?? "",
+      unitsPerBox: raw.unitsPerBox ?? "",
+      boxesToOpen: raw.boxesToOpen ?? "1",
+    };
+  }
+  try {
+    return parseActionPayload(JSON.parse(raw));
+  } catch {
+    return emptyItem().actionPayload;
+  }
+}
+
+function planToForm(plan) {
+  return {
+    title: plan.title || "",
+    description: plan.description || "",
+    startDate: plan.startDate || new Date().toISOString().slice(0, 10),
+    endDate: plan.endDate || new Date().toISOString().slice(0, 10),
+    items:
+      (plan.items || []).length > 0
+        ? plan.items.map((it) => ({
+            title: it.title || "",
+            description: it.description || "",
+            assignedUserId: it.assignedUserId || "",
+            priority: it.priority ?? 0,
+            dueDate: it.dueDate || "",
+            actionType: it.actionType === "open_box" ? "open_box" : "none",
+            actionPayload: parseActionPayload(it.actionPayload),
+          }))
+        : [emptyItem()],
+  };
+}
+
 export default function TareasPage() {
   const { user, toast } = useAuth();
   const isAdmin = ADMIN_ROLES.has(user?.loginRol || "");
@@ -61,16 +110,13 @@ export default function TareasPage() {
   const [myItems, setMyItems] = useState([]);
   const [assignees, setAssignees] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
+  const [editingPlanId, setEditingPlanId] = useState(null);
   const [saving, setSaving] = useState(false);
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    startDate: new Date().toISOString().slice(0, 10),
-    endDate: new Date().toISOString().slice(0, 10),
-    items: [emptyItem()],
-  });
+  const [form, setForm] = useState(emptyForm);
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
+    setLoading(true);
     try {
       if (isAdmin) {
         const [p, a] = await Promise.all([getTaskPlans(), getTaskAssignees()]);
@@ -85,6 +131,8 @@ export default function TareasPage() {
         message: e?.response?.data?.message || "No se pudieron cargar las tareas.",
         variant: "error",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -105,42 +153,63 @@ export default function TareasPage() {
     return [...map.values()];
   }, [myItems]);
 
+  const openCreate = () => {
+    setEditingPlanId(null);
+    setForm(emptyForm());
+    setOpenDialog(true);
+  };
+
+  const openEdit = (plan) => {
+    setEditingPlanId(plan.id);
+    setForm(planToForm(plan));
+    setOpenDialog(true);
+  };
+
+  const closeDialog = () => {
+    setOpenDialog(false);
+    setEditingPlanId(null);
+    setForm(emptyForm());
+  };
+
   const onAddItemRow = () => setForm((s) => ({ ...s, items: [...s.items, emptyItem()] }));
   const onRemoveItemRow = (idx) =>
-    setForm((s) => ({ ...s, items: s.items.filter((_, i) => i !== idx) || [emptyItem()] }));
+    setForm((s) => ({
+      ...s,
+      items: s.items.filter((_, i) => i !== idx).length ? s.items.filter((_, i) => i !== idx) : [emptyItem()],
+    }));
   const onUpdateItemRow = (idx, patch) =>
     setForm((s) => ({ ...s, items: s.items.map((it, i) => (i === idx ? { ...it, ...patch } : it)) }));
 
-  const onCreatePlan = async () => {
+  const buildPayload = () => ({
+    ...form,
+    items: form.items.map((it) => ({
+      ...it,
+      assignedUserId: Number(it.assignedUserId),
+      priority: Number(it.priority || 0),
+      actionPayload:
+        it.actionType === "open_box"
+          ? {
+              boxProductId: Number(it.actionPayload.boxProductId),
+              unitProductId: Number(it.actionPayload.unitProductId),
+              unitsPerBox: Number(it.actionPayload.unitsPerBox),
+              boxesToOpen: Number(it.actionPayload.boxesToOpen || 1),
+            }
+          : null,
+    })),
+  });
+
+  const onSavePlan = async () => {
     try {
       setSaving(true);
-      const payload = {
-        ...form,
-        items: form.items.map((it) => ({
-          ...it,
-          assignedUserId: Number(it.assignedUserId),
-          priority: Number(it.priority || 0),
-          actionPayload:
-            it.actionType === "open_box"
-              ? {
-                  boxProductId: Number(it.actionPayload.boxProductId),
-                  unitProductId: Number(it.actionPayload.unitProductId),
-                  unitsPerBox: Number(it.actionPayload.unitsPerBox),
-                  boxesToOpen: Number(it.actionPayload.boxesToOpen || 1),
-                }
-              : null,
-        })),
-      };
-      await createTaskPlan(payload);
-      void toast?.({ message: "Plan guardado en borrador.", variant: "success" });
-      setOpenDialog(false);
-      setForm({
-        title: "",
-        description: "",
-        startDate: new Date().toISOString().slice(0, 10),
-        endDate: new Date().toISOString().slice(0, 10),
-        items: [emptyItem()],
-      });
+      const payload = buildPayload();
+      if (editingPlanId) {
+        await updateTaskPlan(editingPlanId, payload);
+        void toast?.({ message: "Plan actualizado.", variant: "success" });
+      } else {
+        await createTaskPlan(payload);
+        void toast?.({ message: "Plan guardado en borrador.", variant: "success" });
+      }
+      closeDialog();
       await load();
     } catch (e) {
       void toast?.({
@@ -161,6 +230,23 @@ export default function TareasPage() {
     } catch (e) {
       void toast?.({
         message: e?.response?.data?.message || "No se pudo publicar el plan.",
+        variant: "error",
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const onDeletePlan = async (plan) => {
+    if (!window.confirm(`¿Eliminar el plan "${plan.title}"? Esta acción no se puede deshacer.`)) return;
+    try {
+      setSaving(true);
+      await deleteTaskPlan(plan.id);
+      void toast?.({ message: "Plan eliminado.", variant: "success" });
+      await load();
+    } catch (e) {
+      void toast?.({
+        message: e?.response?.data?.message || "No se pudo eliminar el plan.",
         variant: "error",
       });
     } finally {
@@ -201,9 +287,9 @@ export default function TareasPage() {
         </Typography>
         <Paper sx={{ p: 1, borderRadius: 2, mb: 1, display: "flex", justifyContent: "space-between" }}>
           <Typography variant="body2" color="text.secondary">
-            Crea planes y publica tareas para empleados.
+            Crea planes, edita borradores y publícalos para empleados.
           </Typography>
-          <Button variant="contained" onClick={() => setOpenDialog(true)}>
+          <Button variant="contained" onClick={openCreate}>
             Nuevo plan
           </Button>
         </Paper>
@@ -222,9 +308,17 @@ export default function TareasPage() {
               label: "Acciones",
               render: (r) =>
                 r.status === "draft" ? (
-                  <Button size="small" disabled={saving} onClick={() => onPublishPlan(r.id)}>
-                    Publicar
-                  </Button>
+                  <Stack direction="row" spacing={0.5} alignItems="center">
+                    <Button size="small" disabled={saving} onClick={() => onPublishPlan(r.id)}>
+                      Publicar
+                    </Button>
+                    <IconButton size="small" color="primary" disabled={saving} onClick={() => openEdit(r)} title="Editar">
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton size="small" color="error" disabled={saving} onClick={() => onDeletePlan(r)} title="Eliminar">
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
                 ) : (
                   "—"
                 ),
@@ -234,9 +328,16 @@ export default function TareasPage() {
           showPagination
           showIndex
           defaultRowsPerPage={10}
+          loading={loading}
         />
 
-        <SimpleDialog open={openDialog} onClose={() => setOpenDialog(false)} title="Nuevo plan de tareas" fullWidth maxWidth="lg">
+        <SimpleDialog
+          open={openDialog}
+          onClose={closeDialog}
+          title={editingPlanId ? "Editar plan de tareas" : "Nuevo plan de tareas"}
+          fullWidth
+          maxWidth="lg"
+        >
           <Grid container spacing={1.5} sx={{ mt: 0.5 }}>
             <Grid item xs={12} md={5}>
               <TextField fullWidth size="small" label="Título" value={form.title} onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))} />
@@ -371,8 +472,8 @@ export default function TareasPage() {
               </Button>
             </Grid>
             <Grid item xs={12}>
-              <Button fullWidth variant="contained" disabled={saving} onClick={onCreatePlan}>
-                Guardar plan
+              <Button fullWidth variant="contained" disabled={saving} onClick={onSavePlan}>
+                {editingPlanId ? "Guardar cambios" : "Guardar plan"}
               </Button>
             </Grid>
           </Grid>

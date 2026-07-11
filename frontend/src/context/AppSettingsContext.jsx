@@ -25,6 +25,9 @@ function toActiveApp(settings) {
     cajaQuickCategoryMatch: s.cajaQuickCategoryMatch || "",
     walkInCustomerLabel: s.walkInCustomerLabel || "Consumidor Final",
     timezone: s.timezone || APP_SETTINGS_FALLBACK.timezone || "America/Guayaquil",
+    showPublicCatalog: s.showPublicCatalog !== false,
+    showPublicStoresPropia: s.showPublicStoresPropia !== false,
+    showPublicStoresVitrina: s.showPublicStoresVitrina !== false,
     year: new Date().getFullYear(),
     background: "#fff8f2",
   };

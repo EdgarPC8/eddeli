@@ -1,5 +1,6 @@
 /**
- * Tabla MUI con búsqueda, paginación y acciones por fila.
+ * Tabla MUI con búsqueda, paginación y acciones.
+ * Al cargar: CircularProgress (las tablas no usan skeleton).
  */
 import React, { useState } from "react";
 import {
@@ -15,6 +16,7 @@ import {
   Typography,
   Box,
   TableSortLabel,
+  CircularProgress,
   alpha,
   useTheme,
 } from "@mui/material";
@@ -33,6 +35,7 @@ const TablePro = ({
   onRowClick,
   selectedRowId = null,
   getRowId = (row) => row.id,
+  loading = false,
 }) => {
   const theme = useTheme();
   const accent = theme.palette.primary.main;
@@ -41,6 +44,8 @@ const TablePro = ({
   const [rowsPerPage, setRowsPerPage] = useState(defaultRowsPerPage);
   const [orderBy, setOrderBy] = useState(null);
   const [orderDirection, setOrderDirection] = useState("asc");
+
+  const colCount = (showIndex ? 1 : 0) + columns.length;
 
   const handleSearchChange = (e) => {
     setSearchText(e.target.value.toLowerCase());
@@ -54,7 +59,6 @@ const TablePro = ({
     setPage(0);
   };
 
-  // --- Ordenamiento ---
   const handleSort = (columnId) => {
     if (orderBy === columnId) {
       setOrderDirection((prev) => (prev === "asc" ? "desc" : "asc"));
@@ -86,7 +90,6 @@ const TablePro = ({
     });
   }, [rows, orderBy, orderDirection, columns]);
 
-  // --- Filtro de búsqueda ---
   const filteredRows = sortedRows.filter((row) =>
     columns.some((column) => {
       const raw = column.getSearchValue
@@ -106,7 +109,7 @@ const TablePro = ({
     : filteredRows;
 
   return (
-    <Paper sx={{ width: "100%", p: 1, overflow: "hidden" }}>
+    <Paper sx={{ width: "100%", p: 1, overflow: "hidden", position: "relative" }}>
       <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
         {title && (
           <Typography variant="subtitle1" sx={{ fontWeight: 600, lineHeight: 1.2 }}>
@@ -121,10 +124,11 @@ const TablePro = ({
             placeholder="Buscar..."
             value={searchText}
             onChange={handleSearchChange}
+            disabled={loading}
           />
         )}
 
-        <TableContainer sx={{ maxHeight: tableMaxHeight }}>
+        <TableContainer sx={{ maxHeight: tableMaxHeight, minHeight: loading ? 220 : undefined }}>
           <Table stickyHeader>
             <TableHead>
               <TableRow>
@@ -139,9 +143,9 @@ const TablePro = ({
                     sortDirection={
                       orderBy === column.id ? orderDirection : false
                     }
-                    onClick={() => handleSort(column.id)}
+                    onClick={loading ? undefined : () => handleSort(column.id)}
                     sx={{
-                      cursor: "pointer",
+                      cursor: loading ? "default" : "pointer",
                       userSelect: "none",
                       bgcolor: "background.paper",
                     }}
@@ -149,6 +153,7 @@ const TablePro = ({
                     <TableSortLabel
                       active={orderBy === column.id}
                       direction={orderBy === column.id ? orderDirection : "asc"}
+                      disabled={loading}
                     >
                       {column.label}
                     </TableSortLabel>
@@ -158,58 +163,66 @@ const TablePro = ({
             </TableHead>
 
             <TableBody>
-              {paginatedRows.map((row, idx) => {
-                const rowId = getRowId(row);
-                const selected =
-                  selectedRowId != null && rowId != null && rowId === selectedRowId;
-                return (
-                <TableRow
-                  hover
-                  key={row.id ?? `${idx}-${Math.random()}`}
-                  selected={selected}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  sx={{
-                    cursor: onRowClick ? "pointer" : undefined,
-                    bgcolor: selected ? alpha(accent, 0.08) : undefined,
-                    "&.Mui-selected": {
-                      bgcolor: alpha(accent, 0.1),
-                    },
-                    "&.Mui-selected:hover": {
-                      bgcolor: alpha(accent, 0.14),
-                    },
-                  }}
-                >
-                  {showIndex && (
-                    <TableCell sx={{ py: 0.5 }}>
-                      {showPagination ? page * rowsPerPage + idx + 1 : idx + 1}
-                    </TableCell>
-                  )}
-
-                  {columns.map((column) => (
-                    <TableCell
-                      key={column.id}
-                      sx={{ py: 0.5 }}
-                      onClick={
-                        column.stopRowClick
-                          ? (e) => e.stopPropagation()
-                          : undefined
-                      }
+              {!loading &&
+                paginatedRows.map((row, idx) => {
+                  const rowId = getRowId(row);
+                  const selected =
+                    selectedRowId != null &&
+                    rowId != null &&
+                    rowId === selectedRowId;
+                  return (
+                    <TableRow
+                      hover
+                      key={row.id ?? `row-${idx}`}
+                      selected={selected}
+                      onClick={onRowClick ? () => onRowClick(row) : undefined}
+                      sx={{
+                        cursor: onRowClick ? "pointer" : undefined,
+                        bgcolor: selected ? alpha(accent, 0.08) : undefined,
+                        "&.Mui-selected": {
+                          bgcolor: alpha(accent, 0.1),
+                        },
+                        "&.Mui-selected:hover": {
+                          bgcolor: alpha(accent, 0.14),
+                        },
+                      }}
                     >
-                      {column.render ? column.render(row) : row[column.id]}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              );
-              })}
+                      {showIndex && (
+                        <TableCell sx={{ py: 0.5 }}>
+                          {showPagination
+                            ? page * rowsPerPage + idx + 1
+                            : idx + 1}
+                        </TableCell>
+                      )}
 
-              {paginatedRows.length === 0 && (
+                      {columns.map((column) => (
+                        <TableCell
+                          key={column.id}
+                          sx={{ py: 0.5 }}
+                          onClick={
+                            column.stopRowClick
+                              ? (e) => e.stopPropagation()
+                              : undefined
+                          }
+                        >
+                          {column.render ? column.render(row) : row[column.id]}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                })}
+
+              {!loading && paginatedRows.length === 0 && (
                 <TableRow>
-                  <TableCell
-                    colSpan={(showIndex ? 1 : 0) + columns.length}
-                    align="center"
-                  >
+                  <TableCell colSpan={colCount} align="center">
                     No hay datos
                   </TableCell>
+                </TableRow>
+              )}
+
+              {loading && (
+                <TableRow>
+                  <TableCell colSpan={colCount} sx={{ border: 0, height: 180 }} />
                 </TableRow>
               )}
             </TableBody>
@@ -219,15 +232,32 @@ const TablePro = ({
         {showPagination && (
           <TablePagination
             component="div"
-            count={filteredRows.length}
+            count={loading ? 0 : filteredRows.length}
             page={page}
             onPageChange={handleChangePage}
             rowsPerPage={rowsPerPage}
             onRowsPerPageChange={handleChangeRowsPerPage}
             rowsPerPageOptions={rowsPerPageOptions}
+            disabled={loading}
           />
         )}
       </Box>
+
+      {loading && (
+        <Box
+          sx={{
+            position: "absolute",
+            inset: 0,
+            display: "grid",
+            placeItems: "center",
+            bgcolor: alpha(theme.palette.background.paper, 0.55),
+            zIndex: 2,
+            borderRadius: 1,
+          }}
+        >
+          <CircularProgress size={36} />
+        </Box>
+      )}
     </Paper>
   );
 };

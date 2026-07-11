@@ -11,7 +11,6 @@ import {
   Grid,
   Card,
   CardContent,
-  CircularProgress,
   useTheme,
   Divider,
 } from "@mui/material";
@@ -28,6 +27,7 @@ import DnsIcon from "@mui/icons-material/Dns";
 import BackupIcon from "@mui/icons-material/Backup";
 import { saveBackup, downloadBackup, getPanelStats } from "../api/comandsRequest.js";
 import { useAuth } from "../context/AuthContext.jsx";
+import { PanelSkeleton } from "../components/ContentSkeleton.jsx";
 
 const ALLOWED = new Set(["Administrador", "Programador"]);
 const BANNER_MS = 10000;
@@ -66,6 +66,10 @@ function StatCard({ label, value, icon: Icon, color, loading }) {
   const theme = useTheme();
   const paletteColor = theme.palette[color]?.main ?? theme.palette.primary.main;
 
+  if (loading) {
+    return <PanelSkeleton height={88} />;
+  }
+
   return (
     <Card
       variant="panel"
@@ -95,13 +99,9 @@ function StatCard({ label, value, icon: Icon, color, loading }) {
             <Typography variant="body2" color="text.secondary" noWrap>
               {label}
             </Typography>
-            {loading ? (
-              <CircularProgress size={22} sx={{ mt: 0.5 }} />
-            ) : (
-              <Typography variant="h5" fontWeight={800} lineHeight={1.2}>
-                {Number(value ?? 0).toLocaleString("es-EC")}
-              </Typography>
-            )}
+            <Typography variant="h5" fontWeight={800} lineHeight={1.2}>
+              {Number(value ?? 0).toLocaleString("es-EC")}
+            </Typography>
           </Box>
         </Stack>
       </CardContent>
@@ -250,7 +250,7 @@ export default function PanelControlPage() {
             Última copia en el servidor
           </Typography>
           {loading ? (
-            <CircularProgress size={22} />
+            <PanelSkeleton height={100} />
           ) : lastBackup ? (
             <Stack spacing={0.75}>
               <Typography variant="body2">

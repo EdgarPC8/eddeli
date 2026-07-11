@@ -1,6 +1,7 @@
 import { DataTypes } from "sequelize";
 import { sequelize } from "../database/connection.js";
 import { Users } from "./Users.js";
+import { Store } from "./Inventory.js";
 
 /** Turno de caja: apertura con capital inicial y cierre con arqueo. */
 export const CashShift = sequelize.define(
@@ -9,6 +10,11 @@ export const CashShift = sequelize.define(
     id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
     accountId: { type: DataTypes.INTEGER, allowNull: false },
     userId: { type: DataTypes.INTEGER, allowNull: false },
+    /** Local / panadería desde la que opera este turno */
+    storeId: { type: DataTypes.INTEGER, allowNull: true },
+    /** Snapshot SRI al abrir (por si el Store cambia después) */
+    establishmentCode: { type: DataTypes.STRING(3), allowNull: true },
+    emissionPointCode: { type: DataTypes.STRING(3), allowNull: true },
     status: {
       type: DataTypes.ENUM("open", "closed"),
       allowNull: false,
@@ -37,9 +43,13 @@ export const CashShift = sequelize.define(
       { fields: ["accountId", "status"] },
       { fields: ["userId"] },
       { fields: ["openedAt"] },
+      { fields: ["storeId"] },
     ],
   },
 );
 
 CashShift.belongsTo(Users, { foreignKey: "userId", as: "user" });
 Users.hasMany(CashShift, { foreignKey: "userId", as: "cashShifts" });
+
+CashShift.belongsTo(Store, { foreignKey: "storeId", as: "store" });
+Store.hasMany(CashShift, { foreignKey: "storeId", as: "cashShifts" });

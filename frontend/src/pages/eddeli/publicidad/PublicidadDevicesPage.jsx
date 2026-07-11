@@ -271,6 +271,7 @@ export default function PublicidadDevicesPage() {
         showSearch
         showPagination
         defaultRowsPerPage={15}
+        loading={loading}
       />
 
       <SimpleDialog

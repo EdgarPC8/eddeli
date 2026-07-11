@@ -76,6 +76,7 @@ export default function UsersPage() {
       <TablePro
         title="Usuarios del Sistema"
         rows={users}
+        loading={isLoading}
         columns={[
           { id: "id", label: "ID" },
           {

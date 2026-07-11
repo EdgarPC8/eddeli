@@ -61,14 +61,20 @@ function ProductsPage() {
   const [cardSearch, setCardSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [allCategories, setAllCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const fecthData = async () => {
-    const [{ data: body }, { data: cats }] = await Promise.all([
-      getAllProductsAll(),
-      getCategories(),
-    ]);
-    setData(unwrapListResponse(body));
-    setAllCategories(cats || []);
+    setLoading(true);
+    try {
+      const [{ data: body }, { data: cats }] = await Promise.all([
+        getAllProductsAll(),
+        getCategories(),
+      ]);
+      setData(unwrapListResponse(body));
+      setAllCategories(cats || []);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const categoryFilterOptions = useMemo(
@@ -447,6 +453,7 @@ function ProductsPage() {
             categoryFilter={categoryFilter}
             onEdit={openEditProduct}
             onReload={fecthData}
+            loading={loading}
           />
         </Paper>
       ) : (
@@ -457,6 +464,7 @@ function ProductsPage() {
           rowsPerPageOptions={[25, 50, 100, 200]}
           title="PRODUCTOS"
           showIndex={true}
+          loading={loading}
         />
       )}
     </Container>

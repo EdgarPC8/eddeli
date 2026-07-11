@@ -18,7 +18,6 @@ import {
   Switch,
   TextField,
   Typography,
-  CircularProgress,
 } from "@mui/material";
 import DevicesIcon from "@mui/icons-material/Devices";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
@@ -36,6 +35,7 @@ import PlaylistBuilder from "./components/PlaylistBuilder.jsx";
 import PlaybackPreview from "./components/PlaybackPreview.jsx";
 import CampaignMusicPanel from "./components/CampaignMusicPanel.jsx";
 import { MUSIC_MODES } from "./constants.js";
+import { PageSkeleton } from "../../../components/ContentSkeleton.jsx";
 
 const emptyForm = {
   name: "",
@@ -155,8 +155,8 @@ export default function PublicidadCampaignEditorPage() {
 
   if (loading) {
     return (
-      <Box sx={{ py: 8, display: "grid", placeItems: "center" }}>
-        <CircularProgress />
+      <Box sx={{ py: 2 }}>
+        <PageSkeleton />
       </Box>
     );
   }

@@ -25,7 +25,15 @@ export default function ThemeSwitcher() {
           <SettingsBrightnessIcon />
         </IconButton>
       </Tooltip>
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={() => setAnchorEl(null)}
+        disableScrollLock
+        disableAutoFocusItem
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+        transformOrigin={{ vertical: "top", horizontal: "right" }}
+      >
         {OPTIONS.map((opt) => (
           <MenuItem
             key={opt.value}

@@ -31,7 +31,11 @@ import DocumentRoutes from "./src/routes/DocumentRoutes.js";
 import EditorRoutes from "./src/routes/EditorRoutes.js";
 import ComandsRoutes from "./src/routes/ComandsRoutes.js";
 import AppSettingsRoutes from "./src/routes/AppSettingsRoutes.js";
+import SriBillingRoutes from "./src/routes/SriBillingRoutes.js";
 import { loadAppSettings } from "./src/services/appSettingsService.js";
+import { loadSriBillingSettings } from "./src/services/sriBillingService.js";
+import { Store } from "./src/models/Inventory.js";
+import { CashShift } from "./src/models/CashShift.js";
 
 import NotificationProgramRoutes from "./src/routes/NotificationProgramRoutes.js";
 import { startNotificationScheduler } from "./src/services/notificationScheduler.js";
@@ -92,6 +96,7 @@ app.use(`/${api}/files`, express.static(path.resolve(__dirname, "src/files")));
 
 // ================================
 app.use(`/${api}`, AppSettingsRoutes);
+app.use(`/${api}/sri`, SriBillingRoutes);
 app.use(`/${api}/comands`, ComandsRoutes);
 app.use(`/${api}/editor`, EditorRoutes);
 app.use(`/${api}/users`, UsersRoutes);
@@ -118,6 +123,10 @@ export async function main() {
   try {
     await sequelize.authenticate();
     await loadAppSettings();
+    await loadSriBillingSettings();
+    // Columnas nuevas de locales (001/002) y turno ligado al local
+    await Store.sync({ alter: true });
+    await CashShift.sync({ alter: true });
 
     // ═══════════════════════════════════════════════════════════════════
     // ⚠️  SOLO DESARROLLO — Reset total (borra tablas y carga backup.json)

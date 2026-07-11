@@ -28,7 +28,15 @@ const productInclude = [
   {
     model: InventoryCategory,
     as: "ERP_inventory_category",
-    attributes: ["name"],
+    attributes: ["id", "name", "parentId"],
+    include: [
+      {
+        model: InventoryCategory,
+        as: "parent",
+        attributes: ["id", "name"],
+        required: false,
+      },
+    ],
   },
 ];
 
@@ -54,6 +62,7 @@ const mapProductSnapshot = (product) => {
   if (!product) return null;
   const unit = product.ERP_inventory_unit || product["ERP_inventory_unit"];
   const category = product.ERP_inventory_category || product["ERP_inventory_category"];
+  const parent = category?.parent || null;
   return {
     id: product.id,
     name: product.name,
@@ -62,7 +71,18 @@ const mapProductSnapshot = (product) => {
     displayPrice: formatPriceUSD(product.price),
     primaryImageUrl: product.primaryImageUrl,
     unitAbbr: unit?.abbreviation || unit?.name || null,
+    categoryId: product.categoryId ?? category?.id ?? null,
+    categoryParentId: category?.parentId ?? parent?.id ?? null,
     categoryName: category?.name || null,
+    categoryParentName: parent?.name || null,
+    ERP_inventory_category: category
+      ? {
+          id: category.id,
+          name: category.name,
+          parentId: category.parentId ?? null,
+          parent: parent ? { id: parent.id, name: parent.name } : null,
+        }
+      : null,
   };
 };
 

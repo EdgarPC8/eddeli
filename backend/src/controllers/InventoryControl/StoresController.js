@@ -64,6 +64,16 @@ export const createStore = async (req, res) => {
       payload.isActive = String(payload.isActive) === "true";
     }
 
+    const kind = String(payload.locationKind || "vitrina").trim().toLowerCase();
+    payload.locationKind = kind === "propia" ? "propia" : "vitrina";
+
+    const padCode = (v, fallback = "001") => {
+      const d = String(v ?? "").replace(/\D/g, "").slice(-3);
+      return d ? d.padStart(3, "0") : fallback;
+    };
+    payload.establishmentCode = padCode(payload.establishmentCode, "001");
+    payload.emissionPointCode = padCode(payload.emissionPointCode, "001");
+
     // --- required mínimos ---
     if (!payload.name || !String(payload.name).trim()) {
       return res.status(400).json({ message: "El campo 'name' es obligatorio." });
@@ -179,6 +189,22 @@ export const updateStore = async (req, res) => {
     if ("name" in updates && updates.name != null) updates.name = String(updates.name).trim();
     if ("address" in updates && updates.address != null) updates.address = String(updates.address).trim();
 
+    if ("locationKind" in updates) {
+      const kind = String(updates.locationKind || "vitrina").trim().toLowerCase();
+      updates.locationKind = kind === "propia" ? "propia" : "vitrina";
+    }
+
+    const padCode = (v, fallback = "001") => {
+      const d = String(v ?? "").replace(/\D/g, "").slice(-3);
+      return d ? d.padStart(3, "0") : fallback;
+    };
+    if ("establishmentCode" in updates) {
+      updates.establishmentCode = padCode(updates.establishmentCode, row.establishmentCode || "001");
+    }
+    if ("emissionPointCode" in updates) {
+      updates.emissionPointCode = padCode(updates.emissionPointCode, row.emissionPointCode || "001");
+    }
+
     // ✅ NO guardar subfolder/customFileName/moveImage
     delete updates.subfolder;
     delete updates.customFileName;
@@ -201,14 +227,18 @@ export const updateStore = async (req, res) => {
 
 export const getStores = async (req, res) => {
   try {
-    const { isActive } = req.query;
+    const { isActive, kind, locationKind } = req.query;
 
     const where = {};
-    // Si piden solo activos (ej: home), filtrar
     if (isActive === "true" || isActive === true) {
       where.isActive = true;
     } else if (isActive === "false" || isActive === false) {
       where.isActive = false;
+    }
+
+    const kindFilter = String(kind || locationKind || "").trim().toLowerCase();
+    if (kindFilter === "propia" || kindFilter === "vitrina") {
+      where.locationKind = kindFilter;
     }
 
     const rows = await Store.findAll({

@@ -2,11 +2,13 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   IconButton,
+  Link,
   Paper,
   Tooltip,
   Typography,
 } from "@mui/material";
 import PrintIcon from "@mui/icons-material/Print";
+import { Link as RouterLink } from "react-router-dom";
 import TablePro from "../../components/Tables/TablePro.jsx";
 import PrintFormatDialog from "../../components/saleReceipt/PrintFormatDialog.jsx";
 import { getPosSalesRequest } from "../../api/ordersRequest.js";
@@ -23,8 +25,10 @@ export default function FacturacionPage() {
   const [sales, setSales] = useState([]);
   const [printOpen, setPrintOpen] = useState(false);
   const [printReceipt, setPrintReceipt] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
+    setLoading(true);
     try {
       const { data } = await getPosSalesRequest({ limit: 300 });
       setSales(data || []);
@@ -33,6 +37,8 @@ export default function FacturacionPage() {
         message: e?.response?.data?.message || "No se pudieron cargar las ventas de caja.",
         variant: "error",
       });
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -62,12 +68,16 @@ export default function FacturacionPage() {
   return (
     <Box sx={{ p: { xs: 1.5, md: 3 } }}>
       <Typography variant="h5" fontWeight={700} gutterBottom>
-        Facturación — ventas de caja
+        Comprobantes POS
       </Typography>
       <Paper sx={{ p: 1, mb: 1, borderRadius: 2 }}>
         <Typography variant="body2" color="text.secondary">
-          Registro de ventas del punto de venta: factura, nota de venta, comprobante o consumidor final.
-          Pulsa el icono de impresora para ver la vista previa y elegir formato A4, ticket 80 mm o ticket 55 mm.
+          Reimpresión de ventas del punto de venta (factura, nota de venta, comprobante o consumidor final).
+          No es facturación electrónica SRI. Pulsa el icono de impresora para vista previa y formato A4 o ticket.
+          {" "}
+          <Link component={RouterLink} to="/sistema/configuracion?tab=sri" underline="hover">
+            Configurar facturación electrónica
+          </Link>
         </Typography>
       </Paper>
 
@@ -97,6 +107,7 @@ export default function FacturacionPage() {
         showPagination
         showIndex
         defaultRowsPerPage={15}
+        loading={loading}
       />
 
       <PrintFormatDialog

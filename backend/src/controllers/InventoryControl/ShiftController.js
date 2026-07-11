@@ -4,7 +4,7 @@ import { CashShift } from "../../models/CashShift.js";
 import { CashShiftMovement } from "../../models/CashShiftMovement.js";
 import { Order, OrderItem, Customer } from "../../models/Orders.js";
 import { Users } from "../../models/Users.js";
-import { InventoryProduct, InventoryMovement } from "../../models/Inventory.js";
+import { InventoryProduct, InventoryMovement, Store } from "../../models/Inventory.js";
 import { Expense } from "../../models/Finance.js";
 import { toAppDateTime, nowApp } from "../../utils/appDateTime.js";
 import {
@@ -46,8 +46,26 @@ const billableQty = (item) => {
 export async function findOpenShiftForAccount(accountId) {
   return CashShift.findOne({
     where: { accountId, status: "open" },
+    include: [
+      {
+        model: Store,
+        as: "store",
+        attributes: [
+          "id",
+          "name",
+          "address",
+          "establishmentCode",
+          "emissionPointCode",
+        ],
+      },
+    ],
     order: [["openedAt", "DESC"]],
   });
+}
+
+function padSriCode(v, fallback = "001") {
+  const d = String(v ?? "").replace(/\D/g, "").slice(-3);
+  return d ? d.padStart(3, "0") : fallback;
 }
 
 async function sumOrderTotals(orders) {
@@ -300,6 +318,11 @@ export async function getShifts(req, res) {
           as: "user",
           attributes: ["id", "firstName", "firstLastName"],
         },
+        {
+          model: Store,
+          as: "store",
+          attributes: ["id", "name", "establishmentCode", "emissionPointCode"],
+        },
       ],
       order: [["openedAt", "DESC"]],
       limit,
@@ -493,7 +516,7 @@ export async function createShiftMovement(req, res) {
 export async function openShift(req, res) {
   try {
     const { accountId, userId } = req.user;
-    const { notes, openedAt } = req.body;
+    const { notes, openedAt, storeId } = req.body;
 
     const existing = await findOpenShiftForAccount(accountId);
     if (existing) {
@@ -501,6 +524,49 @@ export async function openShift(req, res) {
         message: "Ya tienes un turno abierto. Ciérralo antes de abrir otro.",
         shiftId: existing.id,
       });
+    }
+
+    const activeStores = await Store.findAll({
+      where: { isActive: true, locationKind: "propia" },
+      order: [["position", "ASC"], ["id", "ASC"]],
+      attributes: [
+        "id",
+        "name",
+        "address",
+        "establishmentCode",
+        "emissionPointCode",
+        "locationKind",
+      ],
+    });
+
+    let store = null;
+    let resolvedStoreId = storeId != null && storeId !== "" ? Number(storeId) : null;
+
+    if (activeStores.length > 0) {
+      if (!resolvedStoreId) {
+        if (activeStores.length === 1) {
+          resolvedStoreId = activeStores[0].id;
+        } else {
+          return res.status(400).json({
+            message: "Selecciona el local / panadería desde el que abres el turno.",
+            stores: activeStores,
+          });
+        }
+      }
+      store = activeStores.find((s) => s.id === resolvedStoreId) || null;
+      if (!store) {
+        store = await Store.findByPk(resolvedStoreId);
+      }
+      if (!store || !store.isActive || store.locationKind === "vitrina") {
+        return res.status(400).json({
+          message: "Elige una sucursal propia (no una vitrina de entrega).",
+        });
+      }
+    } else if (resolvedStoreId) {
+      store = await Store.findByPk(resolvedStoreId);
+      if (!store) {
+        return res.status(400).json({ message: "Local no encontrado." });
+      }
     }
 
     const resolved = resolveCashFromBody(req.body);
@@ -520,9 +586,19 @@ export async function openShift(req, res) {
       if (parsed) openedAtDate = parsed;
     }
 
+    const establishmentCode = store
+      ? padSriCode(store.establishmentCode, "001")
+      : null;
+    const emissionPointCode = store
+      ? padSriCode(store.emissionPointCode, "001")
+      : null;
+
     const shift = await CashShift.create({
       accountId,
       userId,
+      storeId: store?.id ?? null,
+      establishmentCode,
+      emissionPointCode,
       status: "open",
       openedAt: openedAtDate,
       openingCashCounts: counts,
@@ -530,9 +606,11 @@ export async function openShift(req, res) {
       openingNotes: notes || null,
     });
 
+    const withStore = await findOpenShiftForAccount(accountId);
+
     res.status(201).json({
       message: "Turno abierto correctamente.",
-      shift,
+      shift: withStore || shift,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });

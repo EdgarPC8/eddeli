@@ -5,6 +5,8 @@ const auth = () => authHeaders();
 export const getTaskAssignees = () => axios.get("/tasks/assignees", auth());
 export const getTaskPlans = () => axios.get("/tasks/plans", auth());
 export const createTaskPlan = (payload) => axios.post("/tasks/plans", payload, auth());
+export const updateTaskPlan = (id, payload) => axios.put(`/tasks/plans/${id}`, payload, auth());
+export const deleteTaskPlan = (id) => axios.delete(`/tasks/plans/${id}`, auth());
 export const publishTaskPlan = (id) => axios.post(`/tasks/plans/${id}/publish`, {}, auth());
 export const getMyTaskItems = (params = {}) => {
   const qs = new URLSearchParams(params).toString();
@@ -12,5 +14,6 @@ export const getMyTaskItems = (params = {}) => {
 };
 export const updateTaskItemStatus = (id, payload) =>
   axios.put(`/tasks/items/${id}/status`, payload, auth());
+export const deleteTaskItem = (id) => axios.delete(`/tasks/items/${id}`, auth());
 export const executeTaskOpenBox = (id) =>
   axios.post(`/tasks/items/${id}/execute-open-box`, {}, auth());

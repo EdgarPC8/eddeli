@@ -4,8 +4,8 @@ import { Income, Expense } from "../../models/Finance.js";
 import { verifyJWT, getHeaderToken } from "../../libs/jwt.js";
 
 // controllers/finance.controller.js
-import { Op, fn, literal } from 'sequelize';
-import { startOfMonth, endOfMonth, format } from 'date-fns';
+import { Op, fn, col, literal } from 'sequelize';
+import { startOfMonth, endOfMonth, format, parse } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { OrderItem } from "../../models/Orders.js";
 import { ItemGroup, ItemGroupItem, Payment } from "../../models/Finance.js";
@@ -115,6 +115,84 @@ export const getFinanceSummary = async (req, res) => {
     const monthMarginPct =
       monthIncome > 0 ? Number(((monthBalance / monthIncome) * 100).toFixed(2)) : 0;
 
+    // Margen del mes si se cobrara lo pendiente de pedidos.
+    const monthIncomeWithPending = Number((monthIncome + futureIncome).toFixed(2));
+    const monthBalanceWithPending = Number(
+      (monthIncomeWithPending - monthExpense).toFixed(2),
+    );
+    const monthMarginWithPendingPct =
+      monthIncomeWithPending > 0
+        ? Number(((monthBalanceWithPending / monthIncomeWithPending) * 100).toFixed(2))
+        : 0;
+
+    // Mejor mes histórico por ganancia (ingresos − gastos).
+    const [incomeByMonth, expenseByMonth] = await Promise.all([
+      Income.findAll({
+        attributes: [
+          [fn("DATE_FORMAT", col("date"), "%Y-%m"), "monthKey"],
+          [fn("SUM", col("amount")), "total"],
+        ],
+        group: [fn("DATE_FORMAT", col("date"), "%Y-%m")],
+        raw: true,
+      }),
+      Expense.findAll({
+        attributes: [
+          [fn("DATE_FORMAT", col("date"), "%Y-%m"), "monthKey"],
+          [fn("SUM", col("amount")), "total"],
+        ],
+        group: [fn("DATE_FORMAT", col("date"), "%Y-%m")],
+        raw: true,
+      }),
+    ]);
+
+    const monthMap = new Map();
+    for (const row of incomeByMonth) {
+      const key = row.monthKey;
+      if (!key) continue;
+      monthMap.set(key, {
+        monthKey: key,
+        income: toNum(row.total),
+        expense: 0,
+      });
+    }
+    for (const row of expenseByMonth) {
+      const key = row.monthKey;
+      if (!key) continue;
+      const prev = monthMap.get(key) || { monthKey: key, income: 0, expense: 0 };
+      prev.expense = toNum(row.total);
+      monthMap.set(key, prev);
+    }
+
+    let bestMonth = null;
+    for (const entry of monthMap.values()) {
+      const balanceMonth = Number((entry.income - entry.expense).toFixed(2));
+      if (!bestMonth || balanceMonth > bestMonth.balance) {
+        bestMonth = {
+          monthKey: entry.monthKey,
+          balance: balanceMonth,
+          income: entry.income,
+          expense: entry.expense,
+        };
+      }
+    }
+
+    const currentMonthKey = format(now, "yyyy-MM");
+    const bestMonthBalance = bestMonth ? Number(bestMonth.balance) : 0;
+    const vsRecordPct =
+      bestMonthBalance > 0
+        ? Number(((monthBalance / bestMonthBalance) * 100).toFixed(2))
+        : bestMonthBalance === 0 && monthBalance === 0
+          ? 100
+          : 0;
+    const bestMonthLabel = bestMonth?.monthKey
+      ? format(parse(bestMonth.monthKey, "yyyy-MM", new Date()), "MMMM yyyy", {
+          locale: es,
+        })
+      : null;
+    const isRecordMonth = Boolean(
+      bestMonth?.monthKey && bestMonth.monthKey === currentMonthKey,
+    );
+
     const balance = income - expense;
     const projectedBalance = balance + futureIncome;
 
@@ -129,6 +207,13 @@ export const getFinanceSummary = async (req, res) => {
       monthBalance,
       monthMarginPct,
       monthLabel: format(now, "MMMM yyyy", { locale: es }),
+      monthIncomeWithPending,
+      monthBalanceWithPending,
+      monthMarginWithPendingPct,
+      bestMonthBalance,
+      bestMonthLabel,
+      vsRecordPct,
+      isRecordMonth,
     });
   } catch (error) {
     console.error('Error al obtener resumen financiero:', error);

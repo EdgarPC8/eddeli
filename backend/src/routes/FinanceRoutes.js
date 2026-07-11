@@ -13,7 +13,7 @@ import {
 } from "../controllers/InventoryControl/FinanceController.js";
 import { isAuthenticated, requireAdminOrProgrammer } from "../middlewares/authMiddelware.js";
 import { getOrderAnalytics, getWeeklySales,getTopProductsDailySales,getProductRotationAnalysis,getIncomeExpenseBreakdown,getCustomerSalesSummary, getOrdersForCharts,getExpensesForChart } from "../controllers/InventoryControl/AnalyticsController.js";
-import { getFinanceDashboard } from "../controllers/InventoryControl/DashboardController.js";
+import { getFinanceDashboard, getFinanceDashboardHero, getFinanceDashboardRest } from "../controllers/InventoryControl/DashboardController.js";
 import { getCalendarMonthSummary, getCalendarDayDetail, getCalendarPeriodDetail, getCalendarYearSummary } from "../controllers/InventoryControl/CalendarFinanceController.js";
 import {
   getObligationsWorkbench,
@@ -54,6 +54,8 @@ router.delete("/expenses/:id", ...adminOnly, deleteExpense);
 
 // 📊 Resumen financiero
 router.get("/summary", ...adminOnly, getFinanceSummary);
+router.get("/dashboard/hero", ...adminOnly, getFinanceDashboardHero);
+router.get("/dashboard/rest", ...adminOnly, getFinanceDashboardRest);
 router.get("/dashboard", ...adminOnly, getFinanceDashboard);
 router.get("/calendar-month", ...adminOnly, getCalendarMonthSummary);
 router.get("/calendar-year", ...adminOnly, getCalendarYearSummary);

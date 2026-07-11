@@ -32,10 +32,16 @@ function TramosPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [datos, setDatos] = useState({});
   const [titleUserDialog, setTitleUserDialog] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const fetchData = async () => {
-    const { data: rows } = await getTierGroups();
-    setData(rows || []);
+    setLoading(true);
+    try {
+      const { data: rows } = await getTierGroups();
+      setData(rows || []);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDialog = () => setOpen(!open);
@@ -201,6 +207,7 @@ function TramosPage() {
           rows={data}
           tableMaxHeight="calc(100vh - 220px)"
           defaultRowsPerPage={10}
+          loading={loading}
         />
       </Paper>
     </Container>

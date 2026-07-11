@@ -88,3 +88,65 @@ export const deleteNotification = async (req, res) => {
   }
 };
 
+/** Marcar varias notificaciones como leídas (ids en body). */
+export const markManyAsSeen = async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter(Boolean) : [];
+  if (ids.length === 0) {
+    return res.status(400).json({ message: "Sin ids" });
+  }
+  try {
+    await Notifications.update(
+      { seen: true },
+      { where: { id: ids, deleted: false } }
+    );
+    res.json({ message: "Marcadas como leídas", count: ids.length });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/** Soft-delete de varias notificaciones. */
+export const deleteManyNotifications = async (req, res) => {
+  const ids = Array.isArray(req.body?.ids) ? req.body.ids.filter(Boolean) : [];
+  if (ids.length === 0) {
+    return res.status(400).json({ message: "Sin ids" });
+  }
+  try {
+    await Notifications.update(
+      { deleted: true },
+      { where: { id: ids } }
+    );
+    res.json({ message: "Eliminadas", count: ids.length });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/** Marcar todas las no leídas de un usuario. */
+export const markAllAsSeenByUser = async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const [count] = await Notifications.update(
+      { seen: true },
+      { where: { userId, seen: false, deleted: false } }
+    );
+    res.json({ message: "Todas marcadas como leídas", count });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+/** Eliminar (soft) todas las ya leídas de un usuario. */
+export const deleteReadByUser = async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const [count] = await Notifications.update(
+      { deleted: true },
+      { where: { userId, seen: true, deleted: false } }
+    );
+    res.json({ message: "Leídas eliminadas", count });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+

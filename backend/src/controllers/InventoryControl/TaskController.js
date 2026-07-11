@@ -118,11 +118,9 @@ export const createTaskPlan = async (req, res) => {
   if (!title?.trim() || !startDate || !endDate) {
     return res.status(400).json({ message: "title, startDate y endDate son requeridos." });
   }
-  if (!Array.isArray(items) || items.length === 0) {
-    return res.status(400).json({ message: "Debes agregar al menos una tarea." });
-  }
   const t = await sequelize.transaction();
   try {
+    const normalized = normalizePlanItems(items);
     const plan = await TaskPlan.create(
       {
         title: title.trim(),
@@ -134,26 +132,8 @@ export const createTaskPlan = async (req, res) => {
       },
       { transaction: t },
     );
-    for (const [idx, row] of items.entries()) {
-      const assignedUserId = Number(row.assignedUserId || 0);
-      if (!row?.title?.trim() || !assignedUserId) {
-        throw new Error(`La tarea #${idx + 1} requiere título y usuario asignado.`);
-      }
-      const payload = row.actionPayload && typeof row.actionPayload === "object" ? row.actionPayload : null;
-      await TaskItem.create(
-        {
-          planId: plan.id,
-          title: row.title.trim(),
-          description: row.description?.trim() || null,
-          assignedUserId,
-          status: "pending",
-          priority: Number(row.priority || idx || 0),
-          dueDate: row.dueDate || null,
-          actionType: row.actionType === "open_box" ? "open_box" : "none",
-          actionPayload: payload ? JSON.stringify(payload) : null,
-        },
-        { transaction: t },
-      );
+    for (const row of normalized) {
+      await TaskItem.create({ ...row, planId: plan.id }, { transaction: t });
     }
     await t.commit();
     res.status(201).json({ ok: true, planId: plan.id });
@@ -161,6 +141,94 @@ export const createTaskPlan = async (req, res) => {
     await t.rollback();
     res.status(400).json({ message: error.message });
   }
+};
+
+function normalizePlanItems(items) {
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new Error("Debes agregar al menos una tarea.");
+  }
+  return items.map((row, idx) => {
+    const assignedUserId = Number(row.assignedUserId || 0);
+    if (!row?.title?.trim() || !assignedUserId) {
+      throw new Error(`La tarea #${idx + 1} requiere título y usuario asignado.`);
+    }
+    const payload = row.actionPayload && typeof row.actionPayload === "object" ? row.actionPayload : null;
+    return {
+      title: row.title.trim(),
+      description: row.description?.trim() || null,
+      assignedUserId,
+      status: "pending",
+      priority: Number(row.priority || idx || 0),
+      dueDate: row.dueDate || null,
+      actionType: row.actionType === "open_box" ? "open_box" : "none",
+      actionPayload: payload ? JSON.stringify(payload) : null,
+    };
+  });
+}
+
+export const updateTaskPlan = async (req, res) => {
+  if (!isAdminRole(req)) return res.status(403).json({ message: "No autorizado." });
+  const { id } = req.params;
+  const plan = await TaskPlan.findByPk(id, { include: [{ model: TaskItem, as: "items" }] });
+  if (!plan) return res.status(404).json({ message: "Plan no encontrado." });
+  if (plan.status !== "draft") {
+    return res.status(400).json({ message: "Solo se pueden editar planes en borrador." });
+  }
+
+  const { title, description, startDate, endDate, items } = req.body;
+  if (!title?.trim() || !startDate || !endDate) {
+    return res.status(400).json({ message: "title, startDate y endDate son requeridos." });
+  }
+
+  const t = await sequelize.transaction();
+  try {
+    const normalized = normalizePlanItems(items);
+    await plan.update(
+      {
+        title: title.trim(),
+        description: description?.trim() || null,
+        startDate,
+        endDate,
+      },
+      { transaction: t },
+    );
+    await TaskItem.destroy({ where: { planId: plan.id }, transaction: t });
+    for (const row of normalized) {
+      await TaskItem.create({ ...row, planId: plan.id }, { transaction: t });
+    }
+    await t.commit();
+    res.json({ ok: true, planId: plan.id });
+  } catch (error) {
+    await t.rollback();
+    res.status(400).json({ message: error.message });
+  }
+};
+
+export const deleteTaskPlan = async (req, res) => {
+  if (!isAdminRole(req)) return res.status(403).json({ message: "No autorizado." });
+  const { id } = req.params;
+  const plan = await TaskPlan.findByPk(id);
+  if (!plan) return res.status(404).json({ message: "Plan no encontrado." });
+  if (plan.status === "published") {
+    return res.status(400).json({
+      message: "No se puede eliminar un plan publicado. Ciérralo primero o deja de usarlo.",
+    });
+  }
+  await TaskItem.destroy({ where: { planId: plan.id } });
+  await plan.destroy();
+  res.json({ ok: true, planId: Number(id) });
+};
+
+export const deleteTaskItem = async (req, res) => {
+  if (!isAdminRole(req)) return res.status(403).json({ message: "No autorizado." });
+  const { id } = req.params;
+  const item = await TaskItem.findByPk(id, { include: [{ model: TaskPlan, as: "plan" }] });
+  if (!item) return res.status(404).json({ message: "Tarea no encontrada." });
+  if (item.plan?.status !== "draft") {
+    return res.status(400).json({ message: "Solo se pueden eliminar tareas de planes en borrador." });
+  }
+  await item.destroy();
+  res.json({ ok: true, itemId: Number(id) });
 };
 
 export const publishTaskPlan = async (req, res) => {

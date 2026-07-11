@@ -45,7 +45,15 @@ const productIncludeForView = [
   {
     model: InventoryCategory,
     as: "ERP_inventory_category",
-    attributes: ["name"],
+    attributes: ["id", "name", "parentId"],
+    include: [
+      {
+        model: InventoryCategory,
+        as: "parent",
+        attributes: ["id", "name"],
+        required: false,
+      },
+    ],
   },
 ];
 
@@ -61,6 +69,7 @@ const mapCatalogEntryToCard = (row) => {
   const categoryObj = product.ERP_inventory_category || product["ERP_inventory_category"];
   const catName = categoryObj?.name || "";
   const categorySlug = slugify(catName);
+  const parentCat = categoryObj?.parent || null;
 
   const unit = product.ERP_inventory_unit || product["ERP_inventory_unit"];
   const unitAbbr = unit?.abbreviation || unit?.name || null;
@@ -102,7 +111,20 @@ const mapCatalogEntryToCard = (row) => {
       price: effectivePrice,
       primaryImageUrl: product.primaryImageUrl,
       categorySlug: categorySlug || undefined,
-      categoryId: product.categoryId,
+      categoryId: product.categoryId ?? categoryObj?.id ?? null,
+      categoryParentId: categoryObj?.parentId ?? parentCat?.id ?? null,
+      categoryName: catName || undefined,
+      categoryParentName: parentCat?.name || undefined,
+      ERP_inventory_category: categoryObj
+        ? {
+            id: categoryObj.id,
+            name: categoryObj.name,
+            parentId: categoryObj.parentId ?? null,
+            parent: parentCat
+              ? { id: parentCat.id, name: parentCat.name }
+              : null,
+          }
+        : null,
       unitId: product.unitId,
       unitAbbr: unitAbbr || undefined,
       standardWeightGrams: n(product.standardWeightGrams, 0),

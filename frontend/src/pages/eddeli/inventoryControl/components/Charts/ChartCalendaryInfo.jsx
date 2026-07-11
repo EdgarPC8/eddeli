@@ -8,7 +8,6 @@ import {
   Stack,
   Chip,
   LinearProgress,
-  CircularProgress,
   ToggleButton,
   ToggleButtonGroup,
 } from '@mui/material';
@@ -27,6 +26,7 @@ import {
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import ChartBlockHeader from '../../../../../components/Charts/ChartBlockHeader';
+import { ChartSkeleton } from '../../../../../components/ContentSkeleton.jsx';
 import { getChartSeriesColors, CHART_SEMANTIC_INDEX } from '../../../../../theme/chartPalette';
 import CalendarDayDetailDialog from './CalendarDayDetailDialog';
 import {
@@ -303,11 +303,14 @@ export default function ChartCalendaryInfo({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            bgcolor: alpha(theme.palette.background.paper, 0.6),
+            bgcolor: alpha(theme.palette.background.paper, 0.85),
             borderRadius: 2,
+            p: 2,
           }}
         >
-          <CircularProgress size={32} />
+          <Box sx={{ width: '100%', maxWidth: 480 }}>
+            <ChartSkeleton height={220} />
+          </Box>
         </Box>
       )}
 

@@ -292,6 +292,31 @@ export const Store = sequelize.define(
     position: { type: DataTypes.INTEGER, defaultValue: 0 },        // orden en lista
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true },     // visible en home/lista
 
+    /**
+     * propia = tu panadería / caja (turno + códigos SRI 001/002)
+     * vitrina = local ajeno donde entregas producto para que vendan
+     */
+    locationKind: {
+      type: DataTypes.ENUM("propia", "vitrina"),
+      allowNull: false,
+      defaultValue: "vitrina",
+    },
+
+    /**
+     * Códigos fiscales SRI del local (mismo RUC, otro establecimiento).
+     * Relevantes sobre todo en sucursales propias.
+     */
+    establishmentCode: {
+      type: DataTypes.STRING(3),
+      allowNull: false,
+      defaultValue: "001",
+    },
+    emissionPointCode: {
+      type: DataTypes.STRING(3),
+      allowNull: false,
+      defaultValue: "001",
+    },
+
     // Auditoría
     createdBy: { type: DataTypes.INTEGER, allowNull: true },       // FK -> Account.id
   },
@@ -302,6 +327,8 @@ export const Store = sequelize.define(
       { fields: ["position"] },
       { fields: ["city"] },
       { fields: ["province"] },
+      { fields: ["locationKind"] },
+      { fields: ["establishmentCode", "emissionPointCode"] },
     ],
   }
 );

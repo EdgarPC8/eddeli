@@ -407,19 +407,14 @@ export default function LoansDebtsPage() {
         </FormControl>
       </Stack>
 
-      {loading ? (
-        <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
-          Cargando…
-        </Typography>
-      ) : (
-        <TablePro
+      <TablePro
           rows={obligations}
           columns={columns}
           showSearch={false}
           defaultRowsPerPage={10}
           tableMaxHeight="none"
+          loading={loading}
         />
-      )}
 
       {/* Crear */}
       <SimpleDialog

@@ -33,10 +33,16 @@ export default function CuentasPage() {
   const [resetOpen, setResetOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [target, setTarget] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
-    const { data } = await getAccountsRequest();
-    setRows(data || []);
+    setLoading(true);
+    try {
+      const { data } = await getAccountsRequest();
+      setRows(data || []);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -150,6 +156,7 @@ export default function CuentasPage() {
         showPagination
         showIndex
         defaultRowsPerPage={10}
+        loading={loading}
       />
 
       <SimpleDialog

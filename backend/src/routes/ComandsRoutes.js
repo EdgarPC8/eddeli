@@ -1,6 +1,8 @@
 import { Router } from "express";
 import {
   getLogs,
+  deleteLogs,
+  deleteLogById,
   createLicense,
   reloadBdController,
   uploadBackupController,
@@ -34,7 +36,9 @@ const upload = multer({
  * Antes upload-backup estaba público → cualquiera podía subir un backup.json.
  */
 router.get("/createLicense", isAuthenticated, requireProgrammer, createLicense);
-router.get("/getLogs", isAuthenticated, requireProgrammer, getLogs);
+router.get("/getLogs", isAuthenticated, requireAdminOrProgrammer, getLogs);
+router.delete("/logs", isAuthenticated, requireProgrammer, deleteLogs);
+router.delete("/logs/:id", isAuthenticated, requireProgrammer, deleteLogById);
 router.get("/panel-stats", isAuthenticated, requireAdminOrProgrammer, getPanelStatsController);
 router.get("/saveBackup", isAuthenticated, requireAdminOrProgrammer, saveBackupController);
 router.get("/downloadBackup", isAuthenticated, requireProgrammer, downloadBackup);

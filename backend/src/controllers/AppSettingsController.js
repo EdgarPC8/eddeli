@@ -38,6 +38,9 @@ export async function putAppSettings(req, res) {
       "cajaQuickCategoryMatch",
       "walkInCustomerLabel",
       "timezone",
+      "showPublicCatalog",
+      "showPublicStoresPropia",
+      "showPublicStoresVitrina",
     ];
     const patch = {};
     for (const key of allowed) {

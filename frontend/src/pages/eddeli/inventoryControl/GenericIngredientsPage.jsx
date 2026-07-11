@@ -19,6 +19,7 @@ import {
   alpha,
   useTheme,
 } from "@mui/material";
+import { ListSkeleton } from "../../../components/ContentSkeleton.jsx";
 import ScienceIcon from "@mui/icons-material/Science";
 import LinkIcon from "@mui/icons-material/Link";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
@@ -217,13 +218,15 @@ export default function GenericIngredientsPage() {
             <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 1, px: 0.5 }}>
               Insumos genéricos ({generics.length})
             </Typography>
+            {loading && <ListSkeleton count={5} itemHeight={72} />}
             {generics.length === 0 && !loading && (
               <Typography variant="body2" color="text.secondary" sx={{ p: 2, textAlign: "center" }}>
                 Sin insumos. Usa &quot;Crear presentaciones frecuentes&quot; o crea uno nuevo.
               </Typography>
             )}
             <Stack spacing={0.75}>
-              {generics.map((g) => {
+              {!loading &&
+                generics.map((g) => {
                 const active = g.id === selectedId;
                 return (
                   <Paper

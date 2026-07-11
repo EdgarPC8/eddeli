@@ -1,7 +1,7 @@
 /**
  * Barra superior EdDeli: navegación, tema, notificaciones y menú de usuario.
  */
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useNavigate, useLocation, Outlet } from "react-router-dom";
 import {
   AppBar,
@@ -56,6 +56,7 @@ import GroupIcon from "@mui/icons-material/Group";
 import ManageAccountsIcon from "@mui/icons-material/ManageAccounts";
 import CompareArrowsIcon from "@mui/icons-material/CompareArrows";
 import ReceiptLongIcon from "@mui/icons-material/ReceiptLong";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
 import ScienceIcon from "@mui/icons-material/Science";
 import AssignmentIcon from "@mui/icons-material/Assignment";
 import MonetizationOnIcon from "@mui/icons-material/MonetizationOn";
@@ -68,6 +69,8 @@ import StarRoundedIcon from "@mui/icons-material/StarRounded";
 import BakeryDiningIcon from "@mui/icons-material/BakeryDining";
 import StoreMallDirectoryRoundedIcon from "@mui/icons-material/StoreMallDirectoryRounded";
 import ViewModuleIcon from "@mui/icons-material/ViewModule";
+import ExtensionIcon from "@mui/icons-material/Extension";
+import WorkspacePremiumIcon from "@mui/icons-material/WorkspacePremium";
 import EditNoteIcon from "@mui/icons-material/EditNote";
 import VolumeUpIcon from "@mui/icons-material/VolumeUp";
 import CollectionsBookmarkIcon from "@mui/icons-material/CollectionsBookmark";
@@ -84,9 +87,11 @@ import ThemeSwitcher from "./ThemeSwitcher.jsx";
 import NotificationList from "./NotificationList.jsx";
 import CambiarRol from "./CambiarRol.jsx";
 import SimpleDialog from "./Dialogs/SimpleDialog.jsx";
+import { PageSkeleton } from "./ContentSkeleton.jsx";
 import { getUnreadCount } from "../api/notificationsRequest.js";
 import { useNotificationSocket } from "../hooks/useNotificationSocket.js";
 import { useAppSettings } from "../context/AppSettingsContext.jsx";
+import { shouldHideMaintenanceMenuLink } from "../config/sectionMaintenanceAccess.js";
 
 const DRAWER_W = 260;
 
@@ -131,7 +136,7 @@ const MENU_GROUPS = [
         roles: ["Programador", "Administrador", "Empleado"],
       },
       {
-        name: "Facturación",
+        name: "Comprobantes POS",
         link: "/facturacion",
         icon: <ReceiptIcon />,
         roles: ["Programador", "Administrador"],
@@ -140,6 +145,60 @@ const MENU_GROUPS = [
         name: "Supervisión caja",
         link: "/turno/supervision",
         icon: <AssessmentIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+    ],
+  },
+  {
+    id: "comprobantes-sri",
+    label: "Comprobantes electrónicos",
+    items: [
+      {
+        name: "Inicio SRI",
+        link: "/comprobantes-electronicos",
+        icon: <FactCheckIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Facturas",
+        link: "/comprobantes-electronicos/facturas",
+        icon: <ReceiptLongIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Notas de venta",
+        link: "/comprobantes-electronicos/notas-venta",
+        icon: <ReceiptIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Notas de crédito",
+        link: "/comprobantes-electronicos/notas-credito",
+        icon: <ReceiptLongIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Retenciones",
+        link: "/comprobantes-electronicos/retenciones",
+        icon: <AccountBalanceWalletIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Guías de remisión",
+        link: "/comprobantes-electronicos/guias-remision",
+        icon: <LocalShippingIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Documentos emitidos",
+        link: "/comprobantes-electronicos/emitidos",
+        icon: <Inventory2Icon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Configuración SRI",
+        link: "/sistema/configuracion?tab=sri",
+        icon: <SettingsApplicationsIcon />,
         roles: ["Programador", "Administrador"],
       },
     ],
@@ -269,7 +328,7 @@ const MENU_GROUPS = [
         roles: ["Programador", "Administrador"],
       },
       {
-        name: "Puntos de venta",
+        name: "Sucursales / locales",
         link: "/inventory/puntos-venta",
         icon: <StorefrontRoundedIcon />,
         roles: ["Programador", "Administrador"],
@@ -377,6 +436,36 @@ const MENU_GROUPS = [
         roles: ["Programador", "Administrador"],
       },
       {
+        name: "Planes",
+        link: "/sistema/planes",
+        icon: <WorkspacePremiumIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Módulos",
+        link: "/sistema/modulos",
+        icon: <ExtensionIcon />,
+        roles: ["Programador", "Administrador"],
+      },
+      {
+        name: "Perfil",
+        link: "/perfil",
+        icon: <PersonOutlineIcon />,
+        roles: ["Programador", "Administrador", "Empleado"],
+      },
+      {
+        name: "Donaciones",
+        link: "/donaciones",
+        icon: <CardGiftcardIcon />,
+        roles: ["Programador", "Administrador", "Empleado"],
+      },
+    ],
+  },
+  {
+    id: "desarrollador",
+    label: "Desarrollador",
+    items: [
+      {
         name: "Imágenes",
         link: "/img",
         icon: <ImageIcon />,
@@ -425,14 +514,22 @@ const PUBLIC_NAV = [
 
 function menuItemsForRole(loginRol) {
   if (!loginRol) return [];
-  return MENU_ITEMS.filter((item) => item.roles.includes(loginRol));
+  return MENU_ITEMS.filter(
+    (item) =>
+      item.roles.includes(loginRol) &&
+      !shouldHideMaintenanceMenuLink(item.link, loginRol),
+  );
 }
 
 function menuGroupsForRole(loginRol) {
   if (!loginRol) return [];
   return MENU_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter((item) => item.roles.includes(loginRol)),
+    items: group.items.filter(
+      (item) =>
+        item.roles.includes(loginRol) &&
+        !shouldHideMaintenanceMenuLink(item.link, loginRol),
+    ),
   })).filter((group) => group.items.length > 0);
 }
 
@@ -446,10 +543,25 @@ export default function NavBar() {
 
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [expandedGroupId, setExpandedGroupId] = useState(null);
-  const [userAnchor, setUserAnchor] = useState(null);
+  const [userMenuAnchor, setUserMenuAnchor] = useState(null);
   const [notifAnchor, setNotifAnchor] = useState(null);
   const [openChangeRol, setOpenChangeRol] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  const publicNavItems = useMemo(() => {
+    return PUBLIC_NAV.filter((item) => {
+      if (item.to === "/catalogo") return activeApp?.showPublicCatalog !== false;
+      if (item.to === "/punto_venta") {
+        return (
+          activeApp?.showPublicStoresPropia !== false ||
+          activeApp?.showPublicStoresVitrina !== false
+        );
+      }
+      return true;
+    });
+  }, [activeApp]);
+
+  const closeUserMenu = () => setUserMenuAnchor(null);
 
   const hasMultipleRoles = (user?.roles?.length ?? 0) > 1;
   const profileReady = Boolean(user?.loginRol);
@@ -527,6 +639,12 @@ export default function NavBar() {
   useEffect(() => {
     fetchUnreadCount();
   }, [fetchUnreadCount]);
+
+  // Cerrar overlays al cambiar de ruta (evita backdrop MUI huérfano).
+  useEffect(() => {
+    closeUserMenu();
+    setNotifAnchor(null);
+  }, [location.pathname]);
 
   useNotificationSocket(user?.userId, user?.accountId, () => {
     fetchUnreadCount();
@@ -684,7 +802,7 @@ export default function NavBar() {
             Inicio
           </Button>
 
-          {PUBLIC_NAV.map((item) => (
+          {publicNavItems.map((item) => (
             <Button
               key={item.to}
               color="inherit"
@@ -746,23 +864,26 @@ export default function NavBar() {
                 open={Boolean(notifAnchor)}
                 anchorEl={notifAnchor}
                 onClose={() => setNotifAnchor(null)}
+                disableScrollLock
                 anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
                 transformOrigin={{ vertical: "top", horizontal: "right" }}
+                slotProps={{
+                  paper: {
+                    sx: {
+                      width: { xs: "min(100vw - 16px, 420px)", sm: 420 },
+                      maxHeight: 560,
+                      overflow: "hidden",
+                      borderRadius: 2,
+                      boxShadow: 8,
+                    },
+                  },
+                }}
               >
-                <Box sx={{ width: 380, maxHeight: 480 }}>
-                  <NotificationList setCount={setUnreadCount} />
-                  <Box textAlign="center" p={1}>
-                    <Button
-                      size="small"
-                      onClick={() => {
-                        setNotifAnchor(null);
-                        navigate("/notifications");
-                      }}
-                    >
-                      Ver todas
-                    </Button>
-                  </Box>
-                </Box>
+                <NotificationList
+                  compact
+                  setCount={setUnreadCount}
+                  onClose={() => setNotifAnchor(null)}
+                />
               </Popover>
 
               <Typography
@@ -772,8 +893,12 @@ export default function NavBar() {
                 {displayName}
               </Typography>
               <IconButton
+                id="user-menu-button"
                 color="inherit"
-                onClick={(e) => setUserAnchor(e.currentTarget)}
+                aria-controls={userMenuAnchor ? "user-menu" : undefined}
+                aria-haspopup="true"
+                aria-expanded={userMenuAnchor ? "true" : undefined}
+                onClick={(e) => setUserMenuAnchor(e.currentTarget)}
               >
                 <Avatar
                   src={profileImageUser || undefined}
@@ -788,13 +913,19 @@ export default function NavBar() {
                 </Avatar>
               </IconButton>
               <Menu
-                anchorEl={userAnchor}
-                open={Boolean(userAnchor)}
-                onClose={() => setUserAnchor(null)}
+                id="user-menu"
+                anchorEl={userMenuAnchor}
+                open={Boolean(userMenuAnchor)}
+                onClose={closeUserMenu}
+                disableScrollLock
+                disableAutoFocusItem
+                anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+                transformOrigin={{ vertical: "top", horizontal: "right" }}
+                MenuListProps={{ "aria-labelledby": "user-menu-button" }}
               >
                 <MenuItem
                   onClick={() => {
-                    setUserAnchor(null);
+                    closeUserMenu();
                     navigate("/perfil");
                   }}
                 >
@@ -803,9 +934,22 @@ export default function NavBar() {
                   </ListItemIcon>
                   Perfil
                 </MenuItem>
+                {["Programador", "Administrador"].includes(user?.loginRol) && (
+                  <MenuItem
+                    onClick={() => {
+                      closeUserMenu();
+                      navigate("/sistema/configuracion");
+                    }}
+                  >
+                    <ListItemIcon>
+                      <SettingsApplicationsIcon fontSize="small" />
+                    </ListItemIcon>
+                    Configuración
+                  </MenuItem>
+                )}
                 <MenuItem
                   onClick={() => {
-                    setUserAnchor(null);
+                    closeUserMenu();
                     navigate("/info");
                   }}
                 >
@@ -816,7 +960,7 @@ export default function NavBar() {
                 </MenuItem>
                 <MenuItem
                   onClick={() => {
-                    setUserAnchor(null);
+                    closeUserMenu();
                     navigate("/donaciones");
                   }}
                 >
@@ -828,7 +972,7 @@ export default function NavBar() {
                 {hasMultipleRoles && (
                   <MenuItem
                     onClick={() => {
-                      setUserAnchor(null);
+                      closeUserMenu();
                       setOpenChangeRol(true);
                     }}
                   >
@@ -840,7 +984,7 @@ export default function NavBar() {
                 )}
                 <MenuItem
                   onClick={() => {
-                    setUserAnchor(null);
+                    closeUserMenu();
                     logout();
                     navigate("/home");
                   }}
@@ -897,7 +1041,15 @@ export default function NavBar() {
           boxSizing: "border-box",
         }}
       >
-        <Outlet />
+        <Suspense
+          fallback={
+            <Box sx={{ py: 2 }}>
+              <PageSkeleton />
+            </Box>
+          }
+        >
+          <Outlet />
+        </Suspense>
       </Box>
     </Box>
   );

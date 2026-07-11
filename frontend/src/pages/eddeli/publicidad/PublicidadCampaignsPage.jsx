@@ -191,6 +191,7 @@ export default function PublicidadCampaignsPage() {
         showSearch
         showPagination
         defaultRowsPerPage={10}
+        loading={loading}
       />
 
       <SimpleDialog

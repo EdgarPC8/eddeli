@@ -45,7 +45,9 @@ import ShiftProgrammerEditDialog from "./ShiftProgrammerEditDialog.jsx";
 import ProgrammerMovementDateField, {
   movementDateForApi,
 } from "./inventoryControl/components/ProgrammerMovementDateField.jsx";
-import { getAllProductsAll } from "../../api/inventoryControlRequest.js";
+import { getAllProductsAll, getStoresRequest } from "../../api/inventoryControlRequest.js";
+import { fetchSriBillingSettings } from "../../api/sriBillingRequest.js";
+import OpenShiftStoreDialog from "../../components/OpenShiftStoreDialog.jsx";
 import {
   CASH_BILLS,
   CASH_COINS,
@@ -208,6 +210,10 @@ export default function TurnoPage() {
   const [products, setProducts] = useState([]);
   const [productsLoading, setProductsLoading] = useState(false);
   const [editShiftId, setEditShiftId] = useState(null);
+  const [stores, setStores] = useState([]);
+  const [sriSettings, setSriSettings] = useState(null);
+  const [storeModalOpen, setStoreModalOpen] = useState(false);
+  const [pendingStoreId, setPendingStoreId] = useState("");
 
   const openTotal = useMemo(
     () => (isProgrammer ? computeCashTotal(openCounts) : to2(openCashTotal)),
@@ -221,12 +227,16 @@ export default function TurnoPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [activeRes, histRes] = await Promise.all([
+      const [activeRes, histRes, storesRes, sriRes] = await Promise.all([
         getActiveShift(),
         getShifts({ limit: 12 }),
+        getStoresRequest({ isActive: true, kind: "propia" }).catch(() => ({ data: [] })),
+        fetchSriBillingSettings().catch(() => null),
       ]);
       setActiveShift(activeRes.data || null);
       setHistory(Array.isArray(histRes.data) ? histRes.data : []);
+      setStores(Array.isArray(storesRes.data) ? storesRes.data : []);
+      setSriSettings(sriRes);
     } catch (e) {
       void toast?.({
         message: e?.response?.data?.message || "No se pudo cargar turnos.",
@@ -316,20 +326,12 @@ export default function TurnoPage() {
     }
   };
 
-  const handleOpenShift = async () => {
-    if (openTotal <= 0) {
-      void toast?.({
-        message: isProgrammer
-          ? "Ingresa el capital inicial en monedas o billetes."
-          : "Ingresa el total en efectivo de apertura.",
-        variant: "warning",
-      });
-      return;
-    }
+  const doOpenShift = async (storeId) => {
     try {
       setSaving(true);
       const payload = {
         notes: openNotes || undefined,
+        storeId: storeId ? Number(storeId) : undefined,
         ...(isProgrammer
           ? {
               cashCounts: openCounts,
@@ -345,6 +347,8 @@ export default function TurnoPage() {
       setOpenNotes("");
       setCloseCounts(emptyCashCounts());
       setCloseCashTotal("");
+      setStoreModalOpen(false);
+      setPendingStoreId("");
       await load();
     } catch (e) {
       void toast?.({
@@ -354,6 +358,25 @@ export default function TurnoPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleOpenShift = async () => {
+    if (openTotal <= 0) {
+      void toast?.({
+        message: isProgrammer
+          ? "Ingresa el capital inicial en monedas o billetes."
+          : "Ingresa el total en efectivo de apertura.",
+        variant: "warning",
+      });
+      return;
+    }
+    if (stores.length > 1) {
+      setPendingStoreId(String(stores[0].id));
+      setStoreModalOpen(true);
+      return;
+    }
+    const onlyId = stores.length === 1 ? String(stores[0].id) : undefined;
+    await doOpenShift(onlyId);
   };
 
   const handleCloseShift = async () => {
@@ -419,6 +442,18 @@ export default function TurnoPage() {
         {activeShift && (
           <>
             <Chip label="Abierto" color="success" size="small" sx={{ height: 22 }} />
+            {(activeShift.store?.name || activeShift.establishmentCode) && (
+              <Chip
+                size="small"
+                variant="outlined"
+                sx={{ height: 22 }}
+                label={
+                  activeShift.store?.name
+                    ? `${activeShift.store.name} · ${activeShift.establishmentCode || "001"}-${activeShift.emissionPointCode || "001"}`
+                    : `${activeShift.establishmentCode}-${activeShift.emissionPointCode}`
+                }
+              />
+            )}
             <Typography variant="caption" color="text.secondary">
               {formatShiftDate(activeShift.openedAt)}
             </Typography>
@@ -450,6 +485,23 @@ export default function TurnoPage() {
               {user?.loginRol ? ` · ${user.loginRol}` : ""}
             </Typography>
           </Stack>
+
+          {stores.length === 1 && (
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+              Se abrirá en <strong>{stores[0].name}</strong> (
+              {stores[0].establishmentCode || "001"}-{stores[0].emissionPointCode || "001"}).
+              {sriSettings?.readyForInvoicing
+                ? " Emisor SRI listo."
+                : sriSettings?.hasCertificate
+                  ? " Firma cargada; completa datos SRI si vas a facturar."
+                  : ""}
+            </Typography>
+          )}
+          {stores.length > 1 && (
+            <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
+              Después de ingresar el efectivo, al abrir te pediremos en qué sucursal/local.
+            </Typography>
+          )}
 
           {isProgrammer ? (
             <CashArqueoBlock
@@ -800,6 +852,7 @@ export default function TurnoPage() {
               <TableRow>
                 <TableCell>Est.</TableCell>
                 {isAdmin && <TableCell>Operador</TableCell>}
+                <TableCell>Local</TableCell>
                 <TableCell>Apertura</TableCell>
                 <TableCell>Cierre</TableCell>
                 <TableCell align="right">Inic.</TableCell>
@@ -829,6 +882,13 @@ export default function TurnoPage() {
                       {operatorFromShift(row, null)}
                     </TableCell>
                   )}
+                  <TableCell>
+                    {row.store?.name
+                      ? `${row.store.name}`
+                      : row.establishmentCode
+                        ? `${row.establishmentCode}-${row.emissionPointCode}`
+                        : "—"}
+                  </TableCell>
                   <TableCell>{formatShiftDate(row.openedAt)}</TableCell>
                   <TableCell>{formatShiftDate(row.closedAt)}</TableCell>
                   <TableCell align="right">{formatMoney(row.openingCashTotal)}</TableCell>
@@ -865,7 +925,7 @@ export default function TurnoPage() {
               ))}
               {history.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={isProgrammer ? 8 : isAdmin ? 7 : 6}>
+                  <TableCell colSpan={isProgrammer ? 9 : isAdmin ? 8 : 7}>
                     <Typography variant="caption" color="text.secondary">
                       Sin turnos registrados.
                     </Typography>
@@ -888,6 +948,22 @@ export default function TurnoPage() {
         onClose={() => setEditShiftId(null)}
         onSaved={() => void load()}
         toast={toast}
+      />
+
+      <OpenShiftStoreDialog
+        open={storeModalOpen}
+        stores={stores}
+        sri={sriSettings}
+        selectedId={pendingStoreId}
+        onSelect={setPendingStoreId}
+        onCancel={() => {
+          if (!saving) {
+            setStoreModalOpen(false);
+            setPendingStoreId("");
+          }
+        }}
+        onConfirm={() => void doOpenShift(pendingStoreId)}
+        confirming={saving}
       />
     </Box>
   );

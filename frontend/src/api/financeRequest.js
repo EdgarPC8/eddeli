@@ -76,6 +76,20 @@ export const getProductSeriesChartsRequest = async (period = "month", band = 1) 
     headers: { Authorization: jwt() },
   });
 
+/** Cards superiores del dashboard (rápido). */
+export const getFinanceDashboardHeroRequest = async () => {
+  return await axios.get("/finance/dashboard/hero", {
+    headers: { Authorization: jwt() },
+  });
+};
+
+/** Paneles inferiores del dashboard (carga diferida). */
+export const getFinanceDashboardRestRequest = async () => {
+  return await axios.get("/finance/dashboard/rest", {
+    headers: { Authorization: jwt() },
+  });
+};
+
 /** Carga agregada del dashboard (una sola petición). */
 export const getFinanceDashboardRequest = async () => {
   return await axios.get("/finance/dashboard", {

@@ -24,6 +24,8 @@ import {
   Accordion, AccordionSummary, AccordionDetails,
   Divider,
   Button,
+  Alert,
+  Container,
 
 } from "@mui/material";
 import { useTheme,alpha } from "@mui/material/styles";
@@ -41,7 +43,13 @@ import AccessTimeIcon from "@mui/icons-material/AccessTime";
 
 import { getCatalogBySection, getPublicCategories, getPublicCompareGroups } from "../../api/inventoryControlRequest";
 import { pathImg } from "../../api/axios";
+import { useAppSettings } from "../../context/AppSettingsContext.jsx";
 import ProductCompareTable from "../../components/eddeli/ProductCompareTable";
+import {
+  buildCategoryFilterOptions,
+  indexCategories,
+  productMatchesCategoryFilter,
+} from "../../utils/categoryUtils.js";
 
 
 
@@ -624,13 +632,18 @@ const SECTIONS = [
 export default function CatalogoPage() {
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down("sm"));
+  const { activeApp } = useAppSettings();
+  const showCatalog = activeApp?.showPublicCatalog !== false;
 
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("todas");
   const [sort, setSort] = useState("default");
   const [section, setSection] = useState("home");
 
-  const [categories, setCategories] = useState([{ value: "todas", label: "Todas" }]);
+  const [categoryList, setCategoryList] = useState([]);
+  const [categoryOptions, setCategoryOptions] = useState([
+    { value: "todas", label: "Todas" },
+  ]);
   const [entries, setEntries] = useState([]);
   const [compareGroups, setCompareGroups] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -682,22 +695,25 @@ const handleClosePreview = () => {
 };
 
 
-  // Cargar categorías
+  // Cargar categorías públicas (árbol padre/subcategoría)
   const fetchCategories = async () => {
     try {
       const { data } = await getPublicCategories();
-      const opts = Array.isArray(data)
-        ? [{ value: "todas", label: "Todas" }].concat(
-            data.map((c) => ({
-              value: slugify(c.name || String(c.id)),
-              label: c.name,
-            }))
-          )
-        : [{ value: "todas", label: "Todas" }];
-      setCategories(opts);
+      const list = Array.isArray(data) ? data : [];
+      setCategoryList(list);
+      const opts = [
+        { value: "todas", label: "Todas" },
+        ...buildCategoryFilterOptions(list),
+      ];
+      setCategoryOptions(opts);
+      setCategory((prev) =>
+        opts.some((o) => o.value === prev) ? prev : "todas",
+      );
     } catch (e) {
       console.error("Error cargando categorías:", e);
-      setCategories([{ value: "todas", label: "Todas" }]);
+      setCategoryList([]);
+      setCategoryOptions([{ value: "todas", label: "Todas" }]);
+      setCategory("todas");
     }
   };
 
@@ -723,11 +739,17 @@ const handleClosePreview = () => {
   };
 
   useEffect(() => {
+    if (!showCatalog) return;
     fetchCategories();
-  }, []);
+  }, [showCatalog]);
   useEffect(() => {
+    if (!showCatalog) {
+      setEntries([]);
+      setCompareGroups([]);
+      return;
+    }
     fetchSection(section);
-  }, [section]);
+  }, [section, showCatalog]);
 
   const hiddenCompareProductIds = useMemo(() => {
     const ids = new Set();
@@ -738,10 +760,72 @@ const handleClosePreview = () => {
     return ids;
   }, [compareGroups]);
 
+  const categoriesById = useMemo(
+    () => indexCategories(categoryList),
+    [categoryList],
+  );
+
+  const entryMatchesCategory = (entry) => {
+    if (category === "todas") return true;
+    const p = entry?.product;
+    if (!p) return false;
+    const cat =
+      p.ERP_inventory_category ||
+      categoriesById.get(Number(p.categoryId)) ||
+      (p.categoryId
+        ? {
+            id: p.categoryId,
+            name: p.categoryName,
+            parentId: p.categoryParentId,
+            parent: p.categoryParentId
+              ? {
+                  id: p.categoryParentId,
+                  name: p.categoryParentName,
+                }
+              : null,
+          }
+        : null);
+    return productMatchesCategoryFilter(
+      {
+        categoryId: p.categoryId,
+        ERP_inventory_category: cat,
+      },
+      category,
+      categoriesById,
+    );
+  };
+
+  const groupMatchesCategory = (group) => {
+    if (category === "todas") return true;
+    for (const variant of group?.variants || []) {
+      for (const cell of Object.values(variant.cells || {})) {
+        const p = cell?.product;
+        if (!p) continue;
+        if (
+          productMatchesCategoryFilter(
+            {
+              categoryId: p.categoryId,
+              ERP_inventory_category:
+                p.ERP_inventory_category ||
+                categoriesById.get(Number(p.categoryId)) ||
+                null,
+            },
+            category,
+            categoriesById,
+          )
+        ) {
+          return true;
+        }
+      }
+    }
+    return false;
+  };
+
   const visibleCompareGroups = useMemo(() => {
     if (!query.trim() && category === "todas") return compareGroups;
     const q = query.trim().toLowerCase();
     return compareGroups.filter((g) => {
+      if (category !== "todas" && !groupMatchesCategory(g)) return false;
       if (q) {
         const inGroup =
           g.name?.toLowerCase().includes(q) ||
@@ -751,7 +835,7 @@ const handleClosePreview = () => {
       }
       return true;
     });
-  }, [compareGroups, query, category]);
+  }, [compareGroups, query, category, categoriesById]);
 
   // Filtro y orden
   const filtered = useMemo(() => {
@@ -762,7 +846,7 @@ const handleClosePreview = () => {
     }
 
     if (category !== "todas") {
-      list = list.filter((e) => e.product?.categorySlug === category);
+      list = list.filter((e) => entryMatchesCategory(e));
     }
 
     if (query.trim()) {
@@ -784,7 +868,7 @@ const handleClosePreview = () => {
     }
 
     return list;
-  }, [entries, category, query, sort, hiddenCompareProductIds]);
+  }, [entries, category, query, sort, hiddenCompareProductIds, categoriesById]);
 
   const uniqueToday = filtered.filter((e) => e.product?.isUniqueToday);
   const regularList = filtered;
@@ -804,6 +888,16 @@ const handleClosePreview = () => {
     }));
     return [...groups, ...products].sort((a, b) => a.position - b.position);
   }, [visibleCompareGroups, regularList]);
+
+  if (!showCatalog) {
+    return (
+      <Container sx={{ pb: 6, pt: 4 }}>
+        <Alert severity="info">
+          El catálogo no está disponible en este momento.
+        </Alert>
+      </Container>
+    );
+  }
 
   return (
     <Box sx={{ p: { xs: 1.5, sm: 3 }, maxWidth: 1400, mx: "auto" }}>
@@ -1040,7 +1134,7 @@ const handleClosePreview = () => {
             }}
           />
 
-          <FormControl size="small" sx={{ minWidth: { xs: "100%", md: 160 } }}>
+          <FormControl size="small" sx={{ minWidth: { xs: "100%", md: 220 } }}>
             <InputLabel>Categoría</InputLabel>
             <Select
               value={category}
@@ -1048,7 +1142,7 @@ const handleClosePreview = () => {
               onChange={(e) => setCategory(e.target.value)}
               fullWidth
             >
-              {categories.map((c) => (
+              {categoryOptions.map((c) => (
                 <MenuItem key={c.value} value={c.value}>
                   {c.label}
                 </MenuItem>
@@ -1118,14 +1212,4 @@ const handleClosePreview = () => {
       </Grid>
     </Box>
   );
-}
-
-// Helper slugify
-function slugify(s = "") {
-  return String(s)
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
 }

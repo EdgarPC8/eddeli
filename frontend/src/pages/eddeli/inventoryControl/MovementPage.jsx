@@ -34,6 +34,7 @@ function MovementPage() {
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(50);
   const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   const handleDialog = () => {
     setEditingMovement(null);
@@ -51,9 +52,14 @@ function MovementPage() {
   };
 
   const fetchMovements = async () => {
-    const { data } = await getAllMovements({ page: page + 1, pageSize });
-    setMovements(unwrapListResponse(data));
-    setTotal(data?.total ?? unwrapListResponse(data).length);
+    setLoading(true);
+    try {
+      const { data } = await getAllMovements({ page: page + 1, pageSize });
+      setMovements(unwrapListResponse(data));
+      setTotal(data?.total ?? unwrapListResponse(data).length);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleDelete = async (row) => {
@@ -151,6 +157,7 @@ function MovementPage() {
 
       <MovementsListPanel
         movements={movements}
+        loading={loading}
         isProgrammer={isProgrammer}
         onEdit={openEdit}
         onDelete={handleDelete}

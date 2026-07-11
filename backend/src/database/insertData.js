@@ -71,6 +71,7 @@ import { License } from "../models/License.js";
 import { Logs } from "../models/Logs.js";
 import { UserData } from "../models/UserData.js";
 import { AppSettings } from "../models/AppSettings.js";
+import { SriBillingSettings, ElectronicInvoice } from "../models/SriBilling.js";
 
 export const backupFilePath = resolve(__dirname, "backup.json");
 export const backups = resolve(__dirname, "..", "backups");
@@ -135,6 +136,8 @@ export const BACKUP_TABLE_ENTRIES = [
   { key: "License", model: License },
   { key: "Logs", model: Logs },
   { key: "AppSettings", model: AppSettings },
+  { key: "SriBillingSettings", model: SriBillingSettings },
+  { key: "ElectronicInvoice", model: ElectronicInvoice },
 ];
 
 export function summarizeBackupData(data) {
@@ -433,9 +436,37 @@ export function prepareBackupForRestore(jsonData) {
   if (Array.isArray(data.AppSettings)) {
     data.AppSettings = data.AppSettings.map((row) => {
       if (!row || typeof row !== "object") return row;
-      const tz = row.timezone != null ? String(row.timezone).trim() : "";
-      if (tz) return row;
-      return { ...row, timezone: "America/Guayaquil" };
+      const next = { ...row };
+      const tz = next.timezone != null ? String(next.timezone).trim() : "";
+      if (!tz) next.timezone = "America/Guayaquil";
+      // Backups antiguos sin flags de vista pública → defaults seguros (visibles).
+      if (next.showPublicCatalog === undefined || next.showPublicCatalog === null) {
+        next.showPublicCatalog = true;
+      }
+      if (next.showPublicStoresPropia === undefined || next.showPublicStoresPropia === null) {
+        next.showPublicStoresPropia = true;
+      }
+      if (next.showPublicStoresVitrina === undefined || next.showPublicStoresVitrina === null) {
+        next.showPublicStoresVitrina = true;
+      }
+      return next;
+    });
+  }
+
+  if (Array.isArray(data.Store)) {
+    data.Store = data.Store.map((row) => {
+      if (!row || typeof row !== "object") return row;
+      const next = { ...row };
+      // Backups sin locationKind / códigos SRI → defaults (revisar propias a mano).
+      const kind = String(next.locationKind || "").trim().toLowerCase();
+      next.locationKind = kind === "propia" ? "propia" : "vitrina";
+      if (next.establishmentCode == null || String(next.establishmentCode).trim() === "") {
+        next.establishmentCode = "001";
+      }
+      if (next.emissionPointCode == null || String(next.emissionPointCode).trim() === "") {
+        next.emissionPointCode = "001";
+      }
+      return next;
     });
   }
 

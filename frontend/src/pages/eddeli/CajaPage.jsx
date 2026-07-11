@@ -865,8 +865,14 @@ export default function CajaPage() {
         </Alert>
       ) : showOpenShiftBanner ? (
         <Alert severity="success" sx={{ mb: 1 }}>
-          Turno abierto · capital inicial {formatMoney(activeShift.openingCashTotal)} · efectivo
-          esperado ahora {formatMoney(activeShift.expectedCashTotal)}
+          Turno abierto
+          {activeShift.store?.name
+            ? ` · ${activeShift.store.name}`
+            : activeShift.establishmentCode
+              ? ` · ${activeShift.establishmentCode}-${activeShift.emissionPointCode}`
+              : ""}
+          {" · "}capital inicial {formatMoney(activeShift.openingCashTotal)} · efectivo esperado
+          ahora {formatMoney(activeShift.expectedCashTotal)}
         </Alert>
       ) : null}
 

@@ -552,13 +552,19 @@ export default function CatalogManager() {
   const [isEditing, setIsEditing] = useState(false);
   const [datos, setDatos] = useState(null);
   const [titleDialog, setTitleDialog] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const fetchRows = async () => {
-    const params = {};
-    if (sectionFilter) params.section = sectionFilter;
-    if (categoryFilter) params.categoryId = categoryFilter;
-    const { data } = await getCatalogEntries(params);
-    setRows(Array.isArray(data) ? data : []);
+    setLoading(true);
+    try {
+      const params = {};
+      if (sectionFilter) params.section = sectionFilter;
+      if (categoryFilter) params.categoryId = categoryFilter;
+      const { data } = await getCatalogEntries(params);
+      setRows(Array.isArray(data) ? data : []);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchProducts = async () => {
@@ -806,6 +812,7 @@ export default function CatalogManager() {
         defaultRowsPerPage={10}
         title="CATÁLOGO"
         showIndex={true}
+        loading={loading}
       />
       <AutoCatalogLab onSyncAfterSave={fetchRows} />
     </Container>

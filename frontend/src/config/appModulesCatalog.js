@@ -14,15 +14,16 @@
 export const APP_ROLES_LEGEND = [
   {
     name: "Programador",
-    description: "Mantenimiento del sistema, backups, logs y configuración técnica.",
+    description:
+      "Rol técnico SoftEd (en el futuro se renombrará a Desarrollador). Herramientas de logs, backups, archivos e imágenes. No es el uso diario del negocio en producción.",
   },
   {
     name: "Administrador",
-    description: "Gestión completa del negocio: inventario, finanzas, ventas y administración.",
+    description: "Gestión completa del negocio: inventario, finanzas, ventas y administración. Tras el login entra al Dashboard.",
   },
   {
     name: "Empleado",
-    description: "Operación diaria: caja, turno, tareas y notificaciones.",
+    description: "Operación diaria: caja, turno, tareas y notificaciones. Tras el login entra directamente a Caja (no al Dashboard).",
   },
 ];
 
@@ -30,13 +31,13 @@ export const APP_MODULE_GROUPS = [
   {
     id: "acceso",
     label: "Acceso rápido",
-    summary: "Vistas principales al iniciar sesión.",
+    summary: "Vistas principales al iniciar sesión (Admin/Programador → Dashboard; Empleado → Caja).",
     sections: [
       {
         name: "Dashboard",
         path: "/",
         roles: ["Programador", "Administrador"],
-        description: "Resumen del negocio: calendario financiero, clientes, ingresos por producto y gráficos.",
+        description: "Resumen del negocio: calendario financiero, clientes, ingresos por producto y gráficos. El rol Empleado no usa esta vista; se redirige a Caja.",
         functions: [
           { name: "Tarjetas financieras", description: "KPIs de balance, ingresos, gastos, cobranzas, préstamos y margen del mes." },
           { name: "Alertas de inventario", description: "Toggles por agotarse/agotados y filtro por tipo de producto; medidores de stock." },
@@ -46,7 +47,8 @@ export const APP_MODULE_GROUPS = [
           { name: "Estados de pedido", description: "Tarjetas clicables por estado y diálogo de detalle de pedidos." },
           { name: "Gráfico espejo de caja", description: "Granularidad día/semana/mes; clic en barra abre detalle del día." },
           { name: "Gráfico de velas", description: "Periodo configurable con paginación; selección filtra el gráfico espejo." },
-          { name: "Calendario financiero", description: "Navegación mensual, toggle ingresos/todo; clic en día abre movimientos del día." },
+          { name: "Calendario financiero", description: "Navegación mensual; vista Todo (pedidos/caja operativa/cobros/gastos) o Ingresos (caja + cobros por fecha de entrada del dinero)." },
+          { name: "Detalle del día", description: "Modal con chips de caja (entrada $) y cobros; pestañas por origen del ingreso." },
           { name: "Ingresos por producto", description: "Selector de rango top N y periodo semana/mes/año." },
           { name: "Tabla de clientes", description: "Acordeón por cliente con estadísticas; diálogo de detalle completo." },
         ],
@@ -73,13 +75,13 @@ export const APP_MODULE_GROUPS = [
   {
     id: "operacion",
     label: "Operación",
-    summary: "Punto de venta y trabajo diario en mostrador.",
+    summary: "Punto de venta y trabajo diario en mostrador. (Próx.) multi-caja por local.",
     sections: [
       {
         name: "Caja",
         path: "/caja",
         roles: ["Programador", "Administrador", "Empleado"],
-        description: "Ventas en mostrador, carrito, cobro en efectivo/transferencia y comprobantes.",
+        description: "Ventas en mostrador, carrito, cobro en efectivo/transferencia y comprobantes. Pantalla de inicio del rol Empleado.",
         functions: [
           { name: "Escáner de código de barras", description: "Agrega productos al carrito al escanear; se pausa con diálogos abiertos." },
           { name: "Checkbox «Mostrar stock»", description: "Muestra u oculta la columna de stock en la tabla del carrito." },
@@ -116,10 +118,12 @@ export const APP_MODULE_GROUPS = [
         name: "Tareas",
         path: "/tareas",
         roles: ["Programador", "Administrador", "Empleado"],
-        description: "Lista de tareas asignadas al personal.",
+        description: "Planes de trabajo para el personal: crear, editar borradores, publicar y checklist del empleado.",
         functions: [
           { name: "Vista admin: planes", description: "Tabla con búsqueda y paginación de planes de tareas." },
           { name: "Nuevo plan", description: "Diálogo con título, fechas y múltiples tareas." },
+          { name: "Editar borrador", description: "Icono editar en planes en borrador; actualiza título, fechas e ítems." },
+          { name: "Eliminar borrador", description: "Icono eliminar en planes en borrador (con confirmación)." },
           { name: "Configurar tareas", description: "Título, asignado, acción checklist o abrir caja, prioridad y vencimiento." },
           { name: "Acción abrir caja", description: "IDs de producto caja/unidad y cantidad de cajas a abrir." },
           { name: "Guardar y publicar", description: "Borrador o publicar con notificación a empleados." },
@@ -129,10 +133,10 @@ export const APP_MODULE_GROUPS = [
         ],
       },
       {
-        name: "Facturación",
+        name: "Comprobantes POS",
         path: "/facturacion",
         roles: ["Programador", "Administrador"],
-        description: "Ventas de caja registradas para imprimir factura, nota de venta o comprobante.",
+        description: "Antes llamada «Facturación». Reimpresión de ventas de caja (factura, nota de venta, comprobante). No es facturación electrónica SRI. La config SRI está en Sistema → Configuración → Facturación electrónica.",
         functions: [
           { name: "Historial de ventas POS", description: "Hasta 300 ventas con documento, cliente, pago y total." },
           { name: "Búsqueda y paginación", description: "Filtro de texto e índice de filas en tabla." },
@@ -154,12 +158,98 @@ export const APP_MODULE_GROUPS = [
           { name: "Turnos del día", description: "Operador, estado, montos y cierre por turno." },
         ],
       },
+      {
+        name: "Apertura multi-caja por local",
+        path: "/turno/multi-caja",
+        roles: ["Programador", "Administrador", "Empleado"],
+        status: "planned",
+        description:
+          "Próximamente: abrir y operar varias cajas al mismo tiempo en un mismo local/sucursal, con turnos e indicadores independientes por caja.",
+        functions: [
+          { name: "Seleccionar caja del local", description: "Elegir qué caja abrir o continuar en el punto de venta." },
+          { name: "Turnos paralelos", description: "Varios turnos activos en el mismo local sin mezclar arqueos." },
+          { name: "Indicador multi-caja", description: "Estado abierto/cerrado y enlace rápido a cada caja." },
+          { name: "Supervisión por caja", description: "Filtrar ventas y movimientos por caja del local." },
+        ],
+      },
+    ],
+  },
+  {
+    id: "comprobantes-sri",
+    label: "Comprobantes electrónicos",
+    summary: "Documentos tributarios SRI: facturas, notas, retenciones y guías.",
+    status: "development",
+    sections: [
+      {
+        name: "Inicio SRI",
+        path: "/comprobantes-electronicos",
+        roles: ["Programador", "Administrador"],
+        description:
+          "Módulo de comprobantes electrónicos. Emisión al SRI en desarrollo; estructura de secciones lista.",
+        status: "development",
+        functions: [
+          { name: "Panel de secciones", description: "Acceso a facturas, notas, retenciones, guías, etc." },
+          { name: "Atajos", description: "Config SRI, comprobantes POS y sucursales." },
+        ],
+      },
+      {
+        name: "Facturas",
+        path: "/comprobantes-electronicos/facturas",
+        roles: ["Programador", "Administrador"],
+        description: "Factura electrónica (código SRI 01).",
+        functions: [{ name: "Bandeja (próx.)", description: "Emitir, autorizar y consultar facturas." }],
+      },
+      {
+        name: "Notas de venta",
+        path: "/comprobantes-electronicos/notas-venta",
+        roles: ["Programador", "Administrador"],
+        description: "Notas de venta operativas / electrónicas según flujo del negocio.",
+        functions: [{ name: "Bandeja (próx.)", description: "Listado y emisión." }],
+      },
+      {
+        name: "Notas de crédito / débito",
+        path: "/comprobantes-electronicos/notas-credito",
+        roles: ["Programador", "Administrador"],
+        description: "NC (04) y ND (05) vinculadas a facturas.",
+        functions: [
+          { name: "Notas de crédito", description: "/comprobantes-electronicos/notas-credito" },
+          { name: "Notas de débito", description: "/comprobantes-electronicos/notas-debito" },
+        ],
+      },
+      {
+        name: "Retenciones",
+        path: "/comprobantes-electronicos/retenciones",
+        roles: ["Programador", "Administrador"],
+        description: "Comprobante de retención (07).",
+        functions: [{ name: "Bandeja (próx.)", description: "Emitir y autorizar retenciones." }],
+      },
+      {
+        name: "Guías de remisión",
+        path: "/comprobantes-electronicos/guias-remision",
+        roles: ["Programador", "Administrador"],
+        description: "Guía de remisión (06) para traslados.",
+        functions: [{ name: "Bandeja (próx.)", description: "Emitir guías." }],
+      },
+      {
+        name: "Liquidación de compras",
+        path: "/comprobantes-electronicos/liquidacion-compras",
+        roles: ["Programador", "Administrador"],
+        description: "Liquidación de compra (03).",
+        functions: [{ name: "Bandeja (próx.)", description: "Emitir liquidaciones." }],
+      },
+      {
+        name: "Documentos emitidos",
+        path: "/comprobantes-electronicos/emitidos",
+        roles: ["Programador", "Administrador"],
+        description: "Bandeja unificada: autorizados, rechazados, XML y RIDE.",
+        functions: [{ name: "Bandeja (próx.)", description: "Consulta por estado y tipo." }],
+      },
     ],
   },
   {
     id: "ventas",
     label: "Ventas",
-    summary: "Pedidos institucionales y clientes mayoristas.",
+    summary: "Pedidos institucionales, clientes mayoristas y (próx.) clientes con cuenta.",
     sections: [
       {
         name: "Pedidos",
@@ -190,12 +280,25 @@ export const APP_MODULE_GROUPS = [
           { name: "Eliminar cliente", description: "Confirmación antes de borrar." },
         ],
       },
+      {
+        name: "Clientes con cuenta",
+        path: "/inventory/customers/cuentas",
+        roles: ["Programador", "Administrador"],
+        status: "planned",
+        description:
+          "Próximamente: acceso de clientes al sistema (cuenta de login vinculada al cliente mayorista) para consultar pedidos, saldos o catálogo según permisos.",
+        functions: [
+          { name: "Vincular cuenta", description: "Asociar un usuario/login a un cliente del directorio." },
+          { name: "Permisos de cliente", description: "Qué puede ver o pedir desde su cuenta." },
+          { name: "Portal / vistas cliente", description: "Pedidos, estado de cuenta y datos básicos." },
+        ],
+      },
     ],
   },
   {
     id: "finanzas",
     label: "Finanzas",
-    summary: "Ingresos, cobros, gastos y obligaciones.",
+    summary: "Ingresos, cobros, gastos y (próx.) cuentas por pagar a proveedores.",
     sections: [
       {
         name: "Finanzas",
@@ -243,6 +346,7 @@ export const APP_MODULE_GROUPS = [
         name: "Gastos recurrentes",
         path: "/inventory/gastos-recurrentes",
         roles: ["Programador", "Administrador"],
+        status: "maintenance",
         description: "Plantillas de arriendo, servicios y cuotas periódicas.",
         functions: [
           { name: "Generar cuotas", description: "Crea ocurrencias desde plantillas activas." },
@@ -253,12 +357,26 @@ export const APP_MODULE_GROUPS = [
           { name: "Omitir período", description: "Marca cuota omitida sin pago." },
         ],
       },
+      {
+        name: "Cuentas por pagar a proveedores",
+        path: "/inventory/cuentas-por-pagar",
+        roles: ["Programador", "Administrador"],
+        status: "planned",
+        description:
+          "Próximamente: control de deudas con proveedores (compras a crédito, abonos, saldos y vencimientos de pago).",
+        functions: [
+          { name: "Obligaciones por proveedor", description: "Listado de saldos pendientes por proveedor." },
+          { name: "Registrar compra a crédito", description: "Vincular pedido/OC o gasto con fecha de vencimiento." },
+          { name: "Abonos y pagos", description: "Registrar pagos parciales o totales con método y comprobante." },
+          { name: "Alertas de vencimiento", description: "Avisos de facturas por pagar próximas a vencer." },
+        ],
+      },
     ],
   },
   {
     id: "inventario",
     label: "Inventario",
-    summary: "Catálogo de productos y control de stock.",
+    summary: "Catálogo, stock, (próx.) bodegas y lotes/vencimientos.",
     sections: [
       {
         name: "Productos",
@@ -321,12 +439,40 @@ export const APP_MODULE_GROUPS = [
           { name: "Tabla de unidades", description: "Listado con índice y acciones." },
         ],
       },
+      {
+        name: "Bodegas",
+        path: "/inventory/bodegas",
+        roles: ["Programador", "Administrador"],
+        status: "planned",
+        description:
+          "Próximamente: locales usados como bodegas. Se crea una bodega con ubicación y mantiene su propio inventario (stock por bodega, distinto de la vitrina o sucursal de venta).",
+        functions: [
+          { name: "Crear bodega", description: "Nombre, ubicación/dirección y datos de contacto." },
+          { name: "Inventario por bodega", description: "Stock independiente por producto en cada bodega." },
+          { name: "Transferencias", description: "Mover mercadería entre bodegas o hacia sucursales (futuro)." },
+          { name: "Movimientos de bodega", description: "Entradas, salidas y ajustes asociados a la bodega." },
+        ],
+      },
+      {
+        name: "Lotes y vencimientos",
+        path: "/inventory/lotes",
+        roles: ["Programador", "Administrador"],
+        status: "planned",
+        description:
+          "Próximamente: control de lotes por producto (harinas, lácteos, etc.) con fechas de vencimiento, alertas y consumo preferente FEFO/FIFO.",
+        functions: [
+          { name: "Registrar lote", description: "Código de lote, producto, cantidad y fecha de vencimiento." },
+          { name: "Stock por lote", description: "Disponible por lote además del stock total." },
+          { name: "Alertas de vencimiento", description: "Avisos de productos próximos a vencer o vencidos." },
+          { name: "Salida por FEFO/FIFO", description: "Priorizar lotes al vender o consumir en producción." },
+        ],
+      },
     ],
   },
   {
     id: "produccion",
     label: "Producción",
-    summary: "Insumos, recetas y fabricación.",
+    summary: "Insumos, recetas, fabricación y (próx.) proveedores con cuenta.",
     sections: [
       {
         name: "Insumos y marcas",
@@ -377,6 +523,19 @@ export const APP_MODULE_GROUPS = [
           { name: "Tabla paginada", description: "Listado con búsqueda e índice." },
         ],
       },
+      {
+        name: "Proveedores con cuenta",
+        path: "/inventory/suppliers/cuentas",
+        roles: ["Programador", "Administrador"],
+        status: "planned",
+        description:
+          "Próximamente: acceso de proveedores al sistema (cuenta vinculada al proveedor) para pedidos de compra, estados de entrega o catálogo de insumos según permisos.",
+        functions: [
+          { name: "Vincular cuenta", description: "Asociar un usuario/login a un proveedor." },
+          { name: "Permisos de proveedor", description: "Qué puede consultar o confirmar desde su cuenta." },
+          { name: "Portal / vistas proveedor", description: "Órdenes de compra, recepciones y datos de contacto." },
+        ],
+      },
     ],
   },
   {
@@ -400,9 +559,12 @@ export const APP_MODULE_GROUPS = [
         name: "Puntos de venta",
         path: "/inventory/puntos-venta",
         roles: ["Programador", "Administrador"],
-        description: "Locales y mapa de puntos de venta.",
+        description:
+          "Sucursales propias (caja + SRI) y vitrinas (entrega para que vendan). Filtro por tipo y mapa.",
         functions: [
-          { name: "CRUD tiendas", description: "Datos de contacto, posición y estado activo." },
+          { name: "CRUD tiendas", description: "Datos de contacto, posición, tipo propia/vitrina y estado activo." },
+          { name: "Filtro por tipo", description: "Todos / Sucursales propias / Vitrinas." },
+          { name: "Códigos SRI", description: "Establecimiento y punto de emisión solo en sucursales propias." },
           { name: "Ubicación en mapa", description: "Lat/lng manual, URL de Google Maps y preview." },
           { name: "Imagen con recorte", description: "Subida con zoom, presets y formato." },
           { name: "Productos por tienda", description: "Asignar productos y toggle visible/oculto." },
@@ -412,6 +574,7 @@ export const APP_MODULE_GROUPS = [
         name: "Productos destacados",
         path: "/inventory/productos-destacados",
         roles: ["Programador", "Administrador"],
+        status: "maintenance",
         description: "Productos en portada y carrusel del sitio.",
         functions: [
           { name: "CRUD destacados", description: "Nombre, sección, badge, posición y precio override." },
@@ -423,6 +586,7 @@ export const APP_MODULE_GROUPS = [
         name: "Grupos comparativos",
         path: "/compare_groups",
         roles: ["Programador", "Administrador"],
+        status: "maintenance",
         description: "Comparación de productos para la vitrina.",
         functions: [
           { name: "Matriz de celdas", description: "Producto + variante + fila/columna + porciones." },
@@ -434,9 +598,180 @@ export const APP_MODULE_GROUPS = [
     ],
   },
   {
+    id: "documentos",
+    label: "Documentos",
+    summary:
+      "Plantillas, contratos, firmas y archivo documental. Próximamente: aún no hay pantallas activas.",
+    status: "planned",
+    sections: [
+      {
+        name: "Plantillas",
+        path: "/documentos/plantillas",
+        roles: ["Programador", "Administrador"],
+        status: "planned",
+        description:
+          "Próximamente: plantillas reutilizables de documentos (cartas, acuerdos, formatos internos) con campos dinámicos.",
+        functions: [
+          { name: "CRUD plantillas", description: "Nombre, tipo, cuerpo y variables." },
+          { name: "Variables", description: "Insertar datos de cliente, pedido, empresa, etc." },
+          { name: "Vista previa", description: "Previsualizar antes de generar un documento." },
+        ],
+      },
+      {
+        name: "Contratos",
+        path: "/documentos/contratos",
+        roles: ["Programador", "Administrador"],
+        status: "planned",
+        description:
+          "Próximamente: generar y gestionar contratos a partir de plantillas (vigencia, partes y estado).",
+        functions: [
+          { name: "Crear contrato", description: "Desde plantilla + datos de las partes." },
+          { name: "Estados", description: "Borrador, enviado, firmado, vencido o anulado." },
+          { name: "Vencimientos", description: "Alertas de renovación o caducidad." },
+        ],
+      },
+      {
+        name: "Firmas",
+        path: "/documentos/firmas",
+        roles: ["Programador", "Administrador"],
+        status: "planned",
+        description:
+          "Próximamente: captura o solicitud de firmas (manual/digital) vinculadas a un documento.",
+        functions: [
+          { name: "Solicitar firma", description: "Enviar documento a firmante(s)." },
+          { name: "Firmar", description: "Firma en pantalla o carga de evidencia." },
+          { name: "Historial de firmas", description: "Quién firmó, cuándo y desde dónde." },
+        ],
+      },
+      {
+        name: "Archivo",
+        path: "/documentos/archivo",
+        roles: ["Programador", "Administrador"],
+        status: "planned",
+        description:
+          "Próximamente: repositorio de documentos generados o subidos (búsqueda, carpetas y permisos).",
+        functions: [
+          { name: "Explorar archivo", description: "Listado por tipo, fecha o etiqueta." },
+          { name: "Subir documento", description: "PDF/imagen u otro archivo adjunto." },
+          { name: "Descargar / compartir", description: "Acceso controlado al documento." },
+        ],
+      },
+    ],
+  },
+  {
+    id: "logistica",
+    label: "Logística",
+    summary:
+      "Rutas, transportistas, entregas y tracking. Próximamente: aún no hay pantallas activas.",
+    status: "planned",
+    sections: [
+      {
+        name: "Rutas",
+        path: "/logistica/rutas",
+        roles: ["Programador", "Administrador"],
+        status: "planned",
+        description:
+          "Próximamente: definir y gestionar rutas de despacho (zonas, orden de paradas, días de recorrido).",
+        functions: [
+          { name: "CRUD de rutas", description: "Nombre, zona, local de origen y estado activo." },
+          { name: "Paradas", description: "Ordenar puntos de entrega o clientes en la ruta." },
+          { name: "Asignar transportista", description: "Vincular ruta a un transportista o vehículo." },
+        ],
+      },
+      {
+        name: "Transportistas",
+        path: "/logistica/transportistas",
+        roles: ["Programador", "Administrador"],
+        status: "planned",
+        description:
+          "Próximamente: directorio de transportistas (datos, vehículo, y en el futuro cuenta/rol de acceso).",
+        functions: [
+          { name: "CRUD transportistas", description: "Nombre, contacto, placa y notas." },
+          { name: "Disponibilidad", description: "Activo/inactivo y carga asignada." },
+          { name: "Vínculo con cuenta", description: "Asociar login/rol Transportista (futuro)." },
+        ],
+      },
+      {
+        name: "Entregas",
+        path: "/logistica/entregas",
+        roles: ["Programador", "Administrador", "Empleado"],
+        status: "planned",
+        description:
+          "Próximamente: bandeja de entregas del día (pendiente, en ruta, entregado, fallido) vinculadas a pedidos o despachos.",
+        functions: [
+          { name: "Crear entrega", description: "Desde pedido o despacho manual." },
+          { name: "Estados de entrega", description: "Pendiente → en ruta → entregado / fallido." },
+          { name: "Evidencia", description: "Foto, firma o nota al cerrar la entrega." },
+        ],
+      },
+      {
+        name: "Tracking",
+        path: "/logistica/tracking",
+        roles: ["Programador", "Administrador"],
+        status: "planned",
+        description:
+          "Próximamente: seguimiento en vivo o por historial de entregas y ubicación del transportista.",
+        functions: [
+          { name: "Mapa / estado en ruta", description: "Ver entregas activas y avance." },
+          { name: "Historial", description: "Consulta por fecha, ruta o transportista." },
+          { name: "Alertas", description: "Retrasos o entregas fallidas." },
+        ],
+      },
+    ],
+  },
+  {
+    id: "comunidad",
+    label: "Comunidad",
+    summary:
+      "Encuestas, quejas y resultados de participación. Próximamente: aún no hay pantallas activas.",
+    status: "planned",
+    sections: [
+      {
+        name: "Encuestas",
+        path: "/comunidad/encuestas",
+        roles: ["Programador", "Administrador", "Empleado"],
+        status: "planned",
+        description:
+          "Próximamente: crear y responder encuestas (preguntas abiertas u opciones). Puede incluir una encuesta de mejoras del sistema/negocio.",
+        functions: [
+          { name: "Crear encuesta", description: "Título, preguntas y periodo de vigencia." },
+          { name: "Responder encuesta", description: "Formulario para usuarios o público según configuración." },
+          { name: "Encuesta de mejoras", description: "Plantilla fija para sugerencias de mejora." },
+        ],
+      },
+      {
+        name: "Quejas",
+        path: "/comunidad/quejas",
+        roles: ["Programador", "Administrador", "Empleado"],
+        status: "planned",
+        description:
+          "Próximamente: buzón de quejas o reclamos con seguimiento (recibida, en revisión, resuelta).",
+        functions: [
+          { name: "Registrar queja", description: "Motivo, detalle y datos de contacto opcionales." },
+          { name: "Bandeja admin", description: "Listado y estados de atención." },
+          { name: "Respuesta / cierre", description: "Marcar resuelta con nota interna." },
+        ],
+      },
+      {
+        name: "Resultados",
+        path: "/comunidad/resultados",
+        roles: ["Programador", "Administrador"],
+        status: "planned",
+        description:
+          "Próximamente: ver respuestas de encuestas y resumen de quejas (solo Admin/Programador).",
+        functions: [
+          { name: "Resumen de encuestas", description: "Totales y desglose por pregunta." },
+          { name: "Exportar", description: "Descargar respuestas para análisis." },
+          { name: "Filtros", description: "Por encuesta, fecha y estado." },
+        ],
+      },
+    ],
+  },
+  {
     id: "publicidad",
     label: "Publicidad",
-    summary: "Señalización digital en pantallas TV.",
+    summary: "Señalización digital en pantallas TV. En mantenimiento: no se usa en producción y requiere mejora.",
+    status: "maintenance",
     sections: [
       {
         name: "Campañas",
@@ -479,19 +814,22 @@ export const APP_MODULE_GROUPS = [
   {
     id: "diseno",
     label: "Diseño promocional",
-    summary: "Editor gráfico para material de venta.",
+    summary:
+      "Editor gráfico del sistema. En mantenimiento: no se usa en producción y requiere mejora.",
+    status: "maintenance",
     sections: [
       {
         name: "Editor de diseño",
         path: "/diseno-promocional/editor",
         roles: ["Programador", "Administrador"],
-        description: "Compositor visual para piezas promocionales.",
+        description: "Compositor visual para piezas promocionales. Es el único editor activo; rutas legacy (/publicity_edit, /editorDefault) redirigen aquí.",
         functions: [
           { name: "Canvas de diseño", description: "Área central con capas editables." },
           { name: "Capas", description: "Texto, imagen y forma; reordenar, visibilidad y bloqueo." },
           { name: "Inspector", description: "Fuentes, colores, posición y bindings a datos de producto." },
           { name: "Selector de productos", description: "Panel lateral con catálogo para preview real." },
           { name: "Exportar", description: "Guardar en BD, PNG/JPG, importar/exportar JSON." },
+          { name: "Abrir plantilla por ID", description: "Ruta /diseno-promocional/editor/:id carga la plantilla desde el backend." },
         ],
       },
       {
@@ -515,7 +853,7 @@ export const APP_MODULE_GROUPS = [
           { name: "Crear plantilla", description: "Nueva plantilla con formato 16:9 u otro." },
           { name: "Importar/exportar", description: "JSON de plantilla desde archivo." },
           { name: "Duplicar y eliminar", description: "Copiar plantilla o borrar con confirmación." },
-          { name: "Abrir en editor", description: "Navega al editor con la plantilla cargada." },
+          { name: "Abrir en editor", description: "Navega a /diseno-promocional/editor/:id con la plantilla cargada." },
         ],
       },
     ],
@@ -523,7 +861,7 @@ export const APP_MODULE_GROUPS = [
   {
     id: "admin",
     label: "Administración",
-    summary: "Usuarios, permisos y panel del sistema.",
+    summary: "Usuarios, permisos, panel y (próx.) asistencia / horarios del personal.",
     sections: [
       {
         name: "Usuarios",
@@ -583,12 +921,112 @@ export const APP_MODULE_GROUPS = [
           { name: "Enviar ahora", description: "Disparo manual inmediato." },
         ],
       },
+      {
+        name: "Asistencia / horarios del personal",
+        path: "/admin/asistencia",
+        roles: ["Programador", "Administrador"],
+        status: "planned",
+        description:
+          "Próximamente: control de asistencia y horarios del personal (entrada/salida, turnos laborales y reportes).",
+        functions: [
+          { name: "Marcar asistencia", description: "Registro de entrada y salida por empleado." },
+          { name: "Horarios / turnos laborales", description: "Definir jornadas por persona o rol." },
+          { name: "Historial y reportes", description: "Días trabajados, tardanzas y ausencias." },
+          { name: "Vinculo con usuarios", description: "Asistencia ligada a las cuentas del personal." },
+        ],
+      },
     ],
   },
   {
     id: "sistema",
     label: "Sistema",
-    summary: "Herramientas técnicas (solo programador).",
+    summary:
+      "Configuración del negocio, planes, mapa de módulos, perfil y donaciones.",
+    sections: [
+      {
+        name: "Configuración",
+        path: "/sistema/configuracion",
+        roles: ["Programador", "Administrador"],
+        description:
+          "Negocio/app (logo, zona horaria, operación) y preparación de facturación electrónica SRI (RUC, firma .p12). También accesible desde el menú del avatar.",
+        functions: [
+          { name: "Pestaña Negocio y app", description: "Logo, nombre, zona horaria, reglas de caja y redes." },
+          { name: "Pestaña Facturación electrónica", description: "Datos fiscales, ambiente, secuencial y certificado .p12 (siempre editable)." },
+          { name: "Subir / cambiar logo", description: "Imagen en carpeta de medios (sistema/logos/)." },
+          { name: "Zona horaria", description: "IANA (ej. America/Guayaquil) para fechas del sistema." },
+          { name: "Firma SRI", description: "Archivo .p12/.pfx privado + contraseña cifrada." },
+        ],
+      },
+      {
+        name: "Planes",
+        path: "/sistema/planes",
+        roles: ["Programador", "Administrador"],
+        description:
+          "Planes comerciales: Prueba, Básico, Medio, Pro, Socios y Empresarial.",
+        status: "active",
+        functions: [
+          { name: "Plan Prueba", description: "Muchas funciones con límites de uso/tiempo; no es gratis permanente." },
+          { name: "Plan Básico", description: "Operación de mostrador: caja, turno, tareas y POS." },
+          { name: "Plan Medio", description: "Inventario, ventas, finanzas y producción." },
+          { name: "Plan Pro", description: "SRI, catálogo web, publicidad TV y diseño." },
+          { name: "Plan Socios", description: "Multi-local, más usuarios y prioridad para redes/aliados." },
+          { name: "Plan Empresarial", description: "A medida: límites altos, integraciones y soporte dedicado." },
+          { name: "Comparar planes", description: "Tarjetas lado a lado con beneficios y CTA." },
+        ],
+      },
+      {
+        name: "Módulos",
+        path: "/sistema/modulos",
+        roles: ["Programador", "Administrador"],
+        description:
+          "Catálogo de módulos del menú (no secciones): en uso, en desarrollo, mantenimiento o solo desarrollador.",
+        status: "active",
+        functions: [
+          { name: "Tarjetas por módulo", description: "Una card por grupo del menú (Operación, Comprobantes, etc.)." },
+          { name: "Filtro por estado", description: "Todos / En uso / En desarrollo / Mantenimiento / Solo desarrollador / Planificado." },
+          { name: "Ir al módulo", description: "Abre Info → Módulos con ese módulo seleccionado para ver secciones y funciones." },
+        ],
+      },
+      {
+        name: "Perfil",
+        path: "/perfil",
+        roles: ["Programador", "Administrador", "Empleado"],
+        description: "Datos y foto del usuario conectado. También en el menú del avatar.",
+        functions: [
+          { name: "Editar datos personales", description: "Nombre, contacto y foto de perfil." },
+          { name: "Cambiar contraseña", description: "Actualización de credenciales de acceso." },
+        ],
+      },
+      {
+        name: "Donaciones",
+        path: "/donaciones",
+        roles: ["Programador", "Administrador", "Empleado"],
+        description: "Información de apoyo al proyecto SoftEd. También en el menú del avatar.",
+        functions: [
+          { name: "Información de apoyo", description: "Datos para contribuir al desarrollo del proyecto." },
+        ],
+      },
+      {
+        name: "Facturación electrónica",
+        path: "/sistema/configuracion?tab=sri",
+        roles: ["Programador", "Administrador"],
+        description:
+          "Atajo a la pestaña SRI dentro de Configuración. No emite facturas aún; el POS sigue con consumidor final / comprobantes.",
+        functions: [
+          { name: "Datos fiscales", description: "RUC, razón social, direcciones, régimen, secuencial." },
+          { name: "Ambiente", description: "Pruebas o producción." },
+          { name: "Subir firma", description: "Archivo .p12/.pfx en carpeta privada del servidor." },
+          { name: "Contraseña cifrada", description: "Se guarda cifrada; no se vuelve a mostrar." },
+        ],
+      },
+    ],
+  },
+  {
+    id: "desarrollador",
+    label: "Desarrollador",
+    summary:
+      "Herramientas técnicas del rol Programador (futuro: Desarrollador). El cliente debe saber que existe; en producción del negocio no forma parte del uso diario.",
+    status: "developer",
     sections: [
       {
         name: "Imágenes",
@@ -619,7 +1057,10 @@ export const APP_MODULE_GROUPS = [
         roles: ["Programador"],
         description: "Registro de actividad y errores.",
         functions: [
-          { name: "Tabla de logs HTTP", description: "Solo mutaciones POST/PUT/DELETE." },
+          { name: "Tabla de logs HTTP", description: "Solo mutaciones POST/PUT/DELETE; texto truncado con …" },
+          { name: "Detalle ampliado", description: "Modal grande con URL, descripción y user-agent." },
+          { name: "Filtro por método", description: "Chips Todos / POST / PUT / DELETE." },
+          { name: "Borrar logs", description: "Por método, filtrados, uno a uno o todos (Programador)." },
           { name: "Detalle de log", description: "Diálogo con formulario al ver fila." },
           { name: "Búsqueda y paginación", description: "Filtro en tabla." },
         ],
@@ -648,19 +1089,6 @@ export const APP_MODULE_GROUPS = [
           { name: "Progreso visual", description: "Diálogo con pasos y barra por operación." },
         ],
       },
-      {
-        name: "Configuración",
-        path: "/sistema/configuracion",
-        roles: ["Programador", "Administrador"],
-        description: "Nombre, versión, logo y reglas operativas del negocio.",
-        functions: [
-          { name: "Subir / cambiar logo", description: "Imagen en carpeta de medios (logo.jpeg/png)." },
-          { name: "Eliminar logo", description: "Quita archivo y vuelve al logo por defecto." },
-          { name: "Datos de la app", description: "Nombre, alias, versión, descripción y autor." },
-          { name: "Reglas de caja", description: "Filtro accesos rápidos y cliente mostrador." },
-          { name: "Redes sociales", description: "WhatsApp, Facebook, Instagram, TikTok y email." },
-        ],
-      },
     ],
   },
 ];
@@ -680,10 +1108,12 @@ export const APP_ACCOUNT_SECTIONS = [
     name: "Información",
     path: "/info",
     roles: ["Programador", "Administrador", "Empleado"],
-    description: "Versión de la app y mapa de módulos (esta página).",
+    description: "Versión de la app, plan en uso y mapa de módulos por sección (esta página). El PDF exporta el mismo catálogo.",
     functions: [
-      { name: "Mapa de módulos", description: "Acordeones con secciones, roles y funciones." },
-      { name: "Descargar PDF", description: "Botón flotante genera guía en PDF al llegar a módulos." },
+      { name: "Pestaña La app", description: "Logo, nombre, versión, descripción y plan comercial activo." },
+      { name: "Pestaña Módulos", description: "Tarjetas por módulo; al hacer clic se listan secciones con conteo de funciones." },
+      { name: "Detalle de sección", description: "Expandir sección para ver cada función." },
+      { name: "Descargar PDF", description: "Botón genera guía en PDF del catálogo completo." },
     ],
   },
   {
@@ -714,10 +1144,11 @@ export const APP_PUBLIC_SECTIONS = [
     name: "Puntos de venta",
     path: "/punto_venta",
     roles: ["Público"],
-    description: "Ubicación de locales en mapa.",
+    description: "Ubicación de locales en mapa: puntos de venta propios y vitrinas.",
     functions: [
-      { name: "Listado de locales", description: "Tarjetas con imagen, nombre y dirección." },
-      { name: "Detalle de local", description: "Teléfono, email y mapa embebido de Google." },
+      { name: "Filtro por tipo", description: "Todos / Punto de venta / Vitrina." },
+      { name: "Listado de locales", description: "Tarjetas con imagen, nombre, dirección y tipo." },
+      { name: "Detalle de local", description: "Teléfono, email, mapa y explicación del tipo." },
       { name: "Productos del local", description: "Catálogo público filtrado por punto de venta." },
     ],
   },
@@ -733,3 +1164,131 @@ export const APP_PUBLIC_SECTIONS = [
     ],
   },
 ];
+
+/** Estados de módulo para /sistema/modulos */
+export const MODULE_STATUS_META = {
+  active: {
+    id: "active",
+    label: "En uso",
+    color: "success",
+    description: "Disponible y operativo en el día a día.",
+  },
+  development: {
+    id: "development",
+    label: "En desarrollo",
+    color: "warning",
+    description: "Estructura o pantallas listas; falta completar la función principal.",
+  },
+  maintenance: {
+    id: "maintenance",
+    label: "Mantenimiento",
+    color: "error",
+    description: "Fuera de uso operativo; pendiente de mejora o estabilización.",
+  },
+  developer: {
+    id: "developer",
+    label: "Solo desarrollador",
+    color: "info",
+    description:
+      "Herramientas del rol Programador/Desarrollador. Existe para que el cliente lo conozca; no es uso diario del negocio en producción.",
+  },
+  planned: {
+    id: "planned",
+    label: "Planificado",
+    color: "default",
+    description: "Previsto a futuro; aún no hay pantallas útiles.",
+  },
+};
+
+/** Prefijos de ruta cuyo estado por defecto es «en desarrollo». */
+const DEVELOPMENT_PATH_PREFIXES = ["/comprobantes-electronicos"];
+
+/** Rutas exactas planificadas (opcional). */
+const PLANNED_PATHS = new Set([]);
+
+/**
+ * Resuelve el estado de una sección del catálogo.
+ * Prioridad: `section.status` → reglas de path → active.
+ */
+export function resolveModuleStatus(section) {
+  if (section?.status && MODULE_STATUS_META[section.status]) {
+    return section.status;
+  }
+  const path = String(section?.path || "").split("?")[0];
+  if (PLANNED_PATHS.has(path)) return "planned";
+  if (
+    DEVELOPMENT_PATH_PREFIXES.some(
+      (prefix) => path === prefix || path.startsWith(`${prefix}/`),
+    )
+  ) {
+    return "development";
+  }
+  return "active";
+}
+
+/**
+ * Estado del módulo (grupo del menú), no de cada sección.
+ * Prioridad: `group.status` → secciones operativas (ignora «planned», que son avisos futuros).
+ */
+export function resolveGroupModuleStatus(group) {
+  if (group?.status && MODULE_STATUS_META[group.status]) {
+    return group.status;
+  }
+  const sections = group?.sections || [];
+  if (sections.length === 0) return "planned";
+  const operational = sections
+    .map(resolveModuleStatus)
+    .filter((s) => s !== "planned");
+  if (operational.length === 0) return "planned";
+  // Si hay secciones en uso, el módulo sigue «en uso» (el mantenimiento es por sección).
+  if (operational.some((s) => s === "active")) return "active";
+  if (operational.some((s) => s === "development")) return "development";
+  if (operational.some((s) => s === "maintenance")) return "maintenance";
+  if (operational.some((s) => s === "developer")) return "developer";
+  return "active";
+}
+
+/** Lista de módulos (grupos del menú) con estado resuelto — para /sistema/modulos. */
+export function listCatalogModuleGroupsWithStatus() {
+  return APP_MODULE_GROUPS.map((group) => {
+    const sections = group.sections || [];
+    const status = resolveGroupModuleStatus(group);
+    const hubPath =
+      sections.find(
+        (s) =>
+          s.path &&
+          !String(s.path).includes(":") &&
+          resolveModuleStatus(s) !== "planned",
+      )?.path ||
+      sections.find((s) => s.path && !String(s.path).includes(":"))?.path ||
+      null;
+    const sectionRows = sections.map((s) => ({
+      name: s.name,
+      status: resolveModuleStatus(s),
+    }));
+    return {
+      id: group.id,
+      name: group.label,
+      description: group.summary,
+      path: hubPath,
+      sectionCount: sections.length,
+      plannedSectionCount: sectionRows.filter((s) => s.status === "planned").length,
+      maintenanceSectionCount: sectionRows.filter((s) => s.status === "maintenance").length,
+      sectionItems: sectionRows,
+      sections: sectionRows.map((s) =>
+        s.status === "planned"
+          ? `${s.name} (próx.)`
+          : s.status === "maintenance"
+            ? `${s.name} (mant.)`
+            : s.name,
+      ),
+      status,
+      statusMeta: MODULE_STATUS_META[status],
+    };
+  });
+}
+
+/** @deprecated Preferir listCatalogModuleGroupsWithStatus (módulos ≠ secciones). */
+export function listCatalogModulesWithStatus() {
+  return listCatalogModuleGroupsWithStatus();
+}

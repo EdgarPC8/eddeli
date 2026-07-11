@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Box,
   Chip,
-  CircularProgress,
   IconButton,
   Paper,
   Stack,
@@ -18,6 +17,7 @@ import WarningAmberIcon from "@mui/icons-material/WarningAmber";
 import { alpha } from "@mui/material/styles";
 import { ColorType, createChart, CandlestickSeries } from "lightweight-charts";
 import ChartBlockHeader from "../../../../../components/Charts/ChartBlockHeader";
+import { ChartSkeleton } from "../../../../../components/ContentSkeleton.jsx";
 import { getCashFlowCandlesRequest } from "../../../../../api/financeRequest";
 
 const CANDLE_LIMIT = 25;
@@ -293,14 +293,13 @@ export default function CashFlowCandlestickChart({ onCandleSelect, onDrillReset,
             sx={{
               position: "absolute",
               inset: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
               zIndex: 1,
-              bgcolor: alpha(theme.palette.background.paper, 0.6),
+              bgcolor: alpha(theme.palette.background.paper, 0.92),
+              borderRadius: 1,
+              px: 1,
             }}
           >
-            <CircularProgress size={28} />
+            <ChartSkeleton height={220} />
           </Box>
         )}
         {!loading && !payload?.candles?.length && (

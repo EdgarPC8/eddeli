@@ -24,9 +24,18 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import PhoneIphoneRoundedIcon from "@mui/icons-material/PhoneIphoneRounded";
 import EmailRoundedIcon from "@mui/icons-material/EmailRounded";
 import PlaceRoundedIcon from "@mui/icons-material/PlaceRounded";
+import StorefrontRoundedIcon from "@mui/icons-material/StorefrontRounded";
+import LocalMallRoundedIcon from "@mui/icons-material/LocalMallRounded";
 import { buildImageUrl } from "../../../../api/axios";
+import {
+  locationKindChipColor,
+  locationKindHint,
+  locationKindLabel,
+  normalizeLocationKind,
+  sortStoresByKind,
+} from "../../../../utils/storeLocationKind.js";
 
-/** items: [{ id, name, address, description, city, province, phone, email, img, latitude, longitude, ... }] */
+/** items: [{ id, name, address, ..., locationKind: 'propia'|'vitrina' }] */
 export default function StoresPanel({
   title = "Locales",
   items = [],
@@ -34,8 +43,15 @@ export default function StoresPanel({
   onStoreClick, // opcional: callback(store) cuando se abre el diálogo
   /** Si se pasa, al abrir el detalle se cargan productos del local (vista pública). */
   loadStoreProducts,
+  /** Etiquetas orientadas al público (punto de venta / vitrina). */
+  publicFacing = true,
+  /** Vista pública: incluir sucursales propias. */
+  showPropia = true,
+  /** Vista pública: incluir vitrinas. */
+  showVitrina = true,
 }) {
   const theme = useTheme();
+  const [kindFilter, setKindFilter] = useState("all"); // all | propia | vitrina
   const [expanded, setExpanded] = useState(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(null);
@@ -43,8 +59,63 @@ export default function StoresPanel({
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [productsErr, setProductsErr] = useState("");
 
-  const hasOverflow = useMemo(() => items.length > maxVisible, [items.length, maxVisible]);
-  const visibleItems = expanded || !hasOverflow ? items : items.slice(0, maxVisible);
+  const allowedItems = useMemo(() => {
+    return items.filter((s) => {
+      const kind = normalizeLocationKind(s.locationKind);
+      if (kind === "propia") return showPropia !== false;
+      return showVitrina !== false;
+    });
+  }, [items, showPropia, showVitrina]);
+
+  const sortedItems = useMemo(() => sortStoresByKind(allowedItems), [allowedItems]);
+
+  const counts = useMemo(() => {
+    let propia = 0;
+    let vitrina = 0;
+    for (const s of sortedItems) {
+      if (normalizeLocationKind(s.locationKind) === "propia") propia += 1;
+      else vitrina += 1;
+    }
+    return { all: sortedItems.length, propia, vitrina };
+  }, [sortedItems]);
+
+  useEffect(() => {
+    if (kindFilter === "propia" && counts.propia === 0) setKindFilter("all");
+    if (kindFilter === "vitrina" && counts.vitrina === 0) setKindFilter("all");
+  }, [kindFilter, counts.propia, counts.vitrina]);
+
+  const filteredItems = useMemo(() => {
+    if (kindFilter === "all") return sortedItems;
+    return sortedItems.filter(
+      (s) => normalizeLocationKind(s.locationKind) === kindFilter,
+    );
+  }, [sortedItems, kindFilter]);
+
+  const hasOverflow = useMemo(
+    () => filteredItems.length > maxVisible,
+    [filteredItems.length, maxVisible],
+  );
+  const visibleItems =
+    expanded || !hasOverflow ? filteredItems : filteredItems.slice(0, maxVisible);
+
+  useEffect(() => {
+    setExpanded(false);
+  }, [kindFilter]);
+
+  const kindChip = (kind, size = "small") => {
+    const k = normalizeLocationKind(kind);
+    const Icon = k === "propia" ? StorefrontRoundedIcon : LocalMallRoundedIcon;
+    return (
+      <Chip
+        size={size}
+        icon={<Icon sx={{ fontSize: "16px !important" }} />}
+        color={locationKindChipColor(k)}
+        variant={k === "propia" ? "filled" : "outlined"}
+        label={locationKindLabel(k, { publicFacing })}
+        sx={{ fontWeight: 700, height: size === "small" ? 24 : 28 }}
+      />
+    );
+  };
 
   // Alturas de la tarjeta
   const CARD_H = 180;
@@ -178,6 +249,57 @@ export default function StoresPanel({
           {title}
         </Typography>
 
+        {(counts.propia > 0 || counts.vitrina > 0) && (
+          <Stack
+            direction="row"
+            spacing={0.75}
+            justifyContent="center"
+            flexWrap="wrap"
+            useFlexGap
+            sx={{ mb: 1.5 }}
+          >
+            <Chip
+              size="small"
+              clickable
+              color={kindFilter === "all" ? "primary" : "default"}
+              variant={kindFilter === "all" ? "filled" : "outlined"}
+              label={`Todos (${counts.all})`}
+              onClick={() => setKindFilter("all")}
+              sx={{ fontWeight: 700 }}
+            />
+            {counts.propia > 0 && (
+              <Chip
+                size="small"
+                clickable
+                color={kindFilter === "propia" ? "primary" : "default"}
+                variant={kindFilter === "propia" ? "filled" : "outlined"}
+                icon={<StorefrontRoundedIcon sx={{ fontSize: "16px !important" }} />}
+                label={`${locationKindLabel("propia", { publicFacing })} (${counts.propia})`}
+                onClick={() => setKindFilter("propia")}
+                sx={{ fontWeight: 700 }}
+              />
+            )}
+            {counts.vitrina > 0 && (
+              <Chip
+                size="small"
+                clickable
+                color={kindFilter === "vitrina" ? "primary" : "default"}
+                variant={kindFilter === "vitrina" ? "filled" : "outlined"}
+                icon={<LocalMallRoundedIcon sx={{ fontSize: "16px !important" }} />}
+                label={`${locationKindLabel("vitrina", { publicFacing })} (${counts.vitrina})`}
+                onClick={() => setKindFilter("vitrina")}
+                sx={{ fontWeight: 700 }}
+              />
+            )}
+          </Stack>
+        )}
+
+        {filteredItems.length === 0 ? (
+          <Typography variant="body2" color="text.secondary" align="center" sx={{ py: 3 }}>
+            No hay locales en este filtro.
+          </Typography>
+        ) : null}
+
         <Grid container spacing={2}>
           {visibleItems.map((s, i) => (
             <Grid item xs={12} sm={6} md={4} lg={3} key={`${s.id ?? s.name}-${i}`}>
@@ -191,7 +313,7 @@ export default function StoresPanel({
                   borderRadius: 2,
                   overflow: "hidden",
                   textAlign: "center",
-                  height: CARD_H,
+                  height: CARD_H + 18,
                   display: "flex",
                   flexDirection: "column",
                   justifyContent: "flex-start",
@@ -226,6 +348,9 @@ export default function StoresPanel({
                       e.currentTarget.src = placeholderImg(theme.palette.mode);
                     }}
                   />
+                  <Box sx={{ position: "absolute", top: 6, left: 6 }}>
+                    {kindChip(s.locationKind)}
+                  </Box>
                 </Box>
 
                 <CardContent
@@ -278,7 +403,9 @@ export default function StoresPanel({
         {hasOverflow && (
           <Box sx={{ display: "flex", justifyContent: "center", mt: 2 }}>
             <Button variant="ctrl" onClick={() => setExpanded((v) => !v)}>
-              {expanded ? "Mostrar menos" : `Ver más (${items.length - maxVisible})`}
+              {expanded
+                ? "Mostrar menos"
+                : `Ver más (${filteredItems.length - maxVisible})`}
             </Button>
           </Box>
         )}
@@ -307,9 +434,11 @@ export default function StoresPanel({
             display: "flex",
             alignItems: "center",
             gap: 1,
+            flexWrap: "wrap",
           }}
         >
           {active?.name || "Local"}
+          {active ? kindChip(active.locationKind) : null}
           <Box sx={{ flex: 1 }} />
           <Tooltip title="Cerrar">
             <IconButton onClick={handleClose} size="small">
@@ -339,6 +468,12 @@ export default function StoresPanel({
 
         <DialogContent sx={{ pt: 2 }}>
           <Stack spacing={1.25}>
+            {active && (
+              <Typography variant="body2" color="text.secondary">
+                {locationKindHint(active.locationKind, { publicFacing })}
+              </Typography>
+            )}
+
             {/* Chips de ubicación */}
             {(active?.city || active?.province) && (
               <Stack direction="row" spacing={1} flexWrap="wrap">

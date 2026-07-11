@@ -1,17 +1,12 @@
 /**
  * CRUD de notificaciones programadas y envío manual (Admin/Programador).
- *
- * BACKEND_ENABLED: poner true cuando existan rutas /notification-programs en el API.
- * Mientras tanto el ítem del menú está comentado en NavBar.jsx.
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import {
   Alert,
   Box,
   Typography,
   Button,
-  Card,
-  CardContent,
   Chip,
   IconButton,
   Dialog,
@@ -43,6 +38,8 @@ import {
 import { getRolRequest } from "../api/accountRequest.js";
 import { useAuth } from "../context/AuthContext.jsx";
 import { Navigate } from "react-router-dom";
+import { PageSkeleton } from "../components/ContentSkeleton.jsx";
+import TablePro from "../components/Tables/TablePro.jsx";
 
 /** Backend activo — CRUD en /notification-programs */
 const BACKEND_ENABLED = true;
@@ -65,6 +62,14 @@ const initialForm = {
   scheduleIntervalMinutes: 60,
 };
 
+function scheduleLabel(item) {
+  if (item.scheduleType === "daily") return `Diario ${item.scheduleTime || ""}`.trim();
+  if (item.scheduleType === "interval") {
+    return `Cada ${item.scheduleIntervalMinutes || 60} min`;
+  }
+  return "Manual";
+}
+
 export default function NotificationProgramsPage() {
   const { user, toast } = useAuth();
   const [list, setList] = useState([]);
@@ -75,7 +80,7 @@ export default function NotificationProgramsPage() {
   const [form, setForm] = useState(initialForm);
   const [sendingId, setSendingId] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [progsRes, rolesRes] = await Promise.all([
@@ -89,30 +94,13 @@ export default function NotificationProgramsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
-  if (!ALLOWED.has(user?.loginRol)) {
-    return <Navigate to="/notifications" replace />;
-  }
-
-  if (!BACKEND_ENABLED) {
-    return (
-      <Box sx={{ p: 3, maxWidth: 640 }}>
-        <Alert severity="info">
-          Notificaciones programadas: el backend aún no expone{" "}
-          <code>/notification-programs</code>. Activa{" "}
-          <code>BACKEND_ENABLED</code> en esta página y descomenta el menú en{" "}
-          <code>NavBar.jsx</code> cuando la API esté lista.
-        </Alert>
-      </Box>
-    );
-  }
-
-  const handleOpen = (item = null) => {
+  const handleOpen = useCallback((item = null) => {
     if (item) {
       setEditingId(item.id);
       setForm({
@@ -135,7 +123,7 @@ export default function NotificationProgramsPage() {
       setForm(initialForm);
     }
     setOpen(true);
-  };
+  }, []);
 
   const handleClose = () => {
     setOpen(false);
@@ -163,32 +151,178 @@ export default function NotificationProgramsPage() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("¿Eliminar esta notificación programada?")) return;
-    try {
-      await toast({ promise: deleteNotificationProgram(id) });
-      load();
-    } catch {
-      /* toast */
-    }
-  };
+  const handleDelete = useCallback(
+    async (id) => {
+      if (!window.confirm("¿Eliminar esta notificación programada?")) return;
+      try {
+        await toast({ promise: deleteNotificationProgram(id) });
+        load();
+      } catch {
+        /* toast */
+      }
+    },
+    [toast, load],
+  );
 
-  const handleSendNow = async (id) => {
-    setSendingId(id);
-    try {
-      await toast({ promise: sendNotificationProgramNow(id) });
-      load();
-    } catch {
-      /* toast mostró error del backend */
-    } finally {
-      setSendingId(null);
-    }
-  };
+  const handleSendNow = useCallback(
+    async (id) => {
+      setSendingId(id);
+      try {
+        await toast({ promise: sendNotificationProgramNow(id) });
+        load();
+      } catch {
+        /* toast mostró error del backend */
+      } finally {
+        setSendingId(null);
+      }
+    },
+    [toast, load],
+  );
+
+  const columns = useMemo(
+    () => [
+      {
+        label: "Título",
+        id: "title",
+        render: (row) => (
+          <Box>
+            <Typography variant="body2" fontWeight={700}>
+              {row.title}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {row.code}
+            </Typography>
+          </Box>
+        ),
+        getSearchValue: (row) => `${row.title || ""} ${row.code || ""}`,
+      },
+      {
+        label: "Mensaje",
+        id: "message",
+        render: (row) => (
+          <Typography
+            variant="body2"
+            color="text.secondary"
+            sx={{
+              maxWidth: 320,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+            title={row.message || ""}
+          >
+            {row.message || "—"}
+          </Typography>
+        ),
+      },
+      {
+        label: "Horario",
+        id: "scheduleType",
+        render: (row) => (
+          <Chip
+            size="small"
+            label={scheduleLabel(row)}
+            color={row.scheduleType === "manual" ? "default" : "primary"}
+          />
+        ),
+        getSearchValue: (row) => scheduleLabel(row),
+      },
+      {
+        label: "Destino",
+        id: "targetType",
+        render: (row) => (
+          <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+            {row.handlerType === "stock_min" && (
+              <Chip size="small" label="Stock mínimo" color="warning" />
+            )}
+            <Chip
+              size="small"
+              label={row.targetType === "all_users" ? "Todos" : "Por rol"}
+              variant="outlined"
+            />
+          </Stack>
+        ),
+        getSearchValue: (row) =>
+          `${row.handlerType || ""} ${
+            row.targetType === "all_users" ? "todos" : "rol"
+          }`,
+      },
+      {
+        label: "Estado",
+        id: "active",
+        render: (row) => (
+          <Chip
+            size="small"
+            label={row.active ? "Activa" : "Inactiva"}
+            color={row.active ? "success" : "default"}
+            variant="outlined"
+          />
+        ),
+        getSearchValue: (row) => (row.active ? "activa" : "inactiva"),
+      },
+      {
+        label: "Acciones",
+        id: "actions",
+        stopRowClick: true,
+        getSearchValue: () => "",
+        render: (row) => (
+          <Box sx={{ display: "flex", gap: 0.25 }}>
+            <Tooltip title="Enviar ahora">
+              <IconButton
+                color="primary"
+                size="small"
+                onClick={() => handleSendNow(row.id)}
+                disabled={sendingId === row.id}
+              >
+                {sendingId === row.id ? (
+                  <CircularProgress size={18} />
+                ) : (
+                  <SendIcon fontSize="small" />
+                )}
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Editar">
+              <IconButton size="small" onClick={() => handleOpen(row)}>
+                <EditIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Eliminar">
+              <IconButton
+                size="small"
+                color="error"
+                onClick={() => handleDelete(row.id)}
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        ),
+      },
+    ],
+    [sendingId, handleSendNow, handleOpen, handleDelete],
+  );
+
+  if (!ALLOWED.has(user?.loginRol)) {
+    return <Navigate to="/notifications" replace />;
+  }
+
+  if (!BACKEND_ENABLED) {
+    return (
+      <Box sx={{ p: 3, maxWidth: 640 }}>
+        <Alert severity="info">
+          Notificaciones programadas: el backend aún no expone{" "}
+          <code>/notification-programs</code>. Activa{" "}
+          <code>BACKEND_ENABLED</code> en esta página y descomenta el menú en{" "}
+          <code>NavBar.jsx</code> cuando la API esté lista.
+        </Alert>
+      </Box>
+    );
+  }
 
   if (loading) {
     return (
-      <Box sx={{ display: "flex", justifyContent: "center", py: 4 }}>
-        <CircularProgress />
+      <Box sx={{ py: 2, px: 1 }}>
+        <PageSkeleton />
       </Box>
     );
   }
@@ -219,107 +353,14 @@ export default function NotificationProgramsPage() {
         botón de enviar.
       </Typography>
 
-      {list.length === 0 ? (
-        <Card variant="outlined">
-          <CardContent>
-            <Typography color="text.secondary">
-              No hay plantillas. Crea una o reinicia el backend para cargar las
-              predeterminadas.
-            </Typography>
-          </CardContent>
-        </Card>
-      ) : (
-        <Stack spacing={2}>
-          {list.map((item) => (
-            <Card key={item.id} variant="outlined">
-              <CardContent>
-                <Stack
-                  direction="row"
-                  justifyContent="space-between"
-                  alignItems="flex-start"
-                  flexWrap="wrap"
-                  gap={1}
-                >
-                  <Box>
-                    <Typography variant="h6" fontWeight={700}>
-                      {item.title}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {item.code}
-                    </Typography>
-                    <Typography variant="body2" sx={{ mt: 1 }}>
-                      {item.message}
-                    </Typography>
-                    <Stack
-                      direction="row"
-                      spacing={1}
-                      sx={{ mt: 1 }}
-                      flexWrap="wrap"
-                    >
-                      <Chip
-                        size="small"
-                        label={
-                          item.scheduleType === "daily"
-                            ? `Diario ${item.scheduleTime || ""}`
-                            : item.scheduleType === "interval"
-                              ? `Cada ${item.scheduleIntervalMinutes || 60} min`
-                              : "Manual"
-                        }
-                        color={
-                          item.scheduleType === "manual" ? "default" : "primary"
-                        }
-                      />
-                      {item.handlerType === "stock_min" && (
-                        <Chip size="small" label="Stock mínimo" color="warning" />
-                      )}
-                      <Chip
-                        size="small"
-                        label={
-                          item.targetType === "all_users"
-                            ? "Todos los usuarios"
-                            : "Por rol"
-                        }
-                        variant="outlined"
-                      />
-                      <Chip
-                        size="small"
-                        label={item.active ? "Activa" : "Inactiva"}
-                        color={item.active ? "success" : "default"}
-                        variant="outlined"
-                      />
-                    </Stack>
-                  </Box>
-                  <Box sx={{ display: "flex", gap: 0.5 }}>
-                    <Tooltip title="Enviar ahora">
-                      <IconButton
-                        color="primary"
-                        onClick={() => handleSendNow(item.id)}
-                        disabled={sendingId === item.id}
-                      >
-                        {sendingId === item.id ? (
-                          <CircularProgress size={24} />
-                        ) : (
-                          <SendIcon />
-                        )}
-                      </IconButton>
-                    </Tooltip>
-                    <IconButton size="small" onClick={() => handleOpen(item)}>
-                      <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      color="error"
-                      onClick={() => handleDelete(item.id)}
-                    >
-                      <DeleteIcon />
-                    </IconButton>
-                  </Box>
-                </Stack>
-              </CardContent>
-            </Card>
-          ))}
-        </Stack>
-      )}
+      <TablePro
+        rows={list}
+        columns={columns}
+        title="PLANTILLAS"
+        showIndex
+        defaultRowsPerPage={25}
+        rowsPerPageOptions={[10, 25, 50]}
+      />
 
       <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
         <DialogTitle>

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Box,
   Chip,
-  CircularProgress,
   Paper,
   Stack,
   ToggleButton,
@@ -16,6 +15,7 @@ import { alpha } from '@mui/material/styles';
 import { parseISO } from 'date-fns';
 import { BarChart } from '@mui/x-charts/BarChart';
 import ChartBlockHeader from '../../../../../components/Charts/ChartBlockHeader';
+import { ChartSkeleton } from '../../../../../components/ContentSkeleton.jsx';
 import CalendarDayDetailDialog from './CalendarDayDetailDialog';
 import { resolvePeriodRangeFromBucket } from './cashFlowLinkUtils';
 import {
@@ -290,9 +290,7 @@ export default function CashFlowMirrorChart({ focus = null, onClearFocus }) {
         }}
       >
         {loading ? (
-          <Box sx={{ py: 3, textAlign: 'center' }}>
-            <CircularProgress size={22} />
-          </Box>
+          <ChartSkeleton height={160} />
         ) : dataset.length === 0 ? (
           <Typography variant="caption" color="text.secondary" sx={{ py: 3, display: 'block', textAlign: 'center' }}>
             Sin movimientos en este período.

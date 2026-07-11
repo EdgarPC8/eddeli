@@ -37,6 +37,24 @@ export const AppSettings = sequelize.define(
       allowNull: false,
       defaultValue: "America/Guayaquil",
     },
+    /** Vista pública: mostrar catálogo (/catalogo y carrusel home). */
+    showPublicCatalog: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
+    /** Vista pública: mostrar sucursales propias (puntos de venta). */
+    showPublicStoresPropia: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
+    /** Vista pública: mostrar vitrinas (locales de entrega). */
+    showPublicStoresVitrina: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
   },
   { timestamps: true },
 );

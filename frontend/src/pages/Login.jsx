@@ -18,6 +18,7 @@ import { Visibility, VisibilityOff } from "@mui/icons-material";
 import { useNavigate, Link as RouterLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext.jsx";
 import { useAppSettings } from "../context/AppSettingsContext.jsx";
+import { getPostLoginPath } from "../utils/postLoginPath.js";
 
 export default function Login() {
   const { activeApp } = useAppSettings();
@@ -28,12 +29,12 @@ export default function Login() {
   const [selectingRole, setSelectingRole] = useState(false);
   const [roles, setRoles] = useState([]);
 
-  const { signin, isAuthenticated, errors } = useAuth();
+  const { signin, isAuthenticated, user, errors } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (isAuthenticated) navigate("/", { replace: true });
-  }, [isAuthenticated, navigate]);
+    if (isAuthenticated) navigate(getPostLoginPath(user?.loginRol), { replace: true });
+  }, [isAuthenticated, navigate, user?.loginRol]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -41,12 +42,12 @@ export default function Login() {
     if (result?.selectRole) {
       setSelectingRole(true);
       setRoles(result.roles);
-    } else if (result?.success) navigate("/", { replace: true });
+    } else if (result?.success) navigate(getPostLoginPath(result.loginRol), { replace: true });
   };
 
   const handleRoleSelect = async (roleId) => {
     const result = await signin({ username, password, selectedRoleId: roleId });
-    if (result?.success) navigate("/", { replace: true });
+    if (result?.success) navigate(getPostLoginPath(result.loginRol), { replace: true });
   };
 
   return (

@@ -63,6 +63,19 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: "dist",
       emptyOutDir: true,
+      rollupOptions: {
+        output: {
+          manualChunks(id) {
+            if (!id.includes("node_modules")) return;
+            if (id.includes("@mui") || id.includes("@emotion")) return "mui";
+            if (id.includes("jspdf") || id.includes("html2canvas") || id.includes("purify")) return "pdf";
+            if (id.includes("lightweight-charts") || id.includes("@mui/x-charts")) return "charts";
+            if (id.includes("socket.io")) return "realtime";
+            if (id.includes("date-fns")) return "date";
+            return "vendor";
+          },
+        },
+      },
     },
   };
 });

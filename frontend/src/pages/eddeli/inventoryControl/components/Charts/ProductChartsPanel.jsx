@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import { getProductSeriesChartsRequest } from '../../../../../api/financeRequest';
 import ChartBlockHeader from '../../../../../components/Charts/ChartBlockHeader';
+import { ChartSkeleton } from '../../../../../components/ContentSkeleton.jsx';
 import ProductSeriesChart from './ProductSeriesChart';
 
 const paperSx = {
@@ -140,13 +141,17 @@ export default function ProductChartsPanel() {
           : `${periodLabel} · posiciones ${rankStart}–${rankEnd} · ${meta.totalRanked} productos con ventas`}
       </Typography>
 
-      <ProductSeriesChart
-        bundle={sales}
-        loading={loading}
-        chartHeight={300}
-        showHeader={false}
-        sideLegend
-      />
+      {loading ? (
+        <ChartSkeleton height={300} />
+      ) : (
+        <ProductSeriesChart
+          bundle={sales}
+          loading={false}
+          chartHeight={300}
+          showHeader={false}
+          sideLegend
+        />
+      )}
     </Paper>
   );
 }

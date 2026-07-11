@@ -4,13 +4,13 @@ import {
   Paper,
   Stack,
   Button,
-  CircularProgress,
   useTheme,
   alpha,
 } from "@mui/material";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import { PieChart } from "@mui/x-charts/PieChart";
 import ChartBlockHeader from "../../../../components/Charts/ChartBlockHeader";
+import { ChartSkeleton } from "../../../../components/ContentSkeleton.jsx";
 import { money } from "../collections/helpers.js";
 import { getIncomeExpenseBreakdownDetail } from "../../../../api/financeRequest";
 import IncomeExpenseCategoryDetailDialog from "./IncomeExpenseCategoryDetailDialog";
@@ -133,15 +133,8 @@ export default function IncomeExpenseCategoryChart({ data }) {
           subtitle="Totales por fecha en Income y Expense (no por fecha de pedido)."
           sx={{ mb: 1, flexShrink: 0 }}
         />
-        <Box
-          sx={{
-            height: DASHBOARD_TWIN_PANEL_BODY_HEIGHT,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <CircularProgress size={28} />
+        <Box sx={{ height: DASHBOARD_TWIN_PANEL_BODY_HEIGHT, overflow: "hidden" }}>
+          <ChartSkeleton height={Math.max(160, DASHBOARD_TWIN_PANEL_BODY_HEIGHT - 48)} />
         </Box>
       </Paper>
     );

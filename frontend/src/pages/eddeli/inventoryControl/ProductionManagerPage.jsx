@@ -138,13 +138,19 @@ export default function ProductionManagerPage() {
   const [movementDate, setMovementDate] = useState(todayDateInput());
   const [products, setProducts] = useState([]);
   const [selectedProductId, setSelectedProductId] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const fetchdata = async () => {
-    const { data } = await getAllProductsAll();
-    const productsData = data
-      .filter((p) => p.type !== "raw")
-      .sort((a, b) => (b.stock ?? 0) - (a.stock ?? 0));
-    setProducts(productsData);
+    setLoading(true);
+    try {
+      const { data } = await getAllProductsAll();
+      const productsData = data
+        .filter((p) => p.type !== "raw")
+        .sort((a, b) => (b.stock ?? 0) - (a.stock ?? 0));
+      setProducts(productsData);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -205,6 +211,7 @@ export default function ProductionManagerPage() {
             showPagination
             defaultRowsPerPage={10}
             rowsPerPageOptions={[5, 10, 25, 50]}
+            loading={loading}
           />
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
             El valor del campo es el stock absoluto; al guardar se registra un movimiento de ajuste.

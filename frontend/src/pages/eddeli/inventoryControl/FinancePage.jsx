@@ -204,6 +204,7 @@ function FinancePage() {
       <FinanceSummaryCards
         summary={summary}
         pendingTotal={pendingBreakdown.total}
+        loading={loadingCollections}
       />
 
       <Box sx={{ mt: 3 }}>

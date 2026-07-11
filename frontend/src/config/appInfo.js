@@ -18,6 +18,9 @@ export const APP_SETTINGS_FALLBACK = {
   cajaQuickCategoryMatch: "panader",
   walkInCustomerLabel: "Consumidor Final",
   timezone: "America/Guayaquil",
+  showPublicCatalog: true,
+  showPublicStoresPropia: true,
+  showPublicStoresVitrina: true,
 };
 
 /** @deprecated Usar useAppSettings() o getActiveAppSettings() */

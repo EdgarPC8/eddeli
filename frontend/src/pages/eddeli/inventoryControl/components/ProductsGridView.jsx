@@ -18,6 +18,7 @@ import {
   DialogActions,
   Button,
 } from "@mui/material";
+import { CardsGridSkeleton } from "../../../../components/ContentSkeleton.jsx";
 import { useEffect, useMemo, useState } from "react";
 import ContentCopy from "@mui/icons-material/ContentCopy";
 import Edit from "@mui/icons-material/Edit";
@@ -332,6 +333,7 @@ export default function ProductsGridView({
   onEdit,
   onReload,
   pathImgBase = pathImg,
+  loading = false,
 }) {
   const [duplicateProduct, setDuplicateProduct] = useState(null);
   const [page, setPage] = useState(0);
@@ -378,43 +380,49 @@ export default function ProductsGridView({
       <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
         Ordenadas por stock (mayor a menor). Puede ajustar stock con movimiento de ajuste.
       </Typography>
-      <Grid container spacing={2}>
-        {paginatedProducts.map((p) => (
-          <Grid item xs={6} sm={4} md={3} lg={2} key={p.id}>
-            <ProductCard
-              product={p}
-              onEdit={onEdit}
-              onDuplicate={(prod) => setDuplicateProduct(prod)}
-              onStockAdjusted={onReload}
-              pathImgBase={pathImgBase}
-            />
+      {loading ? (
+        <CardsGridSkeleton count={8} />
+      ) : (
+        <>
+          <Grid container spacing={2}>
+            {paginatedProducts.map((p) => (
+              <Grid item xs={6} sm={4} md={3} lg={2} key={p.id}>
+                <ProductCard
+                  product={p}
+                  onEdit={onEdit}
+                  onDuplicate={(prod) => setDuplicateProduct(prod)}
+                  onStockAdjusted={onReload}
+                  pathImgBase={pathImgBase}
+                />
+              </Grid>
+            ))}
           </Grid>
-        ))}
-      </Grid>
-      {filteredProducts.length === 0 && (
-        <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
-          {products.length === 0
-            ? "No hay productos para mostrar"
-            : "Ningún producto coincide con la búsqueda o el filtro."}
-        </Typography>
-      )}
-      {filteredProducts.length > 0 && (
-        <TablePagination
-          component="div"
-          count={filteredProducts.length}
-          page={page}
-          onPageChange={(_, p) => setPage(p)}
-          rowsPerPage={rowsPerPage}
-          onRowsPerPageChange={(e) => {
-            setRowsPerPage(parseInt(e.target.value, 10));
-            setPage(0);
-          }}
-          rowsPerPageOptions={[12, 24, 48]}
-          labelRowsPerPage="Por página"
-          labelDisplayedRows={({ from, to, count }) =>
-            `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
-          }
-        />
+          {filteredProducts.length === 0 && (
+            <Typography color="text.secondary" sx={{ py: 4, textAlign: "center" }}>
+              {products.length === 0
+                ? "No hay productos para mostrar"
+                : "Ningún producto coincide con la búsqueda o el filtro."}
+            </Typography>
+          )}
+          {filteredProducts.length > 0 && (
+            <TablePagination
+              component="div"
+              count={filteredProducts.length}
+              page={page}
+              onPageChange={(_, p) => setPage(p)}
+              rowsPerPage={rowsPerPage}
+              onRowsPerPageChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setPage(0);
+              }}
+              rowsPerPageOptions={[12, 24, 48]}
+              labelRowsPerPage="Por página"
+              labelDisplayedRows={({ from, to, count }) =>
+                `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
+              }
+            />
+          )}
+        </>
       )}
       <DuplicateDialog
         open={!!duplicateProduct}
