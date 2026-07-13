@@ -6,7 +6,7 @@ import { Account } from "./Account.js";
 import { InventoryProduct, Store } from "./Inventory.js";
 
 // ✅ Ajusta a tu proyecto real:
-import { OrderItem, Customer } from "./Orders.js";
+import { OrderItem, Customer, Supplier, SupplierOrder } from "./Orders.js";
 
 // =====================================================
 // 1) GRUPO de ítems (deuda agrupada)
@@ -168,7 +168,67 @@ export const Expense = sequelize.define("ERP_finance_expenses", {
 });
 
 // =====================================================
-// 5) OBLIGACIONES (préstamos / deudas sin pedido)
+// 5) ABONOS A PEDIDOS DE PROVEEDOR (cuentas por pagar)
+// Cada abono crea 1 Expense (referenceType: supplier_order_abono)
+// =====================================================
+export const SupplierOrderPayment = sequelize.define("ERP_finance_supplier_order_payments", {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+
+  supplierOrderId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    comment: "Pedido a proveedor",
+  },
+
+  supplierId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    comment: "Proveedor",
+  },
+
+  date: {
+    type: DataTypes.DATE,
+    allowNull: false,
+    comment: "Fecha y hora del abono",
+  },
+
+  amount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    comment: "Monto del abono",
+  },
+
+  method: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: "efectivo",
+  },
+
+  note: {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+
+  status: {
+    type: DataTypes.ENUM("completed", "cancelled"),
+    allowNull: false,
+    defaultValue: "completed",
+  },
+
+  expenseId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: "Expense contable asociado",
+  },
+
+  createdBy: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+});
+
+// =====================================================
+// 6) OBLIGACIONES (préstamos / deudas sin pedido)
 // receivable = te deben (prestaste) → apertura Expense, cobros Income
 // payable    = debes tú        → apertura Income, pagos Expense
 // =====================================================
@@ -479,6 +539,20 @@ Payment.belongsTo(Account, { foreignKey: "createdBy" });
 // Payment -> Group
 Payment.belongsTo(ItemGroup, { foreignKey: "groupId" });
 ItemGroup.hasMany(Payment, { foreignKey: "groupId" });
+
+// Abonos a pedidos de proveedor
+SupplierOrderPayment.belongsTo(Account, { foreignKey: "createdBy" });
+SupplierOrderPayment.belongsTo(Supplier, { foreignKey: "supplierId", as: "supplier" });
+SupplierOrderPayment.belongsTo(SupplierOrder, {
+  foreignKey: "supplierOrderId",
+  as: "supplierOrder",
+});
+SupplierOrder.hasMany(SupplierOrderPayment, {
+  foreignKey: "supplierOrderId",
+  as: "payments",
+  onDelete: "CASCADE",
+});
+SupplierOrderPayment.belongsTo(Expense, { foreignKey: "expenseId", as: "expense" });
 
 FinancialObligation.belongsTo(Account, { foreignKey: "createdBy" });
 FinancialObligation.hasMany(ObligationPayment, {

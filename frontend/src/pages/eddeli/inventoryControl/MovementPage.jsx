@@ -143,6 +143,7 @@ function MovementPage() {
       >
         <MovementForm
           productOptions={products}
+          onProductsChange={setProducts}
           movementToEdit={editingMovement}
           onClose={() => {
             setOpenDialog(false);

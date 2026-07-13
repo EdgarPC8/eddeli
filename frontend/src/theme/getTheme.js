@@ -27,6 +27,98 @@ const commonColors = {
   ...brand,
 };
 
+/**
+ * Tipografía más compacta en todo el sistema (~12–14% más pequeña).
+ * htmlFontSize 14 (default 16) reduce rem; fontSize 13 ajusta la escala MUI.
+ */
+function compactTypography(overrides = {}) {
+  const { fontFamily, button: buttonOverride, ...rest } = overrides;
+  return {
+    htmlFontSize: 14,
+    fontSize: 13,
+    fontFamily:
+      fontFamily ||
+      `'Poppins', 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif`,
+    h1: { fontWeight: 800, letterSpacing: "-0.02em", fontSize: "2rem" },
+    h2: { fontWeight: 800, letterSpacing: "-0.02em", fontSize: "1.6rem" },
+    h3: { fontWeight: 700, fontSize: "1.35rem" },
+    h4: { fontWeight: 700, fontSize: "1.15rem" },
+    h5: { fontWeight: 700, fontSize: "1.02rem" },
+    h6: { fontWeight: 700, fontSize: "0.95rem" },
+    subtitle1: { fontSize: "0.9rem" },
+    subtitle2: { fontSize: "0.8rem" },
+    body1: { fontSize: "0.875rem", lineHeight: 1.45 },
+    body2: { fontSize: "0.8rem", lineHeight: 1.4 },
+    caption: { fontSize: "0.7rem" },
+    overline: { fontSize: "0.65rem" },
+    button: {
+      fontSize: "0.8rem",
+      textTransform: "none",
+      fontWeight: 600,
+      letterSpacing: "0.02em",
+      ...buttonOverride,
+    },
+    ...rest,
+  };
+}
+
+/** Densidad un poco mayor en controles comunes. */
+function compactComponents(extra = {}) {
+  return {
+    MuiButton: {
+      styleOverrides: {
+        root: { minHeight: 32, paddingTop: 4, paddingBottom: 4 },
+        sizeLarge: { minHeight: 38, fontSize: "0.85rem" },
+        sizeSmall: { minHeight: 26, fontSize: "0.75rem" },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: { padding: 6 },
+      },
+    },
+    MuiToolbar: {
+      styleOverrides: {
+        root: { minHeight: "52px !important" },
+        dense: { minHeight: "44px !important" },
+      },
+    },
+    MuiTableCell: {
+      styleOverrides: {
+        root: { padding: "8px 10px", fontSize: "0.8rem" },
+        sizeSmall: { padding: "4px 8px" },
+      },
+    },
+    MuiListItemButton: {
+      styleOverrides: {
+        root: { minHeight: 36, paddingTop: 4, paddingBottom: 4 },
+      },
+    },
+    MuiInputBase: {
+      styleOverrides: {
+        root: { fontSize: "0.875rem" },
+      },
+    },
+    MuiFormLabel: {
+      styleOverrides: {
+        root: { fontSize: "0.85rem" },
+      },
+    },
+    MuiChip: {
+      styleOverrides: {
+        root: { height: 24, fontSize: "0.72rem" },
+        sizeSmall: { height: 20, fontSize: "0.68rem" },
+      },
+    },
+    MuiDialogTitle: {
+      styleOverrides: {
+        root: { fontSize: "1.05rem", paddingTop: 12, paddingBottom: 12 },
+      },
+    },
+    ...extra,
+  };
+}
+
 /** Util: variantes compartidas que reaccionan a customMode */
 function componentVariants() {
   return {
@@ -190,15 +282,13 @@ export function getTheme(mode = "light") {
         charts: getChartsPalette("dark"),
       },
       shape: { borderRadius: 14 },
-      typography: {
+      typography: compactTypography({
         fontFamily: `'Poppins', 'Inter', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif`,
-        h1: { fontWeight: 800, letterSpacing: "-0.02em" },
-        h2: { fontWeight: 800, letterSpacing: "-0.02em" },
-        button: { letterSpacing: "0.02em" },
-      },
+      }),
       components: {
         MuiCssBaseline: {
           styleOverrides: {
+            html: { fontSize: "14px" },
             body: {
               background:
                 `radial-gradient(800px 400px at 20% -10%, rgba(245,197,107,.08), transparent 60%),
@@ -207,6 +297,7 @@ export function getTheme(mode = "light") {
             },
           },
         },
+        ...compactComponents(),
         ...componentVariants(),
       },
     });
@@ -249,15 +340,13 @@ export function getTheme(mode = "light") {
         "0 0 16px rgba(25,211,255,.22)",
         ...Array(22).fill("0 0 18px rgba(255,209,102,.16)"),
       ],
-      typography: {
+      typography: compactTypography({
         fontFamily: `'Inter', system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif`,
-        h1: { fontWeight: 800, letterSpacing: "-0.02em" },
-        h2: { fontWeight: 800, letterSpacing: "-0.02em" },
-        button: { letterSpacing: "0.02em" },
-      },
+      }),
       components: {
         MuiCssBaseline: {
           styleOverrides: {
+            html: { fontSize: "14px" },
             body: {
               background:
                 `radial-gradient(1200px 600px at 20% -10%, rgba(25,211,255,.10), transparent 60%),
@@ -276,15 +365,19 @@ export function getTheme(mode = "light") {
             },
           },
         },
+        ...compactComponents(),
+        ...componentVariants(),
         MuiChip: {
           styleOverrides: {
             root: {
+              height: 24,
+              fontSize: "0.72rem",
               border: "1px solid rgba(25,211,255,.35)",
               boxShadow: "0 0 12px rgba(25,211,255,.25)",
             },
+            sizeSmall: { height: 20, fontSize: "0.68rem" },
           },
         },
-        ...componentVariants(),
       },
     });
   }
@@ -321,30 +414,25 @@ export function getTheme(mode = "light") {
     },
     
     shape: { borderRadius: 12 },
-    typography: {
+    typography: compactTypography({
       fontFamily: `'Poppins', 'Roboto', sans-serif`,
-      h1: { fontWeight: 700 },
-      h2: { fontWeight: 700 },
       button: { textTransform: "none", fontWeight: 600 },
-    },
+    }),
     components: {
-      
-  MuiCssBaseline: {
-  styleOverrides: {
-    body: {
-      background: `
+      MuiCssBaseline: {
+        styleOverrides: {
+          html: { fontSize: "14px" },
+          body: {
+            background: `
         radial-gradient(800px 400px at 20% -10%, rgba(226,160,91,.12), transparent 60%),
         radial-gradient(700px 300px at 110% 10%, rgba(245,197,107,.12), transparent 60%),
         linear-gradient(180deg, #FFF6E5 0%, #FFE3B0 100%)`,
-      backgroundAttachment: "fixed",
-    },
-  },
-},
-
+            backgroundAttachment: "fixed",
+          },
+        },
+      },
+      ...compactComponents(),
       ...componentVariants(),
     },
-    
-  }
-
-);
+  });
 }

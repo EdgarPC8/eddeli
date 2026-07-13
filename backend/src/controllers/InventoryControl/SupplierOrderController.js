@@ -9,7 +9,7 @@ import {
   SupplierOrderItem,
 } from "../../models/Orders.js";
 import { InventoryProduct, InventoryMovement } from "../../models/Inventory.js";
-import { Expense } from "../../models/Finance.js";
+import { Expense, SupplierOrderPayment } from "../../models/Finance.js";
 import { getHeaderToken, verifyJWT } from "../../libs/jwt.js";
 
 const toNum = (v, d = 0) => {
@@ -25,8 +25,8 @@ function parseRangeDate(value, endOfDay = false) {
   return d;
 }
 
-function formatSupplierOrdersList(orders) {
-  return orders.map((order) => ({
+function formatSupplierOrderBase(order) {
+  return {
     ...order.toJSON(),
     orderKind: "supplier",
     date: format(new Date(order.date), "dd/MM/yyyy HH:mm:ss", { locale: es }),
@@ -38,7 +38,7 @@ function formatSupplierOrdersList(orders) {
       : null,
     createdAt: format(new Date(order.createdAt), "dd/MM/yyyy HH:mm:ss", { locale: es }),
     updatedAt: format(new Date(order.updatedAt), "dd/MM/yyyy HH:mm:ss", { locale: es }),
-  }));
+  };
 }
 
 const orderIncludes = [
@@ -62,6 +62,60 @@ function orderTotal(items = []) {
   return round2(round2(sub) + round2(iva));
 }
 
+/** Incluye total / abonado / saldo para abonos parciales desde el calendario. */
+async function formatSupplierOrdersList(orders) {
+  const list = Array.isArray(orders) ? orders : [];
+  try {
+    await SupplierOrderPayment.sync();
+  } catch {
+    /* ignore */
+  }
+
+  const ids = list.map((o) => o.id).filter(Boolean);
+  const paidByOrderId = new Map();
+  const paymentsByOrderId = new Map();
+
+  if (ids.length > 0) {
+    const payments = await SupplierOrderPayment.findAll({
+      where: { supplierOrderId: { [Op.in]: ids }, status: "completed" },
+      attributes: ["id", "supplierOrderId", "date", "amount", "method", "note", "status"],
+      order: [["date", "DESC"]],
+    });
+    for (const p of payments) {
+      const oid = Number(p.supplierOrderId);
+      paidByOrderId.set(oid, Number(((paidByOrderId.get(oid) || 0) + toNum(p.amount)).toFixed(2)));
+      if (!paymentsByOrderId.has(oid)) paymentsByOrderId.set(oid, []);
+      paymentsByOrderId.get(oid).push({
+        id: p.id,
+        date: p.date ? format(new Date(p.date), "dd/MM/yyyy HH:mm:ss", { locale: es }) : null,
+        amount: Number(toNum(p.amount).toFixed(2)),
+        method: p.method || "efectivo",
+        note: p.note || "",
+        status: p.status,
+      });
+    }
+  }
+
+  return list.map((order) => {
+    const base = formatSupplierOrderBase(order);
+    const total = orderTotal(order.ERP_supplier_order_items || []);
+    let paid = toNum(paidByOrderId.get(Number(order.id)) || 0);
+    if (order.paidAt && paid <= 0 && total > 0) paid = total;
+    const remaining =
+      order.paidAt && paid >= total - 0.009
+        ? 0
+        : Number(Math.max(0, total - paid).toFixed(2));
+
+    return {
+      ...base,
+      totalAmount: total,
+      paidAmount: paid,
+      remainingAmount: remaining,
+      payments: paymentsByOrderId.get(Number(order.id)) || [],
+    };
+  });
+}
+
 export const getSupplierOrders = async (req, res) => {
   try {
     const fromDate = parseRangeDate(req.query.from, false);
@@ -78,7 +132,7 @@ export const getSupplierOrders = async (req, res) => {
       include: orderIncludes,
       order: [["date", "DESC"]],
     });
-    res.json(formatSupplierOrdersList(rows));
+    res.json(await formatSupplierOrdersList(rows));
   } catch (error) {
     console.error("getSupplierOrders:", error);
     res.status(500).json({ message: "Error al obtener pedidos a proveedor" });
@@ -131,7 +185,7 @@ export const createSupplierOrder = async (req, res) => {
     });
 
     const full = await SupplierOrder.findByPk(orderId, { include: orderIncludes });
-    res.status(201).json(formatSupplierOrdersList([full])[0]);
+    res.status(201).json((await formatSupplierOrdersList([full]))[0]);
   } catch (error) {
     console.error("createSupplierOrder:", error);
     res.status(400).json({ message: error.message || "Error al crear pedido a proveedor" });
@@ -193,7 +247,7 @@ export const updateSupplierOrder = async (req, res) => {
     });
 
     const full = await SupplierOrder.findByPk(id, { include: orderIncludes });
-    res.json(formatSupplierOrdersList([full])[0]);
+    res.json((await formatSupplierOrdersList([full]))[0]);
   } catch (error) {
     console.error("updateSupplierOrder:", error);
     res.status(400).json({ message: error.message || "Error al actualizar pedido" });
@@ -243,7 +297,7 @@ export const addSupplierOrderItem = async (req, res) => {
     res.status(201).json({
       message: "Producto agregado al pedido",
       item,
-      order: formatSupplierOrdersList([full])[0],
+      order: (await formatSupplierOrdersList([full]))[0],
     });
   } catch (error) {
     console.error("addSupplierOrderItem:", error);
@@ -312,7 +366,7 @@ export const markSupplierOrderReceived = async (req, res) => {
     });
 
     const full = await SupplierOrder.findByPk(order.id, { include: orderIncludes });
-    res.json(formatSupplierOrdersList([full])[0]);
+    res.json((await formatSupplierOrdersList([full]))[0]);
   } catch (error) {
     console.error("markSupplierOrderReceived:", error);
     res.status(500).json({ message: "Error al marcar pedido como recibido" });
@@ -341,10 +395,24 @@ export const markSupplierOrderPaid = async (req, res) => {
     const supplierName = order.ERP_supplier?.name || "Proveedor";
 
     await sequelize.transaction(async (t) => {
+      await SupplierOrderPayment.sync();
+
+      const alreadyPaid = await SupplierOrderPayment.sum("amount", {
+        where: { supplierOrderId: order.id, status: "completed" },
+        transaction: t,
+      });
+      const remaining = Math.max(0, Number((total - toNum(alreadyPaid)).toFixed(2)));
+      if (remaining <= 0.009) {
+        order.paidAt = payDate;
+        order.paymentMethod = paymentMethod;
+        await order.save({ transaction: t });
+        return;
+      }
+
       const expense = await Expense.create(
         {
           date: payDate,
-          amount: Number(total.toFixed(2)),
+          amount: Number(remaining.toFixed(2)),
           concept: `Pago pedido proveedor #${order.id} — ${supplierName}`,
           category: "Compras",
           referenceType: "supplier_order_payment",
@@ -356,6 +424,21 @@ export const markSupplierOrderPaid = async (req, res) => {
         { transaction: t }
       );
 
+      await SupplierOrderPayment.create(
+        {
+          supplierOrderId: order.id,
+          supplierId: order.supplierId,
+          date: payDate,
+          amount: Number(remaining.toFixed(2)),
+          method: paymentMethod,
+          note: `Liquidación pedido #${order.id}`,
+          status: "completed",
+          expenseId: expense.id,
+          createdBy: user.accountId,
+        },
+        { transaction: t }
+      );
+
       order.paidAt = payDate;
       order.paymentMethod = paymentMethod;
       order.financeExpenseId = expense.id;
@@ -363,7 +446,7 @@ export const markSupplierOrderPaid = async (req, res) => {
     });
 
     const full = await SupplierOrder.findByPk(order.id, { include: orderIncludes });
-    res.json(formatSupplierOrdersList([full])[0]);
+    res.json((await formatSupplierOrdersList([full]))[0]);
   } catch (error) {
     console.error("markSupplierOrderPaid:", error);
     res.status(500).json({ message: "Error al marcar pedido como pagado" });

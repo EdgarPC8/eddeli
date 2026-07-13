@@ -41,6 +41,7 @@ import {
   Payment,
   FinancialObligation,
   ObligationPayment,
+  SupplierOrderPayment,
   RecurringExpenseTemplate,
   RecurringExpenseOccurrence,
 } from "../models/Finance.js";
@@ -123,6 +124,7 @@ export const BACKUP_TABLE_ENTRIES = [
   { key: "ItemGroup", model: ItemGroup },
   { key: "ItemGroupItem", model: ItemGroupItem },
   { key: "Payment", model: Payment },
+  { key: "SupplierOrderPayment", model: SupplierOrderPayment },
   { key: "DocumentAttachment", model: DocumentAttachment },
   { key: "FinancialObligation", model: FinancialObligation },
   { key: "ObligationPayment", model: ObligationPayment },

@@ -19,6 +19,14 @@ const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 const CAJA_POS_TAG = "[CAJA_POS]";
 
+/** Pedidos manuales/calendario: notes NULL o sin marca de caja POS. */
+const nonCajaPosNotesWhere = {
+  [Op.or]: [
+    { notes: null },
+    { notes: { [Op.notLike]: `%${CAJA_POS_TAG}%` } },
+  ],
+};
+
 /** POST /orders/pos/checkout — venta desde caja con turno abierto. */
 export const posCheckout = async (req, res) => {
   try {
@@ -1247,7 +1255,7 @@ export const programmerDashboardOrderItemCorrection = async (req, res) => {
 export const getOrderStatusWorkbench = async (req, res) => {
   try {
     const orders = await Order.findAll({
-      where: { notes: { [Op.notLike]: `%${CAJA_POS_TAG}%` } },
+      where: nonCajaPosNotesWhere,
       include: [
         { model: Customer, as: "ERP_customer" },
         {
@@ -1344,7 +1352,7 @@ export const getAllOrders = async (req, res) => {
     const pagination = parsePagination(req, { defaultPageSize: 100 });
 
     const where = {
-      notes: { [Op.notLike]: `%${CAJA_POS_TAG}%` },
+      ...nonCajaPosNotesWhere,
     };
     if (fromDate || toDate) {
       where.date = {};

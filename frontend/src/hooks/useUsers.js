@@ -1,22 +1,34 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { getUsersRequest } from "../api/userRequest";
 
 export const useUsers = () => {
   const [users, setUsers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
+    setIsLoading(true);
     try {
-      const data = await getUsersRequest();
-      setUsers(data.data);
+      const res = await getUsersRequest();
+      const raw = res?.data;
+      const list = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.rows)
+          ? raw.rows
+          : Array.isArray(raw?.data)
+            ? raw.data
+            : [];
+      setUsers(list);
     } catch (error) {
-      console.error(error);
+      console.error("useUsers:", error);
+      setUsers([]);
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     fetchUsers();
-  }, []);
+  }, [fetchUsers]);
 
   return { users, isLoading, fetchUsers };
 };

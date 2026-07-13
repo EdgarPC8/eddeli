@@ -103,7 +103,7 @@ export const APP_MODULE_GROUPS = [
         roles: ["Programador", "Administrador", "Empleado"],
         description: "Apertura y cierre de turno, capital en caja y movimientos de efectivo.",
         functions: [
-          { name: "Apertura de turno", description: "Efectivo total o arqueo por monedas/billetes (Programador); notas opcionales." },
+          { name: "Apertura de turno", description: "Arqueo por monedas/billetes (Admin/Programador) o total en efectivo (Empleado); notas opcionales." },
           { name: "Movimientos de caja", description: "Toggle salida/entrada, categoría, monto, concepto y registrar." },
           { name: "Compra de mercancía", description: "Vincula producto, cantidad y notas cuando la categoría es compra_mercancia." },
           { name: "Tabla de movimientos", description: "Lista en tiempo real del turno activo." },
@@ -298,7 +298,7 @@ export const APP_MODULE_GROUPS = [
   {
     id: "finanzas",
     label: "Finanzas",
-    summary: "Ingresos, cobros, gastos y (próx.) cuentas por pagar a proveedores.",
+    summary: "Ingresos, cobros, gastos y cuentas por pagar a proveedores.",
     sections: [
       {
         name: "Finanzas",
@@ -306,27 +306,27 @@ export const APP_MODULE_GROUPS = [
         roles: ["Programador", "Administrador"],
         description: "Registro de ingresos y gastos, resumen y movimientos contables.",
         functions: [
-          { name: "Tarjetas resumen", description: "Balance, ingresos, gastos, margen, por cobrar y préstamos." },
-          { name: "Panel cobranzas esperadas", description: "Desglose pendiente sin grupo vs grupos." },
+          { name: "Tarjetas resumen", description: "Balance, ingresos, gastos, margen y totales." },
+          { name: "Tabla unificada", description: "Ingresos y gastos en una sola tabla con filtros." },
+          { name: "Filtro por tipo", description: "Ver todos, solo ingresos o solo gastos." },
+          { name: "Filtro por categoría", description: "Acotar movimientos por categoría." },
           { name: "Registrar ingreso/gasto", description: "Formulario con categoría, monto y comprobante (gastos)." },
-          { name: "Tablas ingresos y gastos", description: "Listado con editar y eliminar por fila." },
-          { name: "Ir a Cobranzas", description: "Enlace directo al módulo de cobranzas." },
+          { name: "Ir a Cobranzas", description: "El detalle de cobros se gestiona en el módulo Cobranzas." },
         ],
       },
       {
         name: "Cobranzas",
         path: "/inventory/collections",
         roles: ["Programador", "Administrador"],
-        description: "Grupos de cobro, abonos parciales y saldo pendiente por cliente.",
+        description:
+          "Cobros a clientes y pagos a proveedores: abonos parciales vinculados a pedidos.",
         functions: [
-          { name: "Selector de clientes", description: "Chips ordenados por deuda con monto pendiente." },
+          { name: "Modo Clientes / Proveedores", description: "Alternar cuentas por cobrar y por pagar." },
+          { name: "Abonar pedido de cliente", description: "Desde el resumen por pedidos: agrupa ítems y registra abono." },
+          { name: "Abonar pedido de proveedor", description: "Pago parcial o total; genera gasto en Finanzas." },
+          { name: "Selector por deuda", description: "Chips ordenados por saldo pendiente." },
+          { name: "Grupos y abonos (clientes)", description: "Crear grupos, abonar, mover ítems e historial." },
           { name: "Resumen de cuenta", description: "Reporte A4/ticket imprimible, PDF, PNG o TXT." },
-          { name: "Pestañas pendientes", description: "Sin grupo, pagados sin grupo, grupos y detalle." },
-          { name: "Selección múltiple", description: "Checkboxes para crear grupo de ítems." },
-          { name: "Crear grupo", description: "Diálogo con concepto para agrupar ítems." },
-          { name: "Abonar a grupo", description: "Monto, fecha, método y nota auto-sugerida." },
-          { name: "Mover ítems", description: "Entre grupos o quitar del grupo." },
-          { name: "Editar ítem (Programador)", description: "Cantidad, precio, dañado, yapa y cambiado." },
         ],
       },
       {
@@ -359,16 +359,14 @@ export const APP_MODULE_GROUPS = [
       },
       {
         name: "Cuentas por pagar a proveedores",
-        path: "/inventory/cuentas-por-pagar",
+        path: "/inventory/collections",
         roles: ["Programador", "Administrador"],
-        status: "planned",
         description:
-          "Próximamente: control de deudas con proveedores (compras a crédito, abonos, saldos y vencimientos de pago).",
+          "Integrado en Cobranzas → Proveedores: deudas por pedido, abonos parciales y saldos.",
         functions: [
-          { name: "Obligaciones por proveedor", description: "Listado de saldos pendientes por proveedor." },
-          { name: "Registrar compra a crédito", description: "Vincular pedido/OC o gasto con fecha de vencimiento." },
-          { name: "Abonos y pagos", description: "Registrar pagos parciales o totales con método y comprobante." },
-          { name: "Alertas de vencimiento", description: "Avisos de facturas por pagar próximas a vencer." },
+          { name: "Saldo por proveedor", description: "Chips ordenados por lo que debes." },
+          { name: "Abonos por pedido", description: "Pagar parcial o liquidar un pedido de compra." },
+          { name: "Historial de abonos", description: "Ver y eliminar abonos (revierte el gasto)." },
         ],
       },
     ],

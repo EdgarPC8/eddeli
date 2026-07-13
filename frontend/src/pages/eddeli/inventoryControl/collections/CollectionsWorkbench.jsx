@@ -37,7 +37,6 @@ import {
   updateGroupPaymentRequest,
   deleteGroupPaymentRequest,
 } from "../../../../api/ordersRequest";
-import { getAllExpensesRequest } from "../../../../api/financeRequest";
 import { useAuth } from "../../../../context/AuthContext";
 import {
   safeFileName,
@@ -69,7 +68,6 @@ export default function CollectionsWorkbench() {
   const [orders, setOrders] = useState([]);
   const [groups, setGroups] = useState([]);
   const [payments, setPayments] = useState([]);
-  const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(false);
   const [uiMsg, setUiMsg] = useState(null);
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
@@ -107,21 +105,16 @@ export default function CollectionsWorkbench() {
     try {
       setLoading(true);
       setUiMsg(null);
-      const [res, expRes] = await Promise.all([
-        getFinanceWorkbenchAllRequest(),
-        getAllExpensesRequest().catch(() => ({ data: [] })),
-      ]);
+      const res = await getFinanceWorkbenchAllRequest();
       const data = res?.data || {};
       const nextCustomers = Array.isArray(data.customers) ? data.customers : [];
       const nextOrders = Array.isArray(data.orders) ? data.orders : [];
       const nextGroups = Array.isArray(data.groups) ? data.groups : [];
       const nextPayments = Array.isArray(data.payments) ? data.payments : [];
-      const nextExpenses = Array.isArray(expRes?.data) ? expRes.data : [];
       setCustomers(nextCustomers);
       setOrders(nextOrders);
       setGroups(nextGroups);
       setPayments(nextPayments);
-      setExpenses(nextExpenses);
       if (!keepSelection || !selectedCustomerId) {
         setSelectedCustomerId(nextCustomers[0]?.id ?? null);
         setSelectedGroupId(null);
@@ -383,13 +376,83 @@ export default function CollectionsWorkbench() {
     return Number(sum(selected, (it) => itemLineTotal(it)).toFixed(2));
   }, [itemsPaidUngrouped, selectedPaidItemIds]);
 
-  const customerPayments = useMemo(
-    () => payments.filter((p) => p.customerId === selectedCustomerId),
-    [payments, selectedCustomerId]
-  );
-
-  /** Pendiente a mostrar: mismo valor que "Total cobrable" (y que los chips de clientes). */
   const displayPending = Number((totalCobrableByCustomer[selectedCustomerId] ?? 0).toFixed(2));
+
+  const prepareOrderGroup = ({ itemIds, concept }) => {
+    if (!itemIds?.length) {
+      setUiMsg({
+        type: "info",
+        text: "Ese pedido no tiene ítems pendientes sin grupo. Revisa el grupo existente en la pestaña Grupos.",
+      });
+      setTab(2);
+      return;
+    }
+    setSelectedItemIds(itemIds);
+    setCreateMode("pending");
+    setGroupConcept(concept || `Grupo de ${customer?.name || ""} (${todayISO()})`.trim());
+    setCreateOpen(true);
+    setTab(0);
+  };
+
+  const abonarOrderGroup = async ({ itemIds, concept, existingGroupId }) => {
+    try {
+      setUiMsg(null);
+      if (existingGroupId) {
+        setSelectedGroupId(existingGroupId);
+        setTab(3);
+        const rem = groupRemaining(existingGroupId);
+        setPayAmount(rem > 0 ? String(rem) : "");
+        setPayDate(nowLocalDateTime());
+        setPayNote(
+          rem > 0
+            ? `Abono al grupo del pedido (saldo ${money(rem)})`
+            : "Abono"
+        );
+        setPayMethod("efectivo");
+        setPayOpen(true);
+        return;
+      }
+      if (!itemIds?.length) {
+        setUiMsg({
+          type: "warning",
+          text: "No hay ítems sin grupo en este pedido. Si ya están agrupados en varios grupos, abona desde la pestaña Grupos.",
+        });
+        setTab(2);
+        return;
+      }
+      if (!selectedCustomerId) return;
+      setLoading(true);
+      const res = await createItemGroupRequest({
+        customerId: selectedCustomerId,
+        itemIds,
+        concept: concept || "Pedido",
+      });
+      const createdId = res?.data?.grupo?.id ?? res?.data?.groupId ?? res?.data?.id ?? null;
+      await loadWorkbench(true);
+      if (createdId) {
+        setSelectedGroupId(createdId);
+        setTab(3);
+        setUiMsg({
+          type: "success",
+          text: "Grupo del pedido creado. Registra el abono del cliente.",
+        });
+        const totalHint = Number(res?.data?.grupo?.totalAmount ?? res?.data?.totalAmount ?? 0);
+        setPayAmount(totalHint > 0 ? String(totalHint) : "");
+        setPayDate(nowLocalDateTime());
+        setPayMethod("efectivo");
+        setPayNote(`Abono vinculado a ${concept || "pedido"}`);
+        setPayOpen(true);
+      }
+    } catch (err) {
+      console.error("abonarOrderGroup:", err);
+      setUiMsg({
+        type: "error",
+        text: err?.response?.data?.message || "Error al preparar abono del pedido",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const toggleSelectItem = (itemId) => {
     setSelectedItemIds((prev) =>
@@ -460,7 +523,7 @@ export default function CollectionsWorkbench() {
         itemIds: selectedIds,
         concept: groupConcept,
       });
-      const createdId = res?.data?.groupId ?? res?.data?.id ?? null;
+      const createdId = res?.data?.grupo?.id ?? res?.data?.groupId ?? res?.data?.id ?? null;
       await loadWorkbench(true);
       setCreateOpen(false);
       setSelectedItemIds([]);
@@ -528,10 +591,20 @@ export default function CollectionsWorkbench() {
       }
       setLoading(true);
       setUiMsg(null);
+      const suggested = buildSuggestedPayNote(amt, selectedGroupId);
+      const noteToSend =
+        !payNote ||
+        String(payNote).trim() === "" ||
+        String(payNote).trim() === suggested ||
+        String(payNote).trim().toLowerCase().startsWith("abono parcial:") ||
+        String(payNote).trim().toLowerCase().startsWith("liquidación total:") ||
+        String(payNote).trim().toLowerCase().startsWith("liquidacion total:")
+          ? "Abono"
+          : String(payNote).trim();
       const res = await payItemGroupRequest(selectedGroupId, {
         amount: amt,
         date: payDate,
-        note: payNote,
+        note: noteToSend,
         method: payMethod,
       });
       const closed = !!res?.data?.closed;
@@ -836,7 +909,7 @@ export default function CollectionsWorkbench() {
               whiteSpace: "nowrap",
             }}
           >
-            Cobranzas (por ítems)
+            Clientes (por ítems / pedidos)
           </Typography>
           <Typography
             variant="body2"
@@ -966,9 +1039,9 @@ export default function CollectionsWorkbench() {
       <PendingSummaryPanel
         customerId={selectedCustomerId}
         customerItems={customerItems}
-        customerPayments={customerPayments}
-        allExpenses={expenses}
         displayPending={displayPending}
+        onPrepareOrderGroup={prepareOrderGroup}
+        onAbonarOrderGroup={abonarOrderGroup}
       />
 
       <Card variant="outlined" sx={{ width: "100%", maxWidth: "100%", boxSizing: "border-box" }}>

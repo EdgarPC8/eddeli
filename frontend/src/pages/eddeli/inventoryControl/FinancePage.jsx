@@ -3,18 +3,24 @@ import {
   IconButton,
   Button,
   Tooltip,
-  Grid,
   Typography,
   Box,
   Divider,
+  Stack,
+  Chip,
+  ToggleButton,
+  ToggleButtonGroup,
+  TextField,
+  MenuItem,
 } from "@mui/material";
 import { useEffect, useMemo, useState } from "react";
-import { Add, MonetizationOn, MoneyOff } from "@mui/icons-material";
+import { Add, EditOutlined, DeleteOutline } from "@mui/icons-material";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
+import TrendingDownIcon from "@mui/icons-material/TrendingDown";
 import TablePro from "../../../components/Tables/TablePro";
 import SimpleDialog from "../../../components/Dialogs/SimpleDialog";
 import FinanceForm from "./components/FinanceForm";
 import FinanceSummaryCards from "./components/FinanceSummaryCards";
-import ExpectedCollectionsPanel from "./components/ExpectedCollectionsPanel";
 import {
   getAllIncomesRequest,
   getAllExpensesRequest,
@@ -22,12 +28,10 @@ import {
   deleteIncomeRequest,
   deleteExpenseRequest,
 } from "../../../api/financeRequest";
-import { getFinanceWorkbenchAllRequest } from "../../../api/ordersRequest";
 import { useAuth } from "../../../context/AuthContext.jsx";
 import { runMutationReload } from "../../../utils/mutationToast.js";
 import { money } from "./collections/helpers.js";
 import { formatDateTime } from "../../../helpers/functions.js";
-import { buildPendingCollectionsBreakdown } from "./finance/pendingCollections.js";
 
 const defaultSummary = {
   totalIncome: 0,
@@ -42,50 +46,33 @@ function FinancePage() {
   const [summary, setSummary] = useState(defaultSummary);
   const [incomes, setIncomes] = useState([]);
   const [expenses, setExpenses] = useState([]);
-  const [workbench, setWorkbench] = useState({
-    customers: [],
-    orders: [],
-    groups: [],
-    payments: [],
-  });
-  const [loadingCollections, setLoadingCollections] = useState(true);
+  const [loading, setLoading] = useState(true);
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [openDialog, setOpenDialog] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
   const [formType, setFormType] = useState("income");
   const [titleUserDialog, setTitleUserDialog] = useState("");
   const [dataToEdit, setDataToEdit] = useState(null);
   const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
   const [dataToDelete, setDataToDelete] = useState({});
 
-  const pendingBreakdown = useMemo(
-    () => buildPendingCollectionsBreakdown(workbench),
-    [workbench]
-  );
-
   const fetchData = async () => {
-    setLoadingCollections(true);
+    setLoading(true);
     try {
-      const [incomeRes, expenseRes, summaryRes, workbenchRes] = await Promise.all([
+      const [incomeRes, expenseRes, summaryRes] = await Promise.all([
         getAllIncomesRequest(),
         getAllExpensesRequest(),
         getFinanceSummaryRequest(),
-        getFinanceWorkbenchAllRequest(),
       ]);
 
-      setIncomes(incomeRes.data);
-      setExpenses(expenseRes.data);
+      setIncomes(Array.isArray(incomeRes.data) ? incomeRes.data : []);
+      setExpenses(Array.isArray(expenseRes.data) ? expenseRes.data : []);
       setSummary({ ...defaultSummary, ...summaryRes.data });
-      setWorkbench({
-        customers: workbenchRes.data?.customers ?? [],
-        orders: workbenchRes.data?.orders ?? [],
-        groups: workbenchRes.data?.groups ?? [],
-        payments: workbenchRes.data?.payments ?? [],
-      });
     } catch (err) {
       console.error("Error al cargar finanzas:", err);
       toast?.({ message: "No se pudo cargar la información financiera.", variant: "error" });
     } finally {
-      setLoadingCollections(false);
+      setLoading(false);
     }
   };
 
@@ -93,76 +80,154 @@ function FinancePage() {
     fetchData();
   }, []);
 
+  const allRows = useMemo(() => {
+    const incomeRows = (incomes || []).map((i) => ({
+      ...i,
+      type: "income",
+      sourceId: i.id,
+      id: `income-${i.id}`,
+    }));
+    const expenseRows = (expenses || []).map((e) => ({
+      ...e,
+      type: "expense",
+      sourceId: e.id,
+      id: `expense-${e.id}`,
+    }));
+    return [...incomeRows, ...expenseRows].sort((a, b) => {
+      const da = new Date(a.date || 0).getTime();
+      const db = new Date(b.date || 0).getTime();
+      return db - da;
+    });
+  }, [incomes, expenses]);
+
+  const categoryOptions = useMemo(() => {
+    const set = new Set();
+    for (const r of allRows) {
+      const c = String(r.category || "").trim();
+      if (c) set.add(c);
+    }
+    return [...set].sort((a, b) => a.localeCompare(b, "es"));
+  }, [allRows]);
+
+  const filteredRows = useMemo(() => {
+    return allRows.filter((r) => {
+      if (typeFilter === "income" && r.type !== "income") return false;
+      if (typeFilter === "expense" && r.type !== "expense") return false;
+      if (categoryFilter !== "all" && String(r.category || "") !== categoryFilter) return false;
+      return true;
+    });
+  }, [allRows, typeFilter, categoryFilter]);
+
+  const filteredTotals = useMemo(() => {
+    let income = 0;
+    let expense = 0;
+    for (const r of filteredRows) {
+      const amt = Number(r.amount || 0);
+      if (r.type === "income") income += amt;
+      else expense += amt;
+    }
+    return {
+      income: Number(income.toFixed(2)),
+      expense: Number(expense.toFixed(2)),
+      balance: Number((income - expense).toFixed(2)),
+    };
+  }, [filteredRows]);
+
   const handleDialogUser = () => setOpenDialog(!openDialog);
   const handleDialogDelete = () => setOpenDeleteDialog(!openDeleteDialog);
 
+  const openCreate = (type) => {
+    setFormType(type);
+    setDataToEdit(null);
+    setTitleUserDialog(type === "income" ? "Registrar Ingreso" : "Registrar Gasto");
+    setOpenDialog(true);
+  };
+
   const deleteData = async () => {
+    const id = dataToDelete.sourceId ?? dataToDelete.id;
     const fn = formType === "income" ? deleteIncomeRequest : deleteExpenseRequest;
     await runMutationReload(toast, {
-      promise: fn(dataToDelete.id),
+      promise: fn(id),
       reload: fetchData,
       onClose: handleDialogDelete,
     });
   };
 
-  const commonColumns = [
+  const columns = [
     {
       label: "Fecha",
       id: "date",
-      render: (params) => {
-        const row = params?.row ?? params;
-        return formatDateTime(row?.date);
-      },
+      getSortValue: (r) => new Date(r.date || 0).getTime(),
+      render: (r) => formatDateTime(r?.date),
+    },
+    {
+      label: "Tipo",
+      id: "type",
+      render: (r) =>
+        r.type === "income" ? (
+          <Chip size="small" color="success" label="Ingreso" icon={<TrendingUpIcon />} />
+        ) : (
+          <Chip size="small" color="error" label="Gasto" icon={<TrendingDownIcon />} />
+        ),
     },
     { label: "Concepto", id: "concept" },
     { label: "Categoría", id: "category" },
     {
       label: "Monto",
       id: "amount",
-      render: (params) => {
-        const row = params?.row ?? params;
-        const value = Number(row?.amount ?? 0);
-        return money(value);
-      },
+      getSortValue: (r) => Number(r.amount || 0),
+      render: (r) => (
+        <Typography
+          component="span"
+          sx={{
+            fontWeight: 700,
+            color: r.type === "income" ? "success.main" : "error.main",
+          }}
+        >
+          {r.type === "expense" ? "−" : "+"}
+          {money(r?.amount)}
+        </Typography>
+      ),
     },
     {
       label: "Acciones",
       id: "actions",
-      render: (params) => {
-        const row = params?.row ?? params;
-        if (!row) return null;
+      stopRowClick: true,
+      render: (r) => {
+        if (!r) return null;
         return (
-          <>
+          <Stack direction="row" spacing={0.5}>
             <Tooltip title="Editar">
               <IconButton
                 size="small"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setFormType(row.type || "income");
-                  setIsEditing(true);
-                  setDataToEdit(row);
-                  setTitleUserDialog("Editar " + (row.type === "expense" ? "Gasto" : "Ingreso"));
+                  setFormType(r.type || "income");
+                  setDataToEdit(r);
+                  setTitleUserDialog(
+                    "Editar " + (r.type === "expense" ? "Gasto" : "Ingreso")
+                  );
                   setOpenDialog(true);
                 }}
               >
-                <MonetizationOn />
+                <EditOutlined fontSize="small" />
               </IconButton>
             </Tooltip>
-
             <Tooltip title="Eliminar">
               <IconButton
                 size="small"
+                color="error"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setFormType(row.type || "income");
-                  setDataToDelete(row);
+                  setFormType(r.type || "income");
+                  setDataToDelete(r);
                   setOpenDeleteDialog(true);
                 }}
               >
-                <MoneyOff />
+                <DeleteOutline fontSize="small" />
               </IconButton>
             </Tooltip>
-          </>
+          </Stack>
         );
       },
     },
@@ -179,14 +244,14 @@ function FinancePage() {
         ¿Está seguro de eliminar este registro?
       </SimpleDialog>
 
-      <SimpleDialog
-        open={openDialog}
-        onClose={handleDialogUser}
-        tittle={titleUserDialog}
-      >
+      <SimpleDialog open={openDialog} onClose={handleDialogUser} tittle={titleUserDialog}>
         <FinanceForm
           type={formType}
-          data={dataToEdit}
+          data={
+            dataToEdit
+              ? { ...dataToEdit, id: dataToEdit.sourceId ?? dataToEdit.id }
+              : null
+          }
           onClose={handleDialogUser}
           onSaved={fetchData}
         />
@@ -197,86 +262,102 @@ function FinancePage() {
           Finanzas
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Resumen del dinero registrado y lo que falta por cobrar según Cobranzas.
+          Resumen de ingresos y gastos registrados. El detalle de cobros está en Cobranzas.
         </Typography>
       </Box>
 
-      <FinanceSummaryCards
-        summary={summary}
-        pendingTotal={pendingBreakdown.total}
-        loading={loadingCollections}
+      <FinanceSummaryCards summary={summary} loading={loading} />
+
+      <Divider sx={{ my: 3 }} />
+
+      <Stack
+        direction={{ xs: "column", md: "row" }}
+        spacing={1.5}
+        alignItems={{ xs: "stretch", md: "center" }}
+        justifyContent="space-between"
+        sx={{ mb: 1.5 }}
+      >
+        <Box>
+          <Typography variant="h6" sx={{ fontWeight: 700 }}>
+            Movimientos
+          </Typography>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mt: 0.5 }}>
+            <Chip size="small" color="success" variant="outlined" label={`Ingresos ${money(filteredTotals.income)}`} />
+            <Chip size="small" color="error" variant="outlined" label={`Gastos ${money(filteredTotals.expense)}`} />
+            <Chip
+              size="small"
+              color={filteredTotals.balance >= 0 ? "primary" : "warning"}
+              variant="outlined"
+              label={`Balance filtro ${money(filteredTotals.balance)}`}
+            />
+          </Stack>
+        </Box>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+          <Button
+            variant="outlined"
+            color="success"
+            size="small"
+            startIcon={<Add />}
+            onClick={() => openCreate("income")}
+          >
+            Ingreso
+          </Button>
+          <Button
+            variant="outlined"
+            color="error"
+            size="small"
+            startIcon={<Add />}
+            onClick={() => openCreate("expense")}
+          >
+            Gasto
+          </Button>
+        </Stack>
+      </Stack>
+
+      <Stack
+        direction={{ xs: "column", sm: "row" }}
+        spacing={1.5}
+        alignItems={{ xs: "stretch", sm: "center" }}
+        sx={{ mb: 1.5 }}
+      >
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          value={typeFilter}
+          onChange={(_, v) => {
+            if (v) setTypeFilter(v);
+          }}
+        >
+          <ToggleButton value="all">Todos</ToggleButton>
+          <ToggleButton value="income">Solo ingresos</ToggleButton>
+          <ToggleButton value="expense">Solo gastos</ToggleButton>
+        </ToggleButtonGroup>
+
+        <TextField
+          select
+          size="small"
+          label="Categoría"
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          sx={{ minWidth: 180 }}
+        >
+          <MenuItem value="all">Todas</MenuItem>
+          {categoryOptions.map((c) => (
+            <MenuItem key={c} value={c}>
+              {c}
+            </MenuItem>
+          ))}
+        </TextField>
+      </Stack>
+
+      <TablePro
+        title="Ingresos y gastos"
+        rows={filteredRows}
+        columns={columns}
+        loading={loading}
+        defaultRowsPerPage={10}
+        rowsPerPageOptions={[10, 25, 50]}
       />
-
-      <Box sx={{ mt: 3 }}>
-        <ExpectedCollectionsPanel
-          customers={workbench.customers}
-          orders={workbench.orders}
-          groups={workbench.groups}
-          payments={workbench.payments}
-          loading={loadingCollections}
-        />
-      </Box>
-
-      <Divider sx={{ mb: 3 }} />
-
-      <Grid container spacing={3}>
-        <Grid item xs={12} md={6}>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Ingresos
-            </Typography>
-            <Button
-              variant="outlined"
-              size="small"
-              startIcon={<Add />}
-              onClick={() => {
-                setFormType("income");
-                setTitleUserDialog("Registrar Ingreso");
-                setIsEditing(false);
-                setDataToEdit(null);
-                handleDialogUser();
-              }}
-            >
-              Registrar
-            </Button>
-          </Box>
-          <TablePro
-            rows={incomes.map((i) => ({ ...i, type: "income" }))}
-            columns={commonColumns}
-            defaultRowsPerPage={5}
-            title="Ingresos registrados"
-          />
-        </Grid>
-
-        <Grid item xs={12} md={6}>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", mb: 1 }}>
-            <Typography variant="h6" sx={{ fontWeight: 700 }}>
-              Gastos
-            </Typography>
-            <Button
-              variant="outlined"
-              color="error"
-              size="small"
-              startIcon={<Add />}
-              onClick={() => {
-                setFormType("expense");
-                setTitleUserDialog("Registrar Gasto");
-                setIsEditing(false);
-                setDataToEdit(null);
-                handleDialogUser();
-              }}
-            >
-              Registrar
-            </Button>
-          </Box>
-          <TablePro
-            rows={expenses.map((e) => ({ ...e, type: "expense" }))}
-            columns={commonColumns}
-            defaultRowsPerPage={5}
-            title="Gastos registrados"
-          />
-        </Grid>
-      </Grid>
     </Container>
   );
 }
