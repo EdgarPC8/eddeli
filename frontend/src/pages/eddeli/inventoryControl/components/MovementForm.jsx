@@ -1,15 +1,17 @@
 import {
   Box,
   Button,
+  Checkbox,
   Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   FormControl,
   FormControlLabel,
   FormLabel,
   Grid,
   IconButton,
-  List,
-  ListItem,
-  ListItemText,
   MenuItem,
   Paper,
   Radio,
@@ -18,12 +20,15 @@ import {
   TextField,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
   Typography,
   alpha,
   useTheme,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
+import AddBoxIcon from "@mui/icons-material/AddBox";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
+import CloseIcon from "@mui/icons-material/Close";
 import InventoryIcon from "@mui/icons-material/Inventory";
 import CallReceivedIcon from "@mui/icons-material/CallReceived";
 import CallMadeIcon from "@mui/icons-material/CallMade";
@@ -34,6 +39,7 @@ import { useForm } from "react-hook-form";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../../../context/AuthContext";
 import {
+  getAllProductsAll,
   openPresentationMovementRequest,
   registerMovement,
   registerMovementsBatchRequest,
@@ -42,6 +48,7 @@ import {
 } from "../../../../api/inventoryControlRequest";
 import SimulateProductionComponent from "./SimulateProduction.jsx";
 import SearchableSelect from "../../../../components/SearchableSelect.jsx";
+import ProductForm from "./ProductForm.jsx";
 import ProgrammerMovementDateField, {
   movementDateForApi,
   todayDateInput,
@@ -65,8 +72,13 @@ import {
 } from "./movementFormConfig.js";
 import AttachmentField from "./AttachmentField.jsx";
 import { uploadMovementVoucher } from "../../../../api/documentRequest.js";
+import { formatProductPrice } from "./ProductPriceReference.jsx";
 
 const BATCH_TYPES = new Set(["entrada", "salida", "ajuste"]);
+
+function round2(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
 
 function reasonLabel(type, reason) {
   return REASON_OPTIONS[type]?.find((r) => r.value === reason)?.label || reason || "—";
@@ -80,6 +92,21 @@ function newCartId() {
   return `line-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Base sin IVA (unitario×cant o total según modo de la línea). */
+function lineBaseAmount(line) {
+  const qty = Number(line.quantity);
+  const unit = Number(line.unitPriceInput);
+  if (!(qty > 0) || unit === "" || Number.isNaN(unit)) return null;
+  return line.shouldMultiply ? qty * unit : unit;
+}
+
+function lineTotalWithIva(line, ivaRate) {
+  const base = lineBaseAmount(line);
+  if (base == null) return null;
+  if (!line.hasIva) return round2(base);
+  return round2(base * (1 + (Number(ivaRate) || 0) / 100));
+}
+
 const TYPE_ICONS = {
   entrada: CallReceivedIcon,
   salida: CallMadeIcon,
@@ -88,7 +115,13 @@ const TYPE_ICONS = {
   apertura: UnarchiveIcon,
 };
 
-function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = null }) {
+function MovementForm({
+  onClose,
+  productOptions = [],
+  onProductsChange,
+  onSaved,
+  movementToEdit = null,
+}) {
   const theme = useTheme();
   const { toast: toastAuth, user } = useAuth();
   const isProgrammer = user?.loginRol === "Programador";
@@ -113,6 +146,13 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
   const [simulatedData, setSimulatedData] = useState(null);
   const [cart, setCart] = useState([]);
   const [pendingVoucherFile, setPendingVoucherFile] = useState(null);
+  const [ivaRate, setIvaRate] = useState(15);
+  const [productDialogOpen, setProductDialogOpen] = useState(false);
+  const [products, setProducts] = useState(() => productOptions || []);
+
+  useEffect(() => {
+    setProducts(productOptions || []);
+  }, [productOptions]);
 
   const selectedProductId = watch("productId");
   const selectedType = watch("type");
@@ -136,24 +176,44 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
 
   const productById = useMemo(() => {
     const map = new Map();
-    (productOptions || []).forEach((p) => map.set(Number(p.id), p));
+    (products || []).forEach((p) => map.set(Number(p.id), p));
     return map;
-  }, [productOptions]);
+  }, [products]);
 
   const genericById = useMemo(() => {
     const map = new Map();
-    (productOptions || []).forEach((p) => {
+    (products || []).forEach((p) => {
       if (p.isGenericIngredient && !p.genericProductId) map.set(Number(p.id), p);
     });
     return map;
-  }, [productOptions]);
+  }, [products]);
 
   const filteredProductOptions = useMemo(() => {
     if (isApertura) {
-      return (productOptions || []).filter(isPresentationProduct);
+      return (products || []).filter(isPresentationProduct);
     }
-    return productOptions || [];
-  }, [productOptions, isApertura]);
+    return products || [];
+  }, [products, isApertura]);
+
+  const handleProductCreated = async (created) => {
+    setProductDialogOpen(false);
+    try {
+      const { data } = await getAllProductsAll();
+      const list = Array.isArray(data) ? data : [];
+      setProducts(list);
+      onProductsChange?.(list);
+      const id = created?.id ?? created?.data?.id;
+      if (id != null) {
+        setValue("productId", String(id), { shouldValidate: true, shouldDirty: true });
+        toastAuth({ message: "Producto creado y seleccionado", variant: "success" });
+      }
+    } catch {
+      toastAuth({
+        message: "Producto creado, pero no se pudo refrescar el listado",
+        variant: "warning",
+      });
+    }
+  };
 
   const selectedProduct = useMemo(() => {
     const pid = Number(selectedProductId);
@@ -182,13 +242,45 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
 
   const totalToSave = useMemo(() => {
     if (!needsPrice || priceInputValue == null || Number.isNaN(priceInputValue)) return null;
+    let base;
     if (shouldMultiply) {
       const qty = Number(quantityValue || 0);
       if (!qty || Number.isNaN(qty)) return null;
-      return qty * priceInputValue;
+      base = qty * priceInputValue;
+    } else {
+      base = priceInputValue;
     }
-    return priceInputValue;
-  }, [needsPrice, priceInputValue, quantityValue, shouldMultiply]);
+    // En edición el precio guardado ya es el total; no reaplicar IVA.
+    if (isEdit) return round2(base);
+    const productIva = Number(selectedProduct?.taxRate) || 0;
+    if (productIva > 0) {
+      return round2(base * (1 + (Number(ivaRate) || productIva) / 100));
+    }
+    return round2(base);
+  }, [
+    needsPrice,
+    priceInputValue,
+    quantityValue,
+    shouldMultiply,
+    selectedProduct,
+    ivaRate,
+    isEdit,
+  ]);
+
+  const cartTotals = useMemo(() => {
+    const rate = (Number(ivaRate) || 0) / 100;
+    let sub = 0;
+    let iva = 0;
+    for (const line of cart) {
+      const base = lineBaseAmount(line);
+      if (base == null) continue;
+      sub += base;
+      if (line.hasIva) iva += base * rate;
+    }
+    const rSub = round2(sub);
+    const rIva = round2(iva);
+    return { subtotal: rSub, ivaTotal: rIva, total: round2(rSub + rIva) };
+  }, [cart, ivaRate]);
 
   const aperturaPreview = useMemo(() => {
     if (!isApertura || !selectedProduct) return null;
@@ -220,13 +312,18 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
 
   useEffect(() => {
     if (isEdit) return;
+    const current = String(getValues("productId") || "");
+    const stillThere = filteredProductOptions.some((p) => String(p.id) === current);
+    if (current && stillThere) return;
     if (filteredProductOptions.length > 0) {
-      const firstId = String(filteredProductOptions[0].id);
-      setValue("productId", firstId, { shouldValidate: true, shouldDirty: false });
+      setValue("productId", String(filteredProductOptions[0].id), {
+        shouldValidate: true,
+        shouldDirty: false,
+      });
     } else {
       setValue("productId", "", { shouldDirty: false });
     }
-  }, [filteredProductOptions, setValue, isEdit, selectedType]);
+  }, [filteredProductOptions, setValue, getValues, isEdit, selectedType]);
 
   useEffect(() => {
     if (isEdit) return;
@@ -253,6 +350,8 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
     if (ref > 0) {
       setValue("price", String(ref), { shouldDirty: false });
     }
+    const productIva = Number(selectedProduct?.taxRate) || 0;
+    if (productIva > 0) setIvaRate(productIva);
   }, [
     selectedProductId,
     selectedType,
@@ -293,14 +392,25 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
     const reason =
       type === "ajuste" ? "AJUSTE_INVENTARIO" : formData.reason;
     const needsPriceLine = showPriceField(type, reason);
-    let lineTotal = null;
-    if (
+    const productIva = Number(product?.taxRate) || 0;
+    const hasIva = productIva > 0;
+    const unitPriceInput =
       needsPriceLine &&
       priceInputValue != null &&
       !Number.isNaN(priceInputValue) &&
       (priceRequired || priceInputValue > 0)
-    ) {
-      lineTotal = shouldMultiply ? quantityValue * priceInputValue : priceInputValue;
+        ? priceInputValue
+        : null;
+
+    const draftLine = {
+      quantity: Number(formData.quantity),
+      unitPriceInput: unitPriceInput ?? 0,
+      shouldMultiply,
+      hasIva,
+    };
+    let lineTotal = null;
+    if (needsPriceLine && unitPriceInput != null) {
+      lineTotal = lineTotalWithIva(draftLine, hasIva ? ivaRate || productIva : 0);
     }
     const description = buildDescription(formData, product, lineTotal);
 
@@ -313,6 +423,9 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
       price: type === "ajuste" || !needsPriceLine ? null : lineTotal,
       referenceType: formData.referenceType || null,
       referenceId: formData.referenceId ? Number(formData.referenceId) : null,
+      unitPriceInput: unitPriceInput ?? "",
+      shouldMultiply,
+      hasIva,
       _meta: {
         productName: product?.name || "—",
         unitAbbr: abbr,
@@ -330,6 +443,10 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
   };
 
   const addCurrentLineToCart = (formData) => {
+    const product = productById.get(Number(formData.productId));
+    const productIva = Number(product?.taxRate) || 0;
+    if (productIva > 0) setIvaRate(productIva);
+
     const payload = buildCurrentLinePayload(formData);
     const { _meta, ...apiLine } = payload;
     setCart((prev) => [
@@ -338,6 +455,7 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
         id: newCartId(),
         ...apiLine,
         ..._meta,
+        hasIva: productIva > 0,
       },
     ]);
     clearLineFields();
@@ -345,6 +463,22 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
 
   const removeCartLine = (id) => {
     setCart((prev) => prev.filter((line) => line.id !== id));
+  };
+
+  const updateCartField = (id, field, rawValue) => {
+    setCart((prev) =>
+      prev.map((line) => {
+        if (line.id !== id) return line;
+        const value = rawValue === "" ? "" : Number(rawValue);
+        return { ...line, [field]: value };
+      }),
+    );
+  };
+
+  const toggleCartIva = (id, checked) => {
+    setCart((prev) =>
+      prev.map((line) => (line.id === id ? { ...line, hasIva: checked } : line)),
+    );
   };
 
   const handleAddLineToCart = (e) => {
@@ -418,18 +552,38 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
     }
 
     if (isBatchType) {
-      const stripMeta = (payload) => {
-        const { _meta, ...line } = payload;
-        return line;
-      };
-
-      const itemsToSave = cart.map(
-        ({ id, productName, unitAbbr, typeLabel, reasonLabel, priceDisplay, ...line }) => line,
-      );
+      const itemsToSave = cart.map((line) => {
+        const needsPriceLine = showPriceField(line.type, line.reason);
+        const total = needsPriceLine ? lineTotalWithIva(line, ivaRate) : null;
+        return {
+          productId: line.productId,
+          type: line.type,
+          reason: line.reason,
+          quantity: Number(line.quantity),
+          description: line.description || null,
+          price: line.type === "ajuste" || !needsPriceLine ? null : total,
+          referenceType: line.referenceType || null,
+          referenceId: line.referenceId || null,
+        };
+      });
 
       if (itemsToSave.length === 0 && !canSubmit) {
         toastAuth({
           message: "Completa los campos del movimiento o añade líneas a la lista.",
+          variant: "warning",
+        });
+        return;
+      }
+
+      const invalidPriced = itemsToSave.some((it) => {
+        if (it.type === "ajuste") return false;
+        if (!showPriceField(it.type, it.reason)) return false;
+        if (isPriceRequired(it.type, it.reason) && !(Number(it.price) >= 0)) return true;
+        return !(Number(it.quantity) > 0);
+      });
+      if (itemsToSave.length > 0 && invalidPriced) {
+        toastAuth({
+          message: "Revisa cantidad y precio (e IVA) de las líneas de la lista.",
           variant: "warning",
         });
         return;
@@ -446,7 +600,11 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
         itemsToSave.length > 0
           ? registerMovementsBatchRequest(itemsToSave, dateApi)
           : registerMovement({
-              ...stripMeta(buildCurrentLinePayload(formData)),
+              ...(() => {
+                const { _meta, unitPriceInput, shouldMultiply: _sm, hasIva: _hi, ...line } =
+                  buildCurrentLinePayload(formData);
+                return line;
+              })(),
               ...(dateApi ? { date: dateApi } : {}),
             });
 
@@ -655,6 +813,7 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
   );
 
   return (
+    <>
     <Box
       component="form"
       onSubmit={handleFormSubmit}
@@ -740,20 +899,47 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
                   />
                 )}
 
-                <SearchableSelect
-                  label={isApertura ? "Presentación a abrir" : "Producto"}
-                  items={filteredProductOptions}
-                  value={selectedProductId || ""}
-                  disabled={isEdit}
-                  onChange={(val) => {
-                    const nextId =
-                      val && typeof val === "object" ? String(val.id ?? "") : String(val ?? "");
-                    setValue("productId", nextId, { shouldValidate: true, shouldDirty: true });
-                  }}
-                  getOptionLabel={(opt) => opt?.name ?? ""}
-                  getOptionValue={(opt) => opt?.id ?? ""}
-                  placeholder={isApertura ? "Quintal, arroba, funda…" : "Busca un producto…"}
-                />
+                <Box sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <SearchableSelect
+                      label={isApertura ? "Presentación a abrir" : "Producto"}
+                      items={filteredProductOptions}
+                      value={selectedProductId || ""}
+                      disabled={isEdit}
+                      onChange={(val) => {
+                        const nextId =
+                          val && typeof val === "object"
+                            ? String(val.id ?? "")
+                            : String(val ?? "");
+                        setValue("productId", nextId, {
+                          shouldValidate: true,
+                          shouldDirty: true,
+                        });
+                      }}
+                      getOptionLabel={(opt) => opt?.name ?? ""}
+                      getOptionValue={(opt) => opt?.id ?? ""}
+                      placeholder={
+                        isApertura ? "Quintal, arroba, funda…" : "Busca un producto…"
+                      }
+                    />
+                  </Box>
+                  {!isEdit ? (
+                    <Tooltip title="Crear producto nuevo">
+                      <IconButton
+                        color="primary"
+                        onClick={() => setProductDialogOpen(true)}
+                        sx={{
+                          mt: 0.5,
+                          border: 1,
+                          borderColor: "primary.main",
+                          borderRadius: 1,
+                        }}
+                      >
+                        <AddBoxIcon />
+                      </IconButton>
+                    </Tooltip>
+                  ) : null}
+                </Box>
 
                 {isApertura && selectedProduct && (
                   <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
@@ -907,6 +1093,27 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
                         />
                       </Grid>
                     )}
+                    {needsPrice && (
+                      <Grid item xs={12} sm={6}>
+                        <TextField
+                          fullWidth
+                          size="small"
+                          label="IVA (%)"
+                          type="number"
+                          value={ivaRate}
+                          onChange={(e) =>
+                            setIvaRate(e.target.value === "" ? "" : Number(e.target.value))
+                          }
+                          InputLabelProps={{ shrink: true }}
+                          inputProps={{ min: 0, step: "0.01" }}
+                          helperText={
+                            Number(selectedProduct?.taxRate) > 0
+                              ? `Producto con IVA ${Number(selectedProduct.taxRate)}%`
+                              : "Se aplica a líneas marcadas con IVA"
+                          }
+                        />
+                      </Grid>
+                    )}
                   </Grid>
                 )}
               </Stack>
@@ -951,45 +1158,145 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
                         Añade líneas con el botón de abajo. Luego guarda todo de una vez.
                       </Typography>
                     ) : (
-                      <List dense disablePadding>
-                        {cart.map((line, idx) => (
-                          <ListItem
-                            key={line.id}
-                            secondaryAction={
+                      <Stack spacing={0.75}>
+                        {cart.map((line, idx) => {
+                          const lineTotal = lineTotalWithIva(line, ivaRate);
+                          const showLinePrice = showPriceField(line.type, line.reason);
+                          return (
+                            <Box
+                              key={line.id}
+                              sx={{
+                                position: "relative",
+                                display: "flex",
+                                flexWrap: "wrap",
+                                alignItems: "center",
+                                columnGap: 0.75,
+                                rowGap: 0.5,
+                                border: 1,
+                                borderColor: "divider",
+                                borderRadius: 1,
+                                px: 0.75,
+                                py: 0.5,
+                                pr: 4.5,
+                                bgcolor: "background.paper",
+                              }}
+                            >
                               <IconButton
                                 type="button"
-                                edge="end"
                                 size="small"
+                                color="error"
                                 aria-label="Quitar"
                                 onClick={() => removeCartLine(line.id)}
+                                sx={{ position: "absolute", top: 2, right: 2 }}
                               >
                                 <DeleteOutlineIcon fontSize="small" />
                               </IconButton>
-                            }
-                            sx={{
-                              borderBottom: "1px solid",
-                              borderColor: "divider",
-                              alignItems: "flex-start",
-                            }}
-                          >
-                            <ListItemText
-                              primary={
-                                <Typography variant="body2" sx={{ fontWeight: 600, pr: 4 }}>
-                                  {idx + 1}. {line.productName}
+                              <Typography variant="body2" fontWeight={700} sx={{ width: "100%" }}>
+                                {idx + 1}. {line.productName}
+                                <Typography
+                                  component="span"
+                                  variant="caption"
+                                  color="text.secondary"
+                                  sx={{ ml: 0.75 }}
+                                >
+                                  {line.typeLabel} · {line.reasonLabel}
                                 </Typography>
-                              }
-                              secondary={
-                                <Typography variant="caption" color="text.secondary" component="span">
-                                  {line.typeLabel} · {line.reasonLabel} · {line.quantity}{" "}
-                                  {line.unitAbbr}
-                                  {line.priceDisplay != null &&
-                                    ` · $${Number(line.priceDisplay).toFixed(2)}`}
-                                </Typography>
-                              }
-                            />
-                          </ListItem>
-                        ))}
-                      </List>
+                              </Typography>
+                              <TextField
+                                label="Cant."
+                                type="number"
+                                size="small"
+                                value={line.quantity}
+                                onChange={(e) =>
+                                  updateCartField(line.id, "quantity", e.target.value)
+                                }
+                                InputLabelProps={{ shrink: true }}
+                                inputProps={{ min: 0.01, step: "any" }}
+                                sx={{ width: 78 }}
+                              />
+                              <Typography variant="caption" color="text.secondary">
+                                {line.unitAbbr || "u."}
+                                {line.shouldMultiply ? " ×" : ""}
+                              </Typography>
+                              {showLinePrice ? (
+                                <>
+                                  <TextField
+                                    label={line.shouldMultiply ? "P. unit." : "P. total"}
+                                    type="number"
+                                    size="small"
+                                    value={line.unitPriceInput}
+                                    onChange={(e) =>
+                                      updateCartField(line.id, "unitPriceInput", e.target.value)
+                                    }
+                                    InputLabelProps={{ shrink: true }}
+                                    inputProps={{ min: 0, step: "0.001" }}
+                                    sx={{ width: 92 }}
+                                  />
+                                  <FormControlLabel
+                                    sx={{
+                                      ml: 0.25,
+                                      mr: 0,
+                                      "& .MuiFormControlLabel-label": { fontSize: "0.75rem" },
+                                    }}
+                                    control={
+                                      <Checkbox
+                                        size="small"
+                                        sx={{ p: 0.25 }}
+                                        checked={Boolean(line.hasIva)}
+                                        onChange={(e) =>
+                                          toggleCartIva(line.id, e.target.checked)
+                                        }
+                                      />
+                                    }
+                                    label={`IVA ${Number(ivaRate) || 0}%`}
+                                  />
+                                  <Typography
+                                    variant="body2"
+                                    fontWeight={700}
+                                    sx={{ ml: "auto", minWidth: 72, textAlign: "right" }}
+                                  >
+                                    {lineTotal != null ? formatProductPrice(lineTotal) : "—"}
+                                  </Typography>
+                                </>
+                              ) : null}
+                            </Box>
+                          );
+                        })}
+                        {cart.some((l) => showPriceField(l.type, l.reason)) ? (
+                          <Box sx={{ pt: 0.5, borderTop: 1, borderColor: "divider" }}>
+                            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                              <Typography variant="body2" color="text.secondary">
+                                Subtotal
+                              </Typography>
+                              <Typography variant="body2">
+                                {formatProductPrice(cartTotals.subtotal)}
+                              </Typography>
+                            </Box>
+                            <Box sx={{ display: "flex", justifyContent: "space-between" }}>
+                              <Typography variant="body2" color="text.secondary">
+                                IVA ({Number(ivaRate) || 0}%)
+                              </Typography>
+                              <Typography variant="body2">
+                                {formatProductPrice(cartTotals.ivaTotal)}
+                              </Typography>
+                            </Box>
+                            <Box
+                              sx={{
+                                display: "flex",
+                                justifyContent: "space-between",
+                                mt: 0.25,
+                              }}
+                            >
+                              <Typography variant="subtitle2" fontWeight={700}>
+                                Total
+                              </Typography>
+                              <Typography variant="subtitle2" fontWeight={700}>
+                                {formatProductPrice(cartTotals.total)}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        ) : null}
+                      </Stack>
                     )}
                   </Paper>
                 ) : (
@@ -1068,6 +1375,59 @@ function MovementForm({ onClose, productOptions = [], onSaved, movementToEdit = 
         </Stack>
       </Box>
     </Box>
+
+      <Dialog
+        open={productDialogOpen}
+        onClose={() => setProductDialogOpen(false)}
+        fullWidth
+        maxWidth="lg"
+        scroll="paper"
+      >
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            px: 2,
+            pt: 1,
+          }}
+        >
+          <DialogTitle sx={{ p: 0, fontWeight: 700, fontSize: "1.05rem" }}>
+            Crear producto
+          </DialogTitle>
+          <IconButton
+            aria-label="Cerrar"
+            onClick={() => setProductDialogOpen(false)}
+            size="small"
+          >
+            <CloseIcon />
+          </IconButton>
+        </Box>
+        <DialogContent dividers>
+          <ProductForm
+            key={productDialogOpen ? "new-movement-product" : "closed"}
+            isEditing={false}
+            datos={{}}
+            onClose={() => setProductDialogOpen(false)}
+            reload={handleProductCreated}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 2, py: 1, borderTop: 1, borderColor: "divider" }}>
+          <Button type="button" onClick={() => setProductDialogOpen(false)} color="inherit">
+            Cancelar
+          </Button>
+          <Box sx={{ flex: 1 }} />
+          <Button
+            type="submit"
+            form="eddeli-product-form"
+            variant="contained"
+            sx={{ minWidth: 160 }}
+          >
+            Guardar producto
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }
 

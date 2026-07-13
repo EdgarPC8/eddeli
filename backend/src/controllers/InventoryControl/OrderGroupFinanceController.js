@@ -36,6 +36,10 @@ const toNum = (v, def = 0) => {
     const n = String(note || "").trim().toLowerCase();
     if (!n || n === "abono") return true;
     if (n === `abono grupo #${groupId}`.toLowerCase()) return true;
+    // El frontend a veces manda la misma nota auto-generada; no concatenar de nuevo
+    if (n.startsWith("abono parcial:")) return true;
+    if (n.startsWith("liquidación total:") || n.startsWith("liquidacion total:")) return true;
+    if (n.startsWith("abono pedido #") || n.startsWith("abono vinculado")) return true;
     return false;
   };
 
@@ -53,7 +57,8 @@ const toNum = (v, def = 0) => {
     const saldo = Number(Number(remainingAfter || 0).toFixed(2));
     const cliente = String(customerName || "Cliente").trim();
     const grupo = String(groupConcept || `Grupo #${groupId}`).trim();
-    const extra = !isGenericPaymentNote(userNote, groupId) ? String(userNote).trim() : "";
+    const rawExtra = String(userNote || "").trim();
+    const extra = !isGenericPaymentNote(rawExtra, groupId) ? rawExtra : "";
 
     let base;
     if (isFullSettlement) {
@@ -63,6 +68,10 @@ const toNum = (v, def = 0) => {
     }
 
     if (!extra) return truncateNote(base);
+    // Evitar "base. base" si el usuario pegó casi el mismo texto
+    if (extra.toLowerCase().includes(base.toLowerCase().slice(0, 40))) {
+      return truncateNote(extra.length >= base.length ? extra : base);
+    }
     return truncateNote(`${base}. ${extra}`);
   };
 
@@ -1058,6 +1067,266 @@ export const getFinanceWorkbenchAll = async (req, res) => {
     console.error("getFinanceWorkbenchAll:", error);
     return res.status(500).json({
       message: "Error al cargar Workbench",
+      error: String(error?.message || error),
+    });
+  }
+};
+
+const itemBillableTotal = (it) => {
+  const qty = toNum(it.quantity);
+  const billable = Math.max(0, qty - toNum(it.damagedQty) - toNum(it.giftQty));
+  return Number((billable * toNum(it.price)).toFixed(2));
+};
+
+/**
+ * Resuelve (o crea) el grupo de cobranzas para abonar un pedido de cliente.
+ * Misma idea que Cobranzas → «Abonar este pedido».
+ */
+async function resolveGroupForCustomerOrder(orderId, userAccountId, { createIfNeeded = true } = {}) {
+  const order = await Order.findByPk(orderId, {
+    include: [
+      {
+        model: OrderItem,
+        as: "ERP_order_items",
+        attributes: ["id", "orderId", "quantity", "price", "paidAt", "damagedQty", "giftQty"],
+      },
+      { model: Customer, as: "ERP_customer", attributes: ["id", "name"] },
+    ],
+  });
+  if (!order) return { error: { status: 404, message: "Pedido no encontrado" } };
+
+  const unpaid = (order.ERP_order_items || []).filter((it) => !it.paidAt);
+  if (unpaid.length === 0) {
+    return { error: { status: 400, message: "Este pedido no tiene ítems pendientes de cobro" } };
+  }
+
+  const unpaidIds = unpaid.map((it) => it.id);
+  const orderUnpaidTotal = Number(
+    unpaid.reduce((s, it) => s + itemBillableTotal(it), 0).toFixed(2)
+  );
+
+  const links = await ItemGroupItem.findAll({
+    where: { orderItemId: { [Op.in]: unpaidIds } },
+  });
+  const groupIdByItem = new Map(links.map((l) => [l.orderItemId, l.groupId]));
+  const ungroupedIds = unpaidIds.filter((id) => !groupIdByItem.has(id));
+  const linkedGroupIds = [...new Set(links.map((l) => Number(l.groupId)))];
+
+  const groups =
+    linkedGroupIds.length > 0
+      ? await ItemGroup.findAll({ where: { id: { [Op.in]: linkedGroupIds } } })
+      : [];
+  const openGroups = groups.filter((g) => g.status === "open");
+
+  const concept = `Pedido #${order.id}`;
+
+  if (ungroupedIds.length === 0) {
+    if (openGroups.length === 1) {
+      const fin = await getGroupFinancials(openGroups[0].id, null);
+      return {
+        order,
+        groupId: openGroups[0].id,
+        created: false,
+        orderUnpaidTotal,
+        groupRemaining: fin?.remaining ?? 0,
+        groupTotal: fin?.total ?? 0,
+        groupPaid: fin?.paid ?? 0,
+        concept: openGroups[0].concept || concept,
+      };
+    }
+    if (openGroups.length === 0) {
+      return {
+        error: {
+          status: 400,
+          message:
+            "Los ítems pendientes están en grupos cerrados. Revisa el pedido en Cobranzas.",
+        },
+      };
+    }
+    return {
+      error: {
+        status: 400,
+        message:
+          "Este pedido está repartido en varios grupos abiertos. Únelos o abona desde Cobranzas.",
+      },
+    };
+  }
+
+  // Hay ítems sin grupo
+  if (openGroups.length > 1) {
+    return {
+      error: {
+        status: 400,
+        message:
+          "Hay ítems sin grupo y otros en varios grupos. Organízalos en Cobranzas y luego abona.",
+      },
+    };
+  }
+
+  if (!createIfNeeded) {
+    let suggested = orderUnpaidTotal;
+    let groupId = null;
+    let groupRemaining = null;
+    if (openGroups.length === 1) {
+      const fin = await getGroupFinancials(openGroups[0].id, null);
+      groupId = openGroups[0].id;
+      groupRemaining = Number(
+        ((fin?.remaining || 0) +
+          ungroupedIds.reduce(
+            (s, id) => s + itemBillableTotal(unpaid.find((u) => u.id === id)),
+            0
+          )).toFixed(2)
+      );
+      suggested = groupRemaining;
+    } else {
+      suggested = Number(
+        ungroupedIds
+          .reduce((s, id) => s + itemBillableTotal(unpaid.find((u) => u.id === id)), 0)
+          .toFixed(2)
+      );
+    }
+    return {
+      order,
+      groupId,
+      created: false,
+      willCreate: openGroups.length === 0,
+      willAddToGroup: openGroups.length === 1,
+      ungroupedIds,
+      orderUnpaidTotal,
+      groupRemaining: groupRemaining ?? suggested,
+      suggestedAmount: suggested,
+      concept: openGroups[0]?.concept || concept,
+    };
+  }
+
+  if (openGroups.length === 1) {
+    await ItemGroupItem.bulkCreate(
+      ungroupedIds.map((orderItemId) => ({
+        groupId: openGroups[0].id,
+        orderItemId,
+      }))
+    );
+    const fin = await getGroupFinancials(openGroups[0].id, null);
+    return {
+      order,
+      groupId: openGroups[0].id,
+      created: false,
+      addedItemIds: ungroupedIds,
+      orderUnpaidTotal,
+      groupRemaining: fin?.remaining ?? 0,
+      groupTotal: fin?.total ?? 0,
+      groupPaid: fin?.paid ?? 0,
+      concept: openGroups[0].concept || concept,
+    };
+  }
+
+  // Crear grupo solo con ítems sin grupo de este pedido
+  const snapshotTotal = Number(
+    ungroupedIds
+      .reduce((s, id) => s + itemBillableTotal(unpaid.find((u) => u.id === id)), 0)
+      .toFixed(2)
+  );
+  const group = await ItemGroup.create({
+    customerId: order.customerId,
+    concept,
+    status: "open",
+    totalAmount: snapshotTotal,
+    createdBy: userAccountId,
+  });
+  await ItemGroupItem.bulkCreate(
+    ungroupedIds.map((orderItemId) => ({ groupId: group.id, orderItemId }))
+  );
+
+  return {
+    order,
+    groupId: group.id,
+    created: true,
+    addedItemIds: ungroupedIds,
+    orderUnpaidTotal,
+    groupRemaining: snapshotTotal,
+    groupTotal: snapshotTotal,
+    groupPaid: 0,
+    concept,
+  };
+}
+
+/** Resumen para abonar un pedido desde el calendario (sin crear grupo aún). */
+export const getCustomerOrderCollectionSummary = async (req, res) => {
+  try {
+    const token = getHeaderToken(req);
+    await verifyJWT(token);
+    const orderId = Number(req.params.orderId);
+    if (!Number.isFinite(orderId)) {
+      return res.status(400).json({ message: "Pedido inválido" });
+    }
+
+    const resolved = await resolveGroupForCustomerOrder(orderId, null, {
+      createIfNeeded: false,
+    });
+    if (resolved.error) {
+      return res.status(resolved.error.status).json({ message: resolved.error.message });
+    }
+
+    return res.json({
+      orderId,
+      customerId: resolved.order.customerId,
+      customerName: resolved.order.ERP_customer?.name || null,
+      concept: resolved.concept,
+      groupId: resolved.groupId,
+      willCreate: Boolean(resolved.willCreate),
+      willAddToGroup: Boolean(resolved.willAddToGroup),
+      ungroupedIds: resolved.ungroupedIds || [],
+      orderUnpaidTotal: resolved.orderUnpaidTotal,
+      suggestedAmount: resolved.suggestedAmount ?? resolved.groupRemaining ?? 0,
+      groupRemaining: resolved.groupRemaining ?? resolved.suggestedAmount ?? 0,
+      canQuickPay: true,
+    });
+  } catch (error) {
+    console.error("getCustomerOrderCollectionSummary:", error);
+    return res.status(500).json({
+      message: "Error al cargar resumen de cobro del pedido",
+      error: String(error?.message || error),
+    });
+  }
+};
+
+/**
+ * Abonar un pedido de cliente desde el calendario:
+ * crea/usa grupo de Cobranzas y registra el Payment + Income.
+ */
+export const payCustomerOrder = async (req, res) => {
+  try {
+    const token = getHeaderToken(req);
+    const user = await verifyJWT(token);
+    const orderId = Number(req.params.orderId);
+    if (!Number.isFinite(orderId)) {
+      return res.status(400).json({ message: "Pedido inválido" });
+    }
+
+    const resolved = await resolveGroupForCustomerOrder(orderId, user.accountId, {
+      createIfNeeded: true,
+    });
+    if (resolved.error) {
+      return res.status(resolved.error.status).json({ message: resolved.error.message });
+    }
+
+    const noteExtra = req.body?.note;
+    const pedidoNote =
+      noteExtra && String(noteExtra).trim()
+        ? String(noteExtra).trim()
+        : `Abono pedido #${orderId}`;
+
+    req.params.groupId = String(resolved.groupId);
+    req.body = {
+      ...(req.body || {}),
+      note: pedidoNote,
+    };
+
+    return payItemGroup(req, res);
+  } catch (error) {
+    console.error("payCustomerOrder:", error);
+    return res.status(500).json({
+      message: "Error al abonar el pedido",
       error: String(error?.message || error),
     });
   }

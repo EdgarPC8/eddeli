@@ -44,11 +44,19 @@ import {
   markSupplierOrderReceived,
   markSupplierOrderPaid,
 } from "../controllers/InventoryControl/SupplierOrderController.js";
+import {
+  getSupplierPayablesWorkbench,
+  paySupplierOrder,
+  updateSupplierOrderPayment,
+  deleteSupplierOrderPayment,
+} from "../controllers/InventoryControl/SupplierPayablesController.js";
 
 import { isAuthenticated, requireProgrammer } from "../middlewares/authMiddelware.js";
 import { 
     // ✅ WORKBENCH
     getFinanceWorkbenchAll,
+    getCustomerOrderCollectionSummary,
+    payCustomerOrder,
 
     // ✅ NUEVO: Grupos por ITEMS
     createItemGroup,
@@ -82,6 +90,16 @@ if (process.env.NODE_ENV !== "production") {
 // WORKBENCH
 // --------------------
 router.get("/workbench/all", isAuthenticated, getFinanceWorkbenchAll);
+router.get(
+  "/workbench/orders/:orderId/summary",
+  isAuthenticated,
+  getCustomerOrderCollectionSummary
+);
+router.post(
+  "/workbench/orders/:orderId/pay",
+  isAuthenticated,
+  payCustomerOrder
+);
 
 // =====================================================
 // ✅ FINANCE WORKBENCH (NUEVO)
@@ -156,6 +174,12 @@ router.put("/supplier-orders/:id", isAuthenticated, updateSupplierOrder);
 router.delete("/supplier-orders/:id", isAuthenticated, deleteSupplierOrder);
 router.put("/supplier-orders/:id/received", isAuthenticated, markSupplierOrderReceived);
 router.put("/supplier-orders/:id/paid", isAuthenticated, markSupplierOrderPaid);
+
+// Cuentas por pagar (abonos a pedidos de proveedor)
+router.get("/supplier-payables/workbench", isAuthenticated, getSupplierPayablesWorkbench);
+router.post("/supplier-payables/orders/:orderId/pay", isAuthenticated, paySupplierOrder);
+router.put("/supplier-payables/payments/:paymentId", isAuthenticated, updateSupplierOrderPayment);
+router.delete("/supplier-payables/payments/:paymentId", isAuthenticated, deleteSupplierOrderPayment);
 
 // =====================================================
 // ✅ ÓRDENES (LO TUYO NORMAL)

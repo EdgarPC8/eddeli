@@ -24,6 +24,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import AddIcon from '@mui/icons-material/Add';
 import PrintIcon from '@mui/icons-material/Print';
+import PaymentsIcon from '@mui/icons-material/Payments';
 
 import {
   updateOrderItemRequest,
@@ -52,7 +53,7 @@ import PrintFormatDialog from '../../../../components/saleReceipt/PrintFormatDia
 import { buildReceiptFromCustomerOrder } from '../../../../utils/saleReceiptUtils.js';
 import { formatOrderItemFromApi } from '../../../../utils/orderListUtils';
 import SupplierOrderAccordion from './SupplierOrderAccordion';
-
+import CustomerOrderPayDialog from './CustomerOrderPayDialog';
 
 /* ---------------- Utils ---------------- */
 function chunkArray(array, size) {
@@ -80,11 +81,26 @@ function getOrderStatusSeverity(items) {
 
 function getSupplierOrderSeverity(order) {
   const received = Boolean(order?.receivedAt);
-  const paid = Boolean(order?.paidAt);
-  if (paid && received) return 3;
-  if (!paid && !received) return 0;
-  if (received && !paid) return 1;
-  if (paid && !received) return 2;
+  const total = Number(order?.totalAmount);
+  const paid = Number(order?.paidAmount);
+  const remaining =
+    order?.remainingAmount != null
+      ? Number(order.remainingAmount)
+      : order?.paidAt
+        ? 0
+        : Number.isFinite(total) && Number.isFinite(paid)
+          ? Math.max(0, total - paid)
+          : order?.paidAt
+            ? 0
+            : 1;
+  const fullyPaid = Boolean(order?.paidAt) || remaining <= 0.009;
+  const partial = !fullyPaid && Number.isFinite(paid) && paid > 0.009;
+
+  if (fullyPaid && received) return 3;
+  if (!fullyPaid && !received && !partial) return 0;
+  if (partial) return received ? 1 : 0;
+  if (received && !fullyPaid) return 1;
+  if (fullyPaid && !received) return 2;
   return 1;
 }
 
@@ -178,6 +194,7 @@ export default function OrderCalendarView({
   const [openDeleteItem, setOpenDeleteItem] = useState(false);
   const [orderToDelete, setOrderToDelete] = useState(null);
   const [itemToDelete, setItemToDelete] = useState(null);
+  const [payCustomerOrder, setPayCustomerOrder] = useState(null);
 
   const { user, toast: toastAuth } = useAuth();
 
@@ -625,6 +642,17 @@ export default function OrderCalendarView({
 
                   const orderItems = order.ERP_order_items || [];
                   const orderColor = getColorByStatus(orderItems, theme, tones.state);
+                  const hasUnpaid = orderItems.some((i) => !i.paidAt);
+                  const orderTotal = orderItems.reduce(
+                    (acc, i) => acc + Number(i.price || 0) * Number(i.quantity || 0),
+                    0
+                  );
+                  const unpaidTotal = orderItems
+                    .filter((i) => !i.paidAt)
+                    .reduce(
+                      (acc, i) => acc + Number(i.price || 0) * Number(i.quantity || 0),
+                      0
+                    );
 
                   return (
                     <Accordion
@@ -647,8 +675,15 @@ export default function OrderCalendarView({
                               Cliente: {order.ERP_customer?.name}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
-                              Pedido #{order.id} – Total: $
-                              {orderItems.reduce((acc, i) => acc + i.price * i.quantity, 0).toFixed(2)}
+                              Pedido #{order.id} – Total: ${orderTotal.toFixed(2)}
+                              {hasUnpaid ? (
+                                <>
+                                  {' '}
+                                  · Por cobrar: <b>${unpaidTotal.toFixed(2)}</b>
+                                </>
+                              ) : (
+                                ' · Cobrado'
+                              )}
                             </Typography>
                           </Box>
 
@@ -688,7 +723,7 @@ export default function OrderCalendarView({
                       </AccordionSummary>
 
                       <AccordionDetails>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 1.5, flexWrap: 'wrap' }}>
                           <Tooltip title="Comprobante / factura">
                             <IconButton
                               size="small"
@@ -701,6 +736,17 @@ export default function OrderCalendarView({
                               <PrintIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                          {canManageOrders && hasUnpaid && (
+                            <Button
+                              size="small"
+                              variant="contained"
+                              color="primary"
+                              startIcon={<PaymentsIcon />}
+                              onClick={() => setPayCustomerOrder(order)}
+                            >
+                              Abonar pedido
+                            </Button>
+                          )}
                         </Box>
 
                         {/* Bloque de edición de la ORDEN */}
@@ -1181,6 +1227,13 @@ export default function OrderCalendarView({
       open={printOpen}
       onClose={() => setPrintOpen(false)}
       receipt={printReceipt}
+    />
+    <CustomerOrderPayDialog
+      open={Boolean(payCustomerOrder)}
+      order={payCustomerOrder}
+      onClose={() => setPayCustomerOrder(null)}
+      onPaid={() => onReload?.()}
+      toast={toastAuth}
     />
     </>
   );

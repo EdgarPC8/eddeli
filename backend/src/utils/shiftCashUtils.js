@@ -56,7 +56,7 @@ export function isValidCountsPayload(input) {
   return Object.keys(input).every((k) => VALID_KEYS.has(k));
 }
 
-/** Acepta arqueo por denominación o solo total (empleados sin modo programador). */
+/** Acepta arqueo por denominación (Admin/Programador) o solo total (empleados). */
 export function resolveCashFromBody(body = {}) {
   const { cashCounts, cashTotal } = body;
   if (cashCounts && typeof cashCounts === "object") {

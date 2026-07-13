@@ -193,6 +193,8 @@ export default function TurnoPage() {
   const { user, toast } = useAuth();
   const isProgrammer = user?.loginRol === "Programador";
   const isAdmin = user?.loginRol === "Administrador" || isProgrammer;
+  /** Admin y Programador abren/cierran con arqueo por monedas/billetes. */
+  const canCashArqueo = isAdmin;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeShift, setActiveShift] = useState(null);
@@ -216,12 +218,12 @@ export default function TurnoPage() {
   const [pendingStoreId, setPendingStoreId] = useState("");
 
   const openTotal = useMemo(
-    () => (isProgrammer ? computeCashTotal(openCounts) : to2(openCashTotal)),
-    [isProgrammer, openCounts, openCashTotal],
+    () => (canCashArqueo ? computeCashTotal(openCounts) : to2(openCashTotal)),
+    [canCashArqueo, openCounts, openCashTotal],
   );
   const closeTotal = useMemo(
-    () => (isProgrammer ? computeCashTotal(closeCounts) : to2(closeCashTotal)),
-    [isProgrammer, closeCounts, closeCashTotal],
+    () => (canCashArqueo ? computeCashTotal(closeCounts) : to2(closeCashTotal)),
+    [canCashArqueo, closeCounts, closeCashTotal],
   );
 
   const load = useCallback(async () => {
@@ -332,10 +334,12 @@ export default function TurnoPage() {
       const payload = {
         notes: openNotes || undefined,
         storeId: storeId ? Number(storeId) : undefined,
-        ...(isProgrammer
+        ...(canCashArqueo
           ? {
               cashCounts: openCounts,
-              openedAt: datetimeLocalForApi(openAt) || undefined,
+              ...(isProgrammer
+                ? { openedAt: datetimeLocalForApi(openAt) || undefined }
+                : {}),
             }
           : { cashTotal: openTotal }),
       };
@@ -363,7 +367,7 @@ export default function TurnoPage() {
   const handleOpenShift = async () => {
     if (openTotal <= 0) {
       void toast?.({
-        message: isProgrammer
+        message: canCashArqueo
           ? "Ingresa el capital inicial en monedas o billetes."
           : "Ingresa el total en efectivo de apertura.",
         variant: "warning",
@@ -385,10 +389,12 @@ export default function TurnoPage() {
       setSaving(true);
       const { data } = await closeShift(activeShift.id, {
         notes: closeNotes || undefined,
-        ...(isProgrammer
+        ...(canCashArqueo
           ? {
               cashCounts: closeCounts,
-              closedAt: datetimeLocalForApi(closeAt) || undefined,
+              ...(isProgrammer
+                ? { closedAt: datetimeLocalForApi(closeAt) || undefined }
+                : {}),
             }
           : { cashTotal: closeTotal }),
       });
@@ -459,8 +465,13 @@ export default function TurnoPage() {
             </Typography>
           </>
         )}
-        {isProgrammer && (
-          <Chip label="Modo Programador" size="small" color="info" sx={{ height: 22 }} />
+        {canCashArqueo && (
+          <Chip
+            label={isProgrammer ? "Modo Programador" : "Arqueo detallado"}
+            size="small"
+            color="info"
+            sx={{ height: 22 }}
+          />
         )}
         {isAdmin && (
           <Button component={RouterLink} to="/turno/supervision" size="small" variant="outlined" sx={{ ml: "auto" }}>
@@ -468,7 +479,7 @@ export default function TurnoPage() {
           </Button>
         )}
       </Stack>
-      {!isAdmin && (
+      {!canCashArqueo && (
         <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 1 }}>
           Abre tu turno, registra salidas de efectivo y cierra caja al terminar tu jornada.
         </Typography>
@@ -503,7 +514,7 @@ export default function TurnoPage() {
             </Typography>
           )}
 
-          {isProgrammer ? (
+          {canCashArqueo ? (
             <CashArqueoBlock
               counts={openCounts}
               onChange={(key, val) => setOpenCounts((p) => ({ ...p, [key]: val }))}
@@ -765,7 +776,7 @@ export default function TurnoPage() {
             Esperado = apertura + ventas en efectivo − salidas + entradas. Transfer. y tarjeta solo se resumen.
           </Typography>
 
-          {isProgrammer ? (
+          {canCashArqueo ? (
             <CashArqueoBlock
               counts={closeCounts}
               onChange={(key, val) => setCloseCounts((p) => ({ ...p, [key]: val }))}

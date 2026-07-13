@@ -170,6 +170,18 @@ export const getFinanceWorkbenchAllRequest = async () =>
     headers: { Authorization: jwt() },
   });
 
+/** Resumen de cobro de un pedido de cliente (calendario → abonar). */
+export const getCustomerOrderCollectionSummaryRequest = async (orderId) =>
+  await axios.get(`/orders/workbench/orders/${orderId}/summary`, {
+    headers: { Authorization: jwt() },
+  });
+
+/** Abonar pedido de cliente (crea/usa grupo de Cobranzas + Payment). */
+export const payCustomerOrderRequest = async (orderId, data) =>
+  await axios.post(`/orders/workbench/orders/${orderId}/pay`, data, {
+    headers: { Authorization: jwt() },
+  });
+
 /** Pedidos con estados, stock de producto y resumen (módulo estados). */
 export const getOrderStatusWorkbenchRequest = async () =>
   await axios.get("/orders/status-workbench", {
@@ -251,5 +263,29 @@ export const updateGroupPaymentRequest = async (paymentId, data) =>
  */
 export const deleteGroupPaymentRequest = async (paymentId) =>
   await axios.delete(`/orders/workbench/payments/${paymentId}`, {
+    headers: { Authorization: jwt() },
+  });
+
+// ===============================
+// 🟠 CUENTAS POR PAGAR (PROVEEDORES)
+// ===============================
+
+export const getSupplierPayablesWorkbenchRequest = async () =>
+  await axios.get("/orders/supplier-payables/workbench", {
+    headers: { Authorization: jwt() },
+  });
+
+export const paySupplierOrderRequest = async (orderId, data) =>
+  await axios.post(`/orders/supplier-payables/orders/${orderId}/pay`, data, {
+    headers: { Authorization: jwt() },
+  });
+
+export const updateSupplierOrderPaymentRequest = async (paymentId, data) =>
+  await axios.put(`/orders/supplier-payables/payments/${paymentId}`, data, {
+    headers: { Authorization: jwt() },
+  });
+
+export const deleteSupplierOrderPaymentRequest = async (paymentId) =>
+  await axios.delete(`/orders/supplier-payables/payments/${paymentId}`, {
     headers: { Authorization: jwt() },
   });

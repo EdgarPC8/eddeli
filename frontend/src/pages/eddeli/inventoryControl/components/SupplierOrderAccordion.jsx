@@ -2,8 +2,10 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  Alert,
   Box,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
@@ -11,7 +13,9 @@ import {
   Divider,
   Grid,
   IconButton,
+  LinearProgress,
   MenuItem,
+  Stack,
   TextField,
   Tooltip,
   Typography,
@@ -26,8 +30,8 @@ import EditCalendarIcon from "@mui/icons-material/EditCalendar";
 import {
   addSupplierOrderItemRequest,
   deleteSupplierOrderRequest,
-  markSupplierOrderPaidRequest,
   markSupplierOrderReceivedRequest,
+  paySupplierOrderRequest,
   updateSupplierOrderRequest,
 } from "../../../../api/ordersRequest";
 import SimpleDialog from "../../../../components/Dialogs/SimpleDialog";
@@ -46,6 +50,9 @@ import ProductPriceReference, {
 import { useState } from "react";
 
 function supplierTotal(order) {
+  if (order?.totalAmount != null && Number.isFinite(Number(order.totalAmount))) {
+    return Number(Number(order.totalAmount).toFixed(2));
+  }
   const round2 = (n) => Math.round((n + Number.EPSILON) * 100) / 100;
   let sub = 0;
   let iva = 0;
@@ -57,13 +64,32 @@ function supplierTotal(order) {
   return round2(round2(sub) + round2(iva));
 }
 
+function supplierPaid(order) {
+  if (order?.paidAmount != null && Number.isFinite(Number(order.paidAmount))) {
+    return Number(Number(order.paidAmount).toFixed(2));
+  }
+  return order?.paidAt ? supplierTotal(order) : 0;
+}
+
+function supplierRemaining(order) {
+  if (order?.remainingAmount != null && Number.isFinite(Number(order.remainingAmount))) {
+    return Number(Number(order.remainingAmount).toFixed(2));
+  }
+  return Number(Math.max(0, supplierTotal(order) - supplierPaid(order)).toFixed(2));
+}
+
 function supplierSeverity(order) {
   const received = Boolean(order.receivedAt);
-  const paid = Boolean(order.paidAt);
-  if (paid && received) return 3;
-  if (!paid && !received) return 0;
-  if (received && !paid) return 1;
-  if (paid && !received) return 2;
+  const remaining = supplierRemaining(order);
+  const paid = supplierPaid(order);
+  const fullyPaid = remaining <= 0.009;
+  const partial = !fullyPaid && paid > 0.009;
+
+  if (fullyPaid && received) return 3;
+  if (!fullyPaid && !received && !partial) return 0;
+  if (partial) return received ? 1 : 0;
+  if (received && !fullyPaid) return 1;
+  if (fullyPaid && !received) return 2;
   return 1;
 }
 
@@ -81,11 +107,23 @@ function toDateInputValue(value) {
   return local.toISOString().slice(0, 10);
 }
 
+function nowLocalDateTime() {
+  const d = new Date();
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
 function severityColor(severity, palette) {
   if (severity === 0) return palette.error.main;
   if (severity === 1) return palette.warning.main;
   if (severity === 2) return palette.info.main;
   return palette.success.main;
+}
+
+function money(n) {
+  return new Intl.NumberFormat("es-EC", { style: "currency", currency: "USD" }).format(
+    Number(n || 0)
+  );
 }
 
 export default function SupplierOrderAccordion({
@@ -102,11 +140,22 @@ export default function SupplierOrderAccordion({
   const { user } = useAuth();
   const isProgramador = user?.loginRol === "Programador";
   const [openDelete, setOpenDelete] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState("efectivo");
   const [busy, setBusy] = useState(false);
   const [addDraft, setAddDraft] = useState({ productId: "", quantity: "", unitPrice: "" });
   const [dateDialogOpen, setDateDialogOpen] = useState(false);
   const [dateDraft, setDateDraft] = useState({ receivedAt: "", paidAt: "" });
+
+  const [payOpen, setPayOpen] = useState(false);
+  const [payAmount, setPayAmount] = useState("");
+  const [payDate, setPayDate] = useState(nowLocalDateTime());
+  const [payMethod, setPayMethod] = useState("efectivo");
+  const [payNote, setPayNote] = useState("");
+
+  const total = supplierTotal(order);
+  const paid = supplierPaid(order);
+  const remaining = supplierRemaining(order);
+  const fullyPaid = remaining <= 0.009;
+  const payPct = total > 0 ? Math.min(100, Math.round((paid / total) * 100)) : 0;
 
   const severity = supplierSeverity(order);
   const base = severityColor(severity, theme.palette);
@@ -124,11 +173,48 @@ export default function SupplierOrderAccordion({
     }
   };
 
-  const handleReceived = () =>
-    run(markSupplierOrderReceivedRequest(order.id));
+  const handleReceived = () => run(markSupplierOrderReceivedRequest(order.id));
 
-  const handlePaid = () =>
-    run(markSupplierOrderPaidRequest(order.id, { paymentMethod }));
+  const openPayDialog = (full = false) => {
+    const rem = remaining > 0 ? remaining : total;
+    setPayAmount(full || rem > 0 ? String(rem) : "");
+    setPayDate(nowLocalDateTime());
+    setPayMethod("efectivo");
+    setPayNote(full ? `Liquidación pedido #${order.id}` : `Abono pedido #${order.id}`);
+    setPayOpen(true);
+  };
+
+  const handleConfirmPay = async () => {
+    const amount = Number(String(payAmount).replace(",", "."));
+    if (!(amount > 0)) {
+      void toast?.({ message: "Ingresa un monto válido", variant: "warning" });
+      return;
+    }
+    if (amount > remaining + 0.009) {
+      void toast?.({
+        message: `El abono no puede superar el saldo (${money(remaining)})`,
+        variant: "warning",
+      });
+      return;
+    }
+    setBusy(true);
+    try {
+      await toast({
+        promise: paySupplierOrderRequest(order.id, {
+          amount,
+          date: payDate,
+          method: payMethod,
+          note: payNote || `Abono pedido #${order.id}`,
+        }),
+      });
+      setPayOpen(false);
+      await onReload?.();
+    } catch {
+      /* toast */
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const openDateDialog = () => {
     setDateDraft({
@@ -246,6 +332,70 @@ export default function SupplierOrderAccordion({
         </DialogActions>
       </Dialog>
 
+      <Dialog open={payOpen} onClose={() => setPayOpen(false)} fullWidth maxWidth="xs">
+        <DialogTitle sx={{ fontWeight: 800 }}>Abonar pedido #{order.id}</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={1.5} sx={{ mt: 0.5 }}>
+            <Alert severity="info" sx={{ py: 0.5 }}>
+              Puedes abonar después de crear el pedido. Saldo actual: <b>{money(remaining)}</b>
+            </Alert>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+              <Chip size="small" label={`Total ${money(total)}`} />
+              <Chip size="small" color="success" variant="outlined" label={`Abonado ${money(paid)}`} />
+              <Chip size="small" color="error" variant="outlined" label={`Saldo ${money(remaining)}`} />
+            </Stack>
+            <TextField
+              label="Monto a abonar"
+              type="number"
+              value={payAmount}
+              onChange={(e) => setPayAmount(e.target.value)}
+              inputProps={{ min: 0, step: "0.01" }}
+              fullWidth
+              helperText="Deja el saldo o cámbialo por un abono parcial"
+            />
+            <Button size="small" onClick={() => setPayAmount(String(remaining))} disabled={remaining <= 0}>
+              Usar saldo completo ({money(remaining)})
+            </Button>
+            <TextField
+              label="Fecha"
+              type="datetime-local"
+              value={payDate}
+              onChange={(e) => setPayDate(e.target.value)}
+              InputLabelProps={{ shrink: true }}
+              fullWidth
+            />
+            <TextField
+              select
+              label="Método"
+              value={payMethod}
+              onChange={(e) => setPayMethod(e.target.value)}
+              fullWidth
+            >
+              <MenuItem value="efectivo">Efectivo</MenuItem>
+              <MenuItem value="transferencia">Transferencia</MenuItem>
+              <MenuItem value="tarjeta">Tarjeta</MenuItem>
+              <MenuItem value="otro">Otro</MenuItem>
+            </TextField>
+            <TextField
+              label="Nota"
+              value={payNote}
+              onChange={(e) => setPayNote(e.target.value)}
+              fullWidth
+              multiline
+              minRows={2}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 2, py: 1.5 }}>
+          <Button onClick={() => setPayOpen(false)} color="inherit">
+            Cancelar
+          </Button>
+          <Button variant="contained" color="error" onClick={handleConfirmPay} disabled={busy}>
+            Registrar abono
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       <Accordion
         sx={{
           mb: 1,
@@ -256,14 +406,39 @@ export default function SupplierOrderAccordion({
         }}
       >
         <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", pr: 1 }}>
-            <Box>
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              width: "100%",
+              pr: 1,
+              gap: 1,
+            }}
+          >
+            <Box sx={{ minWidth: 0 }}>
               <Typography variant="subtitle1" color="secondary.main">
                 Proveedor: {order.ERP_supplier?.name || "—"}
               </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Pedido #{order.id} — Total: ${supplierTotal(order).toFixed(2)}
+              <Typography variant="caption" color="text.secondary" component="div">
+                Pedido #{order.id} — Total: {money(total)}
+                {!fullyPaid ? (
+                  <>
+                    {" "}
+                    · Saldo: <b>{money(remaining)}</b>
+                  </>
+                ) : (
+                  " · Pagado"
+                )}
               </Typography>
+              {!fullyPaid && total > 0 ? (
+                <LinearProgress
+                  variant="determinate"
+                  value={payPct}
+                  color="error"
+                  sx={{ mt: 0.75, height: 4, borderRadius: 99, maxWidth: 220 }}
+                />
+              ) : null}
             </Box>
             <Box sx={{ display: "flex", alignItems: "center", gap: 0.25 }}>
               <DocumentAttachmentIcon
@@ -271,19 +446,19 @@ export default function SupplierOrderAccordion({
                 entityId={order.id}
                 title="Ver factura / nota proveedor"
               />
-            {canManage && !order.receivedAt && (
-              <Tooltip title="Eliminar">
-                <IconButton
-                  size="small"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setOpenDelete(true);
-                  }}
-                >
-                  <DeleteForeverIcon />
-                </IconButton>
-              </Tooltip>
-            )}
+              {canManage && !order.receivedAt && (
+                <Tooltip title="Eliminar">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setOpenDelete(true);
+                    }}
+                  >
+                    <DeleteForeverIcon />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Box>
           </Box>
         </AccordionSummary>
@@ -294,15 +469,22 @@ export default function SupplierOrderAccordion({
               Recibido: {order.receivedAt ? formatDateTime(order.receivedAt) : "Pendiente"}
             </Typography>
             <Typography variant="caption">
-              Pagado: {order.paidAt ? formatDateTime(order.paidAt) : "Pendiente"}
+              Pago:{" "}
+              {fullyPaid
+                ? order.paidAt
+                  ? formatDateTime(order.paidAt)
+                  : "Liquidado"
+                : paid > 0
+                  ? `Parcial (${money(paid)} de ${money(total)})`
+                  : "Pendiente"}
             </Typography>
           </Box>
 
           {(order.ERP_supplier_order_items || []).map((item) => {
             const unit = getProductUnitLabel(item.ERP_inventory_product);
-            const base = formatOrderLineTotal(item.quantity, item.unitPrice);
+            const lineBase = formatOrderLineTotal(item.quantity, item.unitPrice);
             const rate = Number(item.taxRate || 0);
-            const lineTotal = base * (1 + rate / 100);
+            const lineTotal = lineBase * (1 + rate / 100);
             return (
               <Typography key={item.id} variant="body2">
                 • {item.ERP_inventory_product?.name || "Producto"} — {item.quantity} {unit} ×{" "}
@@ -313,9 +495,28 @@ export default function SupplierOrderAccordion({
           })}
 
           {(order.ERP_supplier_order_items || []).length > 0 && (
-            <Typography variant="body2" fontWeight={700} sx={{ mt: 1 }}>
-              Total pedido: {formatProductPrice(supplierTotal(order))}
-            </Typography>
+            <Stack spacing={0.5} sx={{ mt: 1 }}>
+              <Typography variant="body2" fontWeight={700}>
+                Total pedido: {formatProductPrice(total)}
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Abonado: {money(paid)} · Saldo: {money(remaining)}
+              </Typography>
+            </Stack>
+          )}
+
+          {Array.isArray(order.payments) && order.payments.length > 0 && (
+            <Box sx={{ mt: 1.5 }}>
+              <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 700 }}>
+                Abonos registrados
+              </Typography>
+              {order.payments.map((p) => (
+                <Typography key={p.id} variant="caption" display="block" color="text.secondary">
+                  · {p.date || "—"} — {money(p.amount)} ({p.method}
+                  {p.note ? ` · ${p.note}` : ""})
+                </Typography>
+              ))}
+            </Box>
           )}
 
           {order.notes && (
@@ -353,29 +554,26 @@ export default function SupplierOrderAccordion({
                   Marcar recibido
                 </Button>
               )}
-              {!order.paidAt && (
+              {!fullyPaid && (
                 <>
-                  <TextField
-                    select
-                    size="small"
-                    label="Método pago"
-                    value={paymentMethod}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    sx={{ minWidth: 140 }}
-                  >
-                    <MenuItem value="efectivo">Efectivo</MenuItem>
-                    <MenuItem value="transferencia">Transferencia</MenuItem>
-                    <MenuItem value="tarjeta">Tarjeta</MenuItem>
-                  </TextField>
                   <Button
                     size="small"
                     variant="contained"
-                    color="info"
+                    color="error"
                     startIcon={<PaymentsIcon />}
                     disabled={busy}
-                    onClick={handlePaid}
+                    onClick={() => openPayDialog(false)}
                   >
-                    Marcar pagado
+                    Abonar
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="error"
+                    disabled={busy || remaining <= 0}
+                    onClick={() => openPayDialog(true)}
+                  >
+                    Liquidar todo
                   </Button>
                 </>
               )}
@@ -426,9 +624,7 @@ export default function SupplierOrderAccordion({
                         ...prev,
                         productId: val != null && val !== "" ? String(val) : "",
                         unitPrice:
-                          p != null
-                            ? String(getDefaultDistributorPrice(p))
-                            : prev.unitPrice,
+                          p != null ? String(getDefaultDistributorPrice(p)) : prev.unitPrice,
                       }));
                     }}
                     getOptionLabel={(p) => p?.name ?? ""}
