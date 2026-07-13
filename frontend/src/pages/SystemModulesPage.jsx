@@ -1,16 +1,10 @@
 /**
  * Sistema → Módulos: catálogo de módulos (grupos del menú), no secciones internas.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { Link as RouterLink, Navigate } from "react-router-dom";
-import {
-  Box,
-  Button,
-  Chip,
-  Grid,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, Button, Chip, CircularProgress, Grid, Stack, Typography } from "@mui/material";
+import Subify from "subify";
 import ExtensionIcon from "@mui/icons-material/Extension";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import ConstructionIcon from "@mui/icons-material/Construction";
@@ -37,6 +31,7 @@ import {
   MODULE_STATUS_META,
   listCatalogModuleGroupsWithStatus,
 } from "../config/appModulesCatalog.js";
+import { useSubscriptions } from "../hooks/useSubscriptions.js";
 
 const ALLOWED = new Set(["Programador", "Administrador"]);
 
@@ -83,8 +78,34 @@ function ModuleCard({ module }) {
   const canOpen = true;
   const infoHref = `/info?tab=modulos&modulo=${encodeURIComponent(module.id)}`;
 
-  const bannerBg =
-    module.status === "active"
+  const {
+    isTrial,
+    endTrial,
+    limitDaysTrial,
+    subSectionsByKey,
+    imageUrl,
+    isMaintainer,
+    subModuleId,
+  } = module;
+
+  const [trialLoading, setTrialLoading] = useState(false);
+
+  const handleStartTrial = useCallback(async () => {
+    if (!subModuleId) return;
+    setTrialLoading(true);
+    try {
+      await Subify.startTrialModule(subModuleId);
+      window.location.reload();
+    } catch (err) {
+      console.error("Error al iniciar trial:", err);
+    } finally {
+      setTrialLoading(false);
+    }
+  }, [subModuleId]);
+
+  const bannerBg = imageUrl
+    ? `linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.85) 100%), url(${imageUrl}) center/cover`
+    : module.status === "active"
       ? "linear-gradient(135deg, rgba(46,125,50,0.35) 0%, rgba(20,20,20,0.9) 70%)"
       : module.status === "development"
         ? "linear-gradient(135deg, rgba(245,180,0,0.28) 0%, rgba(20,20,20,0.92) 72%)"
@@ -98,7 +119,9 @@ function ModuleCard({ module }) {
   const highlightedFirst = [
     ...sectionItems.filter((s) => s.status === "planned"),
     ...sectionItems.filter((s) => s.status === "maintenance"),
-    ...sectionItems.filter((s) => s.status !== "planned" && s.status !== "maintenance"),
+    ...sectionItems.filter(
+      (s) => s.status !== "planned" && s.status !== "maintenance",
+    ),
   ];
   const preview = highlightedFirst.slice(0, 5);
   const moreCount = Math.max(0, highlightedFirst.length - preview.length);
@@ -116,7 +139,8 @@ function ModuleCard({ module }) {
         bgcolor: "background.paper",
         display: "flex",
         flexDirection: "column",
-        transition: "transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s",
+        transition:
+          "transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s",
         "&:hover": {
           transform: "translateY(-2px)",
           boxShadow: 4,
@@ -202,10 +226,44 @@ function ModuleCard({ module }) {
               }}
             />
           ) : null}
+          {isTrial ? (
+            <Chip
+              size="small"
+              label={`Prueba${limitDaysTrial ? ` ${limitDaysTrial}d` : ""}`}
+              sx={{
+                height: 22,
+                bgcolor: "rgba(245,180,0,0.92)",
+                color: "common.white",
+                fontWeight: 700,
+                fontSize: "0.68rem",
+              }}
+            />
+          ) : null}
+          {isMaintainer ? (
+            <Chip
+              size="small"
+              label="Mant."
+              sx={{
+                height: 22,
+                bgcolor: "rgba(211,47,47,0.92)",
+                color: "common.white",
+                fontWeight: 700,
+                fontSize: "0.68rem",
+              }}
+            />
+          ) : null}
         </Stack>
       </Box>
 
-      <Box sx={{ p: 1.75, display: "flex", flexDirection: "column", flex: 1, gap: 0.75 }}>
+      <Box
+        sx={{
+          p: 1.75,
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          gap: 0.75,
+        }}
+      >
         <Typography variant="subtitle1" fontWeight={800} lineHeight={1.25}>
           {module.name}
         </Typography>
@@ -223,6 +281,12 @@ function ModuleCard({ module }) {
           {module.description}
         </Typography>
 
+        {isTrial && endTrial ? (
+          <Typography variant="caption" color="warning.main" fontWeight={600}>
+            Prueba hasta {new Date(endTrial).toLocaleDateString()}
+          </Typography>
+        ) : null}
+
         <Stack
           direction="row"
           spacing={0.5}
@@ -234,6 +298,14 @@ function ModuleCard({ module }) {
             const isPlanned = sec.status === "planned";
             const isMaintenance = sec.status === "maintenance";
             const highlight = isPlanned || isMaintenance;
+            const subSec = subSectionsByKey?.[sec.path] || null;
+            const activeCaps = subSec
+              ? subSec.capabilities.filter((c) => c.is_active).length
+              : 0;
+            const usageLabel =
+              subSec && subSec.max_records_limit
+                ? `${subSec.usage_count}/${subSec.max_records_limit}`
+                : null;
             return (
               <Chip
                 key={sec.name}
@@ -243,9 +315,15 @@ function ModuleCard({ module }) {
                     ? `${sec.name} · Próximamente`
                     : isMaintenance
                       ? `${sec.name} · Mantenimiento`
-                      : sec.name
+                      : usageLabel
+                        ? `${sec.name} (${usageLabel})`
+                        : activeCaps > 0
+                          ? `${sec.name} · ${activeCaps} caps.`
+                          : sec.name
                 }
-                color={isPlanned ? "warning" : isMaintenance ? "error" : "default"}
+                color={
+                  isPlanned ? "warning" : isMaintenance ? "error" : "default"
+                }
                 variant={highlight ? "filled" : "outlined"}
                 sx={{
                   height: 22,
@@ -285,7 +363,31 @@ function ModuleCard({ module }) {
             label={meta.label}
             sx={{ height: 26, fontWeight: 700 }}
           />
-          {canOpen ? (
+          {isTrial && !endTrial ? (
+            <Button
+              variant="contained"
+              size="small"
+              color="warning"
+              disabled={trialLoading}
+              onClick={handleStartTrial}
+              sx={{ textTransform: "none", fontWeight: 700, px: 1.5 }}
+            >
+              {trialLoading ? (
+                <CircularProgress size={16} sx={{ color: "inherit" }} />
+              ) : (
+                "Iniciar prueba gratis"
+              )}
+            </Button>
+          ) : isTrial && endTrial && new Date(endTrial) < new Date() ? (
+            <Stack spacing={0.25} alignItems="flex-end">
+              <Typography variant="caption" color="error" fontWeight={700} sx={{ lineHeight: 1.1 }}>
+                Prueba finalizada
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.1 }}>
+                Contacte con soporte
+              </Typography>
+            </Stack>
+          ) : canOpen ? (
             <Button
               component={RouterLink}
               to={infoHref}
@@ -316,7 +418,52 @@ export default function SystemModulesPage() {
   const { user } = useAuth();
   const [filter, setFilter] = useState("all");
 
-  const allModules = useMemo(() => listCatalogModuleGroupsWithStatus(), []);
+  const { subscription } = useSubscriptions();
+  const subModules = subscription?.subscription?.modules || [];
+
+  const catalogByName = useMemo(() => {
+    const map = {};
+    for (const m of listCatalogModuleGroupsWithStatus()) {
+      map[m.name] = m;
+    }
+    return map;
+  }, []);
+
+  const allModules = useMemo(() => {
+    return subModules.map((subModule) => {
+      const catalog = catalogByName[subModule.name] || null;
+      const subSectionsByKey = {};
+      for (const sec of subModule.sections) {
+        subSectionsByKey[sec.key] = sec;
+      }
+      return {
+        id: catalog?.id || subModule.name,
+        name: subModule.name,
+        description: catalog?.description || "",
+        path: catalog?.path || null,
+        sectionCount: subModule.sections.length,
+        plannedSectionCount: 0,
+        maintenanceSectionCount: 0,
+        sectionItems: subModule.sections.map((sec) => ({
+          name: sec.name,
+          path: sec.key,
+          status: "active",
+        })),
+        sections: subModule.sections.map((sec) => sec.name),
+        status: "active",
+        statusMeta: MODULE_STATUS_META.active,
+        subscriptionModule: subModule,
+        subModuleId: subModule.id,
+        subSectionsByKey,
+        isTrial: subModule.is_trial || false,
+        startTrial: subModule.start_trial || null,
+        limitDaysTrial: subModule.limit_days_trial || null,
+        endTrial: subModule.end_trial || null,
+        imageUrl: subModule.image_url || null,
+        isMaintainer: subModule.is_maintainer || false,
+      };
+    });
+  }, [subModules]);
 
   const counts = useMemo(() => {
     const c = {
@@ -373,7 +520,9 @@ export default function SystemModulesPage() {
       </Stack>
 
       {modules.length === 0 ? (
-        <Typography color="text.secondary">No hay módulos en este filtro.</Typography>
+        <Typography color="text.secondary">
+          No hay módulos en este filtro.
+        </Typography>
       ) : (
         <Grid container spacing={2}>
           {modules.map((module) => (

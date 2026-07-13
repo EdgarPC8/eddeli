@@ -1264,6 +1264,7 @@ export function listCatalogModuleGroupsWithStatus() {
       null;
     const sectionRows = sections.map((s) => ({
       name: s.name,
+      path: s.path,
       status: resolveModuleStatus(s),
     }));
     return {

@@ -20,7 +20,11 @@ function normalizeBase(path) {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const base = normalizeBase(env.VITE_BASE_PATH || "/eddeli/");
-  const apiPrefix = String(env.VITE_API_PREFIX || "eddeliapi").replace(/^\/+|\/+$/g, "");
+  const apiPrefix = String(env.VITE_API_PREFIX || "eddeliapi").replace(
+    /^\/+|\/+$/g,
+    "",
+  );
+  console.log(apiPrefix);
   const apiPort = env.VITE_API_PORT || "3001";
   const apiTarget = `http://127.0.0.1:${apiPort}`;
 
@@ -68,8 +72,17 @@ export default defineConfig(({ mode }) => {
           manualChunks(id) {
             if (!id.includes("node_modules")) return;
             if (id.includes("@mui") || id.includes("@emotion")) return "mui";
-            if (id.includes("jspdf") || id.includes("html2canvas") || id.includes("purify")) return "pdf";
-            if (id.includes("lightweight-charts") || id.includes("@mui/x-charts")) return "charts";
+            if (
+              id.includes("jspdf") ||
+              id.includes("html2canvas") ||
+              id.includes("purify")
+            )
+              return "pdf";
+            if (
+              id.includes("lightweight-charts") ||
+              id.includes("@mui/x-charts")
+            )
+              return "charts";
             if (id.includes("socket.io")) return "realtime";
             if (id.includes("date-fns")) return "date";
             return "vendor";
