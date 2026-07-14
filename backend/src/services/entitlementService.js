@@ -106,4 +106,14 @@ export async function pullEntitlementFromGestor() {
 
 export async function ensureEntitlementTable() {
   await AppEntitlement.sync({ alter: true });
+  // Fila singleton: el gestor escribe encima con PUT /subscription/entitlement.
+  await AppEntitlement.findOrCreate({
+    where: { id: 1 },
+    defaults: {
+      id: 1,
+      payload: { ...EMPTY },
+      source: "bootstrap",
+      syncedAt: null,
+    },
+  });
 }

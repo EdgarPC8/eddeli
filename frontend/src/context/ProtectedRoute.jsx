@@ -10,9 +10,12 @@ import {
 } from "../hooks/useSubscriptions.js";
 import {
   findMaintenanceSectionForPath,
+  findPlannedSectionForPath,
   shouldBlockMaintenancePath,
+  shouldBlockPlannedPath,
 } from "../config/sectionMaintenanceAccess.js";
 import SectionMaintenanceBlocked from "../pages/SectionMaintenanceBlocked.jsx";
+import SectionPlannedBlocked from "../pages/SectionPlannedBlocked.jsx";
 
 export default function ProtectedRoute({ requiredRol }) {
   const { isAuthenticated, isLoading, user } = useAuth();
@@ -87,6 +90,14 @@ export default function ProtectedRoute({ requiredRol }) {
     );
   }
 
+  if (shouldBlockPlannedPath(location.pathname, user.loginRol, subModules)) {
+    return (
+      <SectionPlannedBlocked
+        section={findPlannedSectionForPath(location.pathname, subModules)}
+      />
+    );
+  }
+
   if (!subscription?.subscribed || expired) {
     return <Navigate to="/subscription-expired" replace />;
   }
@@ -98,7 +109,7 @@ export default function ProtectedRoute({ requiredRol }) {
     const key = String(sectionKey).split("?")[0];
     return path === key || path.startsWith(`${key}/`);
   };
-  const hasAccess = subscription.subscription.modules.find((m) =>
+  const hasAccess = subscription.subscription?.modules?.find((m) =>
     m.sections.some((s) => sectionMatches(s.key)),
   );
 

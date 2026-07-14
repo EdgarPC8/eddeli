@@ -203,3 +203,112 @@ export function isMenuLinkInMaintenance(link, subscriptionModules) {
   if (!isAppInProduction()) return false;
   return isPathInMaintenance(link);
 }
+
+/** Secciones / módulos «Próximamente» (planned). */
+export function listPlannedSectionsFromSubscription(modules = []) {
+  const out = [];
+  const seen = new Set();
+
+  const push = (path, name, moduleLabel, description) => {
+    const p = normalizePath(path);
+    if (!p || p.includes(":") || seen.has(p)) return;
+    seen.add(p);
+    out.push({
+      path: p,
+      name,
+      moduleLabel,
+      description: description || "",
+    });
+  };
+
+  for (const mod of modules) {
+    const modulePlanned = mod.status === "planned";
+    for (const section of mod.sections || []) {
+      if (!modulePlanned && section.status !== "planned") continue;
+      push(section.key, section.name, mod.name, "");
+    }
+  }
+  return out;
+}
+
+export function listPlannedSections() {
+  const out = [];
+  const seen = new Set();
+
+  const push = (path, name, moduleLabel, description) => {
+    const p = normalizePath(path);
+    if (!p || p.includes(":") || seen.has(p)) return;
+    seen.add(p);
+    out.push({
+      path: p,
+      name,
+      moduleLabel,
+      description: description || "",
+    });
+  };
+
+  for (const group of APP_MODULE_GROUPS) {
+    const groupPlanned = group.status === "planned";
+    for (const section of group.sections || []) {
+      const sectionPlanned = resolveModuleStatus(section) === "planned";
+      if (!groupPlanned && !sectionPlanned) continue;
+      push(
+        section.path,
+        section.name,
+        group.label,
+        section.description || group.summary,
+      );
+    }
+  }
+  return out;
+}
+
+function getPlannedIndex(subscriptionModules) {
+  const list =
+    Array.isArray(subscriptionModules) && subscriptionModules.length > 0
+      ? listPlannedSectionsFromSubscription(subscriptionModules)
+      : listPlannedSections();
+  const paths = list.map((s) => s.path).sort((a, b) => b.length - a.length);
+  return { list, paths };
+}
+
+export function findPlannedSectionForPath(pathname, subscriptionModules) {
+  const p = normalizePath(pathname);
+  const { list, paths } = getPlannedIndex(subscriptionModules);
+  const match = paths.find((mp) => p === mp || p.startsWith(`${mp}/`));
+  if (!match) return null;
+  return (
+    list.find((s) => s.path === match) || {
+      path: match,
+      name: "Esta sección",
+      moduleLabel: "",
+      description: "",
+    }
+  );
+}
+
+export function isPathPlanned(pathname, subscriptionModules) {
+  return Boolean(findPlannedSectionForPath(pathname, subscriptionModules));
+}
+
+/** Programador puede abrir secciones próximamente. */
+export function shouldBlockPlannedPath(
+  pathname,
+  loginRol,
+  subscriptionModules,
+) {
+  if (canBypassSectionMaintenance(loginRol)) return false;
+  if (Array.isArray(subscriptionModules) && subscriptionModules.length > 0) {
+    return isPathPlanned(pathname, subscriptionModules);
+  }
+  if (!isAppInProduction()) return false;
+  return isPathPlanned(pathname);
+}
+
+export function isMenuLinkPlanned(link, subscriptionModules) {
+  if (Array.isArray(subscriptionModules) && subscriptionModules.length > 0) {
+    return isPathPlanned(link, subscriptionModules);
+  }
+  if (!isAppInProduction()) return false;
+  return isPathPlanned(link);
+}

@@ -1,27 +1,11 @@
-import { useEffect, useState } from "react";
-import Subify from "subify";
+/**
+ * Catálogo local de planes (informativo).
+ * La activación real la hace el gestor SoftEd (push entitlement).
+ */
+import { useMemo } from "react";
+import { SYSTEM_PLANS } from "../config/systemPlansCatalog.js";
 
 export const usePlans = () => {
-  const [plans, setPlans] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const fetchPlans = async () => {
-    const { error, data } = await Subify.getPlans();
-    console.log(data);
-
-    if (error) {
-      console.error(error);
-      setIsLoading(false);
-      return;
-    }
-
-    setPlans(data);
-    setIsLoading(false);
-  };
-
-  useEffect(() => {
-    fetchPlans();
-  }, []);
-
-  return { plans, isLoading };
+  const plans = useMemo(() => SYSTEM_PLANS, []);
+  return { plans, isLoading: false };
 };

@@ -1,9 +1,9 @@
 /**
  * Planes comerciales de EdDeli (Sistema → Planes / Info).
- * Referencia de producto; la activación real puede ir por Subify más adelante.
+ * Catálogo informativo; la activación real es desde el gestor SoftEd.
  */
 
-/** Plan por defecto mientras no haya licencia Subify amarrada. */
+/** Plan por defecto de referencia si no hay entitlement activo. */
 export const DEFAULT_SYSTEM_PLAN_ID = "pro";
 
 export const SYSTEM_PLANS = [
@@ -124,7 +124,7 @@ export function getSystemPlanById(planId) {
 
 /**
  * Resuelve el plan activo a mostrar en Info / Planes.
- * Si Subify trae un nombre de plan reconocible, lo usa; si no, el default.
+ * Si el entitlement trae un nombre de plan reconocible, lo usa; si no, el default.
  */
 export function resolveActiveSystemPlan(subscription) {
   const raw =

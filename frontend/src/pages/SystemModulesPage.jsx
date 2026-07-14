@@ -1,10 +1,9 @@
 /**
  * Sistema → Módulos: catálogo de módulos (grupos del menú), no secciones internas.
  */
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState } from "react";
 import { Link as RouterLink, Navigate } from "react-router-dom";
 import { Box, Button, Chip, CircularProgress, Grid, Stack, Typography } from "@mui/material";
-import Subify from "subify";
 import ExtensionIcon from "@mui/icons-material/Extension";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
 import BuildCircleIcon from "@mui/icons-material/BuildCircle";
@@ -80,27 +79,8 @@ function ModuleCard({ module }) {
   const {
     isTrial,
     endTrial,
-    limitDaysTrial,
-    subSectionsByKey,
     imageUrl,
-    isMaintainer,
-    subModuleId,
   } = module;
-
-  const [trialLoading, setTrialLoading] = useState(false);
-
-  const handleStartTrial = useCallback(async () => {
-    if (!subModuleId) return;
-    setTrialLoading(true);
-    try {
-      await Subify.startTrialModule(subModuleId);
-      window.location.reload();
-    } catch (err) {
-      console.error("Error al iniciar trial:", err);
-    } finally {
-      setTrialLoading(false);
-    }
-  }, [subModuleId]);
 
   const bannerBg = imageUrl
     ? `linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.85) 100%), url(${imageUrl}) center/cover`
@@ -362,28 +342,13 @@ function ModuleCard({ module }) {
             label={meta.label}
             sx={{ height: 26, fontWeight: 700 }}
           />
-          {isTrial && !endTrial ? (
-            <Button
-              variant="contained"
-              size="small"
-              color="warning"
-              disabled={trialLoading}
-              onClick={handleStartTrial}
-              sx={{ textTransform: "none", fontWeight: 700, px: 1.5 }}
-            >
-              {trialLoading ? (
-                <CircularProgress size={16} sx={{ color: "inherit" }} />
-              ) : (
-                "Iniciar prueba gratis"
-              )}
-            </Button>
-          ) : isTrial && endTrial && new Date(endTrial) < new Date() ? (
+          {isTrial && endTrial && new Date(endTrial) < new Date() ? (
             <Stack spacing={0.25} alignItems="flex-end">
               <Typography variant="caption" color="error" fontWeight={700} sx={{ lineHeight: 1.1 }}>
                 Prueba finalizada
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ lineHeight: 1.1 }}>
-                Contacte con soporte
+                Pedí habilitación en el gestor SoftEd
               </Typography>
             </Stack>
           ) : canOpen ? (

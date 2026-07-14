@@ -92,7 +92,10 @@ import { PageSkeleton } from "./ContentSkeleton.jsx";
 import { getUnreadCount } from "../api/notificationsRequest.js";
 import { useNotificationSocket } from "../hooks/useNotificationSocket.js";
 import { useAppSettings } from "../context/AppSettingsContext.jsx";
-import { isMenuLinkInMaintenance } from "../config/sectionMaintenanceAccess.js";
+import {
+  isMenuLinkInMaintenance,
+  isMenuLinkPlanned,
+} from "../config/sectionMaintenanceAccess.js";
 
 const DRAWER_W = 260;
 
@@ -590,11 +593,22 @@ export default function NavBar() {
 
   const renderMenuItem = (item, nested = false) => {
     const inMaintenance = isMenuLinkInMaintenance(item.link, subModules);
+    const isPlanned = isMenuLinkPlanned(item.link, subModules);
+    const statusLabel = inMaintenance
+      ? "En mantenimiento"
+      : isPlanned
+        ? "Próximamente"
+        : null;
     const tooltip = !drawerOpen
-      ? inMaintenance
-        ? `${item.name} (en mantenimiento)`
+      ? statusLabel
+        ? `${item.name} (${statusLabel.toLowerCase()})`
         : item.name
       : "";
+    const accentColor = inMaintenance
+      ? "error.main"
+      : isPlanned
+        ? "warning.main"
+        : "inherit";
 
     return (
       <ListItem
@@ -610,7 +624,7 @@ export default function NavBar() {
             mb: 0.5,
             justifyContent: drawerOpen ? "initial" : "center",
             minHeight: 40,
-            opacity: inMaintenance ? 0.85 : 1,
+            opacity: statusLabel ? 0.88 : 1,
           }}
         >
           <Tooltip title={tooltip} placement="right">
@@ -618,7 +632,7 @@ export default function NavBar() {
               sx={{
                 minWidth: drawerOpen ? 40 : "auto",
                 justifyContent: "center",
-                color: inMaintenance ? "warning.main" : "inherit",
+                color: accentColor,
               }}
             >
               {item.icon}
@@ -627,11 +641,11 @@ export default function NavBar() {
           {drawerOpen && (
             <ListItemText
               primary={item.name}
-              secondary={inMaintenance ? "En mantenimiento" : null}
+              secondary={statusLabel}
               primaryTypographyProps={{ fontSize: 14 }}
               secondaryTypographyProps={{
                 fontSize: 11,
-                color: "warning.main",
+                color: accentColor,
                 fontWeight: 600,
               }}
             />
