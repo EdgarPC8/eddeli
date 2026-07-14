@@ -178,7 +178,7 @@ export const APP_MODULE_GROUPS = [
     id: "comprobantes-sri",
     label: "Comprobantes electrónicos",
     summary: "Documentos tributarios SRI: facturas, notas, retenciones y guías.",
-    status: "development",
+    status: "maintenance",
     sections: [
       {
         name: "Inicio SRI",
@@ -186,7 +186,7 @@ export const APP_MODULE_GROUPS = [
         roles: ["Programador", "Administrador"],
         description:
           "Módulo de comprobantes electrónicos. Emisión al SRI en desarrollo; estructura de secciones lista.",
-        status: "development",
+        status: "maintenance",
         functions: [
           { name: "Panel de secciones", description: "Acceso a facturas, notas, retenciones, guías, etc." },
           { name: "Atajos", description: "Config SRI, comprobantes POS y sucursales." },
