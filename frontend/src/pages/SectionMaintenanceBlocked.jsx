@@ -40,8 +40,11 @@ export default function SectionMaintenanceBlocked({ section }) {
           <Stack spacing={1.25} sx={{ pt: 0.5 }}>
             <Typography variant="body1">
               <strong>{title}</strong>
-              {moduleLabel ? ` (${moduleLabel})` : ""} no está disponible en producción
-              mientras se mejora o estabiliza.
+              {moduleLabel ? ` (${moduleLabel})` : ""} está en mantenimiento.
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Tu suscripción sigue activa; esta sección solo está temporalmente
+              fuera de servicio mientras se mejora o estabiliza.
             </Typography>
             {section?.description ? (
               <Typography variant="body2" color="text.secondary">

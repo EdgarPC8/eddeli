@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link as RouterLink } from "react-router-dom";
 import {
   Alert,
@@ -46,13 +46,15 @@ import {
 } from "../../api/inventoryControlRequest.js";
 import { getAllCustomersRequest, posCheckoutRequest } from "../../api/ordersRequest.js";
 import { getActiveShift } from "../../api/shiftRequest.js";
+import { fetchSriBillingSettings } from "../../api/sriBillingRequest.js";
+import { emitSriInvoice } from "../../api/sriInvoicesRequest.js";
 import CajaCustomerFormDialog from "./CajaCustomerFormDialog.jsx";
 import CajaQuickProductsDialog from "./CajaQuickProductsDialog.jsx";
 import SearchableSelect from "../../components/SearchableSelect.jsx";
 import { useAuth } from "../../context/AuthContext.jsx";
 import { useAppSettings } from "../../context/AppSettingsContext.jsx";
 import { buildCajaOrderNotes, findConsumidorFinalCustomer } from "../../utils/eddeliPosOrderUtils.js";
-import { buildCustomerDisplayName, formatCustomerDocument } from "./cajaCustomerUtils.js";
+import { buildCustomerDisplayName } from "./cajaCustomerUtils.js";
 import { formatMoney } from "../../utils/turnoCashUtils.js";
 import { useBarcodeScanner } from "../../hooks/useBarcodeScanner.js";
 import {
@@ -69,6 +71,24 @@ import {
   buildReceiptFromCheckout,
   resolveStoredDocumentType,
 } from "../../utils/saleReceiptUtils.js";
+import {
+  annotateCajaDrafts,
+  clearAllCajaDrafts,
+  clearCajaDraft,
+  countAvailableCajaDrafts,
+  createTabDraftId,
+  getTabDraftSession,
+  isCajaDraftWorthRestoring,
+  readCajaDraft,
+  subscribeCajaDraftSync,
+  summarizeCajaDraft,
+  touchCajaDraftPresence,
+  tryClaimCajaDraft,
+  writeCajaDraft,
+} from "../../utils/cajaDraftStorage.js";
+import { buildSriInvoicePayloadFromCaja } from "../../utils/cajaSriEmit.js";
+import FactCheckIcon from "@mui/icons-material/FactCheck";
+import RestoreIcon from "@mui/icons-material/Restore";
 
 const to2 = (n) => Number(Number(n || 0).toFixed(2));
 
@@ -163,9 +183,10 @@ const lineBreakdown = (row) => {
 };
 
 export default function CajaPage() {
-  const { toast } = useAuth();
-  const { activeApp } = useAppSettings();
+  const { toast, user } = useAuth();
+  const { activeApp, loading: appSettingsLoading } = useAppSettings();
   const theme = useTheme();
+  const draftUserId = user?.userId != null ? String(user.userId) : null;
   const [products, setProducts] = useState([]);
   const [tierGroups, setTierGroups] = useState([]);
   const [customers, setCustomers] = useState([]);
@@ -196,13 +217,82 @@ export default function CajaPage() {
   const [printReceipt, setPrintReceipt] = useState(null);
   const [lastSaleReceipt, setLastSaleReceipt] = useState(null);
   const [quickProductsOpen, setQuickProductsOpen] = useState(false);
+  const [sriSettings, setSriSettings] = useState(null);
+  const [draftChoices, setDraftChoices] = useState(null);
+  const [draftModalLocked, setDraftModalLocked] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
+  const [activeDraftId, setActiveDraftId] = useState(null);
+  const [pendingDraftCount, setPendingDraftCount] = useState(0);
+  const draftTokenRef = useRef(null);
+  const draftChoicesOpenRef = useRef(false);
+  const skipDefaultCustomerRef = useRef(false);
+
+  useEffect(() => {
+    draftChoicesOpenRef.current = Boolean(draftChoices?.length);
+  }, [draftChoices]);
+
+  const refreshPendingDraftCount = useCallback(() => {
+    if (draftUserId == null) {
+      setPendingDraftCount(0);
+      return;
+    }
+    setPendingDraftCount(
+      countAvailableCajaDrafts(activeApp, draftUserId, {
+        myToken: draftTokenRef.current,
+        myDraftId: activeDraftId,
+      }),
+    );
+  }, [activeApp, draftUserId, activeDraftId]);
+
+  const refreshDraftChoices = useCallback(() => {
+    if (draftUserId == null) return;
+    const annotated = annotateCajaDrafts(activeApp, draftUserId, {
+      myToken: draftTokenRef.current,
+      myDraftId: activeDraftId,
+    });
+    setDraftChoices(annotated);
+    setPendingDraftCount(annotated.filter((d) => d.status === "available").length);
+  }, [activeApp, draftUserId, activeDraftId]);
+
+  const openDraftRecoverModal = () => {
+    if (draftUserId == null) return;
+    const annotated = annotateCajaDrafts(activeApp, draftUserId, {
+      myToken: draftTokenRef.current,
+      myDraftId: activeDraftId,
+    });
+    setPendingDraftCount(annotated.filter((d) => d.status === "available").length);
+    if (annotated.length === 0) {
+      void toast?.({ message: "No hay cajas pendientes por recuperar.", variant: "info" });
+      return;
+    }
+    setDraftModalLocked(false);
+    setDraftChoices(annotated);
+  };
+
+  const applyDraftState = (d, nextCustomers = customers) => {
+    setCart(Array.isArray(d?.cart) ? d.cart : []);
+    setNotes(String(d?.notes || ""));
+    if (d?.documentType) setDocumentType(d.documentType);
+    if (d?.saleType) setSaleType(d.saleType);
+    if (d?.paymentMethod) setPaymentMethod(d.paymentMethod);
+    setAmountReceived(d?.amountReceived != null ? String(d.amountReceived) : "");
+    setUseCustomerData(Boolean(d?.useCustomerData));
+    const cid = d?.customerId != null ? String(d.customerId) : "";
+    if (cid && nextCustomers.some((c) => String(c.id) === cid)) {
+      setCustomerId(cid);
+    } else {
+      const consumidorFinal = findConsumidorFinalCustomer(nextCustomers);
+      if (consumidorFinal) setCustomerId(String(consumidorFinal.id));
+    }
+  };
 
   const loadData = async () => {
-    const [productsRes, customersRes, shiftRes, tierGroupsRes] = await Promise.allSettled([
+    const [productsRes, customersRes, shiftRes, tierGroupsRes, sriRes] = await Promise.allSettled([
       getAllProducts({ withTierGroups: "true", all: "true" }),
       getAllCustomersRequest(),
       getActiveShift(),
       getTierGroups({ active: "true" }),
+      fetchSriBillingSettings(),
     ]);
     let nextProducts = [];
     let nextTierGroups = [];
@@ -224,7 +314,10 @@ export default function CajaPage() {
     setCustomers(nextCustomers);
     setTierGroups(nextTierGroups);
     setActiveShift(shiftRes.status === "fulfilled" ? shiftRes.value.data : null);
-    if (!customerId) {
+    if (sriRes.status === "fulfilled") {
+      setSriSettings(sriRes.value || null);
+    }
+    if (!customerId && !skipDefaultCustomerRef.current) {
       const consumidorFinal = findConsumidorFinalCustomer(nextCustomers);
       if (consumidorFinal) setCustomerId(String(consumidorFinal.id));
     }
@@ -232,9 +325,222 @@ export default function CajaPage() {
   };
 
   useEffect(() => {
-    void loadData();
+    if (draftUserId == null || appSettingsLoading) return;
+    let cancelled = false;
+    (async () => {
+      const { draftId: sessionDraftId, token } = getTabDraftSession();
+      draftTokenRef.current = token;
+      const { customers: nextCustomers } = await loadData();
+      if (cancelled) return;
+
+      if (sessionDraftId) {
+        const mine = readCajaDraft(activeApp, draftUserId, sessionDraftId);
+        if (mine && isCajaDraftWorthRestoring(mine)) {
+          skipDefaultCustomerRef.current = true;
+          applyDraftState(mine, nextCustomers);
+          skipDefaultCustomerRef.current = false;
+          setActiveDraftId(sessionDraftId);
+          touchCajaDraftPresence(activeApp, draftUserId, sessionDraftId, token);
+          setDraftReady(true);
+          return;
+        }
+      }
+
+      const pending = annotateCajaDrafts(activeApp, draftUserId, {
+        myToken: token,
+        myDraftId: null,
+      });
+      const available = pending.filter((d) => d.status === "available");
+      if (available.length > 0) {
+        skipDefaultCustomerRef.current = true;
+        setDraftModalLocked(true);
+        setDraftChoices(pending);
+        setPendingDraftCount(available.length);
+        return;
+      }
+
+      const freshId = createTabDraftId();
+      setActiveDraftId(freshId);
+      setDraftReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [draftUserId, appSettingsLoading, activeApp?.alias, activeApp?.mediaFolderPrefix]);
+
+  useEffect(() => {
+    if (!draftReady || draftChoices || draftUserId == null || !activeDraftId) return;
+    const timer = window.setTimeout(() => {
+      const draft = {
+        cart,
+        notes,
+        documentType,
+        saleType,
+        paymentMethod,
+        amountReceived,
+        useCustomerData,
+        customerId,
+      };
+      if (isCajaDraftWorthRestoring(draft)) {
+        const writtenId = writeCajaDraft(
+          activeApp,
+          draftUserId,
+          activeDraftId,
+          draft,
+          draftTokenRef.current,
+        );
+        if (writtenId && writtenId !== activeDraftId) setActiveDraftId(writtenId);
+      } else {
+        clearCajaDraft(activeApp, draftUserId, activeDraftId);
+      }
+      refreshPendingDraftCount();
+    }, 450);
+    return () => window.clearTimeout(timer);
+  }, [
+    draftReady,
+    draftChoices,
+    draftUserId,
+    activeDraftId,
+    activeApp,
+    cart,
+    notes,
+    documentType,
+    saleType,
+    paymentMethod,
+    amountReceived,
+    useCustomerData,
+    customerId,
+    refreshPendingDraftCount,
+  ]);
+
+  // Heartbeat de presencia + sync entre pestañas
+  useEffect(() => {
+    if (draftUserId == null || appSettingsLoading) return undefined;
+    const sync = () => {
+      refreshPendingDraftCount();
+      if (draftChoicesOpenRef.current) refreshDraftChoices();
+    };
+    const unsub = subscribeCajaDraftSync(activeApp, draftUserId, sync);
+    const beat = window.setInterval(() => {
+      if (activeDraftId && draftTokenRef.current && draftReady) {
+        touchCajaDraftPresence(activeApp, draftUserId, activeDraftId, draftTokenRef.current);
+      }
+      sync();
+    }, 3000);
+    sync();
+    return () => {
+      unsub();
+      window.clearInterval(beat);
+    };
+  }, [
+    activeApp,
+    draftUserId,
+    appSettingsLoading,
+    activeDraftId,
+    draftReady,
+    refreshPendingDraftCount,
+    refreshDraftChoices,
+  ]);
+
+  const pickCajaDraft = (draft) => {
+    if (!draft?.id || draftUserId == null) return;
+    if (draft.status === "in_use") {
+      void toast?.({
+        message: "Esa caja ya está en uso en otra pestaña.",
+        variant: "warning",
+      });
+      refreshDraftChoices();
+      return;
+    }
+    if (draft.status === "mine") {
+      setDraftChoices(null);
+      setDraftModalLocked(false);
+      return;
+    }
+    const result = tryClaimCajaDraft(
+      activeApp,
+      draftUserId,
+      draft.id,
+      draftTokenRef.current,
+    );
+    if (!result.ok) {
+      void toast?.({
+        message:
+          result.reason === "in_use"
+            ? "Otra pestaña ya recuperó esa caja. Elige otra o empieza limpia."
+            : "Ese borrador ya no existe.",
+        variant: "warning",
+      });
+      refreshDraftChoices();
+      return;
+    }
+    applyDraftState(draft, customers);
+    skipDefaultCustomerRef.current = false;
+    setActiveDraftId(result.id);
+    setDraftChoices(null);
+    setDraftModalLocked(false);
+    setDraftReady(true);
+    refreshPendingDraftCount();
+  };
+
+  const startFreshCajaDraft = () => {
+    const id = createTabDraftId();
+    skipDefaultCustomerRef.current = false;
+    setActiveDraftId(id);
+    setDraftChoices(null);
+    setDraftModalLocked(false);
+    setDraftReady(true);
+    if (draftTokenRef.current) {
+      touchCajaDraftPresence(activeApp, draftUserId, id, draftTokenRef.current);
+    }
+    if (!customerId) {
+      const consumidorFinal = findConsumidorFinalCustomer(customers);
+      if (consumidorFinal) setCustomerId(String(consumidorFinal.id));
+    }
+    refreshPendingDraftCount();
+  };
+
+  const discardOneCajaDraft = (draftId) => {
+    if (draftUserId == null || !draftId) return;
+    clearCajaDraft(activeApp, draftUserId, draftId);
+    const annotated = annotateCajaDrafts(activeApp, draftUserId, {
+      myToken: draftTokenRef.current,
+      myDraftId: activeDraftId,
+    });
+    const available = annotated.filter((d) => d.status === "available");
+    setPendingDraftCount(available.length);
+    if (!draftReady) {
+      if (available.length === 0) {
+        startFreshCajaDraft();
+        return;
+      }
+      setDraftChoices(annotated);
+      return;
+    }
+    if (annotated.length === 0) {
+      setDraftChoices(null);
+      setDraftModalLocked(false);
+      return;
+    }
+    setDraftChoices(annotated);
+  };
+
+  const discardAllCajaDrafts = () => {
+    if (draftUserId != null) clearAllCajaDrafts(activeApp, draftUserId);
+    if (!draftReady) {
+      startFreshCajaDraft();
+      return;
+    }
+    setDraftChoices(null);
+    setDraftModalLocked(false);
+    setPendingDraftCount(0);
+  };
+
+  const closeDraftModalIfAllowed = () => {
+    if (draftModalLocked) return;
+    setDraftChoices(null);
+  };
 
   useEffect(() => {
     if (!activeShift?.id) {
@@ -407,7 +713,12 @@ export default function CajaPage() {
   );
 
   const scannerUiBlocked =
-    saving || stockDialogOpen || quickDownOpen || addCustomerOpen || quickProductsOpen;
+    saving ||
+    stockDialogOpen ||
+    quickDownOpen ||
+    addCustomerOpen ||
+    quickProductsOpen ||
+    Boolean(draftChoices);
 
   const handleBarcodeCode = useCallback(
     (code) => {
@@ -559,11 +870,12 @@ export default function CajaPage() {
         : resolveStoredDocumentType(documentType, useCustomerData || isInvoice);
     const cartSnapshot = pricedCart.map((row) => ({ ...row }));
     const customer = customers.find((c) => String(c.id) === String(resolvedCustomerId));
+    const payMethod = isCreditSale ? "credito" : paymentMethod || "efectivo";
     const { data } = await posCheckoutRequest({
       customerId: Number(resolvedCustomerId),
       notes: orderNotes,
       saleType: isCreditSale ? "credito" : "contado",
-      paymentMethod: isCreditSale ? "credito" : paymentMethod || "efectivo",
+      paymentMethod: payMethod,
       documentType: storedDocType,
       items: cartSnapshot.map((row) => ({
         productId: Number(row.productId),
@@ -585,14 +897,59 @@ export default function CajaPage() {
       cart: cartSnapshot,
       customer,
       documentType: storedDocType,
-      paymentMethod: isCreditSale ? "credito" : paymentMethod || "efectivo",
+      paymentMethod: payMethod,
       saleType,
       notes: orderNotes,
     });
+
+    // Factura electrónica SRI: no bloquea el cobro si falla
+    if (isInvoice && sriSettings?.readyForInvoicing) {
+      void (async () => {
+        try {
+          const payload = buildSriInvoicePayloadFromCaja({
+            customer,
+            cartRows: cartSnapshot,
+            paymentMethod: payMethod,
+          });
+          payload.orderId = data.orderId;
+          if (customer?.id) payload.customerId = Number(customer.id);
+          const result = await emitSriInvoice(payload);
+          const st = result?.invoice?.status;
+          void toast?.({
+            message:
+              st === "authorized"
+                ? `Factura electrónica autorizada (SRI). Clave: ${result.invoice.accessKey || "—"}`
+                : st === "rejected"
+                  ? `Venta OK. SRI rechazó la factura: ${result.invoice?.sriMessage || result.message || ""}`
+                  : result?.message || "Factura electrónica enviada al SRI",
+            variant: st === "authorized" ? "success" : st === "rejected" ? "warning" : "info",
+          });
+        } catch (err) {
+          void toast?.({
+            message: `Venta registrada. No se pudo emitir al SRI: ${
+              err?.response?.data?.message || err.message || "error"
+            }`,
+            variant: "warning",
+          });
+        }
+      })();
+    } else if (isInvoice && !sriSettings?.readyForInvoicing) {
+      void toast?.({
+        message:
+          "Factura POS guardada. Facturación electrónica SRI no está lista (configura firma/RUC).",
+        variant: "info",
+      });
+    }
+
     setCart([]);
     setNotes("");
     setSelectedProductId("");
     setAmountReceived("");
+    if (draftUserId != null && activeDraftId) {
+      clearCajaDraft(activeApp, draftUserId, activeDraftId);
+      const freshId = createTabDraftId();
+      setActiveDraftId(freshId);
+    }
     setLastSaleReceipt(receipt);
     return receipt;
   };
@@ -810,7 +1167,7 @@ export default function CajaPage() {
         gap={1}
         sx={{ mb: 1 }}
       >
-        <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack direction="row" alignItems="center" spacing={1} flexWrap="wrap" useFlexGap>
           <Typography variant="h5" fontWeight={700}>
             Punto de Venta
           </Typography>
@@ -824,6 +1181,40 @@ export default function CajaPage() {
             <Tooltip title="No hay turno abierto">
               <ErrorOutlineIcon color="error" aria-label="Sin turno abierto" />
             </Tooltip>
+          )}
+          {pendingDraftCount > 0 ? (
+            <Tooltip title="Hay cajas guardadas por recuperar en este navegador">
+              <Chip
+                size="small"
+                color="info"
+                icon={<RestoreIcon />}
+                label={`${pendingDraftCount} por recuperar`}
+                onClick={openDraftRecoverModal}
+                clickable
+              />
+            </Tooltip>
+          ) : null}
+          {sriSettings?.readyForInvoicing ? (
+            <Chip
+              size="small"
+              color="success"
+              icon={<FactCheckIcon />}
+              label="Facturación electrónica activa"
+              component={RouterLink}
+              to="/sistema/configuracion?tab=sri"
+              clickable
+            />
+          ) : (
+            <Chip
+              size="small"
+              variant="outlined"
+              color="warning"
+              icon={<FactCheckIcon />}
+              label="SRI no listo"
+              component={RouterLink}
+              to="/sistema/configuracion?tab=sri"
+              clickable
+            />
           )}
         </Stack>
         <Stack direction="row" spacing={1}>
@@ -1175,6 +1566,13 @@ export default function CajaPage() {
                     setUseCustomerData(true);
                   }
                 }}
+                helperText={
+                  documentType === "factura"
+                    ? sriSettings?.readyForInvoicing
+                      ? "Al cobrar se emite también la factura electrónica al SRI (cliente o consumidor final)."
+                      : "Factura POS local. Configura SRI para emitir al fisco."
+                    : undefined
+                }
               >
                 <MenuItem value="documento">Documento</MenuItem>
                 <MenuItem value="factura">Factura</MenuItem>
@@ -1223,9 +1621,12 @@ export default function CajaPage() {
                       onChange={setCustomerId}
                       items={customers}
                       getOptionLabel={(customer) => {
-                        const doc = formatCustomerDocument(customer);
-                        const phone = customer.phone ? ` · ${customer.phone}` : "";
-                        return `${buildCustomerDisplayName(customer)}${doc ? ` · ${doc}` : ""}${phone}`;
+                        const name = buildCustomerDisplayName(customer);
+                        const cedula = String(customer?.cedula || "").trim();
+                        if (cedula) return `${name} · ${cedula}`;
+                        const phone = String(customer?.phone || "").trim();
+                        if (phone) return `${name} · ${phone}`;
+                        return name;
                       }}
                       getOptionValue={(customer) => String(customer.id)}
                     />
@@ -1333,6 +1734,129 @@ export default function CajaPage() {
           </Paper>
         </Grid>
       </Grid>
+
+      <Dialog
+        open={Boolean(draftChoices?.length)}
+        onClose={closeDraftModalIfAllowed}
+        disableEscapeKeyDown={draftModalLocked}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle sx={{ fontSize: "1rem", py: 1.5 }}>
+          Recuperar cajas anteriores
+        </DialogTitle>
+        <DialogContent dividers sx={{ pt: 1.5 }}>
+          <Typography variant="body2" sx={{ mb: 1.5 }}>
+            Elige un borrador libre para esta pestaña. Si está “En uso”, ya lo tomó otra caja.
+          </Typography>
+          <Stack spacing={1.25}>
+            {(draftChoices || []).map((draft) => {
+              const summary = summarizeCajaDraft(draft);
+              const busy = draft.status === "in_use";
+              const mine = draft.status === "mine";
+              return (
+                <Paper
+                  key={draft.id}
+                  variant="outlined"
+                  sx={{
+                    p: 1.25,
+                    opacity: busy ? 0.72 : 1,
+                    borderColor: mine ? "success.main" : busy ? "warning.main" : "divider",
+                  }}
+                >
+                  <Stack
+                    direction={{ xs: "column", sm: "row" }}
+                    spacing={1}
+                    alignItems={{ sm: "flex-start" }}
+                  >
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }} flexWrap="wrap" useFlexGap>
+                        <Typography variant="body2" fontWeight={600}>
+                          {summary.whenLabel}
+                        </Typography>
+                        {mine ? (
+                          <Chip size="small" color="success" label="Esta pestaña" />
+                        ) : busy ? (
+                          <Chip size="small" color="warning" label="En uso en otra pestaña" />
+                        ) : (
+                          <Chip size="small" color="info" variant="outlined" label="Disponible" />
+                        )}
+                      </Stack>
+                      <Typography variant="caption" color="text.secondary" display="block">
+                        {summary.lines > 0
+                          ? `${summary.lines} línea${summary.lines === 1 ? "" : "s"} · ${summary.units} unidad${
+                              summary.units === 1 ? "" : "es"
+                            }`
+                          : "Notas u opciones sin productos"}
+                      </Typography>
+                      {summary.products.items.length > 0 ? (
+                        <Box
+                          component="ul"
+                          sx={{
+                            m: 0,
+                            mt: 0.75,
+                            pl: 2,
+                            maxHeight: 120,
+                            overflow: "auto",
+                          }}
+                        >
+                          {summary.products.items.map((item, idx) => (
+                            <Typography
+                              key={`${draft.id}-${idx}`}
+                              component="li"
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              {item.name} × {item.quantity}
+                            </Typography>
+                          ))}
+                          {summary.products.more > 0 ? (
+                            <Typography component="li" variant="caption" color="text.secondary">
+                              … y {summary.products.more} más
+                            </Typography>
+                          ) : null}
+                        </Box>
+                      ) : null}
+                    </Box>
+                    <Stack direction="row" spacing={0.75} sx={{ flexShrink: 0 }}>
+                      {!mine ? (
+                        <Button
+                          size="small"
+                          color="inherit"
+                          onClick={() => discardOneCajaDraft(draft.id)}
+                        >
+                          Descartar
+                        </Button>
+                      ) : null}
+                      <Button
+                        size="small"
+                        variant="contained"
+                        disabled={busy}
+                        onClick={() => pickCajaDraft(draft)}
+                      >
+                        {mine ? "Ya está aquí" : "Usar"}
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </Paper>
+              );
+            })}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ px: 2, py: 1.5, flexWrap: "wrap", gap: 1 }}>
+          <Button onClick={discardAllCajaDrafts} color="inherit" size="small">
+            Descartar todas
+          </Button>
+          {!draftModalLocked ? (
+            <Button onClick={closeDraftModalIfAllowed} size="small">
+              Cerrar
+            </Button>
+          ) : null}
+          <Button onClick={startFreshCajaDraft} size="small" variant={draftModalLocked ? "outlined" : "text"}>
+            Empezar limpia
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={stockDialogOpen} onClose={closeStockDialog} maxWidth="sm" fullWidth>
         <DialogTitle sx={{ fontSize: "1rem", py: 1.5 }}>

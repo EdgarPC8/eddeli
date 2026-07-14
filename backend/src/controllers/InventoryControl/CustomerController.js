@@ -1,58 +1,82 @@
 import { Customer } from "../../models/Orders.js";
+import {
+  composeCustomerFullName,
+  normalizeCustomerPayload,
+} from "../../services/customerNameService.js";
 
-function normalizeCustomerPayload(body = {}) {
-  const payload = { ...body };
-  if ("cedula" in payload) {
-    const cedula = String(payload.cedula ?? "").trim();
-    payload.cedula = cedula || null;
-  }
-  return payload;
-}
-
-// controllers/CustomerController.js
-// Obtener todos los clientes
 export const getAllCustomers = async (req, res) => {
   try {
-    const customers = await Customer.findAll();
+    const customers = await Customer.findAll({ order: [["id", "DESC"]] });
     res.json(customers);
   } catch (error) {
-    res.status(500).json({ message: 'Error al obtener clientes', error });
+    res.status(500).json({ message: "Error al obtener clientes", error });
   }
 };
 
-// Crear nuevo cliente
 export const createCustomer = async (req, res) => {
   try {
-    const existing = await Customer.findOne({ where: { phone: req.body.phone } });
-    if (existing) {
-      return res.status(409).json({ message: 'Ya existe un cliente con ese teléfono' });
+    const payload = normalizeCustomerPayload(req.body || {});
+    if (!String(payload.name || "").trim() && !String(payload.firstName || "").trim()) {
+      return res.status(400).json({ message: "El primer nombre es obligatorio" });
     }
-    const customer = await Customer.create(normalizeCustomerPayload(req.body));
+    if (!payload.name) {
+      payload.name = composeCustomerFullName(payload) || "Sin nombre";
+    }
+    if (!payload.firstName) {
+      payload.firstName = payload.name;
+    }
+    if (!payload.identType) payload.identType = "05";
+
+    if (payload.phone) {
+      const existing = await Customer.findOne({ where: { phone: payload.phone } });
+      if (existing) {
+        return res.status(409).json({ message: "Ya existe un cliente con ese teléfono" });
+      }
+    }
+
+    const customer = await Customer.create(payload);
     res.status(201).json(customer);
   } catch (error) {
-    res.status(500).json({ message: 'Error al crear cliente', error });
+    console.error("createCustomer", error);
+    res.status(500).json({ message: "Error al crear cliente", error: String(error?.message || error) });
   }
 };
 
-// Actualizar cliente
 export const updateCustomer = async (req, res) => {
   try {
     const customer = await Customer.findByPk(req.params.id);
-    if (!customer) return res.status(404).json({ message: 'Cliente no encontrado' });
-    await customer.update(normalizeCustomerPayload(req.body));
-    res.json(customer);
+    if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
+
+    const current = customer.toJSON();
+    const payload = normalizeCustomerPayload({
+      firstName: current.firstName,
+      secondName: current.secondName,
+      firstLastName: current.firstLastName,
+      secondLastName: current.secondLastName,
+      identType: current.identType,
+      cedula: current.cedula,
+      name: current.name,
+      ...(req.body || {}),
+    });
+
+    if (!payload.name) {
+      payload.name = composeCustomerFullName(payload) || current.name;
+    }
+
+    await customer.update(payload);
+    res.json(await customer.reload());
   } catch (error) {
-    res.status(500).json({ message: 'Error al actualizar cliente', error });
+    console.error("updateCustomer", error);
+    res.status(500).json({ message: "Error al actualizar cliente", error: String(error?.message || error) });
   }
 };
 
-// Eliminar cliente
 export const deleteCustomer = async (req, res) => {
   try {
     const deleted = await Customer.destroy({ where: { id: req.params.id } });
-    if (!deleted) return res.status(404).json({ message: 'Cliente no encontrado' });
-    res.json({ message: 'Cliente eliminado correctamente' });
+    if (!deleted) return res.status(404).json({ message: "Cliente no encontrado" });
+    res.json({ message: "Cliente eliminado correctamente" });
   } catch (error) {
-    res.status(500).json({ message: 'Error al eliminar cliente', error });
+    res.status(500).json({ message: "Error al eliminar cliente", error });
   }
 };

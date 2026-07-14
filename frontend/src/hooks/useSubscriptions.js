@@ -1,14 +1,15 @@
+/**
+ * Suscripción local (backend EdDeli). El gestor solo EMPUJA el entitlement;
+ * en runtime EdDeli lee su propio backend — el gestor puede estar apagado.
+ */
 import { useEffect, useState } from "react";
-import Subify from "subify";
+import axios from "../api/axios.js";
 
 /**
- * Control de licencias/suscripciones.
- *
- * - En desarrollo (`npm run dev`) queda DESACTIVADO por defecto, para no depender
- *   del gestor central y evitar que la app se quede cargando.
- * - En producción (build compilado / `npm run build` + preview) queda ACTIVADO.
- * - Se puede forzar manualmente con la variable de entorno
- *   `VITE_SUBSCRIPTIONS_ENABLED` = "true" | "false" (en un archivo .env del frontend).
+ * Switch en frontend/.env → `VITE_SUBSCRIPTIONS_ENABLED`:
+ *   - "true"  → limitar por entitlement guardado en el backend EdDeli.
+ *   - "false" → acceso total (desarrollo libre).
+ *   - sin definir → desactivado en `npm run dev`, activado en build de producción.
  */
 const ENV_OVERRIDE = import.meta.env.VITE_SUBSCRIPTIONS_ENABLED;
 export const SUBSCRIPTIONS_ENABLED =
@@ -18,45 +19,89 @@ export const SUBSCRIPTIONS_ENABLED =
       ? false
       : import.meta.env.PROD;
 
-/** Suscripción simulada cuando el control está desactivado (acceso total). */
 const BYPASS_SUBSCRIPTION = {
   subscribed: true,
   subscription: { modules: [] },
+  maintenance: false,
 };
 
+const CACHE_KEY = "eddeli_entitlement_cache_v1";
+
+function readCachedEntitlement() {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedEntitlement(data) {
+  try {
+    if (data?.subscribed && data?.subscription) {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+    } else {
+      localStorage.removeItem(CACHE_KEY);
+    }
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+function computeExpired(data) {
+  if (!data?.subscription?.expires_at) return false;
+  return new Date(data.subscription.expires_at) < new Date();
+}
+
 export const useSubscriptions = () => {
-  const [isLoading, setIsLoading] = useState(SUBSCRIPTIONS_ENABLED);
+  const cached = SUBSCRIPTIONS_ENABLED ? readCachedEntitlement() : null;
+  const [isLoading, setIsLoading] = useState(SUBSCRIPTIONS_ENABLED && !cached);
   const [subscription, setSubscription] = useState(
-    SUBSCRIPTIONS_ENABLED ? null : BYPASS_SUBSCRIPTION,
+    SUBSCRIPTIONS_ENABLED ? cached : BYPASS_SUBSCRIPTION,
   );
-  const [expired, setExpired] = useState(false);
+  const [expired, setExpired] = useState(
+    SUBSCRIPTIONS_ENABLED ? computeExpired(cached) : false,
+  );
 
   const fetchSub = async () => {
-    const { error, data } = await Subify.getSubscriptionInfo();
-
-    if (error) {
-      console.error(error);
-      // Evita que la pantalla se quede cargando si el gestor falla.
+    try {
+      const { data } = await axios.get("/subscription");
+      setSubscription(data);
+      setExpired(computeExpired(data));
+      writeCachedEntitlement(data);
       setIsLoading(false);
-      return;
-    }
-
-    setSubscription(data);
-    setIsLoading(false);
-
-    if (data.subscription) {
-      const expireDate = new Date(data.subscription.expires_at);
-      const now = new Date();
-
-      setExpired(now > expireDate);
+    } catch (err) {
+      console.error("Error al cargar suscripción local:", err);
+      // Fallback local: EdDeli no depende del gestor en runtime.
+      const fallback = readCachedEntitlement();
+      if (fallback) {
+        setSubscription(fallback);
+        setExpired(computeExpired(fallback));
+      } else {
+        setSubscription((prev) =>
+          prev ?? {
+            subscribed: false,
+            subscription: null,
+            maintenance: false,
+          },
+        );
+      }
+      setIsLoading(false);
     }
   };
 
   useEffect(() => {
     if (!SUBSCRIPTIONS_ENABLED) return;
-
     fetchSub();
+    const onFocus = () => {
+      fetchSub();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, []);
 
-  return { isLoading, subscription, expired };
+  return { isLoading, subscription, expired, refetch: fetchSub };
 };

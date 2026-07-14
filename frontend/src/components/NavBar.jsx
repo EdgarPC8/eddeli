@@ -83,6 +83,7 @@ import TvIcon from "@mui/icons-material/Tv";
 import PlayCircleOutlineIcon from "@mui/icons-material/PlayCircleOutline";
 
 import { useAuth } from "../context/AuthContext.jsx";
+import { useSubscriptions } from "../hooks/useSubscriptions.js";
 import ThemeSwitcher from "./ThemeSwitcher.jsx";
 import NotificationList from "./NotificationList.jsx";
 import CambiarRol from "./CambiarRol.jsx";
@@ -91,7 +92,7 @@ import { PageSkeleton } from "./ContentSkeleton.jsx";
 import { getUnreadCount } from "../api/notificationsRequest.js";
 import { useNotificationSocket } from "../hooks/useNotificationSocket.js";
 import { useAppSettings } from "../context/AppSettingsContext.jsx";
-import { shouldHideMaintenanceMenuLink } from "../config/sectionMaintenanceAccess.js";
+import { isMenuLinkInMaintenance } from "../config/sectionMaintenanceAccess.js";
 
 const DRAWER_W = 260;
 
@@ -514,22 +515,14 @@ const PUBLIC_NAV = [
 
 function menuItemsForRole(loginRol) {
   if (!loginRol) return [];
-  return MENU_ITEMS.filter(
-    (item) =>
-      item.roles.includes(loginRol) &&
-      !shouldHideMaintenanceMenuLink(item.link, loginRol),
-  );
+  return MENU_ITEMS.filter((item) => item.roles.includes(loginRol));
 }
 
 function menuGroupsForRole(loginRol) {
   if (!loginRol) return [];
   return MENU_GROUPS.map((group) => ({
     ...group,
-    items: group.items.filter(
-      (item) =>
-        item.roles.includes(loginRol) &&
-        !shouldHideMaintenanceMenuLink(item.link, loginRol),
-    ),
+    items: group.items.filter((item) => item.roles.includes(loginRol)),
   })).filter((group) => group.items.length > 0);
 }
 
@@ -540,6 +533,8 @@ export default function NavBar() {
   const { isAuthenticated, isLoading, user, logout, profileImageUser } =
     useAuth();
   const { activeApp } = useAppSettings();
+  const { subscription } = useSubscriptions();
+  const subModules = subscription?.subscription?.modules;
 
   const [drawerOpen, setDrawerOpen] = useState(true);
   const [expandedGroupId, setExpandedGroupId] = useState(null);
@@ -575,13 +570,11 @@ export default function NavBar() {
     "";
 
   const menuItems = useMemo(() => {
-    const items = menuItemsForRole(user?.loginRol);
-    return items;
+    return menuItemsForRole(user?.loginRol);
   }, [user?.loginRol]);
 
   const menuGroups = useMemo(() => {
-    const groups = menuGroupsForRole(user?.loginRol);
-    return groups;
+    return menuGroupsForRole(user?.loginRol);
   }, [user?.loginRol]);
 
   useEffect(() => {
@@ -595,36 +588,58 @@ export default function NavBar() {
     setExpandedGroupId(isExpanded ? groupId : null);
   };
 
-  const renderMenuItem = (item, nested = false) => (
-    <ListItem
-      key={item.link}
-      disablePadding
-      sx={{ display: "block", pl: nested ? 1 : 0 }}
-    >
-      <ListItemButton
-        selected={location.pathname === item.link}
-        onClick={() => navigate(item.link)}
-        sx={{
-          borderRadius: 2,
-          mb: 0.5,
-          justifyContent: drawerOpen ? "initial" : "center",
-          minHeight: 40,
-        }}
+  const renderMenuItem = (item, nested = false) => {
+    const inMaintenance = isMenuLinkInMaintenance(item.link, subModules);
+    const tooltip = !drawerOpen
+      ? inMaintenance
+        ? `${item.name} (en mantenimiento)`
+        : item.name
+      : "";
+
+    return (
+      <ListItem
+        key={item.link}
+        disablePadding
+        sx={{ display: "block", pl: nested ? 1 : 0 }}
       >
-        <Tooltip title={!drawerOpen ? item.name : ""} placement="right">
-          <ListItemIcon
-            sx={{
-              minWidth: drawerOpen ? 40 : "auto",
-              justifyContent: "center",
-            }}
-          >
-            {item.icon}
-          </ListItemIcon>
-        </Tooltip>
-        {drawerOpen && <ListItemText primary={item.name} />}
-      </ListItemButton>
-    </ListItem>
-  );
+        <ListItemButton
+          selected={location.pathname === item.link}
+          onClick={() => navigate(item.link)}
+          sx={{
+            borderRadius: 2,
+            mb: 0.5,
+            justifyContent: drawerOpen ? "initial" : "center",
+            minHeight: 40,
+            opacity: inMaintenance ? 0.85 : 1,
+          }}
+        >
+          <Tooltip title={tooltip} placement="right">
+            <ListItemIcon
+              sx={{
+                minWidth: drawerOpen ? 40 : "auto",
+                justifyContent: "center",
+                color: inMaintenance ? "warning.main" : "inherit",
+              }}
+            >
+              {item.icon}
+            </ListItemIcon>
+          </Tooltip>
+          {drawerOpen && (
+            <ListItemText
+              primary={item.name}
+              secondary={inMaintenance ? "En mantenimiento" : null}
+              primaryTypographyProps={{ fontSize: 14 }}
+              secondaryTypographyProps={{
+                fontSize: 11,
+                color: "warning.main",
+                fontWeight: 600,
+              }}
+            />
+          )}
+        </ListItemButton>
+      </ListItem>
+    );
+  };
 
   const fetchUnreadCount = useCallback(async () => {
     if (!user?.userId) return;

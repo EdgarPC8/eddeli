@@ -1,33 +1,38 @@
 /**
- * Utilidades de cliente: tipos de documento, validación y mapeo formulario ↔ API.
+ * Utilidades de cliente: tipos de documento SRI, nombre en 4 partes, mapeo formulario ↔ API.
  */
-export const DOC_TYPE_OPTIONS = [
-  { value: "cedula", label: "Cédula" },
-  { value: "pasaporte", label: "Pasaporte" },
-  { value: "otro", label: "Otro" },
+
+export const IDENT_TYPE_OPTIONS = [
+  { value: "05", label: "Cédula (05)" },
+  { value: "04", label: "RUC (04)" },
+  { value: "06", label: "Pasaporte (06)" },
+  { value: "08", label: "Id. del exterior (08)" },
+  { value: "07", label: "Consumidor final (07)" },
 ];
+
+/** @deprecated usar IDENT_TYPE_OPTIONS */
+export const DOC_TYPE_OPTIONS = IDENT_TYPE_OPTIONS;
 
 export const EMPTY_CUSTOMER_FORM = {
   firstName: "",
   secondName: "",
   firstLastName: "",
   secondLastName: "",
-  birthDate: "",
-  documentType: "cedula",
-  documentNumber: "",
-  nickname: "",
+  identType: "05",
+  cedula: "",
   email: "",
   phone: "",
-  secondaryPhone: "",
-  city: "",
   address: "",
-  reference: "",
-  notes: "",
 };
 
 export function buildCustomerDisplayName(customer) {
   if (!customer) return "—";
-  const parts = [customer.firstName, customer.secondName, customer.firstLastName, customer.secondLastName]
+  const parts = [
+    customer.firstName,
+    customer.secondName,
+    customer.firstLastName,
+    customer.secondLastName,
+  ]
     .map((s) => String(s ?? "").trim())
     .filter(Boolean);
   if (parts.length) return parts.join(" ");
@@ -36,64 +41,53 @@ export function buildCustomerDisplayName(customer) {
 
 export function formatCustomerDocument(customer) {
   if (!customer) return "";
-  const num = customer.cedula || customer.documentNumber || customer.ci;
+  const num = String(customer.cedula || "").trim();
   if (!num) return "";
-  const type = DOC_TYPE_OPTIONS.find((d) => d.value === customer.documentType)?.label;
-  if (customer.cedula) return `Cédula: ${num}`;
-  return type ? `${type}: ${num}` : num;
+  const type =
+    IDENT_TYPE_OPTIONS.find((d) => d.value === customer.identType)?.label ||
+    customer.identType ||
+    "Doc";
+  return `${type}: ${num}`;
 }
 
 export function customerToForm(customer) {
   if (!customer) return { ...EMPTY_CUSTOMER_FORM };
   return {
-    firstName: customer.firstName || "",
+    firstName: customer.firstName || (customer.name && !customer.firstLastName ? customer.name : "") || "",
     secondName: customer.secondName || "",
     firstLastName: customer.firstLastName || "",
     secondLastName: customer.secondLastName || "",
-    birthDate: customer.birthDate ? String(customer.birthDate).slice(0, 10) : "",
-    documentType: customer.documentType || "cedula",
-    documentNumber: customer.documentNumber || customer.ci || "",
-    nickname: customer.nickname || "",
+    identType: customer.identType || "05",
+    cedula: customer.cedula || "",
     email: customer.email || "",
     phone: customer.phone || "",
-    secondaryPhone: customer.secondaryPhone || "",
-    city: customer.city || "",
     address: customer.address || "",
-    reference: customer.reference || "",
-    notes: customer.notes || "",
   };
 }
 
 export function formToCustomerPayload(form) {
-  const firstName = form.firstName?.trim();
-  const firstLastName = form.firstLastName?.trim();
-  const name = [firstName, form.secondName?.trim(), firstLastName, form.secondLastName?.trim()]
-    .filter(Boolean)
-    .join(" ");
+  const firstName = String(form.firstName || "").trim();
+  const secondName = String(form.secondName || "").trim();
+  const firstLastName = String(form.firstLastName || "").trim();
+  const secondLastName = String(form.secondLastName || "").trim();
+  const name = [firstName, secondName, firstLastName, secondLastName].filter(Boolean).join(" ");
   return {
     name,
-    firstName,
-    secondName: form.secondName?.trim() || null,
-    firstLastName,
-    secondLastName: form.secondLastName?.trim() || null,
-    birthDate: form.birthDate || null,
-    documentType: form.documentType || "cedula",
-    documentNumber: form.documentNumber?.trim() || null,
-    ci: form.documentNumber?.trim() || null,
-    nickname: form.nickname?.trim() || null,
-    email: form.email?.trim() || null,
-    phone: form.phone?.trim() || null,
-    secondaryPhone: form.secondaryPhone?.trim() || null,
-    city: form.city?.trim() || null,
-    address: form.address?.trim() || null,
-    reference: form.reference?.trim() || null,
-    notes: form.notes?.trim() || null,
+    firstName: firstName || null,
+    secondName: secondName || null,
+    firstLastName: firstLastName || null,
+    secondLastName: secondLastName || null,
+    identType: form.identType || "05",
+    cedula: String(form.cedula || "").trim() || null,
+    email: String(form.email || "").trim() || null,
+    phone: String(form.phone || "").trim() || null,
+    address: String(form.address || "").trim() || null,
   };
 }
 
 export function validateCustomerForm(form) {
-  if (!form.firstName?.trim() || !form.firstLastName?.trim()) {
-    return "Nombre y apellido son obligatorios.";
+  if (!String(form.firstName || "").trim()) {
+    return "El primer nombre es obligatorio.";
   }
   return null;
 }

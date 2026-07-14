@@ -7,7 +7,6 @@ import { Box, Button, Chip, CircularProgress, Grid, Stack, Typography } from "@m
 import Subify from "subify";
 import ExtensionIcon from "@mui/icons-material/Extension";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import ConstructionIcon from "@mui/icons-material/Construction";
 import BuildCircleIcon from "@mui/icons-material/BuildCircle";
 import CodeIcon from "@mui/icons-material/Code";
 import ScheduleIcon from "@mui/icons-material/Schedule";
@@ -30,6 +29,7 @@ import { useAuth } from "../context/AuthContext.jsx";
 import {
   MODULE_STATUS_META,
   listCatalogModuleGroupsWithStatus,
+  normalizeModuleStatus,
 } from "../config/appModulesCatalog.js";
 import { useSubscriptions } from "../hooks/useSubscriptions.js";
 
@@ -38,10 +38,9 @@ const ALLOWED = new Set(["Programador", "Administrador"]);
 const FILTERS = [
   { id: "all", label: "Todos" },
   { id: "active", label: "En uso" },
-  { id: "development", label: "En desarrollo" },
   { id: "maintenance", label: "Mantenimiento" },
+  { id: "planned", label: "Próximamente" },
   { id: "developer", label: "Solo desarrollador" },
-  { id: "planned", label: "Planificado" },
 ];
 
 const GROUP_ICON = {
@@ -65,8 +64,8 @@ const GROUP_ICON = {
 
 const STATUS_ICON = {
   active: CheckCircleIcon,
-  development: ConstructionIcon,
   maintenance: BuildCircleIcon,
+  development: BuildCircleIcon,
   developer: CodeIcon,
   planned: ScheduleIcon,
 };
@@ -107,10 +106,10 @@ function ModuleCard({ module }) {
     ? `linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.85) 100%), url(${imageUrl}) center/cover`
     : module.status === "active"
       ? "linear-gradient(135deg, rgba(46,125,50,0.35) 0%, rgba(20,20,20,0.9) 70%)"
-      : module.status === "development"
-        ? "linear-gradient(135deg, rgba(245,180,0,0.28) 0%, rgba(20,20,20,0.92) 72%)"
-        : module.status === "maintenance"
-          ? "linear-gradient(135deg, rgba(211,47,47,0.4) 0%, rgba(20,20,20,0.92) 72%)"
+      : module.status === "maintenance"
+        ? "linear-gradient(135deg, rgba(211,47,47,0.4) 0%, rgba(20,20,20,0.92) 72%)"
+        : module.status === "planned"
+          ? "linear-gradient(135deg, rgba(245,180,0,0.35) 0%, rgba(20,20,20,0.92) 72%)"
           : module.status === "developer"
             ? "linear-gradient(135deg, rgba(2,136,209,0.4) 0%, rgba(20,20,20,0.92) 72%)"
             : "linear-gradient(135deg, rgba(120,120,120,0.25) 0%, rgba(20,20,20,0.92) 72%)";
@@ -433,25 +432,46 @@ export default function SystemModulesPage() {
     return subModules.map((subModule) => {
       const catalog = catalogByName[subModule.name] || null;
       const subSectionsByKey = {};
-      for (const sec of subModule.sections) {
+      for (const sec of subModule.sections || []) {
         subSectionsByKey[sec.key] = sec;
       }
-      return {
-        id: catalog?.id || subModule.name,
-        name: subModule.name,
-        description: catalog?.description || "",
-        path: catalog?.path || null,
-        sectionCount: subModule.sections.length,
-        plannedSectionCount: 0,
-        maintenanceSectionCount: 0,
-        sectionItems: subModule.sections.map((sec) => ({
+
+      const sectionItems = (subModule.sections || []).map((sec) => {
+        const secStatus = normalizeModuleStatus(sec.status || "active");
+        return {
           name: sec.name,
           path: sec.key,
-          status: "active",
-        })),
-        sections: subModule.sections.map((sec) => sec.name),
-        status: "active",
-        statusMeta: MODULE_STATUS_META.active,
+          status: secStatus,
+        };
+      });
+
+      const status = normalizeModuleStatus(
+        subModule.status && MODULE_STATUS_META[subModule.status]
+          ? subModule.status
+          : catalog?.status || "active",
+      );
+
+      return {
+        id: catalog?.id || subModule.key || subModule.name,
+        name: subModule.name,
+        description: catalog?.description || "",
+        path: catalog?.path || sectionItems[0]?.path || null,
+        sectionCount: sectionItems.length,
+        plannedSectionCount: sectionItems.filter((s) => s.status === "planned")
+          .length,
+        maintenanceSectionCount: sectionItems.filter(
+          (s) => s.status === "maintenance",
+        ).length,
+        sectionItems,
+        sections: sectionItems.map((sec) =>
+          sec.status === "planned"
+            ? `${sec.name} (próx.)`
+            : sec.status === "maintenance"
+              ? `${sec.name} (mant.)`
+              : sec.name,
+        ),
+        status,
+        statusMeta: MODULE_STATUS_META[status] || MODULE_STATUS_META.active,
         subscriptionModule: subModule,
         subModuleId: subModule.id,
         subSectionsByKey,
@@ -463,18 +483,20 @@ export default function SystemModulesPage() {
         isMaintainer: subModule.is_maintainer || false,
       };
     });
-  }, [subModules]);
+  }, [subModules, catalogByName]);
 
   const counts = useMemo(() => {
     const c = {
       all: allModules.length,
       active: 0,
-      development: 0,
       maintenance: 0,
-      developer: 0,
       planned: 0,
+      developer: 0,
     };
-    for (const m of allModules) c[m.status] = (c[m.status] || 0) + 1;
+    for (const m of allModules) {
+      const key = normalizeModuleStatus(m.status);
+      c[key] = (c[key] || 0) + 1;
+    }
     return c;
   }, [allModules]);
 

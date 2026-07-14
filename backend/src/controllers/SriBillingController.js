@@ -6,6 +6,13 @@ import {
   saveSriCertificate,
   clearSriCertificate,
 } from "../services/sriBillingService.js";
+import {
+  emitManualInvoice,
+  emitSriDocument,
+  listElectronicInvoices,
+  getElectronicInvoiceById,
+  refreshInvoiceAuthorization,
+} from "../services/sriInvoiceEmitService.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -87,5 +94,75 @@ export async function deleteSriCertificate(req, res) {
   } catch (err) {
     console.error("deleteSriCertificate", err);
     res.status(500).json({ message: "No se pudo eliminar el certificado" });
+  }
+}
+
+export async function postEmitSriInvoice(req, res) {
+  try {
+    const documentType = req.body?.documentType || "01";
+    const result =
+      String(documentType).padStart(2, "0") === "01"
+        ? await emitManualInvoice(req.body || {})
+        : await emitSriDocument(documentType, req.body || {});
+    const status = result.invoice?.status;
+    const message =
+      status === "authorized"
+        ? "Comprobante autorizado por el SRI"
+        : status === "rejected"
+          ? "El SRI rechazó el comprobante"
+          : status === "sent"
+            ? "Enviado al SRI; autorización pendiente (usa Consultar)"
+            : "Comprobante procesado";
+    res.json({ message, ...result });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error("postEmitSriInvoice", err);
+    res.status(status).json({
+      message: err.message || "No se pudo emitir el comprobante",
+      invoice: err.invoice || null,
+    });
+  }
+}
+
+export async function getSriInvoices(req, res) {
+  try {
+    const invoices = await listElectronicInvoices({
+      limit: req.query?.limit,
+      documentType: req.query?.documentType,
+    });
+    res.json({ invoices });
+  } catch (err) {
+    console.error("getSriInvoices", err);
+    res.status(500).json({ message: "No se pudo listar los comprobantes" });
+  }
+}
+
+export async function getSriInvoiceById(req, res) {
+  try {
+    const invoice = await getElectronicInvoiceById(req.params.id);
+    res.json({ invoice });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error("getSriInvoiceById", err);
+    res.status(status).json({ message: err.message || "No se pudo obtener el comprobante" });
+  }
+}
+
+export async function postRefreshSriInvoice(req, res) {
+  try {
+    const result = await refreshInvoiceAuthorization(req.params.id);
+    res.json({
+      message:
+        result.invoice?.status === "authorized"
+          ? "Autorizada"
+          : result.invoice?.status === "rejected"
+            ? "No autorizada / rechazada"
+            : "Consulta actualizada",
+      ...result,
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error("postRefreshSriInvoice", err);
+    res.status(status).json({ message: err.message || "No se pudo consultar la autorización" });
   }
 }

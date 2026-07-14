@@ -17,11 +17,13 @@ import { NotificationProgram, NotificationDispatchLog } from "../models/Notifica
 import { Notifications } from "../models/Notifications.js";
 import { EditorTemplate, EditorTemplateGroup, EditorTemplateLayer, EditorLayerProp, EditorLayerBind, EditorDesign, EditorDesignLayerOverride } from "../models/Editor.js";
 import { AppSettings } from "../models/AppSettings.js";
+import { AppEntitlement } from "../models/AppEntitlement.js";
 import { SriBillingSettings, ElectronicInvoice } from "../models/SriBilling.js";
 
 const MODELS_TO_SYNC = [
   // ── Sin FK externas ──
   AppSettings,
+  AppEntitlement,
   SriBillingSettings,
   ElectronicInvoice,
   Users,

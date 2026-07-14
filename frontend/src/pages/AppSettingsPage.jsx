@@ -30,7 +30,7 @@ import { updateAppSettings } from "../api/appSettingsRequest.js";
 import { uploadImageRequest, deleteImageRequest } from "../api/imgRequest.js";
 import { buildImageUrl } from "../api/axios.js";
 import AppTimeClockPanel from "../components/AppTimeClockPanel.jsx";
-import SriBillingSettingsPanel from "../components/SriBillingSettingsPanel.jsx";
+import SriBillingSettingsPanel from "../components/SriBillingSettingsPanel.jsx"; // panel SRI (default export)
 import { PageSkeleton } from "../components/ContentSkeleton.jsx";
 import { APP_TIMEZONE_OPTIONS } from "../utils/appDateTime.js";
 
@@ -47,6 +47,8 @@ export default function AppSettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
   const tab = TABS.some((t) => t.id === tabParam) ? tabParam : "app";
+  const sriPanelRef = useRef(null);
+  const [sriSaving, setSriSaving] = useState(false);
 
   const [form, setForm] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -177,6 +179,29 @@ export default function AppSettingsPage() {
     }
   };
 
+  const onFooterSave = async () => {
+    if (tab === "app") {
+      await onSave();
+      return;
+    }
+    setSriSaving(true);
+    try {
+      await sriPanelRef.current?.save?.();
+    } finally {
+      setSriSaving(false);
+    }
+  };
+
+  const footerBusy = tab === "app" ? saving : sriSaving;
+  const footerLabel =
+    tab === "app"
+      ? footerBusy
+        ? "Guardando…"
+        : "Guardar configuración"
+      : footerBusy
+        ? "Guardando…"
+        : "Guardar facturación SRI";
+
   if (loading || !form) {
     return (
       <Box sx={{ maxWidth: 880, mx: "auto", py: 3, px: 2 }}>
@@ -188,7 +213,7 @@ export default function AppSettingsPage() {
   const logoPreview = form.logoPath ? buildImageUrl(form.logoPath) : activeApp.logoUrl;
 
   return (
-    <Box sx={{ maxWidth: 880, mx: "auto", py: 3, px: 2 }}>
+    <Box sx={{ maxWidth: 880, mx: "auto", py: 3, px: 2, pb: 10 }}>
       <Typography variant="h5" fontWeight={800} gutterBottom>
         Configuración
       </Typography>
@@ -200,7 +225,7 @@ export default function AppSettingsPage() {
         variant="outlined"
         sx={{
           borderRadius: 2,
-          overflow: "hidden",
+          overflow: "visible",
           mb: 2,
         }}
       >
@@ -213,6 +238,8 @@ export default function AppSettingsPage() {
             bgcolor: "action.hover",
             borderBottom: 1,
             borderColor: "divider",
+            borderTopLeftRadius: 8,
+            borderTopRightRadius: 8,
             "& .MuiTab-root": {
               minHeight: 52,
               textTransform: "none",
@@ -446,22 +473,35 @@ export default function AppSettingsPage() {
                   </Grid>
                 ))}
               </Grid>
-
-              <Button
-                variant="contained"
-                startIcon={<SaveIcon />}
-                onClick={onSave}
-                disabled={saving}
-                sx={{ alignSelf: "flex-end" }}
-              >
-                {saving ? "Guardando…" : "Guardar configuración"}
-              </Button>
             </Stack>
           )}
 
-          {tab === "sri" && <SriBillingSettingsPanel />}
+          {tab === "sri" && <SriBillingSettingsPanel ref={sriPanelRef} />}
         </Box>
       </Paper>
+
+      <Button
+        variant="contained"
+        size="large"
+        startIcon={<SaveIcon />}
+        onClick={() => void onFooterSave()}
+        disabled={footerBusy}
+        sx={{
+          position: "fixed",
+          right: { xs: 16, sm: 28 },
+          bottom: { xs: 20, sm: 28 },
+          zIndex: (t) => t.zIndex.snackbar,
+          borderRadius: 999,
+          px: 2.5,
+          py: 1.25,
+          boxShadow: 6,
+          textTransform: "none",
+          fontWeight: 700,
+          "&:hover": { boxShadow: 10 },
+        }}
+      >
+        {footerLabel}
+      </Button>
     </Box>
   );
 }

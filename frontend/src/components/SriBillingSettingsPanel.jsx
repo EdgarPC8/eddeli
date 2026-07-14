@@ -2,7 +2,7 @@
  * Panel embebible: datos fiscales SRI + firma .p12.
  * Siempre editable (no solo cuando falta configurar).
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, forwardRef, useImperativeHandle } from "react";
 import {
   Alert,
   Box,
@@ -17,7 +17,6 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import SaveIcon from "@mui/icons-material/Save";
 import UploadFileIcon from "@mui/icons-material/UploadFile";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
@@ -70,7 +69,73 @@ function SectionTitle({ children, hint }) {
   );
 }
 
-export default function SriBillingSettingsPanel() {
+/** Verde OK · Rojo falta (obligatorio) · Amarillo opcional (vacío) / verde si ya tiene valor */
+function fieldTone({ required, ok, filled }) {
+  if (required) {
+    return ok
+      ? {
+          color: "success",
+          focused: true,
+          helperPrefix: "✓ OK · ",
+        }
+      : {
+          color: "error",
+          error: true,
+          focused: true,
+          helperPrefix: "✗ Falta · ",
+        };
+  }
+  if (filled) {
+    return {
+      color: "success",
+      focused: true,
+      helperPrefix: "✓ OK · ",
+    };
+  }
+  return {
+    color: "warning",
+    focused: true,
+    helperPrefix: "○ Opcional · ",
+  };
+}
+
+function StatusTextField({
+  required = false,
+  ok,
+  value,
+  helperText = "",
+  label,
+  ...rest
+}) {
+  const filled = String(value ?? "").trim().length > 0;
+  const isOk = ok != null ? Boolean(ok) : filled;
+  const tone = fieldTone({ required, ok: isOk, filled });
+  return (
+    <TextField
+      {...rest}
+      required={required}
+      value={value}
+      label={label}
+      color={tone.color}
+      error={Boolean(tone.error)}
+      focused={tone.focused}
+      helperText={`${tone.helperPrefix}${helperText}`}
+      FormHelperTextProps={{
+        sx: {
+          color:
+            tone.color === "success"
+              ? "success.main"
+              : tone.color === "error"
+                ? "error.main"
+                : "warning.main",
+          fontWeight: 600,
+        },
+      }}
+    />
+  );
+}
+
+const SriBillingSettingsPanel = forwardRef(function SriBillingSettingsPanel(_props, ref) {
   const { toast } = useAuth();
   const [form, setForm] = useState(null);
   const [password, setPassword] = useState("");
@@ -91,14 +156,13 @@ export default function SriBillingSettingsPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!form) return <PageSkeleton />;
-
   const onChange = (key) => (e) => {
     const val = e?.target?.type === "checkbox" ? e.target.checked : e.target.value;
     setForm((f) => ({ ...f, [key]: val }));
   };
 
   const onSave = async () => {
+    if (!form) return;
     setSaving(true);
     try {
       await toast({
@@ -133,6 +197,20 @@ export default function SriBillingSettingsPanel() {
       setSaving(false);
     }
   };
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      save: onSave,
+      get saving() {
+        return saving;
+      },
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [form, password, saving],
+  );
+
+  if (!form) return <PageSkeleton />;
 
   const onCertSelected = async (e) => {
     const file = e.target.files?.[0];
@@ -207,8 +285,11 @@ export default function SriBillingSettingsPanel() {
 
       <Alert severity="info" sx={{ py: 1 }}>
         El POS sigue con consumidor final y comprobantes. Aquí solo se preparan RUC, datos del
-        emisor y la firma <strong>.p12</strong> para cuando se emitan facturas al SRI. Esta
-        sección siempre se puede editar (no desaparece al completar).
+        emisor y la firma <strong>.p12</strong>. Colores:{" "}
+        <strong style={{ color: "#2e7d32" }}>verde</strong> = bien,{" "}
+        <strong style={{ color: "#d32f2f" }}>rojo</strong> = falta obligatorio,{" "}
+        <strong style={{ color: "#ed6c02" }}>amarillo</strong> = opcional. El texto gris del
+        campo es un <strong>placeholder</strong> (ejemplo).
       </Alert>
 
       <Box
@@ -236,119 +317,158 @@ export default function SriBillingSettingsPanel() {
       </Box>
 
       <Box>
-        <SectionTitle hint="Identificación del negocio ante el SRI">Datos del emisor</SectionTitle>
+        <SectionTitle hint="Identificación del negocio ante el SRI. * = obligatorio para quedar listo.">
+          Datos del emisor
+        </SectionTitle>
         <Grid container spacing={2}>
           <Grid item xs={12} sm={4}>
-            <TextField
+            <StatusTextField
               select
+              required
               fullWidth
-              label="Ambiente SRI"
+              label="Ambiente SRI *"
               value={form.environment}
               onChange={onChange("environment")}
+              ok={form.environment === "pruebas" || form.environment === "produccion"}
+              helperText="Pruebas = certificado/ambiente de prueba"
             >
               <MenuItem value="pruebas">Pruebas</MenuItem>
               <MenuItem value="produccion">Producción</MenuItem>
-            </TextField>
+            </StatusTextField>
           </Grid>
           <Grid item xs={12} sm={4}>
-            <TextField
+            <StatusTextField
+              required
               fullWidth
-              label="RUC"
+              label="RUC *"
               value={form.ruc}
               onChange={onChange("ruc")}
+              placeholder="1790012345001"
               inputProps={{ maxLength: 13, inputMode: "numeric" }}
-              helperText="13 dígitos"
+              ok={String(form.ruc || "").trim().length === 13}
+              helperText="13 dígitos, ej. 1790012345001"
             />
           </Grid>
           <Grid item xs={12} sm={4}>
-            <TextField
+            <StatusTextField
               fullWidth
               label="Régimen"
               value={form.taxRegime}
               onChange={onChange("taxRegime")}
-              placeholder="Ej. RIMPE, General"
+              placeholder="RIMPE / Régimen general"
+              helperText="ej. RIMPE, General"
             />
           </Grid>
           <Grid item xs={12} sm={6}>
-            <TextField
+            <StatusTextField
+              required
               fullWidth
-              label="Razón social"
+              label="Razón social *"
               value={form.legalName}
               onChange={onChange("legalName")}
+              placeholder="PANADERIA EJEMPLO S.A."
+              ok={String(form.legalName || "").trim().length > 0}
+              helperText="como aparece en el RUC"
             />
           </Grid>
           <Grid item xs={12} sm={6}>
-            <TextField
+            <StatusTextField
               fullWidth
               label="Nombre comercial"
               value={form.tradeName}
               onChange={onChange("tradeName")}
+              placeholder="EdDeli Panadería"
+              helperText="nombre de fantasía del negocio"
             />
           </Grid>
           <Grid item xs={12}>
-            <TextField
+            <StatusTextField
               fullWidth
               label="Dirección matriz"
               value={form.matrixAddress}
               onChange={onChange("matrixAddress")}
+              placeholder="Av. Principal 123 y Calle Secundaria, Loja"
+              helperText="dirección del RUC / matriz"
             />
           </Grid>
           <Grid item xs={12}>
-            <TextField
+            <StatusTextField
               fullWidth
               label="Dirección establecimiento"
               value={form.establishmentAddress}
               onChange={onChange("establishmentAddress")}
+              placeholder="Calle del local 45, Barrio Centro"
+              helperText="dirección del punto de venta"
             />
           </Grid>
           <Grid item xs={6} sm={3}>
-            <TextField
+            <StatusTextField
+              required
               fullWidth
-              label="Establecimiento"
+              label="Establecimiento *"
               value={form.establishmentCode}
               onChange={onChange("establishmentCode")}
+              placeholder="001"
               inputProps={{ maxLength: 3 }}
-              helperText="Ej. 001"
+              ok={String(form.establishmentCode || "").trim().length === 3}
+              helperText="3 dígitos, ej. 001"
             />
           </Grid>
           <Grid item xs={6} sm={3}>
-            <TextField
+            <StatusTextField
+              required
               fullWidth
-              label="Punto de emisión"
+              label="Punto de emisión *"
               value={form.emissionPointCode}
               onChange={onChange("emissionPointCode")}
+              placeholder="001"
               inputProps={{ maxLength: 3 }}
-              helperText="Ej. 001"
+              ok={String(form.emissionPointCode || "").trim().length === 3}
+              helperText="3 dígitos, ej. 001"
             />
           </Grid>
           <Grid item xs={12} sm={3}>
-            <TextField
+            <StatusTextField
               fullWidth
               type="number"
               label="Próximo secuencial"
               value={form.nextInvoiceSequential}
               onChange={onChange("nextInvoiceSequential")}
+              placeholder="1"
               inputProps={{ min: 1 }}
+              ok={Number(form.nextInvoiceSequential) >= 1}
+              helperText="normalmente empieza en 1"
             />
           </Grid>
           <Grid item xs={12} sm={3}>
-            <TextField
+            <StatusTextField
               fullWidth
               label="Resolución contrib. especial"
               value={form.specialTaxpayerResolution}
               onChange={onChange("specialTaxpayerResolution")}
+              placeholder="N/A o número de resolución"
+              helperText="solo si aplica"
             />
           </Grid>
           <Grid item xs={12} sm={6}>
-            <TextField fullWidth label="Teléfono fiscal" value={form.phone} onChange={onChange("phone")} />
+            <StatusTextField
+              fullWidth
+              label="Teléfono fiscal"
+              value={form.phone}
+              onChange={onChange("phone")}
+              placeholder="0987654321"
+              helperText="contacto fiscal"
+            />
           </Grid>
           <Grid item xs={12} sm={6}>
-            <TextField
+            <StatusTextField
               fullWidth
               type="email"
               label="Email fiscal"
               value={form.email}
               onChange={onChange("email")}
+              placeholder="facturacion@tunegocio.com"
+              helperText="correo fiscal"
             />
           </Grid>
           <Grid item xs={12}>
@@ -368,8 +488,8 @@ export default function SriBillingSettingsPanel() {
       <Divider />
 
       <Box>
-        <SectionTitle hint="Archivo privado en el servidor; la contraseña se cifra y no se vuelve a mostrar">
-          Firma electrónica
+        <SectionTitle hint="Obligatorios para quedar listo: archivo .p12/.pfx + contraseña. La clave se cifra y no se vuelve a mostrar.">
+          Firma electrónica *
         </SectionTitle>
 
         <Stack
@@ -381,15 +501,15 @@ export default function SriBillingSettingsPanel() {
           <Box sx={{ flex: 1, minWidth: 0 }}>
             {form.hasCertificate ? (
               <Alert severity="success" sx={{ py: 0.75 }}>
-                <strong>{form.certificateFileName}</strong>
+                ✓ OK · <strong>{form.certificateFileName}</strong>
                 {form.certificateUploadedAt
                   ? ` · ${new Date(form.certificateUploadedAt).toLocaleString("es-EC")}`
                   : ""}
                 {form.hasCertificatePassword ? " · contraseña OK" : " · falta contraseña"}
               </Alert>
             ) : (
-              <Alert severity="warning" sx={{ py: 0.75 }}>
-                Sin certificado subido
+              <Alert severity="error" sx={{ py: 0.75 }}>
+                ✗ Falta · Sin certificado subido (ej. firma_sri_pruebas.p12)
               </Alert>
             )}
           </Box>
@@ -402,11 +522,12 @@ export default function SriBillingSettingsPanel() {
           />
           <Button
             variant="outlined"
+            color={form.hasCertificate ? "success" : "error"}
             startIcon={<UploadFileIcon />}
             onClick={() => fileRef.current?.click()}
             disabled={certBusy}
           >
-            Subir .p12 / .pfx
+            Subir .p12 / .pfx *
           </Button>
           {form.hasCertificate ? (
             <Button
@@ -420,41 +541,41 @@ export default function SriBillingSettingsPanel() {
           ) : null}
         </Stack>
 
-        <TextField
+        <StatusTextField
+          required={!form.hasCertificatePassword}
           fullWidth
           type="password"
           label={
             form.hasCertificatePassword
-              ? "Nueva contraseña del certificado (opcional)"
-              : "Contraseña del certificado"
+              ? "Nueva contraseña del certificado"
+              : "Contraseña del certificado *"
           }
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          helperText="Escríbela y guarda, o súbela junto con el archivo."
+          placeholder="••••••••"
+          ok={form.hasCertificatePassword || Boolean(password.trim())}
+          helperText={
+            form.hasCertificatePassword
+              ? "solo si quieres cambiar la contraseña guardada"
+              : "la del .p12; guárdala o súbela junto con el archivo"
+          }
           sx={{ mb: 2 }}
           autoComplete="new-password"
         />
 
-        <TextField
+        <StatusTextField
           fullWidth
           multiline
           minRows={2}
           label="Notas internas"
           value={form.notes}
           onChange={onChange("notes")}
+          placeholder="Ej. Certificado de pruebas vigente hasta dic 2026"
+          helperText="solo para ti / el equipo"
         />
       </Box>
-
-      <Stack direction="row" justifyContent="flex-end">
-        <Button
-          variant="contained"
-          startIcon={<SaveIcon />}
-          onClick={onSave}
-          disabled={saving}
-        >
-          {saving ? "Guardando…" : "Guardar facturación SRI"}
-        </Button>
-      </Stack>
     </Stack>
   );
-}
+});
+
+export default SriBillingSettingsPanel;

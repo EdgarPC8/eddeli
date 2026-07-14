@@ -105,6 +105,8 @@ const EXPLICIT_RULES = [
   { method: "PUT", pattern: /^\/sri\/settings\/?$/, action: "Actualizar config SRI" },
   { method: "POST", pattern: /^\/sri\/certificate\/?$/, action: "Subir certificado SRI" },
   { method: "DELETE", pattern: /^\/sri\/certificate\/?$/, action: "Eliminar certificado SRI" },
+  { method: "POST", pattern: /^\/sri\/invoices\/emit\/?$/, action: "Emitir factura SRI" },
+  { method: "POST", pattern: /^\/sri\/invoices\/\d+\/refresh\/?$/, action: "Consultar autorización SRI" },
 
   { method: "PUT", pattern: /^\/notifications\/seen\//, action: "Marcar notificación leída" },
   { method: "PUT", pattern: /^\/notifications\/seen-all\//, action: "Marcar todas leídas" },

@@ -1,3 +1,6 @@
+/**
+ * Modal para crear cliente desde caja (nombre en 4 partes + tipo doc SRI).
+ */
 import React, { useEffect, useState } from "react";
 import {
   Button,
@@ -6,38 +9,37 @@ import {
   DialogContent,
   DialogTitle,
   Grid,
+  MenuItem,
   TextField,
 } from "@mui/material";
 import { createCustomerRequest } from "../../api/ordersRequest.js";
+import {
+  EMPTY_CUSTOMER_FORM,
+  IDENT_TYPE_OPTIONS,
+  formToCustomerPayload,
+  validateCustomerForm,
+} from "../../utils/customerUtils.js";
 
-const EMPTY_FORM = { name: "", cedula: "", phone: "", email: "", address: "" };
-
-/** Modal para crear cliente desde caja. */
 export default function CajaCustomerFormDialog({ open, onClose, onCreated, toast }) {
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState(EMPTY_CUSTOMER_FORM);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (open) setForm(EMPTY_FORM);
+    if (open) setForm({ ...EMPTY_CUSTOMER_FORM });
   }, [open]);
 
   const setField = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 
   const handleSave = async () => {
-    const name = String(form.name || "").trim();
-    if (!name) {
-      void toast?.({ message: "El nombre es obligatorio.", variant: "warning" });
+    const err = validateCustomerForm(form);
+    if (err) {
+      void toast?.({ message: err, variant: "warning" });
       return;
     }
     try {
       setSaving(true);
-      const { data } = await createCustomerRequest({
-        name,
-        cedula: form.cedula?.trim() || undefined,
-        phone: form.phone?.trim() || undefined,
-        email: form.email?.trim() || undefined,
-        address: form.address?.trim() || undefined,
-      });
+      const payload = formToCustomerPayload(form);
+      const { data } = await createCustomerRequest(payload);
       void toast?.({ message: "Cliente creado.", variant: "success" });
       onCreated?.(data);
       onClose?.();
@@ -56,22 +58,63 @@ export default function CajaCustomerFormDialog({ open, onClose, onCreated, toast
       <DialogTitle>Nuevo cliente</DialogTitle>
       <DialogContent dividers>
         <Grid container spacing={2} sx={{ pt: 0.5 }}>
-          <Grid item xs={12}>
+          <Grid item xs={12} sm={6}>
             <TextField
-              label="Nombre"
+              label="Primer nombre"
               fullWidth
               required
-              value={form.name}
-              onChange={(e) => setField("name", e.target.value)}
+              value={form.firstName}
+              onChange={(e) => setField("firstName", e.target.value)}
             />
           </Grid>
           <Grid item xs={12} sm={6}>
             <TextField
-              label="Cédula"
+              label="Segundo nombre"
+              fullWidth
+              value={form.secondName}
+              onChange={(e) => setField("secondName", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="Primer apellido"
+              fullWidth
+              value={form.firstLastName}
+              onChange={(e) => setField("firstLastName", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="Segundo apellido"
+              fullWidth
+              value={form.secondLastName}
+              onChange={(e) => setField("secondLastName", e.target.value)}
+            />
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              select
+              label="Tipo de documento"
+              fullWidth
+              value={form.identType}
+              onChange={(e) => setField("identType", e.target.value)}
+            >
+              {IDENT_TYPE_OPTIONS.map((o) => (
+                <MenuItem key={o.value} value={o.value}>
+                  {o.label}
+                </MenuItem>
+              ))}
+            </TextField>
+          </Grid>
+          <Grid item xs={12} sm={6}>
+            <TextField
+              label="Número de documento"
               fullWidth
               value={form.cedula}
               onChange={(e) => setField("cedula", e.target.value)}
-              helperText="Opcional"
+              helperText={
+                form.identType === "07" ? "Consumidor final: normalmente 9999999999999" : "Cédula 10 / RUC 13 dígitos"
+              }
             />
           </Grid>
           <Grid item xs={12} sm={6}>

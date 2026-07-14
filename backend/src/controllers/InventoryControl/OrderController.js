@@ -217,6 +217,12 @@ export const getPosSales = async (req, res) => {
           ? {
               id: customer.id,
               name: customer.name,
+              firstName: customer.firstName,
+              secondName: customer.secondName,
+              firstLastName: customer.firstLastName,
+              secondLastName: customer.secondLastName,
+              identType: customer.identType,
+              cedula: customer.cedula,
               phone: customer.phone,
               email: customer.email,
               address: customer.address,

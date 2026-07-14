@@ -64,31 +64,52 @@ export default function ProtectedRoute({ requiredRol }) {
     );
   }
 
-  if (shouldBlockMaintenancePath(location.pathname, user.loginRol)) {
-    return (
-      <SectionMaintenanceBlocked
-        section={findMaintenanceSectionForPath(location.pathname)}
-      />
-    );
-  }
+  const subModules = subscription?.subscription?.modules;
 
-  // Licencias desactivadas (desarrollo): acceso solo por rol, sin gestor.
+  // Licencias desactivadas (desarrollo): acceso solo por rol.
   if (!SUBSCRIPTIONS_ENABLED) return <Outlet />;
 
+  // Mantenimiento de la app: solo avisa. No cancela ni “quita” la suscripción.
   if (subscription?.maintenance) {
     return <Navigate to="/mantenimiento" replace />;
+  }
+
+  if (
+    shouldBlockMaintenancePath(location.pathname, user.loginRol, subModules)
+  ) {
+    return (
+      <SectionMaintenanceBlocked
+        section={findMaintenanceSectionForPath(
+          location.pathname,
+          subModules,
+        )}
+      />
+    );
   }
 
   if (!subscription?.subscribed || expired) {
     return <Navigate to="/subscription-expired" replace />;
   }
 
+  // Exacto o prefijo (rutas anidadas: /editor/123, /publicidad/campanas/:id, ?query).
+  const path = location.pathname;
+  const sectionMatches = (sectionKey) => {
+    if (!sectionKey) return false;
+    const key = String(sectionKey).split("?")[0];
+    return path === key || path.startsWith(`${key}/`);
+  };
   const hasAccess = subscription.subscription.modules.find((m) =>
-    m.sections.some((s) => s.key === location.pathname),
+    m.sections.some((s) => sectionMatches(s.key)),
   );
 
   if (!hasAccess) {
-    return <Navigate to="/no-subscription" replace />;
+    return (
+      <Navigate
+        to="/no-subscription"
+        replace
+        state={{ from: location.pathname }}
+      />
+    );
   }
 
   return <Outlet />;

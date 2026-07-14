@@ -32,7 +32,7 @@ export const ELECTRONIC_DOC_SECTIONS = [
       "Factura electrónica (01). Venta con IVA a cliente identificado (RUC/cédula).",
     icon: ReceiptLongIcon,
     sriCode: "01",
-    status: "soon",
+    status: "ready",
   },
   {
     id: "notas-venta",
@@ -40,10 +40,10 @@ export const ELECTRONIC_DOC_SECTIONS = [
     name: "Notas de venta",
     short: "Notas venta",
     description:
-      "Comprobantes de nota de venta. Útiles en operación; la emisión tributaria SRI principal sigue siendo la factura.",
+      "Comprobante interno. No se envía al SRI; para eso usa Factura electrónica.",
     icon: PointOfSaleIcon,
     sriCode: null,
-    status: "soon",
+    status: "ready",
   },
   {
     id: "notas-credito",
@@ -53,7 +53,7 @@ export const ELECTRONIC_DOC_SECTIONS = [
     description: "Nota de crédito (04). Devoluciones, descuentos o anulaciones parciales de facturas.",
     icon: NoteAddIcon,
     sriCode: "04",
-    status: "soon",
+    status: "ready",
   },
   {
     id: "notas-debito",
@@ -63,7 +63,7 @@ export const ELECTRONIC_DOC_SECTIONS = [
     description: "Nota de débito (05). Cargos adicionales vinculados a una factura.",
     icon: RemoveCircleOutlineIcon,
     sriCode: "05",
-    status: "soon",
+    status: "ready",
   },
   {
     id: "retenciones",
@@ -73,7 +73,7 @@ export const ELECTRONIC_DOC_SECTIONS = [
     description: "Comprobante de retención (07). Retención en la fuente de renta e IVA.",
     icon: AccountBalanceIcon,
     sriCode: "07",
-    status: "soon",
+    status: "ready",
   },
   {
     id: "guias-remision",
@@ -83,7 +83,7 @@ export const ELECTRONIC_DOC_SECTIONS = [
     description: "Guía de remisión (06). Traslado de mercadería entre locales o hacia clientes.",
     icon: LocalShippingIcon,
     sriCode: "06",
-    status: "soon",
+    status: "ready",
   },
   {
     id: "liquidacion-compras",
@@ -94,7 +94,7 @@ export const ELECTRONIC_DOC_SECTIONS = [
       "Liquidación de compra de bienes o prestación de servicios (03). Cuando el emisor liquida la compra.",
     icon: ShoppingCartCheckoutIcon,
     sriCode: "03",
-    status: "soon",
+    status: "ready",
   },
   {
     id: "emitidos",
@@ -105,7 +105,7 @@ export const ELECTRONIC_DOC_SECTIONS = [
       "Bandeja de comprobantes enviados al SRI: autorizados, rechazados, pendientes. XML y RIDE.",
     icon: InventoryIcon,
     sriCode: null,
-    status: "soon",
+    status: "ready",
   },
   {
     id: "configuracion",

@@ -43,7 +43,8 @@ export default function NoSubscriptionPage() {
           Módulo no contratado
         </Typography>
         <Typography variant="body1" color="text.secondary" sx={{ mb: 2 }}>
-          Esta sección no está incluida en tu plan actual.
+          Esta sección no está incluida en tu plan actual. Si necesitas acceso,
+          pide que te lo habiliten desde el gestor SoftEd.
         </Typography>
         {location.state?.from && (
           <Chip

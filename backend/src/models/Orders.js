@@ -6,7 +6,22 @@ import { CashShift } from './CashShift.js';
 // Tabla de clientes
 export const Customer = sequelize.define("ERP_customers", {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+  /** Nombre completo (denormalizado para listados / pedidos). */
   name: { type: DataTypes.STRING, allowNull: false },
+  firstName: { type: DataTypes.STRING(120), allowNull: true },
+  secondName: { type: DataTypes.STRING(120), allowNull: true },
+  firstLastName: { type: DataTypes.STRING(120), allowNull: true },
+  secondLastName: { type: DataTypes.STRING(120), allowNull: true },
+  /**
+   * Tipo identificación SRI: 04 RUC, 05 cédula, 06 pasaporte,
+   * 07 consumidor final, 08 id. exterior.
+   */
+  identType: {
+    type: DataTypes.STRING(2),
+    allowNull: true,
+    defaultValue: "05",
+  },
+  /** Número de documento (cédula / RUC / pasaporte). */
   cedula: { type: DataTypes.STRING(32), allowNull: true },
   phone: { type: DataTypes.STRING },
   address: { type: DataTypes.STRING },

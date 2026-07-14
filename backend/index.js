@@ -31,9 +31,12 @@ import DocumentRoutes from "./src/routes/DocumentRoutes.js";
 import EditorRoutes from "./src/routes/EditorRoutes.js";
 import ComandsRoutes from "./src/routes/ComandsRoutes.js";
 import AppSettingsRoutes from "./src/routes/AppSettingsRoutes.js";
+import SubscriptionRoutes from "./src/routes/SubscriptionRoutes.js";
 import SriBillingRoutes from "./src/routes/SriBillingRoutes.js";
 import { loadAppSettings } from "./src/services/appSettingsService.js";
 import { loadSriBillingSettings } from "./src/services/sriBillingService.js";
+import { ensureEntitlementTable } from "./src/services/entitlementService.js";
+import { ensureCustomerNameSchema } from "./src/services/customerNameService.js";
 import { Store } from "./src/models/Inventory.js";
 import { CashShift } from "./src/models/CashShift.js";
 
@@ -96,6 +99,7 @@ app.use(`/${api}/files`, express.static(path.resolve(__dirname, "src/files")));
 
 // ================================
 app.use(`/${api}`, AppSettingsRoutes);
+app.use(`/${api}`, SubscriptionRoutes);
 app.use(`/${api}/sri`, SriBillingRoutes);
 app.use(`/${api}/comands`, ComandsRoutes);
 app.use(`/${api}/editor`, EditorRoutes);
@@ -124,9 +128,11 @@ export async function main() {
     await sequelize.authenticate();
     await loadAppSettings();
     await loadSriBillingSettings();
+    await ensureEntitlementTable();
     // Columnas nuevas de locales (001/002) y turno ligado al local
     await Store.sync({ alter: true });
     await CashShift.sync({ alter: true });
+    await ensureCustomerNameSchema();
 
     // ═══════════════════════════════════════════════════════════════════
     // ⚠️  SOLO DESARROLLO — Reset total (borra tablas y carga backup.json)

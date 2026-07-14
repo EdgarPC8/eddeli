@@ -1,4 +1,4 @@
-import { Box, Container, Typography, Paper } from "@mui/material";
+import { Container, Typography, Paper, Alert } from "@mui/material";
 import BuildCircleIcon from "@mui/icons-material/BuildCircle";
 
 export default function MaintenancePage() {
@@ -12,9 +12,13 @@ export default function MaintenancePage() {
         <Typography variant="body1" color="text.secondary" sx={{ mb: 1 }}>
           Estamos realizando tareas de mantenimiento para mejorar el sistema.
         </Typography>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
           Por favor, intenta de nuevo más tarde. Disculpa las molestias.
         </Typography>
+        <Alert severity="info" sx={{ textAlign: "left" }}>
+          Tu suscripción no se canceló: EdDeli solo está en modo mantenimiento
+          hasta que el administrador lo reactive.
+        </Alert>
       </Paper>
     </Container>
   );

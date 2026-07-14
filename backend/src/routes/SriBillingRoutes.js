@@ -10,6 +10,10 @@ import {
   uploadSriCertificate,
   deleteSriCertificate,
   sriCertificateUploadMiddleware,
+  postEmitSriInvoice,
+  getSriInvoices,
+  getSriInvoiceById,
+  postRefreshSriInvoice,
 } from "../controllers/SriBillingController.js";
 
 const router = Router();
@@ -24,5 +28,10 @@ router.post(
   uploadSriCertificate,
 );
 router.delete("/certificate", isAuthenticated, requireAdminOrProgrammer, deleteSriCertificate);
+
+router.get("/invoices", isAuthenticated, requireStaff, getSriInvoices);
+router.post("/invoices/emit", isAuthenticated, requireAdminOrProgrammer, postEmitSriInvoice);
+router.post("/invoices/:id/refresh", isAuthenticated, requireAdminOrProgrammer, postRefreshSriInvoice);
+router.get("/invoices/:id", isAuthenticated, requireStaff, getSriInvoiceById);
 
 export default router;

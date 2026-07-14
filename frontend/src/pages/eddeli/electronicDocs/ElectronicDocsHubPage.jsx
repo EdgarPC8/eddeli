@@ -21,9 +21,9 @@ export default function ElectronicDocsHubPage() {
   return (
     <Box>
       <Alert severity="info" sx={{ mb: 2 }}>
-        Este módulo prepara la facturación electrónica del SRI. Puedes organizar las secciones ya;
-        la emisión (XML → firma → autorización) se conectará después sobre la config SRI y las
-        sucursales propias.
+        Configura el emisor (firma .p12, RUC, ambiente Pruebas) y emite desde cada sección: Facturas,
+        notas de crédito/débito, retenciones, guías o liquidaciones. Verás estado y clave en
+        Documentos emitidos.
       </Alert>
 
       <Grid container spacing={1.5}>

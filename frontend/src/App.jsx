@@ -7,9 +7,16 @@ import PublicOnlyRoute from "./context/PublicOnlyRoute.jsx";
 import NavBar from "./components/NavBar.jsx";
 import Subify from "subify";
 
-Subify.configure({
-  apiKey: import.meta.env.VITE_SUBSCRIPTION_API_KEY,
-});
+// Subify solo para catálogo de planes / trial (opcional). No valida licencia.
+// La suscripción activa la lee el backend EdDeli (GET /subscription).
+if (import.meta.env.VITE_SUBSCRIPTION_API_KEY) {
+  Subify.configure({
+    apiKey: import.meta.env.VITE_SUBSCRIPTION_API_KEY,
+  });
+  if (import.meta.env.VITE_SUBSCRIPTION_API_URL) {
+    Subify.apiUrl = import.meta.env.VITE_SUBSCRIPTION_API_URL;
+  }
+}
 
 const AUTH_ROLES = ["Programador", "Administrador", "Empleado"];
 

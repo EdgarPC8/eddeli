@@ -1,7 +1,6 @@
-export function buildCustomerDisplayName(customer) {
-  return String(customer?.name || "").trim() || "—";
-}
-
-export function formatCustomerDocument() {
-  return "";
-}
+/** Reexporta helpers de cliente para Caja (nombre compuesto + documento). */
+export {
+  buildCustomerDisplayName,
+  formatCustomerDocument,
+  IDENT_TYPE_OPTIONS,
+} from "../../utils/customerUtils.js";

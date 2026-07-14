@@ -981,7 +981,7 @@ export const APP_MODULE_GROUPS = [
         status: "active",
         functions: [
           { name: "Tarjetas por módulo", description: "Una card por grupo del menú (Operación, Comprobantes, etc.)." },
-          { name: "Filtro por estado", description: "Todos / En uso / En desarrollo / Mantenimiento / Solo desarrollador / Planificado." },
+          { name: "Filtro por estado", description: "Todos / En uso / Mantenimiento / Próximamente / Solo desarrollador." },
           { name: "Ir al módulo", description: "Abre Info → Módulos con ese módulo seleccionado para ver secciones y funciones." },
         ],
       },
@@ -1163,7 +1163,7 @@ export const APP_PUBLIC_SECTIONS = [
   },
 ];
 
-/** Estados de módulo para /sistema/modulos */
+/** Estados de módulo para /sistema/modulos (4 visibles). */
 export const MODULE_STATUS_META = {
   active: {
     id: "active",
@@ -1171,11 +1171,12 @@ export const MODULE_STATUS_META = {
     color: "success",
     description: "Disponible y operativo en el día a día.",
   },
+  // Legacy: se muestra como mantenimiento (rojo).
   development: {
     id: "development",
-    label: "En desarrollo",
-    color: "warning",
-    description: "Estructura o pantallas listas; falta completar la función principal.",
+    label: "Mantenimiento",
+    color: "error",
+    description: "Fuera de uso operativo; pendiente de mejora o estabilización.",
   },
   maintenance: {
     id: "maintenance",
@@ -1192,11 +1193,25 @@ export const MODULE_STATUS_META = {
   },
   planned: {
     id: "planned",
-    label: "Planificado",
-    color: "default",
+    label: "Próximamente",
+    color: "warning",
     description: "Previsto a futuro; aún no hay pantallas útiles.",
   },
 };
+
+/** Normaliza legacy: development → maintenance. */
+export function normalizeModuleStatus(status) {
+  if (status === "development") return "maintenance";
+  if (
+    status === "active" ||
+    status === "maintenance" ||
+    status === "developer" ||
+    status === "planned"
+  ) {
+    return status;
+  }
+  return "active";
+}
 
 /** Prefijos de ruta cuyo estado por defecto es «en desarrollo». */
 const DEVELOPMENT_PATH_PREFIXES = ["/comprobantes-electronicos"];
@@ -1210,7 +1225,7 @@ const PLANNED_PATHS = new Set([]);
  */
 export function resolveModuleStatus(section) {
   if (section?.status && MODULE_STATUS_META[section.status]) {
-    return section.status;
+    return normalizeModuleStatus(section.status);
   }
   const path = String(section?.path || "").split("?")[0];
   if (PLANNED_PATHS.has(path)) return "planned";
@@ -1219,7 +1234,7 @@ export function resolveModuleStatus(section) {
       (prefix) => path === prefix || path.startsWith(`${prefix}/`),
     )
   ) {
-    return "development";
+    return "maintenance";
   }
   return "active";
 }
@@ -1230,7 +1245,7 @@ export function resolveModuleStatus(section) {
  */
 export function resolveGroupModuleStatus(group) {
   if (group?.status && MODULE_STATUS_META[group.status]) {
-    return group.status;
+    return normalizeModuleStatus(group.status);
   }
   const sections = group?.sections || [];
   if (sections.length === 0) return "planned";
@@ -1240,7 +1255,6 @@ export function resolveGroupModuleStatus(group) {
   if (operational.length === 0) return "planned";
   // Si hay secciones en uso, el módulo sigue «en uso» (el mantenimiento es por sección).
   if (operational.some((s) => s === "active")) return "active";
-  if (operational.some((s) => s === "development")) return "development";
   if (operational.some((s) => s === "maintenance")) return "maintenance";
   if (operational.some((s) => s === "developer")) return "developer";
   return "active";
