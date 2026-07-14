@@ -5,6 +5,8 @@ import axios from "axios";
 import { AppEntitlement } from "../models/AppEntitlement.js";
 import { subscription as gestorConfig } from "../config/subscription-api.js";
 
+const GESTOR_SYNC_SECRET = process.env.GESTOR_SYNC_SECRET || "";
+
 const EMPTY = {
   maintenance: false,
   subscribed: false,
@@ -88,16 +90,16 @@ export async function saveEntitlement(rawPayload, source = "gestor_push") {
 
 /** Trae del gestor y guarda localmente (bootstrap / refresh manual). */
 export async function pullEntitlementFromGestor() {
-  if (!gestorConfig.apikey) {
+  if (!GESTOR_SYNC_SECRET) {
     throw Object.assign(
-      new Error("SUBSCRIPTION_API_KEY no configurada en el backend"),
+      new Error("GESTOR_SYNC_SECRET no configurado en el backend"),
       { status: 500 },
     );
   }
 
   const url = `${String(gestorConfig.api).replace(/\/$/, "")}/subscriptions/check`;
   const { data } = await axios.get(url, {
-    headers: { Authorization: `Bearer ${gestorConfig.apikey}` },
+    headers: { Authorization: `Bearer ${GESTOR_SYNC_SECRET}` },
     timeout: 15000,
   });
 

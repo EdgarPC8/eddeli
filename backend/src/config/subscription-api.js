@@ -6,5 +6,4 @@ export const subscription = {
   api:
     process.env.SUBSCRIPTION_API_URL ||
     "https://aplicaciones.marianosamaniego.edu.ec/gestor-proyectos-negocios/api",
-  apikey: process.env.SUBSCRIPTION_API_KEY || "",
 };

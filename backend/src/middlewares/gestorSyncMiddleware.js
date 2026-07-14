@@ -16,5 +16,7 @@ export function requireGestorSyncSecret(req, res, next) {
     return res.status(401).json({ error: "No autorizado (gestor sync)" });
   }
 
+  //console.log(req.headers.authorization);
+
   return next();
 }
