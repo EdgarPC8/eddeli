@@ -28,6 +28,7 @@ export async function putAppSettings(req, res) {
       "description",
       "author",
       "logoPath",
+      "iconPath",
       "phone",
       "socialWhatsapp",
       "socialFacebook",

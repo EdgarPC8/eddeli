@@ -4,8 +4,11 @@ frontend/node_modules/
 
 # Variables de entorno
 .env
-.env.*
+.env.local
+.env.*.local
 !.env.example
+!frontend/.env.eddeli
+!frontend/.env.store
 backend/.env
 frontend/.env
 

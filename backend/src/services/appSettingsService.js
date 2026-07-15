@@ -16,6 +16,7 @@ export const DEFAULT_APP_SETTINGS = {
   description: "Sistema de Gestión de Negocios",
   author: "SoftEd",
   logoPath: "sistema/logos/logo.jpeg",
+  iconPath: null,
   phone: "0969236901",
   socialWhatsapp: "https://wa.me/593969236901",
   socialFacebook: "https://facebook.com/profile.php?id=61581806494763",
@@ -51,6 +52,10 @@ export function logosFolder() {
   return mediaSubfolder("logos");
 }
 
+export function iconsFolder() {
+  return mediaSubfolder("icons");
+}
+
 export function qrFolder() {
   return mediaSubfolder("qr");
 }
@@ -59,14 +64,19 @@ export function defaultLogoPath(prefix = mediaFolderPrefix()) {
   return `${prefix}/logos/logo.jpeg`;
 }
 
+export function defaultIconPath(prefix = mediaFolderPrefix()) {
+  return `${prefix}/icons/icon.jpeg`;
+}
+
 function ensureDirRel(rel) {
   if (!rel) return;
   fs.mkdirSync(path.join(IMG_BASE, rel), { recursive: true });
 }
 
-/** Carpetas estándar: {prefix}/logos y {prefix}/qr */
+/** Carpetas estándar: {prefix}/logos, {prefix}/icons y {prefix}/qr */
 export function ensureStandardAssetDirs(prefix = mediaFolderPrefix()) {
   ensureDirRel(`${prefix}/logos`);
+  ensureDirRel(`${prefix}/icons`);
   ensureDirRel(`${prefix}/qr`);
 }
 
@@ -120,6 +130,13 @@ async function ensureAppSettingsSchema() {
       type: DataTypes.STRING(64),
       allowNull: false,
       defaultValue: "America/Guayaquil",
+    });
+  }
+  if (!table.iconPath) {
+    await qi.addColumn("app_settings", "iconPath", {
+      type: DataTypes.STRING(255),
+      allowNull: true,
+      defaultValue: null,
     });
   }
   const boolCols = [
@@ -202,6 +219,7 @@ export function toPublicSettings(data = cache) {
     description: data.description,
     author: data.author,
     logoPath: data.logoPath,
+    iconPath: data.iconPath,
     phone: data.phone,
     socials: {
       whatsapp: data.socialWhatsapp || "",
@@ -212,6 +230,7 @@ export function toPublicSettings(data = cache) {
     },
     mediaFolderPrefix: data.mediaFolderPrefix,
     logoFolder: logosFolder(),
+    iconFolder: iconsFolder(),
     qrFolder: qrFolder(),
     cajaQuickCategoryMatch: data.cajaQuickCategoryMatch || "",
     walkInCustomerLabel: data.walkInCustomerLabel || "Consumidor Final",
