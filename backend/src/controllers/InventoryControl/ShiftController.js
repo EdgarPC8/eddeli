@@ -134,7 +134,7 @@ function computeExpectedCash(opening, salesCash, cashOut, cashIn) {
 
 function requireProgrammerRole(req, res) {
   if (req.user?.loginRol !== PROGRAMMER_ROLE) {
-    res.status(403).json({ message: "Solo el rol Programador puede ejecutar esta acción." });
+    res.status(403).json({ message: "No tenés permiso para esta acción." });
     return false;
   }
   return true;

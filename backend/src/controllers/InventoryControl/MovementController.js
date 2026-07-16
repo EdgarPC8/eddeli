@@ -37,7 +37,7 @@ const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 const createBatchReferenceId = () => Math.floor(Date.now() / 1000);
 
 const PROGRAMMER_ONLY_MSG =
-  "Solo el rol Programador puede editar, eliminar movimientos o usar fecha personalizada";
+  "No tenés permiso para editar o eliminar movimientos";
 
 const PRODUCTION_OP_REF_PREFIX = "produccion_op:";
 

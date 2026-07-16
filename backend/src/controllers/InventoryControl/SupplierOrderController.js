@@ -207,7 +207,7 @@ export const updateSupplierOrder = async (req, res) => {
       if (user?.loginRol !== "Programador") {
         return res
           .status(403)
-          .json({ message: "Solo el rol Programador puede editar las fechas de entrega y pago" });
+          .json({ message: "No tenés permiso para editar las fechas de entrega y pago" });
       }
     }
     if (isReceived && !hasDateOverride) {
@@ -262,7 +262,7 @@ export const addSupplierOrderItem = async (req, res) => {
     const isPrivileged = ["Administrador", "Programador"].includes(user?.loginRol);
     if (!isPrivileged) {
       return res.status(403).json({
-        message: "Solo Administrador o Programador pueden agregar productos al pedido",
+        message: "No tenés permiso para agregar productos al pedido",
       });
     }
 

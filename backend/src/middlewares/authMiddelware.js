@@ -33,7 +33,7 @@ const isAuthenticated = async (req, res, next) => {
 const requireProgrammer = (req, res, next) => {
   if (req.user?.loginRol !== "Programador") {
     return res.status(403).json({
-      message: "Solo el rol Programador puede ejecutar esta acción",
+      message: "No tenés permiso para esta acción",
     });
   }
   next();
@@ -47,7 +47,7 @@ const requireAdminOrProgrammer = (req, res, next) => {
   const rol = req.user?.loginRol;
   if (rol !== "Programador" && rol !== "Administrador") {
     return res.status(403).json({
-      message: "Solo Administrador o Programador pueden ejecutar esta acción",
+      message: "No tenés permiso para esta acción",
     });
   }
   next();

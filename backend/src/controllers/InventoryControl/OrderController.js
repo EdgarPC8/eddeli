@@ -307,7 +307,7 @@ export const updateOrderItem = async (req, res) => {
     if (isDashboardCorrection) {
       if (user?.loginRol !== "Programador") {
         return res.status(403).json({
-          message: "Solo el rol Programador puede ejecutar esta acción",
+          message: "No tenés permiso para esta acción",
         });
       }
       return programmerDashboardOrderItemCorrection(req, res);
@@ -1032,7 +1032,7 @@ export const addOrderItem = async (req, res) => {
     const isPrivileged = ['Administrador', 'Programador'].includes(user?.loginRol);
     if (!isPrivileged) {
       return res.status(403).json({
-        message: 'Solo Administrador o Programador pueden agregar productos a un pedido existente',
+        message: 'No tenés permiso para agregar productos a un pedido existente',
       });
     }
 

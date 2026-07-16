@@ -75,7 +75,7 @@ const toNum = (v, def = 0) => {
     return truncateNote(`${base}. ${extra}`);
   };
 
-  const PROGRAMMER_ONLY_MSG = "Solo el rol Programador puede editar o eliminar abonos";
+  const PROGRAMMER_ONLY_MSG = "No tenés permiso para editar o eliminar abonos";
   const assertProgrammerRole = (user) =>
     user?.loginRol === "Programador";
 

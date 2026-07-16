@@ -4,17 +4,28 @@ import { Roles } from "../models/Roles.js";
 import { Users } from "../models/Users.js";
 import bcrypt from "bcrypt";
 
+/** Quita el rol Programador de un listado de IDs si quien pide no es Programador. */
+async function sanitizeRoleIdsForRequester(roleIds, loginRol) {
+  if (!Array.isArray(roleIds) || loginRol === "Programador") return roleIds;
+  const programmer = await Roles.findOne({ where: { name: "Programador" } });
+  if (!programmer) return roleIds;
+  return roleIds.filter((id) => Number(id) !== Number(programmer.id));
+}
+
 export const getRoles = async (req, res) => {
   try {
     const data = await Roles.findAll();
-    res.json(data);
-
-
+    // Rol interno: solo visible si la sesión actual es Programador
+    const roles =
+      req.user?.loginRol === "Programador"
+        ? data
+        : data.filter((r) => r.name !== "Programador");
+    res.json(roles);
   } catch (error) {
     console.error("Error al obtener los roles:", error);
     res.status(500).json({ message: "Error en el servidor." });
   }
-  };
+};
 
 export const addAccount = async (req, res) => {
   try {
@@ -39,7 +50,11 @@ export const addAccount = async (req, res) => {
     });
     // Insertar los roles
     if (roles && roles.length > 0) {
-      const roleEntries = roles.map(roleId => ({
+      const safeRoles = await sanitizeRoleIdsForRequester(
+        roles,
+        req.user?.loginRol,
+      );
+      const roleEntries = safeRoles.map(roleId => ({
         accountId: newAccount.id,
         roleId,
       }));
@@ -85,7 +100,11 @@ export const updateAccount = async (req, res) => {
 
     // ✅ Actualizar roles si vienen
     if (Array.isArray(data.roles)) {
-      await cuenta.setRoles(data.roles); // ← esto borra y vuelve a insertar
+      const safeRoles = await sanitizeRoleIdsForRequester(
+        data.roles,
+        req.user?.loginRol,
+      );
+      await cuenta.setRoles(safeRoles); // ← esto borra y vuelve a insertar
     }
 
     return res.json({ message: "Cuenta actualizada con éxito" });
@@ -133,7 +152,11 @@ export const updateAccountUser = async (req, res) => {
 
     // Actualizar roles si se envían
     if (Array.isArray(data.roles)) {
-      await cuenta.setRoles(data.roles);
+      const safeRoles = await sanitizeRoleIdsForRequester(
+        data.roles,
+        req.user?.loginRol,
+      );
+      await cuenta.setRoles(safeRoles);
     }
 
     // También podrías enviar los datos actualizados del usuario si quieres
