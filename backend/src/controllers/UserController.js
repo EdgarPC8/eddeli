@@ -1,19 +1,152 @@
+import bcrypt from "bcrypt";
 import { Users } from "../models/Users.js";
 import { Account } from "../models/Account.js";
 import { Roles } from "../models/Roles.js";
+import { UserData } from "../models/UserData.js";
 import { UniqueConstraintError } from "sequelize";
+
+const USER_FIELDS = [
+  "ci",
+  "documentType",
+  "firstName",
+  "secondName",
+  "firstLastName",
+  "secondLastName",
+  "birthday",
+  "gender",
+];
+
+const userInclude = [
+  {
+    model: Account,
+    attributes: ["id", "username", "userId"],
+    include: [{ model: Roles, attributes: ["id", "name"], through: { attributes: [] } }],
+  },
+  {
+    model: UserData,
+    attributes: ["personalEmail", "institutionalEmail"],
+  },
+];
+
+function pickUserFields(body) {
+  const data = {};
+  USER_FIELDS.forEach((key) => {
+    if (body[key] !== undefined) data[key] = body[key];
+  });
+  return data;
+}
+
+function resolveEmailFromBody(body) {
+  if (body.email !== undefined) return body.email;
+  if (body.personalEmail !== undefined) return body.personalEmail;
+  return undefined;
+}
+
+function getUserDataRow(row) {
+  return (
+    row.user_datum ||
+    row.UserData ||
+    row.UserDatum ||
+    row.userData ||
+    row.userDatum ||
+    null
+  );
+}
+
+function formatUserRow(user) {
+  const row = user.toJSON();
+  const accounts = row.Accounts || row.accounts || [];
+  const primary = accounts[0] || null;
+  const userData = getUserDataRow(row);
+  const roles = primary?.roles || primary?.Roles || [];
+
+  return {
+    ...row,
+    email:
+      userData?.personalEmail ??
+      userData?.institutionalEmail ??
+      null,
+    Accounts: undefined,
+    accounts: undefined,
+    UserData: undefined,
+    UserDatum: undefined,
+    user_datum: undefined,
+    userDatum: undefined,
+    userData: undefined,
+    account: primary
+      ? {
+          id: primary.id,
+          username: primary.username,
+          userId: primary.userId,
+          roles,
+          roleIds: roles.map((role) => role.id),
+        }
+      : null,
+    roles: roles.map((role) => role.id),
+  };
+}
+
+async function upsertUserAccount(userId, { username, password, roles }) {
+  if (!username && !password && !Array.isArray(roles)) return null;
+
+  let account = await Account.findOne({ where: { userId } });
+
+  if (!account) {
+    if (!username) return null;
+
+    const hashedPassword =
+      password && String(password).trim()
+        ? await bcrypt.hash(password, 10)
+        : await bcrypt.hash("12345678", 10);
+
+    account = await Account.create({
+      username,
+      password: hashedPassword,
+      userId,
+    });
+  } else {
+    if (username) account.username = username;
+    if (password && String(password).trim()) {
+      account.password = await bcrypt.hash(password, 10);
+    }
+    await account.save();
+  }
+
+  if (Array.isArray(roles)) {
+    await account.setRoles(roles);
+  }
+
+  return account;
+}
+
+async function upsertUserEmail(userId, email) {
+  if (email === undefined) return;
+
+  const [row] = await UserData.findOrCreate({
+    where: { idUser: userId },
+    defaults: { idUser: userId },
+  });
+
+  await row.update({ personalEmail: email || null });
+}
 
 // ✅ CREATE (addUser) - ignora "photo" que venga en el body
 export const addUser = async (req, res) => {
   try {
-    // Quitamos photo del body (la foto se maneja SOLO con el endpoint de uploadPhoto)
-    const { photo, ...data } = req.body;
+    const { photo, username, password, roles, ...rest } = req.body;
+    const email = resolveEmailFromBody(req.body);
+    const userData = pickUserFields(rest);
 
-    const newUser = await Users.create(data);
+    const newUser = await Users.create(userData);
+
+    await upsertUserEmail(newUser.id, email);
+    await upsertUserAccount(newUser.id, { username, password, roles });
+
+    const created = await Users.findByPk(newUser.id, { include: userInclude });
 
     return res.json({
       message: "agregado con éxito",
-      user: newUser,
+      user: formatUserRow(created),
     });
   } catch (error) {
     if (error instanceof UniqueConstraintError || error.name === "SequelizeUniqueConstraintError") {
@@ -32,14 +165,24 @@ export const addUser = async (req, res) => {
 // ✅ EDIT (updateUserData) - ignora "photo" que venga en el body
 export const updateUserData = async (req, res) => {
   try {
-    // Quitamos photo del body (la foto se maneja SOLO con el endpoint de uploadPhoto)
-    const { photo, ...data } = req.body;
+    const userId = req.params.userId;
+    const { photo, username, password, roles, ...rest } = req.body;
+    const email = resolveEmailFromBody(req.body);
+    const userData = pickUserFields(rest);
 
-    await Users.update(data, {
-      where: { id: req.params.userId },
+    if (Object.keys(userData).length > 0) {
+      await Users.update(userData, { where: { id: userId } });
+    }
+
+    await upsertUserEmail(userId, email);
+    await upsertUserAccount(userId, { username, password, roles });
+
+    const updated = await Users.findByPk(userId, { include: userInclude });
+
+    return res.json({
+      message: "usuario editado con éxito",
+      user: updated ? formatUserRow(updated) : null,
     });
-
-    return res.json({ message: "usuario editado con éxito" });
   } catch (error) {
     return res.status(500).json({
       message: error.message,
@@ -50,111 +193,73 @@ export const updateUserData = async (req, res) => {
 export const getUsers = async (req, res) => {
   try {
     const users = await Users.findAll({
-      include: [
-        {
-          model: Account,
-          attributes: ["id", "username", "userId"],
-          include: [{ model: Roles, attributes: ["id", "name"], through: { attributes: [] } }],
-        },
-      ],
+      include: userInclude,
       order: [["id", "ASC"]],
     });
 
-    const payload = users.map((user) => {
-      const row = user.toJSON();
-      const accounts = row.Accounts || row.accounts || [];
-      const primary = accounts[0] || null;
-      return {
-        ...row,
-        Accounts: undefined,
-        accounts: undefined,
-        account: primary
-          ? {
-              id: primary.id,
-              username: primary.username,
-              userId: primary.userId,
-              roles: primary.roles || primary.Roles || [],
-            }
-          : null,
-      };
-    });
 
-    res.json(payload);
+    res.json(users.map(formatUserRow));
   } catch (error) {
     console.error("Error al obtener usuarios:", error);
     res.status(500).json({ message: "Error en el servidor." });
   }
 };
 
-  
-  export const getOneUser = async (req, res) => {
-    const { userId } = req.params;
-    try {
-      const user = await Users.findOne({
-        // attributes: [
-        //   "userId",
-        //   "firstName",
-        //   "secondName",
-        //   "username",
-        //   "ci",
-        //   "firstLastName",
-        //   "secondLastName",
-        //   "photo",
-        // ],
-        where: { id:userId },
-      });
-  
+export const getOneUser = async (req, res) => {
+  const { userId } = req.params;
+  try {
+    const user = await Users.findOne({
+      where: { id: userId },
+      include: userInclude,
+    });
 
-      res.json(user);
-    } catch (error) {
-      res.status(500).json({
-        message: error.message,
-      });
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
     }
-  };
- 
 
-  export const deleteUser = async (req, res) => {
-    try {
-      const removingUser = await Users.destroy({
-        where: {
-          id: req.params.userId,
-        },
-      });
-  
-      res.json({ message: "Usuario eleminado con éxito" });
-    } catch (error) {
-      return res.status(500).json({
-        message: error.message,
-      });
-    }
-  };
-  export const addUsersBulk = async (req, res) => {
-    let usuarios = req.body; // <-- antes era const
-
-
-    if (!Array.isArray(usuarios) || usuarios.length === 0) {
-      return res.status(400).json({ message: "No hay usuarios para registrar" });
-    }
-    usuarios = usuarios.map(({ id, ...rest }) => rest);
-    try {
-      const resultado = await Users.bulkCreate(usuarios, {
-        ignoreDuplicates: true, // opcional según tu BD
-        returning: true,
-      });
-  
-      res.json({
-        insertados: resultado.length,
-        detalles: resultado,
-      });
-    } catch (error) {
-      console.error("Error al insertar usuarios:", error);
-      res.status(500).json({ error: "Error interno del servidor" });
-    }
-    
+    res.json(formatUserRow(user));
+  } catch (error) {
+    res.status(500).json({
+      message: error.message,
+    });
   }
+};
 
-  
+export const deleteUser = async (req, res) => {
+  try {
+    await Users.destroy({
+      where: {
+        id: req.params.userId,
+      },
+    });
 
+    res.json({ message: "Usuario eleminado con éxito" });
+  } catch (error) {
+    return res.status(500).json({
+      message: error.message,
+    });
+  }
+};
 
+export const addUsersBulk = async (req, res) => {
+  let usuarios = req.body;
 
+  if (!Array.isArray(usuarios) || usuarios.length === 0) {
+    return res.status(400).json({ message: "No hay usuarios para registrar" });
+  }
+  usuarios = usuarios.map(({ id, ...rest }) => rest);
+  try {
+    const resultado = await Users.bulkCreate(usuarios, {
+      ignoreDuplicates: true,
+      returning: true,
+    });
+
+    res.json({
+      insertados: resultado.length,
+      detalles: resultado,
+    });
+  } catch (error) {
+    console.error("Error al insertar usuarios:", error);
+    res.status(500).json({ error: "Error interno del servidor" });
+  }
+};

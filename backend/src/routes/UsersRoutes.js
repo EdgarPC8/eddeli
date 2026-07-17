@@ -23,9 +23,9 @@ router.get("/me/data", isAuthenticated, getMyData);
 router.put("/me/data", isAuthenticated, updateMyData);
 
 router.put("/photo/:userId", isAuthenticated, requireSelfOrAdmin, uploadPhoto);
-router.post("", isAuthenticated, requireAdminOrProgrammer, addUser);
+router.post("/", isAuthenticated, requireAdminOrProgrammer, addUser);
 router.post("/bulk", isAuthenticated, requireAdminOrProgrammer, addUsersBulk);
-router.get("", isAuthenticated, requireAdminOrProgrammer, getUsers);
+router.get("/", isAuthenticated, requireAdminOrProgrammer, getUsers);
 router.delete("/:userId", isAuthenticated, requireAdminOrProgrammer, deleteUser);
 router.put("/:userId", isAuthenticated, requireAdminOrProgrammer, updateUserData);
 router.get("/:userId", isAuthenticated, requireAdminOrProgrammer, getOneUser);
