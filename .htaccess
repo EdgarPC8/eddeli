@@ -1,5 +1,4 @@
-# SPA — despliegue en subcarpeta (copiado al build).
-# Debe coincidir con VITE_BASE_PATH en frontend/.env (ej. /eddeli/).
+# SPA — generado en build desde VITE_BASE_PATH (/eddeli/)
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteBase /eddeli/

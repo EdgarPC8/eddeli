@@ -197,7 +197,6 @@ export const getUsers = async (req, res) => {
       order: [["id", "ASC"]],
     });
 
-
     res.json(users.map(formatUserRow));
   } catch (error) {
     console.error("Error al obtener usuarios:", error);
