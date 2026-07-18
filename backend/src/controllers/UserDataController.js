@@ -1,4 +1,5 @@
 import { UserData } from "../models/UserData.js";
+import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
 
 const allowedFields = [
   "direction",
@@ -44,8 +45,14 @@ export const getMyData = async (req, res) => {
 export const updateMyData = async (req, res) => {
   try {
     const idUser = req.user?.userId;
-    if (!idUser)
+    if (!idUser) {
+      notifyFail("user.data_update_failed", "No autenticado", {
+        req,
+        httpStatus: 401,
+        extra: { reason: "unauthenticated" },
+      });
       return res.status(401).json({ message: "No autenticado" });
+    }
 
     const payload = pickBody(req.body);
     const [row, created] = await UserData.findOrCreate({
@@ -53,8 +60,18 @@ export const updateMyData = async (req, res) => {
       defaults: { idUser },
     });
     await row.update(payload);
+    notifyOk("user.data_updated", "Datos personales actualizados", {
+      userId: idUser,
+      created,
+      data: row,
+    });
     res.json({ message: "Datos actualizados", data: row });
   } catch (error) {
+    notifyFail("user.data_update_failed", "Error al actualizar datos personales", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: error.message });
   }
 };

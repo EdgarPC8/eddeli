@@ -10,6 +10,7 @@ import { es } from 'date-fns/locale';
 import { OrderItem } from "../../models/Orders.js";
 import { ItemGroup, ItemGroupItem, Payment } from "../../models/Finance.js";
 import { toFinanceDateTime } from "../../utils/financeDateTime.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 /**
  * Ingresos futuros / por cobrar: alineado con cobranzas por grupos.
@@ -240,9 +241,11 @@ export const createIncome = async (req, res) => {
       referenceType,
       createdBy,
     });
+    notifyOk("income.created", "Ingreso creado", { income });
     res.status(201).json(income);
   } catch (error) {
     console.error("Error al crear ingreso:", error);
+    notifyFail("income.create_failed", "Error interno al crear ingreso", { error, req, httpStatus: 500 });
     res.status(500).json({ message: "Error interno al crear ingreso" });
   }
 };
@@ -264,9 +267,11 @@ export const createExpense = async (req, res) => {
       referenceType,
       createdBy,
     });
+    notifyOk("expense.created", "Gasto creado", { expense });
     res.status(201).json(expense);
   } catch (error) {
     console.error("Error al crear gasto:", error);
+    notifyFail("expense.create_failed", "Error interno al crear gasto", { error, req, httpStatus: 500 });
     res.status(500).json({ message: "Error interno al crear gasto" });
   }
 };
@@ -312,7 +317,10 @@ export const updateIncome = async (req, res) => {
     const { id } = req.params;
     const { date, amount, concept, category, referenceId, referenceType } = req.body;
     const income = await Income.findByPk(id);
-    if (!income) return res.status(404).json({ message: "Ingreso no encontrado" });
+    if (!income) {
+      notifyFail("income.update_failed", `Ingreso #${id} no encontrado`, { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Ingreso no encontrado" });
+    }
 
     await income.update({
       date: toFinanceDateTime(date),
@@ -322,9 +330,11 @@ export const updateIncome = async (req, res) => {
       referenceId,
       referenceType,
     });
+    notifyOk("income.updated", `Ingreso #${id}`, { income });
     res.json(income);
   } catch (error) {
     console.error("Error al editar ingreso:", error);
+    notifyFail("income.update_failed", `Error al editar ingreso #${req.params.id}`, { error, req, httpStatus: 500 });
     res.status(500).json({ message: "Error interno al editar ingreso" });
   }
 };
@@ -335,7 +345,10 @@ export const updateExpense = async (req, res) => {
     const { id } = req.params;
     const { date, amount, concept, category, referenceId, referenceType } = req.body;
     const expense = await Expense.findByPk(id);
-    if (!expense) return res.status(404).json({ message: "Gasto no encontrado" });
+    if (!expense) {
+      notifyFail("expense.update_failed", `Gasto #${id} no encontrado`, { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Gasto no encontrado" });
+    }
 
     await expense.update({
       date: toFinanceDateTime(date),
@@ -345,9 +358,11 @@ export const updateExpense = async (req, res) => {
       referenceId,
       referenceType,
     });
+    notifyOk("expense.updated", `Gasto #${id}`, { expense });
     res.json(expense);
   } catch (error) {
     console.error("Error al editar gasto:", error);
+    notifyFail("expense.update_failed", `Error al editar gasto #${req.params.id}`, { error, req, httpStatus: 500 });
     res.status(500).json({ message: "Error interno al editar gasto" });
   }
 };
@@ -357,12 +372,17 @@ export const deleteIncome = async (req, res) => {
   try {
     const { id } = req.params;
     const income = await Income.findByPk(id);
-    if (!income) return res.status(404).json({ message: "Ingreso no encontrado" });
+    if (!income) {
+      notifyFail("income.delete_failed", `Ingreso #${id} no encontrado`, { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Ingreso no encontrado" });
+    }
 
     await income.destroy();
+    notifyOk("income.deleted", `Ingreso #${id}`, { incomeId: id });
     res.json({ message: "Ingreso eliminado" });
   } catch (error) {
     console.error("Error al eliminar ingreso:", error);
+    notifyFail("income.delete_failed", `Error al eliminar ingreso #${req.params.id}`, { error, req, httpStatus: 500 });
     res.status(500).json({ message: "Error interno al eliminar ingreso" });
   }
 };
@@ -372,12 +392,17 @@ export const deleteExpense = async (req, res) => {
   try {
     const { id } = req.params;
     const expense = await Expense.findByPk(id);
-    if (!expense) return res.status(404).json({ message: "Gasto no encontrado" });
+    if (!expense) {
+      notifyFail("expense.delete_failed", `Gasto #${id} no encontrado`, { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Gasto no encontrado" });
+    }
 
     await expense.destroy();
+    notifyOk("expense.deleted", `Gasto #${id}`, { expenseId: id });
     res.json({ message: "Gasto eliminado" });
   } catch (error) {
     console.error("Error al eliminar gasto:", error);
+    notifyFail("expense.delete_failed", `Error al eliminar gasto #${req.params.id}`, { error, req, httpStatus: 500 });
     res.status(500).json({ message: "Error interno al eliminar gasto" });
   }
 };

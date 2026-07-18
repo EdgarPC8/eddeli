@@ -11,6 +11,7 @@ import {
 import { InventoryProduct, InventoryMovement } from "../../models/Inventory.js";
 import { Expense, SupplierOrderPayment } from "../../models/Finance.js";
 import { getHeaderToken, verifyJWT } from "../../libs/jwt.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 const toNum = (v, d = 0) => {
   const n = Number(v ?? d);
@@ -146,11 +147,18 @@ export const createSupplierOrder = async (req, res) => {
     const { supplierId, date, notes, items = [] } = req.body || {};
 
     if (!supplierId || !date || !Array.isArray(items) || items.length === 0) {
+      notifyFail("supplier_order.create_failed", "Proveedor, fecha e ítems son requeridos", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "Proveedor, fecha e ítems son requeridos" });
     }
 
     const supplier = await Supplier.findByPk(supplierId);
-    if (!supplier) return res.status(404).json({ message: "Proveedor no encontrado" });
+    if (!supplier) {
+      notifyFail("supplier_order.create_failed", "Proveedor no encontrado", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Proveedor no encontrado" });
+    }
 
     const orderId = await sequelize.transaction(async (t) => {
       const order = await SupplierOrder.create(
@@ -185,9 +193,15 @@ export const createSupplierOrder = async (req, res) => {
     });
 
     const full = await SupplierOrder.findByPk(orderId, { include: orderIncludes });
+    notifyOk("supplier_order.created", "Pedido a proveedor creado", { supplierOrderId: orderId });
     res.status(201).json((await formatSupplierOrdersList([full]))[0]);
   } catch (error) {
     console.error("createSupplierOrder:", error);
+    notifyFail("supplier_order.create_failed", error.message || "Error al crear pedido a proveedor", {
+      error,
+      req,
+      httpStatus: 400,
+    });
     res.status(400).json({ message: error.message || "Error al crear pedido a proveedor" });
   }
 };
@@ -197,7 +211,13 @@ export const updateSupplierOrder = async (req, res) => {
     const { id } = req.params;
     const { supplierId, date, notes, items, receivedAt, paidAt } = req.body || {};
     const order = await SupplierOrder.findByPk(id);
-    if (!order) return res.status(404).json({ message: "Pedido no encontrado" });
+    if (!order) {
+      notifyFail("supplier_order.update_failed", `Pedido proveedor #${id} no encontrado`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
 
     const isReceived = Boolean(order.receivedAt);
     // Corrección manual de fechas (Programador): no re-dispara movimientos de stock.
@@ -205,12 +225,20 @@ export const updateSupplierOrder = async (req, res) => {
     if (hasDateOverride) {
       const user = await verifyJWT(getHeaderToken(req));
       if (user?.loginRol !== "Programador") {
+        notifyFail("supplier_order.update_failed", "No tenés permiso para editar las fechas de entrega y pago", {
+          req,
+          httpStatus: 403,
+        });
         return res
           .status(403)
           .json({ message: "No tenés permiso para editar las fechas de entrega y pago" });
       }
     }
     if (isReceived && !hasDateOverride) {
+      notifyFail("supplier_order.update_failed", "No se puede editar un pedido ya recibido", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "No se puede editar un pedido ya recibido" });
     }
 
@@ -247,9 +275,15 @@ export const updateSupplierOrder = async (req, res) => {
     });
 
     const full = await SupplierOrder.findByPk(id, { include: orderIncludes });
+    notifyOk("supplier_order.updated", `Pedido proveedor #${id}`, { supplierOrderId: Number(id) });
     res.json((await formatSupplierOrdersList([full]))[0]);
   } catch (error) {
     console.error("updateSupplierOrder:", error);
+    notifyFail("supplier_order.update_failed", error.message || "Error al actualizar pedido", {
+      error,
+      req,
+      httpStatus: 400,
+    });
     res.status(400).json({ message: error.message || "Error al actualizar pedido" });
   }
 };
@@ -261,14 +295,28 @@ export const addSupplierOrderItem = async (req, res) => {
     const user = await verifyJWT(token);
     const isPrivileged = ["Administrador", "Programador"].includes(user?.loginRol);
     if (!isPrivileged) {
+      notifyFail("supplier_order.item_add_failed", "No tenés permiso para agregar productos al pedido", {
+        req,
+        httpStatus: 403,
+      });
       return res.status(403).json({
         message: "No tenés permiso para agregar productos al pedido",
       });
     }
 
     const order = await SupplierOrder.findByPk(req.params.id);
-    if (!order) return res.status(404).json({ message: "Pedido no encontrado" });
+    if (!order) {
+      notifyFail("supplier_order.item_add_failed", `Pedido proveedor #${req.params.id} no encontrado`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
     if (order.receivedAt) {
+      notifyFail("supplier_order.item_add_failed", "No se pueden agregar productos a un pedido ya recibido", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "No se pueden agregar productos a un pedido ya recibido" });
     }
 
@@ -276,14 +324,22 @@ export const addSupplierOrderItem = async (req, res) => {
     const quantity = toNum(req.body?.quantity);
     const unitPrice = toNum(req.body?.unitPrice ?? req.body?.price, -1);
     if (!productId || quantity <= 0) {
+      notifyFail("supplier_order.item_add_failed", "Producto y cantidad válidos son requeridos", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "Producto y cantidad válidos son requeridos" });
     }
     if (unitPrice < 0) {
+      notifyFail("supplier_order.item_add_failed", "Precio unitario inválido", { req, httpStatus: 400 });
       return res.status(400).json({ message: "Precio unitario inválido" });
     }
 
     const product = await InventoryProduct.findByPk(productId);
-    if (!product) return res.status(404).json({ message: "Producto no encontrado" });
+    if (!product) {
+      notifyFail("supplier_order.item_add_failed", "Producto no encontrado", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Producto no encontrado" });
+    }
 
     const item = await SupplierOrderItem.create({
       orderId: order.id,
@@ -294,6 +350,10 @@ export const addSupplierOrderItem = async (req, res) => {
     });
 
     const full = await SupplierOrder.findByPk(order.id, { include: orderIncludes });
+    notifyOk("supplier_order.item_added", `Ítem pedido proveedor #${req.params.id}`, {
+      supplierOrderId: order.id,
+      itemId: item.id,
+    });
     res.status(201).json({
       message: "Producto agregado al pedido",
       item,
@@ -301,6 +361,11 @@ export const addSupplierOrderItem = async (req, res) => {
     });
   } catch (error) {
     console.error("addSupplierOrderItem:", error);
+    notifyFail("supplier_order.item_add_failed", error.message || "Error al agregar producto", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: error.message || "Error al agregar producto" });
   }
 };
@@ -308,14 +373,32 @@ export const addSupplierOrderItem = async (req, res) => {
 export const deleteSupplierOrder = async (req, res) => {
   try {
     const order = await SupplierOrder.findByPk(req.params.id);
-    if (!order) return res.status(404).json({ message: "Pedido no encontrado" });
+    if (!order) {
+      notifyFail("supplier_order.delete_failed", `Pedido proveedor #${req.params.id} no encontrado`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
     if (order.receivedAt) {
+      notifyFail("supplier_order.delete_failed", "No se puede eliminar un pedido ya recibido", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "No se puede eliminar un pedido ya recibido" });
     }
     await order.destroy();
+    notifyOk("supplier_order.deleted", `Pedido proveedor #${req.params.id}`, {
+      supplierOrderId: Number(req.params.id),
+    });
     res.json({ message: "Pedido a proveedor eliminado" });
   } catch (error) {
     console.error("deleteSupplierOrder:", error);
+    notifyFail("supplier_order.delete_failed", `Error al eliminar pedido #${req.params.id}`, {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al eliminar pedido" });
   }
 };
@@ -327,8 +410,18 @@ export const markSupplierOrderReceived = async (req, res) => {
     const order = await SupplierOrder.findByPk(req.params.id, {
       include: [{ model: SupplierOrderItem, as: "ERP_supplier_order_items" }],
     });
-    if (!order) return res.status(404).json({ message: "Pedido no encontrado" });
+    if (!order) {
+      notifyFail("supplier_order.mark_received_failed", `Pedido proveedor #${req.params.id} no encontrado`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
     if (order.receivedAt) {
+      notifyFail("supplier_order.mark_received_failed", "El pedido ya fue marcado como recibido", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "El pedido ya fue marcado como recibido" });
     }
 
@@ -366,9 +459,17 @@ export const markSupplierOrderReceived = async (req, res) => {
     });
 
     const full = await SupplierOrder.findByPk(order.id, { include: orderIncludes });
+    notifyOk("supplier_order.mark_received", `Pedido recibido #${req.params.id}`, {
+      supplierOrderId: order.id,
+    });
     res.json((await formatSupplierOrdersList([full]))[0]);
   } catch (error) {
     console.error("markSupplierOrderReceived:", error);
+    notifyFail("supplier_order.mark_received_failed", "Error al marcar pedido como recibido", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al marcar pedido como recibido" });
   }
 };
@@ -385,8 +486,18 @@ export const markSupplierOrderPaid = async (req, res) => {
         { model: SupplierOrderItem, as: "ERP_supplier_order_items" },
       ],
     });
-    if (!order) return res.status(404).json({ message: "Pedido no encontrado" });
+    if (!order) {
+      notifyFail("supplier_order.mark_paid_failed", `Pedido proveedor #${req.params.id} no encontrado`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
     if (order.paidAt) {
+      notifyFail("supplier_order.mark_paid_failed", "El pedido ya fue marcado como pagado", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "El pedido ya fue marcado como pagado" });
     }
 
@@ -446,9 +557,17 @@ export const markSupplierOrderPaid = async (req, res) => {
     });
 
     const full = await SupplierOrder.findByPk(order.id, { include: orderIncludes });
+    notifyOk("supplier_order.mark_paid", `Pedido proveedor pagado #${req.params.id}`, {
+      supplierOrderId: order.id,
+    });
     res.json((await formatSupplierOrdersList([full]))[0]);
   } catch (error) {
     console.error("markSupplierOrderPaid:", error);
+    notifyFail("supplier_order.mark_paid_failed", "Error al marcar pedido como pagado", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al marcar pedido como pagado" });
   }
 };

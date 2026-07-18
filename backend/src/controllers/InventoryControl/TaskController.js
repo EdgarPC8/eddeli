@@ -7,6 +7,7 @@ import { Roles } from "../../models/Roles.js";
 import { InventoryProduct, InventoryMovement } from "../../models/Inventory.js";
 import { Notifications } from "../../models/Notifications.js";
 import { sendNotificationToUser } from "../../sockets/notificationSocket.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 const ADMIN_ROLES = new Set(["Administrador", "Programador"]);
 const TASK_STATUS_PRIORITY = { pending: 0, in_progress: 1, blocked: 2, done: 3 };
@@ -113,9 +114,16 @@ export const getTaskAssignees = async (req, res) => {
 };
 
 export const createTaskPlan = async (req, res) => {
-  if (!isAdminRole(req)) return res.status(403).json({ message: "No autorizado." });
+  if (!isAdminRole(req)) {
+    notifyFail("task_plan.create_failed", "No autorizado", { req, httpStatus: 403 });
+    return res.status(403).json({ message: "No autorizado." });
+  }
   const { title, description, startDate, endDate, items = [] } = req.body;
   if (!title?.trim() || !startDate || !endDate) {
+    notifyFail("task_plan.create_failed", "title, startDate y endDate son requeridos", {
+      req,
+      httpStatus: 400,
+    });
     return res.status(400).json({ message: "title, startDate y endDate son requeridos." });
   }
   const t = await sequelize.transaction();
@@ -136,9 +144,11 @@ export const createTaskPlan = async (req, res) => {
       await TaskItem.create({ ...row, planId: plan.id }, { transaction: t });
     }
     await t.commit();
+    notifyOk("task_plan.created", "Plan de tareas creado", { planId: plan.id });
     res.status(201).json({ ok: true, planId: plan.id });
   } catch (error) {
     await t.rollback();
+    notifyFail("task_plan.create_failed", error.message, { error, req, httpStatus: 400 });
     res.status(400).json({ message: error.message });
   }
 };
@@ -167,16 +177,31 @@ function normalizePlanItems(items) {
 }
 
 export const updateTaskPlan = async (req, res) => {
-  if (!isAdminRole(req)) return res.status(403).json({ message: "No autorizado." });
+  if (!isAdminRole(req)) {
+    notifyFail("task_plan.update_failed", "No autorizado", { req, httpStatus: 403 });
+    return res.status(403).json({ message: "No autorizado." });
+  }
   const { id } = req.params;
   const plan = await TaskPlan.findByPk(id, { include: [{ model: TaskItem, as: "items" }] });
-  if (!plan) return res.status(404).json({ message: "Plan no encontrado." });
+  if (!plan) {
+    notifyFail("task_plan.update_failed", `Plan #${id} no encontrado`, { req, httpStatus: 404 });
+    return res.status(404).json({ message: "Plan no encontrado." });
+  }
   if (plan.status !== "draft") {
+    notifyFail("task_plan.update_failed", "Solo se pueden editar planes en borrador", {
+      req,
+      httpStatus: 400,
+      extra: { planId: id },
+    });
     return res.status(400).json({ message: "Solo se pueden editar planes en borrador." });
   }
 
   const { title, description, startDate, endDate, items } = req.body;
   if (!title?.trim() || !startDate || !endDate) {
+    notifyFail("task_plan.update_failed", "title, startDate y endDate son requeridos", {
+      req,
+      httpStatus: 400,
+    });
     return res.status(400).json({ message: "title, startDate y endDate son requeridos." });
   }
 
@@ -197,46 +222,88 @@ export const updateTaskPlan = async (req, res) => {
       await TaskItem.create({ ...row, planId: plan.id }, { transaction: t });
     }
     await t.commit();
+    notifyOk("task_plan.updated", `Plan tareas #${id}`, { planId: plan.id });
     res.json({ ok: true, planId: plan.id });
   } catch (error) {
     await t.rollback();
+    notifyFail("task_plan.update_failed", error.message, {
+      error,
+      req,
+      httpStatus: 400,
+      extra: { planId: id },
+    });
     res.status(400).json({ message: error.message });
   }
 };
 
 export const deleteTaskPlan = async (req, res) => {
-  if (!isAdminRole(req)) return res.status(403).json({ message: "No autorizado." });
+  if (!isAdminRole(req)) {
+    notifyFail("task_plan.delete_failed", "No autorizado", { req, httpStatus: 403 });
+    return res.status(403).json({ message: "No autorizado." });
+  }
   const { id } = req.params;
   const plan = await TaskPlan.findByPk(id);
-  if (!plan) return res.status(404).json({ message: "Plan no encontrado." });
+  if (!plan) {
+    notifyFail("task_plan.delete_failed", `Plan #${id} no encontrado`, { req, httpStatus: 404 });
+    return res.status(404).json({ message: "Plan no encontrado." });
+  }
   if (plan.status === "published") {
+    notifyFail("task_plan.delete_failed", "No se puede eliminar un plan publicado", {
+      req,
+      httpStatus: 400,
+      extra: { planId: id },
+    });
     return res.status(400).json({
       message: "No se puede eliminar un plan publicado. Ciérralo primero o deja de usarlo.",
     });
   }
   await TaskItem.destroy({ where: { planId: plan.id } });
   await plan.destroy();
+  notifyOk("task_plan.deleted", `Plan tareas #${id}`, { planId: Number(id) });
   res.json({ ok: true, planId: Number(id) });
 };
 
 export const deleteTaskItem = async (req, res) => {
-  if (!isAdminRole(req)) return res.status(403).json({ message: "No autorizado." });
+  if (!isAdminRole(req)) {
+    notifyFail("task_item.delete_failed", "No autorizado", { req, httpStatus: 403 });
+    return res.status(403).json({ message: "No autorizado." });
+  }
   const { id } = req.params;
   const item = await TaskItem.findByPk(id, { include: [{ model: TaskPlan, as: "plan" }] });
-  if (!item) return res.status(404).json({ message: "Tarea no encontrada." });
+  if (!item) {
+    notifyFail("task_item.delete_failed", `Tarea #${id} no encontrada`, { req, httpStatus: 404 });
+    return res.status(404).json({ message: "Tarea no encontrada." });
+  }
   if (item.plan?.status !== "draft") {
+    notifyFail("task_item.delete_failed", "Solo se pueden eliminar tareas de planes en borrador", {
+      req,
+      httpStatus: 400,
+      extra: { itemId: id },
+    });
     return res.status(400).json({ message: "Solo se pueden eliminar tareas de planes en borrador." });
   }
   await item.destroy();
+  notifyOk("task_item.deleted", `Tarea #${id}`, { itemId: Number(id) });
   res.json({ ok: true, itemId: Number(id) });
 };
 
 export const publishTaskPlan = async (req, res) => {
-  if (!isAdminRole(req)) return res.status(403).json({ message: "No autorizado." });
+  if (!isAdminRole(req)) {
+    notifyFail("task_plan.publish_failed", "No autorizado", { req, httpStatus: 403 });
+    return res.status(403).json({ message: "No autorizado." });
+  }
   const { id } = req.params;
   const plan = await TaskPlan.findByPk(id, { include: [{ model: TaskItem, as: "items" }] });
-  if (!plan) return res.status(404).json({ message: "Plan no encontrado." });
+  if (!plan) {
+    notifyFail("task_plan.publish_failed", `Plan #${id} no encontrado`, { req, httpStatus: 404 });
+    return res.status(404).json({ message: "Plan no encontrado." });
+  }
   if ((plan.items || []).length === 0) {
+    notifyFail("task_plan.publish_failed", "El plan no tiene tareas", {
+      req,
+      httpStatus: 400,
+      extra: { planId: id },
+    });
     return res.status(400).json({ message: "El plan no tiene tareas." });
   }
   await plan.update({ status: "published", publishedAt: new Date() });
@@ -254,6 +321,10 @@ export const publishTaskPlan = async (req, res) => {
     ),
   );
   created.forEach((n) => sendNotificationToUser(n.userId, n.toJSON()));
+  notifyOk("task_plan.published", `Plan publicado #${id}`, {
+    planId: plan.id,
+    notifiedUsers: assignedUsers.length,
+  });
   res.json({ ok: true, planId: plan.id, notifiedUsers: assignedUsers.length });
 };
 
@@ -316,9 +387,20 @@ export const updateTaskItemStatus = async (req, res) => {
   const { id } = req.params;
   const { status, resultNote } = req.body;
   const item = await TaskItem.findByPk(id);
-  if (!item) return res.status(404).json({ message: "Tarea no encontrada." });
+  if (!item) {
+    notifyFail("task_item.status_update_failed", `Tarea #${id} no encontrada`, {
+      req,
+      httpStatus: 404,
+    });
+    return res.status(404).json({ message: "Tarea no encontrada." });
+  }
   const userId = Number(req.user?.userId || 0);
   if (!isAdminRole(req) && Number(item.assignedUserId) !== userId) {
+    notifyFail("task_item.status_update_failed", "No autorizado para esta tarea", {
+      req,
+      httpStatus: 403,
+      extra: { itemId: id },
+    });
     return res.status(403).json({ message: "No autorizado para esta tarea." });
   }
   const nextStatus = ["pending", "in_progress", "done", "blocked"].includes(String(status))
@@ -330,18 +412,32 @@ export const updateTaskItemStatus = async (req, res) => {
     checkedAt: nextStatus === "done" ? new Date() : null,
     checkedByUserId: nextStatus === "done" ? userId || item.checkedByUserId : null,
   });
+  notifyOk("task_item.status_updated", `Estado tarea #${id}`, { itemId: id, status: nextStatus });
   res.json(item);
 };
 
 export const executeTaskOpenBox = async (req, res) => {
   const { id } = req.params;
   const item = await TaskItem.findByPk(id);
-  if (!item) return res.status(404).json({ message: "Tarea no encontrada." });
+  if (!item) {
+    notifyFail("task_item.open_box_failed", `Tarea #${id} no encontrada`, { req, httpStatus: 404 });
+    return res.status(404).json({ message: "Tarea no encontrada." });
+  }
   const userId = Number(req.user?.userId || 0);
   if (!isAdminRole(req) && Number(item.assignedUserId) !== userId) {
+    notifyFail("task_item.open_box_failed", "No autorizado para esta tarea", {
+      req,
+      httpStatus: 403,
+      extra: { itemId: id },
+    });
     return res.status(403).json({ message: "No autorizado para esta tarea." });
   }
   if (item.actionType !== "open_box") {
+    notifyFail("task_item.open_box_failed", "Esta tarea no tiene acción de abrir caja", {
+      req,
+      httpStatus: 400,
+      extra: { itemId: id },
+    });
     return res.status(400).json({ message: "Esta tarea no tiene acción de abrir caja." });
   }
   const payload = parseActionPayload(item);
@@ -358,9 +454,19 @@ export const executeTaskOpenBox = async (req, res) => {
       { transaction: t },
     );
     await t.commit();
+    notifyOk("task_item.open_box_executed", `Apertura caja tarea #${id}`, {
+      taskItemId: item.id,
+      ...exec,
+    });
     res.json({ ok: true, taskItemId: item.id, ...exec });
   } catch (error) {
     await t.rollback();
+    notifyFail("task_item.open_box_failed", error.message, {
+      error,
+      req,
+      httpStatus: 400,
+      extra: { itemId: id },
+    });
     res.status(400).json({ message: error.message });
   }
 };

@@ -11,6 +11,7 @@ import {
   } from "../../models/Editor.js";
 import { sequelize } from "../../database/connection.js";
 import { verifyJWT,getHeaderToken } from "../../libs/jwt.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 
 
@@ -50,6 +51,10 @@ export const deleteTemplateLayer = async (req, res) => {
   const layerKey = String(req.params.layerKey || "").trim();
 
   if (!templateId || !layerKey) {
+    notifyFail("editor.template_layer_delete_failed", "templateId y layerKey son requeridos", {
+      req,
+      httpStatus: 400,
+    });
     return res.status(400).json({ message: "templateId y layerKey son requeridos" });
   }
 
@@ -57,6 +62,7 @@ export const deleteTemplateLayer = async (req, res) => {
   try {
     await verifyJWT(token);
   } catch {
+    notifyFail("editor.template_layer_delete_failed", "No autorizado", { req, httpStatus: 401 });
     return res.status(401).json({ message: "No autorizado" });
   }
 
@@ -70,6 +76,11 @@ export const deleteTemplateLayer = async (req, res) => {
 
     if (!layer) {
       await t.rollback();
+      notifyFail("editor.template_layer_delete_failed", "Capa no encontrada", {
+        req,
+        httpStatus: 404,
+        extra: { templateId, layerKey },
+      });
       return res.status(404).json({ message: "Capa no encontrada" });
     }
 
@@ -96,10 +107,20 @@ export const deleteTemplateLayer = async (req, res) => {
     await layer.destroy({ transaction: t });
 
     await t.commit();
+    notifyOk("editor.template_layer_deleted", `Capa ${layerKey} eliminada`, {
+      templateId,
+      layerKey,
+    });
     return res.json({ message: "Capa eliminada correctamente", layerKey });
   } catch (error) {
     await t.rollback();
     console.error("deleteTemplateLayer error:", error);
+    notifyFail("editor.template_layer_delete_failed", "Error eliminando capa", {
+      error,
+      req,
+      httpStatus: 500,
+      extra: { templateId, layerKey },
+    });
     return res.status(500).json({ message: "Error eliminando capa" });
   }
 };
@@ -112,12 +133,14 @@ export const updateTemplateDoc = async (req, res) => {
   try {
     user = await verifyJWT(token);
   } catch {
+    notifyFail("editor.template_doc_update_failed", "No autorizado", { req, httpStatus: 401 });
     return res.status(401).json({ message: "No autorizado" });
   }
   const updatedBy = user?.accountId ? toInt(user.accountId, 0) : null;
 
   const doc = req.body?.doc;
   if (!doc || typeof doc !== "object") {
+    notifyFail("editor.template_doc_update_failed", "doc requerido", { req, httpStatus: 400 });
     return res.status(400).json({ message: "doc requerido" });
   }
 
@@ -157,6 +180,10 @@ export const updateTemplateDoc = async (req, res) => {
     const tpl = await EditorTemplate.findByPk(id, { transaction: t });
     if (!tpl) {
       await t.rollback();
+      notifyFail("editor.template_doc_update_failed", `Plantilla #${id} no encontrada`, {
+        req,
+        httpStatus: 404,
+      });
       return res.status(404).json({ message: "Template no encontrado" });
     }
 
@@ -262,10 +289,16 @@ export const updateTemplateDoc = async (req, res) => {
     }
 
     await t.commit();
+    notifyOk("editor.template_doc_updated", `Doc plantilla #${tpl.id}`, { templateId: tpl.id });
     return res.json({ message: "Template doc guardado", templateId: tpl.id });
   } catch (error) {
     await t.rollback();
     console.error("updateTemplateDoc error:", error);
+    notifyFail("editor.template_doc_update_failed", `Error guardando doc plantilla #${id}`, {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({ message: "Error guardando doc", error: String(error?.message || error) });
   }
 };
@@ -281,6 +314,7 @@ export const importTemplate = async (req, res) => {
   try {
     user = await verifyJWT(token);
   } catch (e) {
+    notifyFail("editor.template_import_failed", "No autorizado", { req, httpStatus: 401 });
     return res.status(401).json({ message: "No autorizado" });
   }
   const templateJson = req.body?.templateJson ?? req.body;
@@ -289,9 +323,11 @@ export const importTemplate = async (req, res) => {
   const isPlainObject = (x) => x && typeof x === "object" && !Array.isArray(x);
 
   if (!templateJson || !isPlainObject(templateJson)) {
+    notifyFail("editor.template_import_failed", "templateJson inválido", { req, httpStatus: 400 });
     return res.status(400).json({ message: "templateJson inválido" });
   }
   if (!createdBy) {
+    notifyFail("editor.template_import_failed", "createdBy requerido", { req, httpStatus: 400 });
     return res.status(400).json({ message: "createdBy requerido (o req.user.id)" });
   }
 
@@ -434,6 +470,11 @@ export const importTemplate = async (req, res) => {
     }
 
     await t.commit();
+    notifyOk("editor.template_imported", "Plantilla importada", {
+      templateId: tpl.id,
+      groups: groupKeyToId.size,
+      layers: layersIn.length,
+    });
     return res.json({
       message: "Template importado con éxito",
       templateId: tpl.id,
@@ -443,6 +484,11 @@ export const importTemplate = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error("importTemplate error:", error);
+    notifyFail("editor.template_import_failed", "Error importando template", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({
       message: "Error importando template",
       error: String(error?.message || error),
@@ -527,6 +573,7 @@ export const updateTemplate = async (req, res) => {
   try {
     user = await verifyJWT(token);
   } catch (e) {
+    notifyFail("editor.template_update_failed", "No autorizado", { req, httpStatus: 401 });
     return res.status(401).json({ message: "No autorizado" });
   }
 
@@ -575,7 +622,13 @@ export const updateTemplate = async (req, res) => {
 
   try {
     const tpl = await EditorTemplate.findByPk(id);
-    if (!tpl) return res.status(404).json({ message: "Template no encontrado" });
+    if (!tpl) {
+      notifyFail("editor.template_update_failed", `Plantilla #${id} no encontrada`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Template no encontrado" });
+    }
 
     const t = await sequelize.transaction();
     try {
@@ -694,6 +747,7 @@ export const updateTemplate = async (req, res) => {
         }
 
         await t.commit();
+        notifyOk("editor.template_updated", `Plantilla #${tpl.id}`, { templateId: tpl.id });
         return res.json({ message: "Template guardado (doc completo)", templateId: tpl.id });
       }
 
@@ -719,6 +773,7 @@ export const updateTemplate = async (req, res) => {
       await tpl.update(patch, { transaction: t });
 
       await t.commit();
+      notifyOk("editor.template_updated", `Plantilla #${tpl.id}`, { templateId: tpl.id });
       return res.json({ message: "Template actualizado", template: tpl });
     } catch (e) {
       await t.rollback();
@@ -726,6 +781,11 @@ export const updateTemplate = async (req, res) => {
     }
   } catch (error) {
     console.error("updateTemplate error:", error);
+    notifyFail("editor.template_update_failed", `Error actualizando plantilla #${id}`, {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({ message: "Error actualizando template" });
   }
 };
@@ -899,12 +959,24 @@ export const deleteTemplate = async (req, res) => {
     const id = toInt(req.params.id, 0);
 
     const tpl = await EditorTemplate.findByPk(id);
-    if (!tpl) return res.status(404).json({ message: "Template no encontrado" });
+    if (!tpl) {
+      notifyFail("editor.template_delete_failed", `Plantilla #${id} no encontrada`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Template no encontrado" });
+    }
 
     await tpl.destroy();
+    notifyOk("editor.template_deleted", `Plantilla #${id}`, { templateId: id });
     res.json({ message: "Template eliminado" });
   } catch (error) {
     console.error("deleteTemplate error:", error);
+    notifyFail("editor.template_delete_failed", `Error eliminando plantilla #${req.params.id}`, {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error eliminando template" });
   }
 };
@@ -921,11 +993,20 @@ export const createDesign = async (req, res) => {
     const createdBy = toInt(req.user?.accountId || req.body?.createdBy, 0);
     const templateId = toInt(req.body?.templateId, 0);
 
-    if (!createdBy) return res.status(400).json({ message: "createdBy requerido" });
-    if (!templateId) return res.status(400).json({ message: "templateId requerido" });
+    if (!createdBy) {
+      notifyFail("editor.design_create_failed", "createdBy requerido", { req, httpStatus: 400 });
+      return res.status(400).json({ message: "createdBy requerido" });
+    }
+    if (!templateId) {
+      notifyFail("editor.design_create_failed", "templateId requerido", { req, httpStatus: 400 });
+      return res.status(400).json({ message: "templateId requerido" });
+    }
 
     const tpl = await EditorTemplate.findByPk(templateId);
-    if (!tpl) return res.status(404).json({ message: "Template no existe" });
+    if (!tpl) {
+      notifyFail("editor.design_create_failed", "Template no existe", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Template no existe" });
+    }
 
     const row = await EditorDesign.create({
       templateId,
@@ -939,9 +1020,11 @@ export const createDesign = async (req, res) => {
       updatedBy: null,
     });
 
+    notifyOk("editor.design_created", "Diseño creado", { designId: row.id, templateId });
     res.json({ message: "Design creado", design: row });
   } catch (error) {
     console.error("createDesign error:", error);
+    notifyFail("editor.design_create_failed", "Error creando design", { error, req, httpStatus: 500 });
     res.status(500).json({ message: "Error creando design" });
   }
 };
@@ -952,7 +1035,13 @@ export const updateDesign = async (req, res) => {
     const updatedBy = toInt(req.user?.accountId || req.body?.updatedBy, 0);
 
     const row = await EditorDesign.findByPk(id);
-    if (!row) return res.status(404).json({ message: "Design no encontrado" });
+    if (!row) {
+      notifyFail("editor.design_update_failed", `Design #${id} no encontrado`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Design no encontrado" });
+    }
 
     const patch = {};
     if (req.body.name != null) patch.name = String(req.body.name);
@@ -962,9 +1051,15 @@ export const updateDesign = async (req, res) => {
     if (updatedBy) patch.updatedBy = updatedBy;
 
     await row.update(patch);
+    notifyOk("editor.design_updated", `Diseño #${id}`, { designId: id });
     res.json({ message: "Design actualizado", design: row });
   } catch (error) {
     console.error("updateDesign error:", error);
+    notifyFail("editor.design_update_failed", `Error actualizando design #${req.params.id}`, {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error actualizando design" });
   }
 };
@@ -974,6 +1069,10 @@ export const upsertOverride = async (req, res) => {
   const layerKey = String(req.body?.layerKey || "").trim();
 
   if (!designId || !layerKey) {
+    notifyFail("editor.override_upsert_failed", "designId y layerKey son requeridos", {
+      req,
+      httpStatus: 400,
+    });
     return res.status(400).json({ message: "designId y layerKey son requeridos" });
   }
 
@@ -996,6 +1095,10 @@ export const upsertOverride = async (req, res) => {
     const design = await EditorDesign.findByPk(designId, { transaction: t });
     if (!design) {
       await t.rollback();
+      notifyFail("editor.override_upsert_failed", `Design #${designId} no encontrado`, {
+        req,
+        httpStatus: 404,
+      });
       return res.status(404).json({ message: "Design no encontrado" });
     }
 
@@ -1008,10 +1111,19 @@ export const upsertOverride = async (req, res) => {
     if (!created) await row.update(payload, { transaction: t });
 
     await t.commit();
+    notifyOk("editor.override_upserted", `Override diseño #${designId}`, {
+      designId,
+      layerKey,
+    });
     res.json({ message: "Override guardado", override: row });
   } catch (error) {
     await t.rollback();
     console.error("upsertOverride error:", error);
+    notifyFail("editor.override_upsert_failed", `Error guardando override design #${designId}`, {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error guardando override" });
   }
 };

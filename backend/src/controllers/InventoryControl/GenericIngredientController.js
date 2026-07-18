@@ -12,6 +12,7 @@ import {
   isCountUnit,
   resolveGramFactor,
 } from "../../utils/genericIngredientUtils.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 const productInclude = [
   { model: InventoryCategory, attributes: ["id", "name"] },
@@ -511,6 +512,7 @@ export const getGenericIngredientsWorkbench = async (req, res) => {
 export const bootstrapGenericIngredients = async (req, res) => {
   try {
     const summary = await runGenericIngredientsBootstrap();
+    notifyOk("generic_ingredient.bootstrapped", "Bootstrap insumos genéricos", { summary });
     res.json({
       message:
         "Genéricos marcados y presentaciones creadas (azúcar, harina, aceite).",
@@ -518,6 +520,7 @@ export const bootstrapGenericIngredients = async (req, res) => {
     });
   } catch (error) {
     console.error("bootstrapGenericIngredients:", error);
+    notifyFail("generic_ingredient.bootstrap_failed", error.message, { error, req, httpStatus: 500 });
     res.status(500).json({ message: error.message });
   }
 };
@@ -530,6 +533,10 @@ export const createGenericIngredient = async (req, res) => {
   try {
     const { name, unitId, categoryId, categoryFamily, minStock } = req.body;
     if (!name?.trim() || !unitId) {
+      notifyFail("generic_ingredient.create_failed", "Nombre y unidad son obligatorios", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "Nombre y unidad son obligatorios." });
     }
 
@@ -552,9 +559,11 @@ export const createGenericIngredient = async (req, res) => {
     });
 
     const full = await InventoryProduct.findByPk(row.id, { include: productInclude });
+    notifyOk("generic_ingredient.created", `Insumo genérico #${row.id}`, { genericIngredient: shapeProductRow(full) });
     res.status(201).json(shapeProductRow(full));
   } catch (error) {
     console.error("createGenericIngredient:", error);
+    notifyFail("generic_ingredient.create_failed", error.message, { error, req, httpStatus: 500 });
     res.status(500).json({ message: error.message });
   }
 };
@@ -567,6 +576,7 @@ export const createPresentation = async (req, res) => {
     const genericId = Number(req.params.genericId);
     const generic = await InventoryProduct.findByPk(genericId);
     if (!generic?.isGenericIngredient) {
+      notifyFail("presentation.create_failed", "Insumo genérico no encontrado", { req, httpStatus: 404 });
       return res.status(404).json({ message: "Insumo genérico no encontrado." });
     }
 
@@ -583,14 +593,29 @@ export const createPresentation = async (req, res) => {
 
     if (existingProductId) {
       const existing = await InventoryProduct.findByPk(existingProductId);
-      if (!existing) return res.status(404).json({ message: "Producto no encontrado." });
+      if (!existing) {
+        notifyFail("presentation.create_failed", "Producto no encontrado", { req, httpStatus: 404 });
+        return res.status(404).json({ message: "Producto no encontrado." });
+      }
       if (existing.isGenericIngredient) {
+        notifyFail("presentation.create_failed", "No puedes enlazar otro insumo genérico", {
+          req,
+          httpStatus: 400,
+        });
         return res.status(400).json({ message: "No puedes enlazar otro insumo genérico." });
       }
       if (existing.genericProductId && existing.genericProductId !== genericId) {
+        notifyFail("presentation.create_failed", "Producto ya enlazado a otro insumo", {
+          req,
+          httpStatus: 400,
+        });
         return res.status(400).json({ message: "El producto ya está enlazado a otro insumo." });
       }
       if (isAzucarComunGeneric(generic) && isAzucarImpalpableProduct(existing)) {
+        notifyFail("presentation.create_failed", "Azúcar impalpable no se enlaza bajo Azúcar común", {
+          req,
+          httpStatus: 400,
+        });
         return res.status(400).json({
           message:
             "Azúcar impalpable es un insumo distinto. No se enlaza bajo Azúcar común.",
@@ -607,10 +632,18 @@ export const createPresentation = async (req, res) => {
       });
 
       const full = await InventoryProduct.findByPk(existing.id, { include: productInclude });
+      notifyOk("presentation.created", `Presentación #${existing.id}`, {
+        productId: existing.id,
+        genericProductId: genericId,
+      });
       return res.status(200).json(shapeProductRow(full));
     }
 
     if (!name?.trim()) {
+      notifyFail("presentation.create_failed", "Nombre de presentación obligatorio", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "Nombre de presentación obligatorio." });
     }
 
@@ -629,9 +662,14 @@ export const createPresentation = async (req, res) => {
     });
 
     const full = await InventoryProduct.findByPk(row.id, { include: productInclude });
+    notifyOk("presentation.created", `Presentación #${row.id}`, {
+      productId: row.id,
+      genericProductId: genericId,
+    });
     res.status(201).json(shapeProductRow(full));
   } catch (error) {
     console.error("createPresentation:", error);
+    notifyFail("presentation.create_failed", error.message, { error, req, httpStatus: 500 });
     res.status(500).json({ message: error.message });
   }
 };
@@ -651,12 +689,18 @@ export const linkPresentation = async (req, res) => {
     ]);
 
     if (!product || product.type !== "raw") {
+      notifyFail("presentation.link_failed", "Producto no encontrado", { req, httpStatus: 404 });
       return res.status(404).json({ message: "Producto no encontrado." });
     }
     if (!generic?.isGenericIngredient) {
+      notifyFail("presentation.link_failed", "Insumo genérico no encontrado", { req, httpStatus: 404 });
       return res.status(404).json({ message: "Insumo genérico no encontrado." });
     }
     if (isAzucarComunGeneric(generic) && isAzucarImpalpableProduct(product)) {
+      notifyFail("presentation.link_failed", "Azúcar impalpable no se enlaza bajo Azúcar común", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({
         message: "Azúcar impalpable es un insumo distinto. No se enlaza bajo Azúcar común.",
       });
@@ -671,9 +715,14 @@ export const linkPresentation = async (req, res) => {
     });
 
     const full = await InventoryProduct.findByPk(product.id, { include: productInclude });
+    notifyOk("presentation.linked", `Presentación #${productId} vinculada`, {
+      productId,
+      genericProductId: genericId,
+    });
     res.json(shapeProductRow(full));
   } catch (error) {
     console.error("linkPresentation:", error);
+    notifyFail("presentation.link_failed", error.message, { error, req, httpStatus: 500 });
     res.status(500).json({ message: error.message });
   }
 };
@@ -684,13 +733,20 @@ export const linkPresentation = async (req, res) => {
 export const unlinkPresentation = async (req, res) => {
   try {
     const product = await InventoryProduct.findByPk(req.params.productId);
-    if (!product) return res.status(404).json({ message: "Producto no encontrado." });
+    if (!product) {
+      notifyFail("presentation.unlink_failed", "Producto no encontrado", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Producto no encontrado." });
+    }
 
     await product.update({ genericProductId: null });
     const full = await InventoryProduct.findByPk(product.id, { include: productInclude });
+    notifyOk("presentation.unlinked", `Presentación #${req.params.productId} desvinculada`, {
+      productId: req.params.productId,
+    });
     res.json(shapeProductRow(full));
   } catch (error) {
     console.error("unlinkPresentation:", error);
+    notifyFail("presentation.unlink_failed", error.message, { error, req, httpStatus: 500 });
     res.status(500).json({ message: error.message });
   }
 };

@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import fileDirName from "../libs/file-dirname.js";
 import { mediaSubfolder } from "../services/appSettingsService.js";
+import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
 
 const { __dirname } = fileDirName(import.meta);
 const FILES_BASE_DIR = path.resolve(__dirname, "../files");
@@ -43,11 +44,13 @@ export const documentUploadMiddleware = makeFileUpload({
 export const uploadDocument = async (req, res) => {
   try {
     if (!req.file?.filename) {
+      notifyFail("document.upload_failed", "No se recibió ningún archivo", { req, httpStatus: 400 });
       return res.status(400).json({ message: "No se recibió ningún archivo." });
     }
 
     const entityType = String(req.body?.entityType || "").trim();
     if (!DOCUMENT_ENTITY_TYPES.includes(entityType)) {
+      notifyFail("document.upload_failed", "entityType inválido", { req, httpStatus: 400 });
       return res.status(400).json({ message: "entityType inválido." });
     }
 
@@ -58,9 +61,14 @@ export const uploadDocument = async (req, res) => {
     const label = req.body?.label ? String(req.body.label).trim() : null;
 
     if (entityType === "movement_batch" && !batchKey) {
+      notifyFail("document.upload_failed", "batchKey requerido para movement_batch", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "batchKey requerido para movement_batch." });
     }
     if (entityType !== "movement_batch" && !entityId) {
+      notifyFail("document.upload_failed", "entityId requerido", { req, httpStatus: 400 });
       return res.status(400).json({ message: "entityId requerido." });
     }
 
@@ -69,6 +77,10 @@ export const uploadDocument = async (req, res) => {
 
     const relPath = req.fileManager?.relativePath || req.fileManager?.publicUrl;
     if (!relPath) {
+      notifyFail("document.upload_failed", "No se pudo determinar la ruta del archivo", {
+        req,
+        httpStatus: 500,
+      });
       return res.status(500).json({ message: "No se pudo determinar la ruta del archivo." });
     }
 
@@ -99,6 +111,10 @@ export const uploadDocument = async (req, res) => {
       linked.push(row);
     }
 
+    notifyOk("document.uploaded", "Documento subido", {
+      attachmentId: created.id,
+      entityType,
+    });
     return res.status(201).json({
       message: "Comprobante guardado.",
       attachment: created,
@@ -106,6 +122,11 @@ export const uploadDocument = async (req, res) => {
     });
   } catch (error) {
     console.error("uploadDocument:", error);
+    notifyFail("document.upload_failed", "Error al subir comprobante", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({
       message: error?.message || "Error al subir comprobante",
     });
@@ -145,7 +166,13 @@ export const deleteDocument = async (req, res) => {
   try {
     const { id } = req.params;
     const row = await DocumentAttachment.findByPk(id);
-    if (!row) return res.status(404).json({ message: "Comprobante no encontrado." });
+    if (!row) {
+      notifyFail("document.delete_failed", `Comprobante #${id} no encontrado`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Comprobante no encontrado." });
+    }
 
     const filePath = row.filePath;
     const others = await DocumentAttachment.count({
@@ -165,9 +192,15 @@ export const deleteDocument = async (req, res) => {
       }
     }
 
+    notifyOk("document.deleted", `Documento #${id}`, { attachmentId: id });
     return res.json({ message: "Comprobante eliminado." });
   } catch (error) {
     console.error("deleteDocument:", error);
+    notifyFail("document.delete_failed", `Error al eliminar comprobante #${req.params.id}`, {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({ message: "Error al eliminar comprobante" });
   }
 };

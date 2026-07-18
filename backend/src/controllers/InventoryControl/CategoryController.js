@@ -1,5 +1,6 @@
 import { Op } from "sequelize";
 import { InventoryCategory } from "../../models/Inventory.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 const CATEGORY_INCLUDE_PARENT = {
   model: InventoryCategory,
@@ -119,10 +120,16 @@ export const createCategory = async (req, res) => {
     const full = await InventoryCategory.findByPk(category.id, {
       include: [CATEGORY_INCLUDE_PARENT],
     });
+    notifyOk("category.created", `Categoría #${category.id}`, { category: full });
     res.status(201).json(full);
   } catch (err) {
     const mapped = mapCategoryError(err, "Error al crear categoría");
     if (mapped.status === 500) console.error("createCategory:", err);
+    notifyFail("category.create_failed", mapped.message, {
+      error: mapped.error || err,
+      req,
+      httpStatus: mapped.status,
+    });
     res.status(mapped.status).json({
       message: mapped.message,
       ...(mapped.error ? { error: mapped.error } : {}),
@@ -167,6 +174,11 @@ export const updateCategory = async (req, res) => {
     if ("parentId" in updates && updates.parentId) {
       const children = await InventoryCategory.count({ where: { parentId: id } });
       if (children > 0) {
+        notifyFail("category.update_failed", "Categoría con subcategorías hijas", {
+          req,
+          httpStatus: 400,
+          extra: { categoryId: id },
+        });
         return res.status(400).json({
           message: "No puedes convertir en subcategoría una categoría que ya tiene hijas.",
         });
@@ -177,10 +189,16 @@ export const updateCategory = async (req, res) => {
     const full = await InventoryCategory.findByPk(id, {
       include: [CATEGORY_INCLUDE_PARENT],
     });
+    notifyOk("category.updated", `Categoría #${id}`, { category: full });
     res.json(full);
   } catch (err) {
     const mapped = mapCategoryError(err, "Error al actualizar categoría");
     if (mapped.status === 500) console.error("updateCategory:", err);
+    notifyFail("category.update_failed", mapped.message, {
+      error: mapped.error || err,
+      req,
+      httpStatus: mapped.status,
+    });
     res.status(mapped.status).json({
       message: mapped.message,
       ...(mapped.error ? { error: mapped.error } : {}),
@@ -193,13 +211,24 @@ export const deleteCategory = async (req, res) => {
     const { id } = req.params;
     const children = await InventoryCategory.count({ where: { parentId: id } });
     if (children > 0) {
+      notifyFail("category.delete_failed", "Categoría con subcategorías", {
+        req,
+        httpStatus: 400,
+        extra: { categoryId: id },
+      });
       return res.status(400).json({
         message: "Elimina o reasigna las subcategorías antes de borrar esta categoría.",
       });
     }
     await InventoryCategory.destroy({ where: { id } });
+    notifyOk("category.deleted", `Categoría #${id}`, { categoryId: id });
     res.json({ message: "Categoría eliminada" });
   } catch (err) {
+    notifyFail("category.delete_failed", "Error al eliminar categoría", {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al eliminar categoría", error: err });
   }
 };

@@ -3,6 +3,7 @@ import path from "path";
 import fs from "fs";
 import archiver from "archiver";
 import fileDirName from "../libs/file-dirname.js";
+import { notifyOk } from "../services/notifyRaptorSolutions.js";
 
 const { __dirname } = fileDirName(import.meta);
 const FILES_BASE_DIR = path.resolve(__dirname, "../files");
@@ -62,9 +63,11 @@ export const downloadFolderZip = async (req, res) => {
 // 2) Upload file
 // ==============================
 export const uploadFile = async (req, res) => {
-  // El middleware ya subió y validó todo
   const f = req.fileManager;
-
+  notifyOk("file.uploaded", "Archivo subido", {
+    relativePath: f.relativePath,
+    fileName: f.fileName,
+  });
   return res.json({
     ok: true,
     message: f.replaced ? "Archivo reemplazado correctamente" : "Archivo subido correctamente",
@@ -83,6 +86,7 @@ export const uploadFile = async (req, res) => {
 // 3) Delete file
 // ==============================
 export const deleteFile = async (req, res) => {
+  notifyOk("file.deleted", "Archivo eliminado", { data: req.fileManager });
   return res.json({
     ok: true,
     message: "Archivo eliminado correctamente",
@@ -106,6 +110,7 @@ export const scanFiles = async (req, res) => {
 // 5) Delete folder
 // ==============================
 export const deleteFolder = async (req, res) => {
+  notifyOk("file.deleted", "Carpeta eliminada", { data: req.fileManager });
   return res.json({
     ok: true,
     message: "Carpeta eliminada correctamente",

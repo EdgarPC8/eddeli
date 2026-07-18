@@ -6,6 +6,7 @@ import {
   InventoryCategory,
   HomeProduct,
 } from "../../models/Inventory.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 // controllers/InventoryControl/HomeProductController.js
 import { join } from "path";
@@ -126,6 +127,7 @@ export const createHomeProduct = async (req, res) => {
       } = req.body;
   
       if (!name || !String(name).trim()) {
+        notifyFail("home_product.create_failed", "El campo name es obligatorio", { req, httpStatus: 400 });
         return res.status(400).json({ message: "El campo 'name' es obligatorio." });
       }
   
@@ -145,9 +147,15 @@ export const createHomeProduct = async (req, res) => {
         createdBy,
       });
   
+      notifyOk("home_product.created", `Producto destacado #${row.id}`, { homeProduct: row });
       res.status(201).json({ message: "Creado", homeProduct: row });
     } catch (error) {
       console.error("Error createHomeProduct:", error);
+      notifyFail("home_product.create_failed", "Error al crear Home Product", {
+        error,
+        req,
+        httpStatus: 500,
+      });
       res.status(500).json({ message: "Error al crear Home Product" });
     }
   };
@@ -156,7 +164,10 @@ export const createHomeProduct = async (req, res) => {
     try {
       const { id } = req.params;
       const row = await HomeProduct.findByPk(id);
-      if (!row) return res.status(404).json({ message: "No encontrado" });
+      if (!row) {
+        notifyFail("home_product.update_failed", "HomeProduct no encontrado", { req, httpStatus: 404 });
+        return res.status(404).json({ message: "No encontrado" });
+      }
   
       const {
         productId, name, description, priceOverride,
@@ -167,7 +178,10 @@ export const createHomeProduct = async (req, res) => {
   
       if (typeof productId !== "undefined") updates.productId = productId ? Number(productId) : null;
       if (typeof name !== "undefined") {
-        if (!String(name).trim()) return res.status(400).json({ message: "Nombre vacío" });
+        if (!String(name).trim()) {
+          notifyFail("home_product.update_failed", "Nombre vacío", { req, httpStatus: 400 });
+          return res.status(400).json({ message: "Nombre vacío" });
+        }
         updates.name = String(name).trim();
       }
       if (typeof description !== "undefined") updates.description = description;
@@ -198,9 +212,15 @@ export const createHomeProduct = async (req, res) => {
       }
   
       await row.update(updates);
+      notifyOk("home_product.updated", `Producto destacado #${id}`, { homeProduct: row });
       res.status(200).json({ message: "Actualizado", homeProduct: row });
     } catch (error) {
       console.error("Error updateHomeProduct:", error);
+      notifyFail("home_product.update_failed", "Error al actualizar Home Product", {
+        error,
+        req,
+        httpStatus: 500,
+      });
       res.status(500).json({ message: "Error al actualizar Home Product" });
     }
   };
@@ -210,7 +230,10 @@ export const createHomeProduct = async (req, res) => {
     try {
       const { id } = req.params;
       const row = await HomeProduct.findByPk(id);
-      if (!row) return res.status(404).json({ message: "HomeProduct no encontrado" });
+      if (!row) {
+        notifyFail("home_product.delete_failed", "HomeProduct no encontrado", { req, httpStatus: 404 });
+        return res.status(404).json({ message: "HomeProduct no encontrado" });
+      }
   
       // antes de borrar el registro, intenta borrar la imagen si no la usan otros
       if (row.imageUrl) {
@@ -219,9 +242,15 @@ export const createHomeProduct = async (req, res) => {
       }
   
       await row.destroy();
+      notifyOk("home_product.deleted", `Producto destacado #${id}`, { homeProductId: id });
       res.status(200).json({ message: "HomeProduct eliminado correctamente." });
     } catch (error) {
       console.error("Error deleteHomeProduct:", error);
+      notifyFail("home_product.delete_failed", "Error al eliminar Home Product", {
+        error,
+        req,
+        httpStatus: 500,
+      });
       res.status(500).json({ message: "Error al eliminar Home Product" });
     }
   };

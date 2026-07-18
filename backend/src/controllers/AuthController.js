@@ -6,6 +6,7 @@ import { Roles } from "../models/Roles.js";
 import { logger } from "../log/LogActivity.js";
 import { License } from "../models/License.js";
 import { calculateExpirationDate } from "../helpers/functions.js";
+import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
 
 export const login = async (req, res) => {
   let { username, password, selectedRoleId } = req.body;
@@ -28,11 +29,21 @@ export const login = async (req, res) => {
     });
 
     if (!account) {
+      notifyFail("auth.login_failed", "Datos incorrectos", {
+        req,
+        httpStatus: 400,
+        extra: { reason: "account_not_found", username },
+      });
       return res.status(400).json({ message: "Datos incorrectos" });
     }
 
     const isCorrectPassword = await bcrypt.compare(password, account.password);
     if (!isCorrectPassword) {
+      notifyFail("auth.login_failed", "Datos incorrectos", {
+        req,
+        httpStatus: 400,
+        extra: { reason: "invalid_password", accountId: account.id },
+      });
       return res.status(400).json({ message: "Datos incorrectos" });
     }
 
@@ -55,6 +66,11 @@ export const login = async (req, res) => {
 
     const selectedRole = account.roles.find((r) => r.id === selectedRoleId);
     if (!selectedRole) {
+      notifyFail("auth.login_failed", "Rol seleccionado inválido", {
+        req,
+        httpStatus: 400,
+        extra: { reason: "invalid_role", accountId: account.id, selectedRoleId },
+      });
       return res.status(400).json({ message: "Rol seleccionado inválido" });
     }
 
@@ -67,9 +83,20 @@ export const login = async (req, res) => {
 
     const token = await createAccessToken({ payload });
 
+    notifyOk("auth.login", "Inicio de sesión", {
+      accountId: account.id,
+      userId: account.userId,
+      rolId: selectedRole.id,
+      loginRol: selectedRole.name,
+    });
     res.json({ message: "User authenticated", token });
   } catch (error) {
     console.error("Error en login:", error);
+    notifyFail("auth.login_failed", "Error en inicio de sesión", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: error.message });
   }
 };
@@ -78,10 +105,20 @@ export const changeRole = async (req, res) => {
   const { accountId, rolId } = req.body;
 
   if (!accountId || !rolId) {
+    notifyFail("auth.role_change_failed", "accountId y rolId son obligatorios", {
+      req,
+      httpStatus: 400,
+      extra: { reason: "missing_fields" },
+    });
     return res.status(400).json({ message: "accountId y rolId son obligatorios" });
   }
 
   if (Number(accountId) !== Number(req.user?.accountId)) {
+    notifyFail("auth.role_change_failed", "No puedes cambiar el rol de otra cuenta", {
+      req,
+      httpStatus: 403,
+      extra: { accountId, reason: "forbidden_account" },
+    });
     return res.status(403).json({ message: "No puedes cambiar el rol de otra cuenta" });
   }
 
@@ -97,11 +134,21 @@ export const changeRole = async (req, res) => {
     });
 
     if (!account) {
+      notifyFail("auth.role_change_failed", "Cuenta no encontrada", {
+        req,
+        httpStatus: 404,
+        extra: { accountId },
+      });
       return res.status(404).json({ message: "Cuenta no encontrada" });
     }
 
     const hasRole = account.roles.find((r) => r.id === rolId);
     if (!hasRole) {
+      notifyFail("auth.role_change_failed", "No tiene asignado ese rol", {
+        req,
+        httpStatus: 403,
+        extra: { accountId, rolId, reason: "role_not_assigned" },
+      });
       return res.status(403).json({ message: "No tiene asignado ese rol" });
     }
 
@@ -113,11 +160,21 @@ export const changeRole = async (req, res) => {
     };
 
     const token = await createAccessToken({ payload });
+    notifyOk("auth.role_changed", "Cambio de rol", {
+      accountId: account.id,
+      rolId: hasRole.id,
+      loginRol: hasRole.name,
+    });
     res.json({
       token,
       message: `Rol cambiado a ${hasRole.name}`,
     });
   } catch (error) {
+    notifyFail("auth.role_change_failed", "Error al cambiar de rol", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al cambiar de rol", error: error.message });
   }
 };
@@ -145,7 +202,14 @@ export const renoveLicense = async (req, res) => {
       where: {...name,valide:1}
     });
 
-    if(!lic)return res.status(401).json({ message: "Clave incorrecta para Licencia" });
+    if(!lic) {
+      notifyFail("license.renew_failed", "Clave incorrecta para Licencia", {
+        req,
+        httpStatus: 401,
+        extra: { reason: "invalid_key" },
+      });
+      return res.status(401).json({ message: "Clave incorrecta para Licencia" });
+    }
 
     const dateExpiration = calculateExpirationDate(now, lic.time);
 
@@ -168,8 +232,17 @@ export const renoveLicense = async (req, res) => {
       attributes:["token",'dateCreation',"name","time","dateExpiration"],
       where: {id:lic.id}
     });
+    notifyOk("license.renewed", "Licencia renovada", {
+      licenseId: lic.id,
+      name: lic.name,
+    });
     res.json({ message: "Clave correcta para Licencia",data:newTokenKey });
   } catch (error) {
+    notifyFail("license.renew_failed", "License Caducada", {
+      error,
+      req,
+      httpStatus: 401,
+    });
     return res.status(401).json({ message: "License Caducada" });
   }
 };
@@ -192,11 +265,20 @@ export const getLicenses = async (req, res) => {
         time:`${valorTime}${time}`,
         name:name
       });
+      notifyOk("license.created", "Licencia creada", {
+        licenseId: newData.id,
+        name: newData.name,
+      });
       res.json({ message: `agregado con éxito`,data:newData});
   
     } catch (error) {
-      // manejo de errores si ocurre algún problema durante la creación del usuario
       console.error("error al crear el rol:", error);
+      notifyFail("license.create_failed", "Error al crear la licencia", {
+        error,
+        req,
+        httpStatus: 500,
+      });
+      res.status(500).json({ message: error.message });
     }
   };
 
@@ -216,13 +298,20 @@ export const getLicenses = async (req, res) => {
  
   export const deleteLicense= async (req, res) => {
     try {
-      const removingLicense= await License.destroy({
+      const licenseId = req.params.id;
+      await License.destroy({
         where: {
-          id: req.params.id,
+          id: licenseId,
         },
       });
+      notifyOk("license.deleted", `Licencia #${licenseId}`, { licenseId });
       res.json({ message: "Licencia eleminada con éxito" });
     } catch (error) {
+      notifyFail("license.delete_failed", `Error al eliminar licencia #${req.params.id}`, {
+        error,
+        req,
+        httpStatus: 500,
+      });
       return res.status(500).json({
         message: error.message,
       });
@@ -230,21 +319,35 @@ export const getLicenses = async (req, res) => {
   };
   export const updateLicense = async (req, res) => {
     const data=req.body;
+    const licenseId = req.params.id;
     try {
       const lic = await License.findOne({
-        where: { id: req.params.id },
+        where: { id: licenseId },
       });
-      if(lic.valide==0)return res.status(401).json({ message: "Ya no se puede Editar" });
+      if(lic.valide==0) {
+        notifyFail("license.update_failed", "Ya no se puede Editar", {
+          req,
+          httpStatus: 401,
+          extra: { licenseId, reason: "already_used" },
+        });
+        return res.status(401).json({ message: "Ya no se puede Editar" });
+      }
 
-      const userUpdate = await License.update(data,
+      await License.update(data,
         {
           where: {
-            id: req.params.id,
+            id: licenseId,
           },
         }
       );
+      notifyOk("license.updated", `Licencia #${licenseId}`, { licenseId });
       res.json({ message: "Licencia editada con éxito" });
     } catch (error) {
+      notifyFail("license.update_failed", `Error al editar licencia #${licenseId}`, {
+        error,
+        req,
+        httpStatus: 500,
+      });
       res.status(500).json({
         message: error.message,
       });

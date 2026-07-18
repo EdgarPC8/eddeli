@@ -14,6 +14,7 @@ import {
   isWalkInPosOrder,
   walkInPosOrderExcludeWhere,
 } from "../../utils/posOrderUtils.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 const toNum = (v, def = 0) => {
     const n = Number(v ?? def);
     return Number.isFinite(n) ? n : def;
@@ -164,6 +165,7 @@ const toNum = (v, def = 0) => {
       const token = getHeaderToken(req);
       const user = await verifyJWT(token);
       if (!assertProgrammerRole(user)) {
+        notifyFail("workbench_payment.delete_failed", PROGRAMMER_ONLY_MSG, { req, httpStatus: 403 });
         return res.status(403).json({ message: PROGRAMMER_ONLY_MSG });
       }
   
@@ -184,9 +186,23 @@ const toNum = (v, def = 0) => {
         return { status: 200, body: { mensaje: "Pago eliminado", paymentId: Number(paymentId) } };
       });
   
+      if (result.status >= 400) {
+        notifyFail(
+          "workbench_payment.delete_failed",
+          result.body?.message || "Error eliminando pago",
+          { req, httpStatus: result.status, extra: { paymentId } },
+        );
+      } else {
+        notifyOk("workbench_payment.deleted", `Pago workbench #${paymentId}`, { paymentId: Number(paymentId) });
+      }
       return res.status(result.status).json(result.body);
     } catch (error) {
       console.error("deleteGroupPayment:", error);
+      notifyFail("workbench_payment.delete_failed", "Error eliminando pago", {
+        error,
+        req,
+        httpStatus: 500,
+      });
       return res.status(500).json({ message: "Error eliminando pago", error: String(error?.message || error) });
     }
   };
@@ -199,6 +215,7 @@ const toNum = (v, def = 0) => {
       const token = getHeaderToken(req);
       const user = await verifyJWT(token);
       if (!assertProgrammerRole(user)) {
+        notifyFail("workbench_payment.update_failed", PROGRAMMER_ONLY_MSG, { req, httpStatus: 403 });
         return res.status(403).json({ message: PROGRAMMER_ONLY_MSG });
       }
   
@@ -264,9 +281,23 @@ const toNum = (v, def = 0) => {
         };
       });
   
+      if (result.status >= 400) {
+        notifyFail(
+          "workbench_payment.update_failed",
+          result.body?.message || "Error actualizando pago",
+          { req, httpStatus: result.status, extra: { paymentId } },
+        );
+      } else {
+        notifyOk("workbench_payment.updated", `Pago workbench #${paymentId}`, { paymentId: Number(paymentId) });
+      }
       return res.status(result.status).json(result.body);
     } catch (error) {
       console.error("updateGroupPayment:", error);
+      notifyFail("workbench_payment.update_failed", "Error actualizando pago", {
+        error,
+        req,
+        httpStatus: 500,
+      });
       return res.status(500).json({ message: "Error actualizando pago", error: String(error?.message || error) });
     }
   };
@@ -281,6 +312,11 @@ const toNum = (v, def = 0) => {
   
     const payAmount = Number(amount);
     if (!Number.isFinite(payAmount) || payAmount <= 0) {
+      notifyFail(
+        req.raptorNotify?.fail || "item_group.paid_failed",
+        "Monto inválido",
+        { req, httpStatus: 400 },
+      );
       return res.status(400).json({ message: "Monto inválido" });
     }
 
@@ -516,9 +552,31 @@ const toNum = (v, def = 0) => {
         };
       });
   
+      const payNotify = req.raptorNotify || {
+        ok: "item_group.paid",
+        fail: "item_group.paid_failed",
+        okName: `Abono grupo #${groupId}`,
+      };
+      if (result.status >= 400) {
+        notifyFail(payNotify.fail, result.body?.message || "Error registrando abono", {
+          req,
+          httpStatus: result.status,
+          extra: { groupId: Number(groupId) },
+        });
+      } else {
+        notifyOk(payNotify.ok, payNotify.okName, {
+          groupId: Number(groupId),
+          paymentId: result.body?.pago?.paymentId,
+        });
+      }
       return res.status(result.status).json(result.body);
     } catch (error) {
       console.error("payItemGroup:", error);
+      notifyFail(
+        req.raptorNotify?.fail || "item_group.paid_failed",
+        "Error registrando abono",
+        { error, req, httpStatus: 500 },
+      );
       return res.status(500).json({ message: "Error registrando abono", error: String(error?.message || error) });
     }
   };
@@ -528,7 +586,10 @@ const toNum = (v, def = 0) => {
     const { orderItemId, toGroupId } = req.body; 
     // toGroupId = null => quitar del grupo
   
-    if (!orderItemId) return res.status(400).json({ message: "orderItemId requerido" });
+    if (!orderItemId) {
+      notifyFail("item_group.item_moved_failed", "orderItemId requerido", { req, httpStatus: 400 });
+      return res.status(400).json({ message: "orderItemId requerido" });
+    }
   
     try {
       const token = getHeaderToken(req);
@@ -560,9 +621,26 @@ const toNum = (v, def = 0) => {
         return { status: 201, body: { mensaje: "Item agregado al grupo", orderItemId, toGroupId } };
       });
   
+      if (result.status >= 400) {
+        notifyFail(
+          "item_group.item_moved_failed",
+          result.body?.message || "Error moviendo item",
+          { req, httpStatus: result.status, extra: { orderItemId, toGroupId } },
+        );
+      } else {
+        notifyOk("item_group.item_moved", "Ítem movido entre grupos", {
+          orderItemId,
+          toGroupId,
+        });
+      }
       return res.status(result.status).json(result.body);
     } catch (error) {
       console.error("moveItemBetweenGroups:", error);
+      notifyFail("item_group.item_moved_failed", "Error moviendo item", {
+        error,
+        req,
+        httpStatus: 500,
+      });
       return res.status(500).json({ message: "Error moviendo item", error: String(error?.message || error) });
     }
   };
@@ -589,9 +667,23 @@ const toNum = (v, def = 0) => {
         return { status: 200, body: { mensaje: "Grupo eliminado", groupId: Number(groupId) } };
       });
   
+      if (result.status >= 400) {
+        notifyFail(
+          "item_group.delete_failed",
+          result.body?.message || "Error eliminando grupo",
+          { req, httpStatus: result.status, extra: { groupId } },
+        );
+      } else {
+        notifyOk("item_group.deleted", `Grupo ítems #${groupId}`, { groupId: Number(groupId) });
+      }
       return res.status(result.status).json(result.body);
     } catch (error) {
       console.error("deleteItemGroup:", error);
+      notifyFail("item_group.delete_failed", "Error eliminando grupo", {
+        error,
+        req,
+        httpStatus: 500,
+      });
       return res.status(500).json({ message: "Error eliminando grupo", error: String(error?.message || error) });
     }
   };
@@ -619,9 +711,23 @@ const toNum = (v, def = 0) => {
         };
       });
   
+      if (result.status >= 400) {
+        notifyFail(
+          "item_group.update_failed",
+          result.body?.message || "Error actualizando grupo",
+          { req, httpStatus: result.status, extra: { groupId } },
+        );
+      } else {
+        notifyOk("item_group.updated", `Grupo ítems #${groupId}`, { groupId: Number(groupId) });
+      }
       return res.status(result.status).json(result.body);
     } catch (error) {
       console.error("updateItemGroup:", error);
+      notifyFail("item_group.update_failed", "Error actualizando grupo", {
+        error,
+        req,
+        httpStatus: 500,
+      });
       return res.status(500).json({ message: "Error actualizando grupo", error: String(error?.message || error) });
     }
   };
@@ -632,6 +738,10 @@ export const addItemsToGroup = async (req, res) => {
   const { itemIds } = req.body;
 
   if (!Array.isArray(itemIds) || itemIds.length === 0) {
+    notifyFail("item_group.items_added_failed", "itemIds es requerido y debe ser un array no vacío", {
+      req,
+      httpStatus: 400,
+    });
     return res.status(400).json({ message: "itemIds es requerido y debe ser un array no vacío" });
   }
 
@@ -731,9 +841,26 @@ export const addItemsToGroup = async (req, res) => {
       };
     });
 
+    if (result.status >= 400) {
+      notifyFail(
+        "item_group.items_added_failed",
+        result.body?.message || "Error agregando ítems al grupo",
+        { req, httpStatus: result.status, extra: { groupId } },
+      );
+    } else {
+      notifyOk("item_group.items_added", `Ítems agregados al grupo #${groupId}`, {
+        groupId: Number(groupId),
+        itemsAgregados: result.body?.itemsAgregados,
+      });
+    }
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("addItemsToGroup:", error);
+    notifyFail("item_group.items_added_failed", "Error agregando ítems al grupo", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({ message: "Error agregando ítems al grupo", error: String(error?.message || error) });
   }
 };
@@ -742,6 +869,10 @@ export const createItemGroup = async (req, res) => {
   const { customerId, itemIds, concept } = req.body;
 
   if (!customerId || !Array.isArray(itemIds) || itemIds.length === 0) {
+    notifyFail("item_group.create_failed", "customerId e itemIds son requeridos", {
+      req,
+      httpStatus: 400,
+    });
     return res.status(400).json({ message: "customerId e itemIds son requeridos" });
   }
 
@@ -807,9 +938,26 @@ export const createItemGroup = async (req, res) => {
       };
     });
 
+    if (result.status >= 400) {
+      notifyFail(
+        "item_group.create_failed",
+        result.body?.message || "Error creando grupo",
+        { req, httpStatus: result.status },
+      );
+    } else {
+      notifyOk("item_group.created", "Grupo de ítems creado", {
+        groupId: result.body?.grupo?.id,
+        customerId,
+      });
+    }
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("createItemGroup:", error);
+    notifyFail("item_group.create_failed", "Error creando grupo", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({ message: "Error creando grupo", error: String(error?.message || error) });
   }
 };
@@ -1300,6 +1448,7 @@ export const payCustomerOrder = async (req, res) => {
     const user = await verifyJWT(token);
     const orderId = Number(req.params.orderId);
     if (!Number.isFinite(orderId)) {
+      notifyFail("workbench.order_paid_failed", "Pedido inválido", { req, httpStatus: 400 });
       return res.status(400).json({ message: "Pedido inválido" });
     }
 
@@ -1307,6 +1456,11 @@ export const payCustomerOrder = async (req, res) => {
       createIfNeeded: true,
     });
     if (resolved.error) {
+      notifyFail("workbench.order_paid_failed", resolved.error.message, {
+        req,
+        httpStatus: resolved.error.status,
+        extra: { orderId },
+      });
       return res.status(resolved.error.status).json({ message: resolved.error.message });
     }
 
@@ -1316,6 +1470,11 @@ export const payCustomerOrder = async (req, res) => {
         ? String(noteExtra).trim()
         : `Abono pedido #${orderId}`;
 
+    req.raptorNotify = {
+      ok: "workbench.order_paid",
+      fail: "workbench.order_paid_failed",
+      okName: `Cobro pedido #${orderId}`,
+    };
     req.params.groupId = String(resolved.groupId);
     req.body = {
       ...(req.body || {}),
@@ -1325,6 +1484,11 @@ export const payCustomerOrder = async (req, res) => {
     return payItemGroup(req, res);
   } catch (error) {
     console.error("payCustomerOrder:", error);
+    notifyFail("workbench.order_paid_failed", "Error al abonar el pedido", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({
       message: "Error al abonar el pedido",
       error: String(error?.message || error),

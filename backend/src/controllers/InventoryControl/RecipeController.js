@@ -1,5 +1,6 @@
 import { Op } from "sequelize";
 import { InventoryRecipe, InventoryProduct } from "../../models/Inventory.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 const safeDiv = (a, b) => (b > 0 ? a / b : 0);
 
@@ -564,17 +565,23 @@ export const createRecipe = async (req, res) => {
   try {
     const data = Array.isArray(req.body) ? req.body : [req.body];
     if (!data.length) {
+      notifyFail("recipe.create_failed", "Se requiere al menos una línea de receta", { req, httpStatus: 400 });
       return res.status(400).json({ message: "Se requiere al menos una línea de receta" });
     }
 
     for (const line of data) {
       const error = await validateRecipeLine(line);
-      if (error) return res.status(400).json({ message: error });
+      if (error) {
+        notifyFail("recipe.create_failed", error, { req, httpStatus: 400 });
+        return res.status(400).json({ message: error });
+      }
     }
 
     const created = await InventoryRecipe.bulkCreate(data);
+    notifyOk("recipe.created", "Receta creada", { count: created.length });
     res.status(201).json(created);
   } catch (error) {
+    notifyFail("recipe.create_failed", "Error al crear receta", { error, req, httpStatus: 500 });
     res.status(500).json({ message: "Error al crear receta", error });
   }
 };
@@ -583,7 +590,10 @@ export const updateRecipe = async (req, res) => {
   try {
     const { id } = req.params;
     const existing = await InventoryRecipe.findByPk(id);
-    if (!existing) return res.status(404).json({ message: "Línea de receta no encontrada" });
+    if (!existing) {
+      notifyFail("recipe.update_failed", "Línea de receta no encontrada", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Línea de receta no encontrada" });
+    }
 
     const payload = {
       productFinalId: req.body.productFinalId ?? existing.productFinalId,
@@ -594,11 +604,16 @@ export const updateRecipe = async (req, res) => {
     };
 
     const error = await validateRecipeLine({ ...payload, excludeId: id });
-    if (error) return res.status(400).json({ message: error });
+    if (error) {
+      notifyFail("recipe.update_failed", error, { req, httpStatus: 400 });
+      return res.status(400).json({ message: error });
+    }
 
     await existing.update(payload);
+    notifyOk("recipe.updated", `Receta #${id}`, { recipeId: id });
     res.json(existing);
   } catch (error) {
+    notifyFail("recipe.update_failed", "Error al actualizar receta", { error, req, httpStatus: 500 });
     res.status(500).json({ message: "Error al actualizar receta", error });
   }
 };
@@ -607,11 +622,16 @@ export const deleteRecipe = async (req, res) => {
   try {
     const { id } = req.params;
     const existing = await InventoryRecipe.findByPk(id);
-    if (!existing) return res.status(404).json({ message: "Línea de receta no encontrada" });
+    if (!existing) {
+      notifyFail("recipe.update_failed", "Línea de receta no encontrada", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Línea de receta no encontrada" });
+    }
 
     await existing.destroy();
+    notifyOk("recipe.deleted", `Receta #${id}`, { recipeId: id });
     res.json({ message: "Ingrediente eliminado de la receta" });
   } catch (error) {
+    notifyFail("recipe.delete_failed", "Error al eliminar receta", { error, req, httpStatus: 500 });
     res.status(500).json({ message: "Error al eliminar receta", error });
   }
 };

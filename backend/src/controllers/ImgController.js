@@ -6,6 +6,7 @@ import path from "path";
 import fs from "fs";
 import archiver from "archiver";
 import fileDirName from "../libs/file-dirname.js";
+import { notifyOk } from "../services/notifyRaptorSolutions.js";
 
 const { __dirname } = fileDirName(import.meta);
 const IMG_BASE_DIR = path.resolve(__dirname, "../img");
@@ -59,9 +60,11 @@ export const downloadFolderZip = async (req, res) => {
 
 
 export const uploadImage = async (req, res) => {
-    // El middleware ya subió y validó todo
     const img = req.imageManager;
-  
+    notifyOk("image.uploaded", "Imagen subida", {
+      relativePath: img.relativePath,
+      fileName: img.fileName,
+    });
     return res.json({
       ok: true,
       message: img.replaced
@@ -77,6 +80,7 @@ export const uploadImage = async (req, res) => {
   };
   
   export const deleteImage = async (req, res) => {
+    notifyOk("image.deleted", "Imagen eliminada", { data: req.imageManager });
     return res.json({
       ok: true,
       message: "Imagen eliminada correctamente",

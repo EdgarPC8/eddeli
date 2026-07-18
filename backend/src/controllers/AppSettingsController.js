@@ -5,6 +5,7 @@ import {
   ensureStandardAssetDirs,
 } from "../services/appSettingsService.js";
 import { getTimeStatus } from "../services/timeStatusService.js";
+import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
 
 const IANA_TIMEZONE_RE = /^[A-Za-z_]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?$/;
 
@@ -50,6 +51,11 @@ export async function putAppSettings(req, res) {
     if (patch.timezone != null) {
       const tz = String(patch.timezone).trim();
       if (!IANA_TIMEZONE_RE.test(tz)) {
+        notifyFail("app.settings_update_failed", "Zona horaria IANA inválida", {
+          req,
+          httpStatus: 400,
+          extra: { reason: "invalid_timezone", timezone: tz },
+        });
         return res.status(400).json({ message: "Zona horaria IANA inválida (ej. America/Guayaquil)" });
       }
       patch.timezone = tz;
@@ -59,9 +65,17 @@ export async function putAppSettings(req, res) {
       ensureStandardAssetDirs(patch.mediaFolderPrefix);
     }
     const data = await updateAppSettings(patch);
+    notifyOk("app.settings_updated", "Configuración app actualizada", {
+      settings: toPublicSettings(data),
+    });
     res.json({ message: "Configuración actualizada", settings: toPublicSettings(data) });
   } catch (err) {
     console.error("putAppSettings", err);
+    notifyFail("app.settings_update_failed", "No se pudo guardar la configuración", {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "No se pudo guardar la configuración" });
   }
 }

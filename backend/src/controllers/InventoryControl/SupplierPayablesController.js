@@ -12,6 +12,7 @@ import {
 } from "../../models/Orders.js";
 import { InventoryProduct } from "../../models/Inventory.js";
 import { Expense, SupplierOrderPayment } from "../../models/Finance.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 const toNum = (v, d = 0) => {
   const n = Number(v ?? d);
@@ -213,9 +214,14 @@ export const paySupplierOrder = async (req, res) => {
     const payDate = req.body?.date ? toAppDateTime(req.body.date) : nowApp();
 
     if (!Number.isFinite(orderId) || orderId <= 0) {
+      notifyFail("supplier_payable.paid_failed", "Pedido inválido", { req, httpStatus: 400 });
       return res.status(400).json({ message: "Pedido inválido" });
     }
     if (!(amount > 0)) {
+      notifyFail("supplier_payable.paid_failed", "El monto del abono debe ser mayor a 0", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "El monto del abono debe ser mayor a 0" });
     }
 
@@ -309,9 +315,27 @@ export const paySupplierOrder = async (req, res) => {
       };
     });
 
+    if (result.status >= 400) {
+      notifyFail("supplier_payable.paid_failed", result.body?.message || "Error registrando abono a proveedor", {
+        req,
+        httpStatus: result.status,
+        extra: { orderId },
+      });
+    } else {
+      notifyOk("supplier_payable.paid", `Abono proveedor #${orderId}`, {
+        orderId,
+        paymentId: result.body?.paymentId,
+        amount: result.body?.amount,
+      });
+    }
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("paySupplierOrder:", error);
+    notifyFail("supplier_payable.paid_failed", "Error registrando abono a proveedor", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({
       message: "Error registrando abono a proveedor",
       error: String(error?.message || error),
@@ -327,6 +351,7 @@ export const updateSupplierOrderPayment = async (req, res) => {
 
     const paymentId = Number(req.params.paymentId);
     if (!Number.isFinite(paymentId)) {
+      notifyFail("supplier_payable.payment_update_failed", "Pago inválido", { req, httpStatus: 400 });
       return res.status(400).json({ message: "Pago inválido" });
     }
 
@@ -389,9 +414,23 @@ export const updateSupplierOrderPayment = async (req, res) => {
       return { status: 200, body: { ok: true, paymentId: payment.id } };
     });
 
+    if (result.status >= 400) {
+      notifyFail(
+        "supplier_payable.payment_update_failed",
+        result.body?.message || "Error actualizando abono",
+        { req, httpStatus: result.status, extra: { paymentId } },
+      );
+    } else {
+      notifyOk("supplier_payable.payment_updated", `Abono proveedor #${paymentId}`, { paymentId });
+    }
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("updateSupplierOrderPayment:", error);
+    notifyFail("supplier_payable.payment_update_failed", "Error actualizando abono", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({ message: "Error actualizando abono" });
   }
 };
@@ -404,6 +443,7 @@ export const deleteSupplierOrderPayment = async (req, res) => {
 
     const paymentId = Number(req.params.paymentId);
     if (!Number.isFinite(paymentId)) {
+      notifyFail("supplier_payable.payment_delete_failed", "Pago inválido", { req, httpStatus: 400 });
       return res.status(400).json({ message: "Pago inválido" });
     }
 
@@ -439,9 +479,23 @@ export const deleteSupplierOrderPayment = async (req, res) => {
       return { status: 200, body: { ok: true } };
     });
 
+    if (result.status >= 400) {
+      notifyFail(
+        "supplier_payable.payment_delete_failed",
+        result.body?.message || "Error eliminando abono",
+        { req, httpStatus: result.status, extra: { paymentId } },
+      );
+    } else {
+      notifyOk("supplier_payable.payment_deleted", `Abono proveedor #${paymentId}`, { paymentId });
+    }
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("deleteSupplierOrderPayment:", error);
+    notifyFail("supplier_payable.payment_delete_failed", "Error eliminando abono", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({ message: "Error eliminando abono" });
   }
 };

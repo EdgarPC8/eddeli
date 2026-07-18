@@ -13,6 +13,7 @@ import {
   getElectronicInvoiceById,
   refreshInvoiceAuthorization,
 } from "../services/sriInvoiceEmitService.js";
+import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -27,6 +28,11 @@ const upload = multer({
 export const sriCertificateUploadMiddleware = (req, res, next) => {
   upload.single("certificate")(req, res, (err) => {
     if (err) {
+      notifyFail("sri.certificate_upload_failed", err.message || "Error al subir el certificado", {
+        error: err,
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: err.message || "Error al subir el certificado" });
     }
     next();
@@ -46,6 +52,9 @@ export async function getSriBillingSettings(req, res) {
 export async function putSriBillingSettings(req, res) {
   try {
     const row = await updateSriBillingSettings(req.body || {});
+    notifyOk("sri.settings_updated", "Configuración SRI actualizada", {
+      settings: toPublicSriSettings(row),
+    });
     res.json({
       message: "Configuración SRI guardada",
       settings: toPublicSriSettings(row),
@@ -53,6 +62,11 @@ export async function putSriBillingSettings(req, res) {
   } catch (err) {
     const status = err.status || 500;
     if (status >= 500) console.error("putSriBillingSettings", err);
+    notifyFail("sri.settings_update_failed", err.message || "No se pudo guardar", {
+      error: err,
+      req,
+      httpStatus: status,
+    });
     res.status(status).json({ message: err.message || "No se pudo guardar" });
   }
 }
@@ -60,6 +74,10 @@ export async function putSriBillingSettings(req, res) {
 export async function uploadSriCertificate(req, res) {
   try {
     if (!req.file) {
+      notifyFail("sri.certificate_upload_failed", "Falta el archivo certificate (.p12 / .pfx)", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "Falta el archivo certificate (.p12 / .pfx)" });
     }
     const row = await saveSriCertificate({
@@ -73,6 +91,9 @@ export async function uploadSriCertificate(req, res) {
     }
 
     const fresh = await loadSriBillingSettings();
+    notifyOk("sri.certificate_uploaded", "Certificado SRI subido", {
+      settings: toPublicSriSettings(fresh),
+    });
     res.json({
       message: "Certificado guardado",
       settings: toPublicSriSettings(fresh),
@@ -80,6 +101,11 @@ export async function uploadSriCertificate(req, res) {
   } catch (err) {
     const status = err.status || 500;
     if (status >= 500) console.error("uploadSriCertificate", err);
+    notifyFail("sri.certificate_upload_failed", err.message || "No se pudo guardar el certificado", {
+      error: err,
+      req,
+      httpStatus: status,
+    });
     res.status(status).json({ message: err.message || "No se pudo guardar el certificado" });
   }
 }
@@ -87,12 +113,20 @@ export async function uploadSriCertificate(req, res) {
 export async function deleteSriCertificate(req, res) {
   try {
     const row = await clearSriCertificate();
+    notifyOk("sri.certificate_deleted", "Certificado SRI eliminado", {
+      settings: toPublicSriSettings(row),
+    });
     res.json({
       message: "Certificado eliminado",
       settings: toPublicSriSettings(row),
     });
   } catch (err) {
     console.error("deleteSriCertificate", err);
+    notifyFail("sri.certificate_delete_failed", "No se pudo eliminar el certificado", {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "No se pudo eliminar el certificado" });
   }
 }
@@ -113,10 +147,19 @@ export async function postEmitSriInvoice(req, res) {
           : status === "sent"
             ? "Enviado al SRI; autorización pendiente (usa Consultar)"
             : "Comprobante procesado";
+    notifyOk("sri.invoice.emitted", "Factura SRI emitida", {
+      invoiceId: result.invoice?.id,
+      status: result.invoice?.status,
+    });
     res.json({ message, ...result });
   } catch (err) {
     const status = err.status || 500;
     if (status >= 500) console.error("postEmitSriInvoice", err);
+    notifyFail("sri.invoice.emit_failed", err.message || "No se pudo emitir el comprobante", {
+      error: err,
+      req,
+      httpStatus: status,
+    });
     res.status(status).json({
       message: err.message || "No se pudo emitir el comprobante",
       invoice: err.invoice || null,
@@ -151,6 +194,10 @@ export async function getSriInvoiceById(req, res) {
 export async function postRefreshSriInvoice(req, res) {
   try {
     const result = await refreshInvoiceAuthorization(req.params.id);
+    notifyOk("sri.invoice.refreshed", `Factura SRI consultada #${req.params.id}`, {
+      invoiceId: req.params.id,
+      status: result.invoice?.status,
+    });
     res.json({
       message:
         result.invoice?.status === "authorized"
@@ -163,6 +210,12 @@ export async function postRefreshSriInvoice(req, res) {
   } catch (err) {
     const status = err.status || 500;
     if (status >= 500) console.error("postRefreshSriInvoice", err);
+    notifyFail("sri.invoice.refresh_failed", err.message || "No se pudo consultar la autorización", {
+      error: err,
+      req,
+      httpStatus: status,
+      extra: { invoiceId: req.params.id },
+    });
     res.status(status).json({ message: err.message || "No se pudo consultar la autorización" });
   }
 }

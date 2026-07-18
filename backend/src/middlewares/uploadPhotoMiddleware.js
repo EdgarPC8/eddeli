@@ -4,6 +4,7 @@ import fs from "fs";
 import fileDirName from "../libs/file-dirname.js";
 import { unlink } from "fs/promises";
 import { Users } from "../models/Users.js";
+import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
 
 const { __dirname } = fileDirName(import.meta);
 
@@ -41,15 +42,22 @@ const safeUnlink = async (fullPath) => {
 };
 
 export const uploadPhoto = async (req, res) => {
+  const userId = req.params.userId;
   // 1) Leer foto anterior ANTES de subir/reemplazar en BD
   const user = await Users.findOne({
     attributes: ["photo"],
-    where: { id: req.params.userId },
+    where: { id: userId },
   });
   const oldRelPath = user?.photo || null; // ej: "photos/userPhotoProfileId12.jpg"
 
   upload(req, res, async (err) => {
     if (err) {
+      notifyFail("user.photo_upload_failed", `Error al subir la foto: ${err.message}`, {
+        error: err,
+        req,
+        httpStatus: 500,
+        extra: { userId },
+      });
       return res.status(500).json({
         message: `Error al subir la foto: ${err.message}`,
       });
@@ -57,6 +65,11 @@ export const uploadPhoto = async (req, res) => {
 
     try {
       if (!req.file?.filename) {
+        notifyFail("user.photo_upload_failed", "No se recibió archivo", {
+          req,
+          httpStatus: 400,
+          extra: { userId },
+        });
         return res.status(400).json({ message: "No se recibió archivo" });
       }
 
@@ -66,7 +79,7 @@ export const uploadPhoto = async (req, res) => {
       // 3) Actualiza BD
       await Users.update(
         { photo: newRelPath },
-        { where: { id: req.params.userId } }
+        { where: { id: userId } }
       );
 
       // 4) Borra la anterior si existe y es distinta a la nueva
@@ -75,25 +88,38 @@ export const uploadPhoto = async (req, res) => {
         await safeUnlink(oldFullPath);
       }
 
+      notifyOk("user.photo_uploaded", `Foto usuario #${userId}`, { userId, photo: newRelPath });
       return res.json({
         message: "Foto de perfil subida con éxito",
         photo: newRelPath,
       });
     } catch (e) {
+      notifyFail("user.photo_upload_failed", e.message, {
+        error: e,
+        req,
+        httpStatus: 500,
+        extra: { userId },
+      });
       return res.status(500).json({ message: e.message });
     }
   });
 };
 
 export const deletePhoto = async (req, res) => {
+  const userId = req.params.userId;
   const user = await Users.findOne({
     attributes: ["photo"],
-    where: { id: req.params.userId },
+    where: { id: userId },
   });
 
   const photoToDelete = user?.photo;
 
   if (!photoToDelete) {
+    notifyFail("user.photo_delete_failed", "No existe imagen para eliminar", {
+      req,
+      httpStatus: 404,
+      extra: { userId },
+    });
     return res.status(404).json({ message: "No existe imagen para eliminar" });
   }
 
@@ -103,11 +129,18 @@ export const deletePhoto = async (req, res) => {
 
     await Users.update(
       { photo: null },
-      { where: { id: req.params.userId } }
+      { where: { id: userId } }
     );
 
+    notifyOk("user.photo_deleted", `Foto usuario #${userId}`, { userId });
     return res.json({ message: "Foto de perfil eliminada con éxito" });
   } catch (error) {
+    notifyFail("user.photo_delete_failed", error.message, {
+      error,
+      req,
+      httpStatus: 500,
+      extra: { userId },
+    });
     return res.status(500).json({ message: error.message });
   }
 };

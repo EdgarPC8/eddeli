@@ -9,6 +9,7 @@ import {
   InventoryCategory,
   InventoryUnit,
 } from "../../models/Inventory.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 const n = (x, d = 0) => (Number.isFinite(Number(x)) ? Number(x) : d);
 
@@ -294,6 +295,7 @@ export const createCompareGroup = async (req, res) => {
     } = req.body || {};
 
     if (!name?.trim()) {
+      notifyFail("compare_group.create_failed", "El nombre del grupo es obligatorio", { req, httpStatus: 400 });
       return res.status(400).json({ message: "El nombre del grupo es obligatorio" });
     }
 
@@ -329,9 +331,15 @@ export const createCompareGroup = async (req, res) => {
     }
 
     const full = await loadGroupWithItems(group.id);
+    notifyOk("compare_group.created", `Grupo comparación #${group.id}`, { groupId: group.id });
     res.status(201).json(buildCompareGroupMatrix(full, full.items || []));
   } catch (err) {
     console.error("createCompareGroup error:", err);
+    notifyFail("compare_group.create_failed", "Error al crear grupo comparativo", {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al crear grupo comparativo" });
   }
 };
@@ -342,7 +350,10 @@ export const createCompareGroup = async (req, res) => {
 export const updateCompareGroup = async (req, res) => {
   try {
     const group = await ProductCompareGroup.findByPk(req.params.id);
-    if (!group) return res.status(404).json({ message: "Grupo no encontrado" });
+    if (!group) {
+      notifyFail("compare_group.update_failed", "Grupo no encontrado", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Grupo no encontrado" });
+    }
 
     const {
       name,
@@ -397,9 +408,15 @@ export const updateCompareGroup = async (req, res) => {
     }
 
     const full = await loadGroupWithItems(group.id);
+    notifyOk("compare_group.updated", `Grupo comparación #${group.id}`, { groupId: group.id });
     res.json(buildCompareGroupMatrix(full, full.items || []));
   } catch (err) {
     console.error("updateCompareGroup error:", err);
+    notifyFail("compare_group.update_failed", "Error al actualizar grupo comparativo", {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al actualizar grupo comparativo" });
   }
 };
@@ -410,11 +427,22 @@ export const updateCompareGroup = async (req, res) => {
 export const deleteCompareGroup = async (req, res) => {
   try {
     const group = await ProductCompareGroup.findByPk(req.params.id);
-    if (!group) return res.status(404).json({ message: "Grupo no encontrado" });
+    if (!group) {
+      notifyFail("compare_group.delete_failed", "Grupo no encontrado", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Grupo no encontrado" });
+    }
     await group.destroy();
+    notifyOk("compare_group.deleted", `Grupo comparación #${req.params.id}`, {
+      groupId: req.params.id,
+    });
     res.json({ message: "Grupo eliminado" });
   } catch (err) {
     console.error("deleteCompareGroup error:", err);
+    notifyFail("compare_group.delete_failed", "Error al eliminar grupo comparativo", {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al eliminar grupo comparativo" });
   }
 };
@@ -439,6 +467,9 @@ export const bootstrapPastelesCompareGroup = async (req, res) => {
     const existing = await ProductCompareGroup.findOne({ where: { name: "Pasteles" } });
     if (existing) {
       const full = await loadGroupWithItems(existing.id);
+      notifyOk("compare_group.pasteles_bootstrapped", "Bootstrap pasteles (ya existía)", {
+        groupId: existing.id,
+      });
       return res.json({
         message: "El grupo Pasteles ya existe",
         group: buildCompareGroupMatrix(full, full.items || []),
@@ -490,12 +521,21 @@ export const bootstrapPastelesCompareGroup = async (req, res) => {
     }
 
     const full = await loadGroupWithItems(group.id);
+    notifyOk("compare_group.pasteles_bootstrapped", "Bootstrap pasteles", {
+      groupId: group.id,
+      itemCount: items.length,
+    });
     res.status(201).json({
       message: `Grupo Pasteles creado con ${items.length} productos`,
       group: buildCompareGroupMatrix(full, full.items || []),
     });
   } catch (err) {
     console.error("bootstrapPastelesCompareGroup error:", err);
+    notifyFail("compare_group.pasteles_bootstrap_failed", "Error al crear grupo Pasteles", {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al crear grupo Pasteles" });
   }
 };

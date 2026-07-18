@@ -1,5 +1,6 @@
 import { PricingTierGroup, InventoryCategory } from "../../models/Inventory.js";
 import { normalizePackageTiersStrict } from "../../utils/productPricingUtils.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 const GROUP_INCLUDE = {
   model: InventoryCategory,
@@ -105,11 +106,14 @@ export const createTierGroup = async (req, res) => {
     const payload = await applyTierGroupPayload(req.body);
     const group = await PricingTierGroup.create(payload);
     const full = await PricingTierGroup.findByPk(group.id, { include: [GROUP_INCLUDE] });
+    notifyOk("tier_group.created", `Grupo tramos #${group.id}`, { tierGroupId: group.id });
     res.status(201).json(full);
   } catch (err) {
     if (err?.message && /(packageTiers|tramo|categoría|productIds)/i.test(err.message)) {
+      notifyFail("tier_group.create_failed", err.message, { error: err, req, httpStatus: 400 });
       return res.status(400).json({ message: err.message });
     }
+    notifyFail("tier_group.create_failed", "Error al crear tramo", { error: err, req, httpStatus: 500 });
     res.status(500).json({ message: "Error al crear tramo", error: err });
   }
 };
@@ -119,15 +123,21 @@ export const updateTierGroup = async (req, res) => {
     const { id } = req.params;
     const updates = await applyTierGroupPayload(req.body);
     const existing = await PricingTierGroup.findByPk(id);
-    if (!existing) return res.status(404).json({ message: "Tramo no encontrado" });
+    if (!existing) {
+      notifyFail("tier_group.update_failed", "Tramo no encontrado", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Tramo no encontrado" });
+    }
 
     await PricingTierGroup.update(updates, { where: { id } });
     const full = await PricingTierGroup.findByPk(id, { include: [GROUP_INCLUDE] });
+    notifyOk("tier_group.updated", `Grupo tramos #${id}`, { tierGroupId: id });
     res.json(full);
   } catch (err) {
     if (err?.message && /(packageTiers|tramo|categoría|productIds)/i.test(err.message)) {
+      notifyFail("tier_group.update_failed", err.message, { error: err, req, httpStatus: 400 });
       return res.status(400).json({ message: err.message });
     }
+    notifyFail("tier_group.update_failed", "Error al actualizar tramo", { error: err, req, httpStatus: 500 });
     res.status(500).json({ message: "Error al actualizar tramo", error: err });
   }
 };
@@ -136,9 +146,14 @@ export const deleteTierGroup = async (req, res) => {
   try {
     const { id } = req.params;
     const deleted = await PricingTierGroup.destroy({ where: { id } });
-    if (!deleted) return res.status(404).json({ message: "Tramo no encontrado" });
+    if (!deleted) {
+      notifyFail("tier_group.delete_failed", "Tramo no encontrado", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Tramo no encontrado" });
+    }
+    notifyOk("tier_group.deleted", `Grupo tramos #${id}`, { tierGroupId: id });
     res.json({ message: "Tramo eliminado" });
   } catch (err) {
+    notifyFail("tier_group.delete_failed", "Error al eliminar tramo", { error: err, req, httpStatus: 500 });
     res.status(500).json({ message: "Error al eliminar tramo", error: err });
   }
 };
@@ -182,9 +197,18 @@ export const migrateTierGroupsFromCategories = async (req, res) => {
     }
 
     const groups = await PricingTierGroup.findAll({ include: [GROUP_INCLUDE] });
+    notifyOk("tier_group.migrated_from_categories", "Migración tramos desde categorías", {
+      created,
+      skipped,
+    });
     res.json({ message: "Migración completada", created, skipped, groups });
   } catch (err) {
     console.error("Error en migración de tramos:", err);
+    notifyFail("tier_group.migrate_failed", "Error al migrar tramos desde categorías", {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al migrar tramos desde categorías", error: err });
   }
 };

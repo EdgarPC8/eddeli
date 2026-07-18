@@ -11,6 +11,7 @@ import { Op } from "sequelize";
 import { sequelize } from "../../database/connection.js";
 import { logger } from "../../log/LogActivity.js";
 import { parsePagination, sendPaginated } from "../../utils/pagination.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 
 
@@ -36,11 +37,16 @@ export const posCheckout = async (req, res) => {
 
     const { customerId, notes, items, paymentMethod, saleType, documentType } = req.body;
     if (!customerId || !Array.isArray(items) || items.length === 0) {
+      notifyFail("order.pos_checkout_failed", "Faltan customerId o items.", { req, httpStatus: 400 });
       return res.status(400).json({ message: "Faltan customerId o items." });
     }
 
     const notesText = String(notes || "");
     if (!notesText.includes(CAJA_POS_TAG)) {
+      notifyFail("order.pos_checkout_failed", "Pedido POS inválido (falta marca de caja).", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "Pedido POS inválido (falta marca de caja)." });
     }
 
@@ -52,6 +58,10 @@ export const posCheckout = async (req, res) => {
       : "consumidor_final";
     const shift = await findOpenShiftForAccount(accountId);
     if (!shift) {
+      notifyFail("order.pos_checkout_failed", "Abre un turno de caja antes de registrar ventas en el punto de venta.", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({
         message: "Abre un turno de caja antes de registrar ventas en el punto de venta.",
       });
@@ -144,9 +154,15 @@ export const posCheckout = async (req, res) => {
       return order;
     });
 
+    notifyOk("order.pos_checkout", "Cobro en caja POS", { orderId: result.id });
     res.status(201).json({ ok: true, orderId: result.id, order: result });
   } catch (error) {
     console.error("posCheckout:", error);
+    notifyFail("order.pos_checkout_failed", error.message || "Error en checkout POS", {
+      error,
+      req,
+      httpStatus: 400,
+    });
     res.status(400).json({ message: error.message || "Error en checkout POS" });
   }
 };
@@ -306,6 +322,10 @@ export const updateOrderItem = async (req, res) => {
       req.body?.programmerDashboard === true || req.body?.programmerDashboard === "true";
     if (isDashboardCorrection) {
       if (user?.loginRol !== "Programador") {
+        notifyFail("order_item.programmer_corrected_failed", "No tenés permiso para esta acción", {
+          req,
+          httpStatus: 403,
+        });
         return res.status(403).json({
           message: "No tenés permiso para esta acción",
         });
@@ -490,9 +510,23 @@ export const updateOrderItem = async (req, res) => {
       return { status: 200, body: { message: "Ítem actualizado ✅", item: updated } };
     });
 
+    if (result.status >= 400) {
+      notifyFail(
+        "order_item.update_failed",
+        result.body?.message || "Error al actualizar ítem",
+        { req, httpStatus: result.status, extra: { itemId } },
+      );
+    } else {
+      notifyOk("order_item.updated", `Ítem pedido #${itemId}`, { itemId: Number(itemId) });
+    }
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("updateOrderItem:", error);
+    notifyFail("order_item.update_failed", "Error al actualizar ítem", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({
       message: "Error al actualizar ítem",
       error: String(error?.message || error),
@@ -574,7 +608,10 @@ export const closeOrderItemLogistics = async (req, res) => {
   const token = getHeaderToken(req);
   let user = null;
   try { user = await verifyJWT(token); }
-  catch { return res.status(401).json({ message: "No autorizado" }); }
+  catch {
+    notifyFail("order_item.update_failed", "No autorizado", { req, httpStatus: 401 });
+    return res.status(401).json({ message: "No autorizado" });
+  }
 
   try {
     const result = await sequelize.transaction(async (t) => {
@@ -651,9 +688,23 @@ export const closeOrderItemLogistics = async (req, res) => {
       return { status: 200, body: { message: "Cierre/logística guardado", item } };
     });
 
+    if (result.status >= 400) {
+      notifyFail(
+        "order_item.update_failed",
+        result.body?.message || "Error en cierre/logística",
+        { req, httpStatus: result.status, extra: { itemId } },
+      );
+    } else {
+      notifyOk("order_item.updated", `Cierre ítem pedido #${itemId}`, { itemId: Number(itemId) });
+    }
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("closeOrderItemLogistics:", error);
+    notifyFail("order_item.update_failed", "Error en cierre/logística", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({ message: "Error", error: String(error?.message || error) });
   }
 };
@@ -731,9 +782,23 @@ export const markItemAsPaid = async (req, res) => {
       return { status: 200, body: { message: "Ítem marcado como pagado", item, income } };
     });
 
+    if (result.status >= 400) {
+      notifyFail(
+        "order_item.mark_paid_failed",
+        result.body?.message || "Error al marcar ítem como pagado",
+        { req, httpStatus: result.status, extra: { itemId } },
+      );
+    } else {
+      notifyOk("order_item.mark_paid", `Ítem pagado #${itemId}`, { itemId: Number(itemId) });
+    }
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("markItemAsPaid:", error);
+    notifyFail("order_item.mark_paid_failed", "Error al marcar ítem como pagado", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({ message: "Error", error: String(error?.message || error) });
   }
 };
@@ -783,9 +848,23 @@ export const unmarkItemAsPaid = async (req, res) => {
       return { status: 200, body: { message: "Pago revertido", item } };
     });
 
+    if (result.status >= 400) {
+      notifyFail(
+        "order_item.update_failed",
+        result.body?.message || "Error al revertir pago del ítem",
+        { req, httpStatus: result.status, extra: { itemId } },
+      );
+    } else {
+      notifyOk("order_item.updated", `Pago ítem revertido #${itemId}`, { itemId: Number(itemId) });
+    }
     return res.status(result.status).json(result.body);
   } catch (error) {
     console.error("unmarkItemAsPaid:", error);
+    notifyFail("order_item.update_failed", "Error al revertir pago del ítem", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({ message: "Error", error: String(error?.message || error) });
   }
 };
@@ -803,14 +882,29 @@ export const markItemAsDelivered = async (req, res) => {
       ]
     });
 
-    if (!item) return res.status(404).json({ message: "Item not found" });
-    if (item.deliveredAt) return res.status(400).json({ message: "Este ítem ya fue marcado como entregado" });
+    if (!item) {
+      notifyFail("order_item.mark_delivered_failed", "Item not found", {
+        req,
+        httpStatus: 404,
+        extra: { itemId },
+      });
+      return res.status(404).json({ message: "Item not found" });
+    }
+    if (item.deliveredAt) {
+      notifyFail("order_item.mark_delivered_failed", "Este ítem ya fue marcado como entregado", {
+        req,
+        httpStatus: 400,
+        extra: { itemId },
+      });
+      return res.status(400).json({ message: "Este ítem ya fue marcado como entregado" });
+    }
 
     // ✅ si es panadería/consignación: NO descontar stock aquí
     const consignment = isConsignmentOrder(item);
     if (consignment) {
       item.deliveredAt = new Date();
       await item.save();
+      notifyOk("order_item.mark_delivered", `Ítem entregado #${itemId}`, { itemId: Number(itemId) });
       return res.json({
         message: "Ítem entregado (consignación). La salida real se registra con el cierre (vendido/dañado/yapa).",
         item
@@ -819,9 +913,21 @@ export const markItemAsDelivered = async (req, res) => {
 
     // ✅ modo normal: descontar stock y registrar movement de venta
     const product = await InventoryProduct.findByPk(item.productId);
-    if (!product) return res.status(404).json({ message: "Producto no encontrado" });
+    if (!product) {
+      notifyFail("order_item.mark_delivered_failed", "Producto no encontrado", {
+        req,
+        httpStatus: 404,
+        extra: { itemId },
+      });
+      return res.status(404).json({ message: "Producto no encontrado" });
+    }
 
     if (num(product.stock) < num(item.quantity)) {
+      notifyFail("order_item.mark_delivered_failed", "Stock insuficiente para entregar este ítem", {
+        req,
+        httpStatus: 400,
+        extra: { itemId },
+      });
       return res.status(400).json({ message: "Stock insuficiente para entregar este ítem" });
     }
 
@@ -858,9 +964,15 @@ export const markItemAsDelivered = async (req, res) => {
       }
     }
 
+    notifyOk("order_item.mark_delivered", `Ítem entregado #${itemId}`, { itemId: Number(itemId) });
     res.json({ message: "Item delivered, stock updated, and movement recorded", item });
   } catch (error) {
     console.error("Error delivering item:", error);
+    notifyFail("order_item.mark_delivered_failed", "Error delivering item", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error delivering item", error: String(error?.message || error) });
   }
 };
@@ -869,8 +981,10 @@ export const markItemAsDelivered = async (req, res) => {
 export const createCustomer = async (req, res) => {
   try {
     const customer = await Customer.create(req.body);
+    notifyOk("customer.created", "Cliente creado", { customerId: customer.id });
     res.status(201).json(customer);
   } catch (error) {
+    notifyFail("customer.create_failed", "Error al crear cliente", { error, req, httpStatus: 500 });
     res.status(500).json({ message: 'Error al crear cliente', error });
   }
 };
@@ -881,6 +995,7 @@ export const createOrder = async (req, res) => {
     const { customerId, notes, date, items } = req.body;
 
     if (!customerId || !items || items.length === 0) {
+      notifyFail("order.create_failed", "Faltan datos del pedido", { req, httpStatus: 400 });
       return res.status(400).json({ message: 'Faltan datos del pedido' });
     }
 
@@ -903,6 +1018,7 @@ export const createOrder = async (req, res) => {
       )
     );
 
+    notifyOk("order.created", `Pedido #${order.id}`, { orderId: order.id, customerId });
     res.status(201).json({
       message: "Pedido registrado correctamente",
       order,
@@ -910,6 +1026,7 @@ export const createOrder = async (req, res) => {
     });
   } catch (error) {
     console.error("createOrder:", error);
+    notifyFail("order.create_failed", "Error al crear pedido", { error, req, httpStatus: 500 });
     res.status(500).json({ message: "Error al crear pedido" });
   }
 };
@@ -920,17 +1037,31 @@ export const markOrderAsPaid = async (req, res) => {
     const { id } = req.params;
     const order = await Order.findByPk(id);
 
-    if (!order) return res.status(404).json({ message: 'Pedido no encontrado' });
+    if (!order) {
+      notifyFail("order.mark_paid_failed", `Pedido #${id} no encontrado`, { req, httpStatus: 404 });
+      return res.status(404).json({ message: 'Pedido no encontrado' });
+    }
 
     if (order.status === 'pagado') {
+      notifyFail("order.mark_paid_failed", "El pedido ya está marcado como pagado", {
+        req,
+        httpStatus: 400,
+        extra: { orderId: id },
+      });
       return res.status(400).json({ message: 'El pedido ya está marcado como pagado' });
     }
 
     order.status = 'pagado';
     await order.save();
 
+    notifyOk("order.mark_paid", `Pedido pagado #${id}`, { orderId: Number(id) });
     res.json({ message: 'Pedido marcado como pagado', order });
   } catch (error) {
+    notifyFail("order.mark_paid_failed", "Error al marcar pedido como pagado", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: 'Error al marcar pedido como pagado', error });
   }
 };
@@ -938,20 +1069,36 @@ export const markOrderAsPaid = async (req, res) => {
 export const deleteOrderItem = async (req, res) => {
   try {
     const item = await OrderItem.findByPk(req.params.id);
-    if (!item) return res.status(404).json({ message: "Ítem no encontrado" });
+    if (!item) {
+      notifyFail("order_item.delete_failed", `Ítem #${req.params.id} no encontrado`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Ítem no encontrado" });
+    }
     await item.destroy();
+    notifyOk("order_item.deleted", `Ítem pedido #${req.params.id}`, { itemId: Number(req.params.id) });
     res.json({ message: "Ítem eliminado correctamente" });
   } catch (error) {
+    notifyFail("order_item.delete_failed", "Error al eliminar ítem", { error, req, httpStatus: 500 });
     res.status(500).json({ message: "Error al eliminar ítem", error });
   }
 };
 export const deleteOrder = async (req, res) => {
   try {
     const order = await Order.findByPk(req.params.id);
-    if (!order) return res.status(404).json({ message: "Orden no encontrado" });
+    if (!order) {
+      notifyFail("order.delete_failed", `Pedido #${req.params.id} no encontrado`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Orden no encontrado" });
+    }
     await order.destroy();
+    notifyOk("order.deleted", `Pedido #${req.params.id}`, { orderId: Number(req.params.id) });
     res.json({ message: "Orden eliminado correctamente" });
   } catch (error) {
+    notifyFail("order.delete_failed", "Error al eliminar Orden", { error, req, httpStatus: 500 });
     res.status(500).json({ message: "Error al eliminar Orden", error });
   }
 };
@@ -967,12 +1114,18 @@ export const updateOrder = async (req, res) => {
 
     const order = await Order.findByPk(id);
     if (!order) {
+      notifyFail("order.update_failed", `Pedido #${id} no encontrado`, { req, httpStatus: 404 });
       return res.status(404).json({ message: 'Pedido no encontrado' });
     }
 
     // Bloqueo por estado si no es Admin/Programador
     const isPrivileged = ['Administrador', 'Programador'].includes(user?.loginRol);
     if (['entregado', 'pagado'].includes(order.status) && !isPrivileged) {
+      notifyFail("order.update_failed", `No tiene permisos para editar pedidos ${order.status}`, {
+        req,
+        httpStatus: 403,
+        extra: { orderId: id },
+      });
       return res.status(403).json({
         message: `No tiene permisos para editar pedidos ${order.status}`,
       });
@@ -984,6 +1137,7 @@ export const updateOrder = async (req, res) => {
     if (typeof customerId !== 'undefined') {
       // Validación simple
       if (customerId === null || Number.isNaN(Number(customerId))) {
+        notifyFail("order.update_failed", "customerId inválido", { req, httpStatus: 400, extra: { orderId: id } });
         return res.status(400).json({ message: 'customerId inválido' });
       }
       updates.customerId = customerId;
@@ -998,6 +1152,7 @@ export const updateOrder = async (req, res) => {
       // Acepta Date ISO o string "YYYY-MM-DDTHH:mm:ss"
       const parsed = new Date(date);
       if (isNaN(parsed.getTime())) {
+        notifyFail("order.update_failed", "Formato de fecha inválido", { req, httpStatus: 400, extra: { orderId: id } });
         return res.status(400).json({ message: 'Formato de fecha inválido' });
       }
       updates.date = parsed; // Sequelize DATE/DATETIME
@@ -1005,17 +1160,21 @@ export const updateOrder = async (req, res) => {
 
     // Si no hay nada que actualizar:
     if (Object.keys(updates).length === 0) {
+      notifyFail("order.update_failed", "No se enviaron campos válidos para actualizar", {
+        req,
+        httpStatus: 400,
+        extra: { orderId: id },
+      });
       return res.status(400).json({ message: 'No se enviaron campos válidos para actualizar' });
     }
 
     await order.update(updates);
 
-    // Opcional: vuelve a cargar asociaciones mínimas si las necesitas en el front
-    // await order.reload({ include: [Customer] });
-
+    notifyOk("order.updated", `Pedido #${id}`, { orderId: Number(id) });
     return res.json({ message: "Pedido actualizado correctamente", order });
   } catch (error) {
     console.error('Error al actualizar pedido:', error);
+    notifyFail("order.update_failed", "Error al actualizar pedido", { error, req, httpStatus: 500 });
     return res.status(500).json({ message: 'Error al actualizar pedido', error: String(error?.message || error) });
   }
 };
@@ -1031,6 +1190,10 @@ export const addOrderItem = async (req, res) => {
 
     const isPrivileged = ['Administrador', 'Programador'].includes(user?.loginRol);
     if (!isPrivileged) {
+      notifyFail("order_item.create_failed", "No tenés permiso para agregar productos a un pedido existente", {
+        req,
+        httpStatus: 403,
+      });
       return res.status(403).json({
         message: 'No tenés permiso para agregar productos a un pedido existente',
       });
@@ -1038,6 +1201,10 @@ export const addOrderItem = async (req, res) => {
 
     const order = await Order.findByPk(orderId);
     if (!order) {
+      notifyFail("order_item.create_failed", `Pedido #${orderId} no encontrado`, {
+        req,
+        httpStatus: 404,
+      });
       return res.status(404).json({ message: 'Pedido no encontrado' });
     }
 
@@ -1045,17 +1212,21 @@ export const addOrderItem = async (req, res) => {
     const qty = Number(quantity);
     const pr = Number(price);
     if (!Number.isFinite(pid) || pid <= 0) {
+      notifyFail("order_item.create_failed", "productId inválido", { req, httpStatus: 400, extra: { orderId } });
       return res.status(400).json({ message: 'productId inválido' });
     }
     if (!Number.isFinite(qty) || qty <= 0) {
+      notifyFail("order_item.create_failed", "Cantidad inválida", { req, httpStatus: 400, extra: { orderId } });
       return res.status(400).json({ message: 'Cantidad inválida' });
     }
     if (!Number.isFinite(pr) || pr < 0) {
+      notifyFail("order_item.create_failed", "Precio inválido", { req, httpStatus: 400, extra: { orderId } });
       return res.status(400).json({ message: 'Precio inválido' });
     }
 
     const product = await InventoryProduct.findByPk(pid);
     if (!product) {
+      notifyFail("order_item.create_failed", "Producto no encontrado", { req, httpStatus: 404, extra: { orderId } });
       return res.status(404).json({ message: 'Producto no encontrado' });
     }
 
@@ -1066,9 +1237,18 @@ export const addOrderItem = async (req, res) => {
       price: pr,
     });
 
+    notifyOk("order_item.created", `Ítem pedido #${orderId}`, {
+      orderId: order.id,
+      itemId: item.id,
+    });
     return res.status(201).json({ message: 'Ítem agregado', item });
   } catch (error) {
     console.error('addOrderItem:', error);
+    notifyFail("order_item.create_failed", "Error al agregar ítem al pedido", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({
       message: 'Error al agregar ítem al pedido',
       error: String(error?.message || error),
@@ -1087,12 +1267,21 @@ export const updateOrderStatus = async (req, res) => {
     const { id } = req.params;
     const { status } = req.body;
     const order = await Order.findByPk(id);
-    if (!order) return res.status(404).json({ message: 'Pedido no encontrado' });
+    if (!order) {
+      notifyFail("order.status_change_failed", `Pedido #${id} no encontrado`, { req, httpStatus: 404 });
+      return res.status(404).json({ message: 'Pedido no encontrado' });
+    }
 
     order.status = status;
     await order.save();
+    notifyOk("order.status_changed", `Estado pedido #${id}`, { orderId: Number(id), status });
     res.json({ message: 'Estado actualizado', order });
   } catch (error) {
+    notifyFail("order.status_change_failed", "Error al actualizar estado del pedido", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: 'Error al actualizar estado del pedido', error });
   }
 };
@@ -1115,13 +1304,25 @@ export const programmerDashboardOrderItemCorrection = async (req, res) => {
 
   try {
     const item = await OrderItem.findByPk(itemId);
-    if (!item) return res.status(404).json({ message: "Ítem no encontrado" });
+    if (!item) {
+      notifyFail("order_item.programmer_corrected_failed", "Ítem no encontrado", {
+        req,
+        httpStatus: 404,
+        extra: { itemId },
+      });
+      return res.status(404).json({ message: "Ítem no encontrado" });
+    }
 
     const itemPayload = {};
     const logParts = [];
 
     const delParsed = parseDateField(deliveredAt);
     if (delParsed === "__INVALID__") {
+      notifyFail("order_item.programmer_corrected_failed", "Fecha de entrega inválida", {
+        req,
+        httpStatus: 400,
+        extra: { itemId },
+      });
       return res.status(400).json({ message: "Fecha de entrega inválida" });
     }
     if (delParsed !== undefined) {
@@ -1133,6 +1334,11 @@ export const programmerDashboardOrderItemCorrection = async (req, res) => {
 
     const paidParsed = parseDateField(paidAt);
     if (paidParsed === "__INVALID__") {
+      notifyFail("order_item.programmer_corrected_failed", "Fecha de pago inválida", {
+        req,
+        httpStatus: 400,
+        extra: { itemId },
+      });
       return res.status(400).json({ message: "Fecha de pago inválida" });
     }
     if (paidParsed !== undefined) {
@@ -1149,13 +1355,25 @@ export const programmerDashboardOrderItemCorrection = async (req, res) => {
 
     if ((stockTouched || minTouched) && pid) {
       productRow = await InventoryProduct.findByPk(pid);
-      if (!productRow) return res.status(404).json({ message: "Producto no encontrado" });
+      if (!productRow) {
+        notifyFail("order_item.programmer_corrected_failed", "Producto no encontrado", {
+          req,
+          httpStatus: 404,
+          extra: { itemId },
+        });
+        return res.status(404).json({ message: "Producto no encontrado" });
+      }
     }
 
     const productUpdates = {};
     if (productRow && stockTouched) {
       const n = Number(stock);
       if (!Number.isFinite(n) || n < 0) {
+        notifyFail("order_item.programmer_corrected_failed", "Stock inválido", {
+          req,
+          httpStatus: 400,
+          extra: { itemId },
+        });
         return res.status(400).json({ message: "Stock inválido" });
       }
       productUpdates.stock = n;
@@ -1163,6 +1381,11 @@ export const programmerDashboardOrderItemCorrection = async (req, res) => {
     if (productRow && minTouched) {
       const n = Number(minStock);
       if (!Number.isFinite(n) || n < 0) {
+        notifyFail("order_item.programmer_corrected_failed", "Stock mínimo inválido", {
+          req,
+          httpStatus: 400,
+          extra: { itemId },
+        });
         return res.status(400).json({ message: "Stock mínimo inválido" });
       }
       productUpdates.minStock = n;
@@ -1172,6 +1395,11 @@ export const programmerDashboardOrderItemCorrection = async (req, res) => {
       !Object.keys(itemPayload).length &&
       !Object.keys(productUpdates).length
     ) {
+      notifyFail("order_item.programmer_corrected_failed", "No hay cambios para registrar", {
+        req,
+        httpStatus: 400,
+        extra: { itemId },
+      });
       return res.status(400).json({ message: "No hay cambios para registrar" });
     }
 
@@ -1245,12 +1473,21 @@ export const programmerDashboardOrderItemCorrection = async (req, res) => {
         }
       : null;
 
+    notifyOk("order_item.programmer_corrected", `Corrección ítem #${itemId}`, {
+      itemId: Number(itemId),
+      orderId: item.orderId,
+    });
     return res.json({
       message: "Cambios registrados (solo Logs, sin movimientos ni ingresos)",
       item: formatted,
     });
   } catch (error) {
     console.error("programmerDashboardOrderItemCorrection:", error);
+    notifyFail("order_item.programmer_corrected_failed", "Error al registrar corrección", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({
       message: "Error al registrar corrección",
       error: error.message,

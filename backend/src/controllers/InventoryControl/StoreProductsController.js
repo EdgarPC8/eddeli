@@ -8,6 +8,7 @@ import {
   StoreProduct,
   Store, // 👈 te faltaba
 } from "../../models/Inventory.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 // GET /stores/:storeId/products
 // Controllers/InventoryControl/StoreProductsController.js
@@ -96,6 +97,7 @@ export const addProductsToStore = async (req, res) => {
     const { productIds = [] } = req.body;
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
+      notifyFail("store.product_assign_failed", "productIds es requerido", { req, httpStatus: 400 });
       return res.status(400).json({ message: "productIds es requerido (array)" });
     }
 
@@ -110,9 +112,18 @@ export const addProductsToStore = async (req, res) => {
     });
 
     const created = await Promise.all(ops);
+    notifyOk("store.product_assigned", `Productos asignados al local #${storeId}`, {
+      storeId,
+      count: created.length,
+    });
     res.status(201).json({ message: "Asignaciones creadas/activadas", rows: created });
   } catch (err) {
     console.error("addProductsToStore error:", err);
+    notifyFail("store.product_assign_failed", "Error al asignar productos a la tienda", {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al asignar productos a la tienda" });
   }
 };
@@ -122,12 +133,27 @@ export const removeProductFromStore = async (req, res) => {
     const row = await StoreProduct.findOne({
       where: { storeId: Number(storeId), productId: Number(productId) },
     });
-    if (!row) return res.status(404).json({ message: "Relación no encontrada" });
+    if (!row) {
+      notifyFail("store.product_remove_failed", "Relación store-producto no encontrada", {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Relación no encontrada" });
+    }
 
     await row.destroy();
+    notifyOk("store.product_removed", `Producto #${productId} quitado del local #${storeId}`, {
+      storeId,
+      productId,
+    });
     res.json({ message: "Desasignado" });
   } catch (err) {
     console.error("removeProductFromStore error:", err);
+    notifyFail("store.product_remove_failed", "Error al desasignar producto", {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al desasignar producto" });
   }
 };
@@ -139,12 +165,28 @@ export const toggleStoreProduct = async (req, res) => {
     const row = await StoreProduct.findOne({
       where: { storeId: Number(storeId), productId: Number(productId) },
     });
-    if (!row) return res.status(404).json({ message: "Relación no encontrada" });
+    if (!row) {
+      notifyFail("store.product_toggle_failed", "Relación store-producto no encontrada", {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Relación no encontrada" });
+    }
 
     await row.update({ isActive: Boolean(isActive) });
+    notifyOk("store.product_toggled", `Toggle producto #${productId} en local #${storeId}`, {
+      storeId,
+      productId,
+      isActive: Boolean(isActive),
+    });
     res.json({ message: "Actualizado", row });
   } catch (err) {
     console.error("toggleStoreProduct error:", err);
+    notifyFail("store.product_toggle_failed", "Error al actualizar relación", {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al actualizar relación" });
   }
 };

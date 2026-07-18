@@ -12,6 +12,7 @@ import {
 } from "../../models/Finance.js";
 import { getHeaderToken, verifyJWT } from "../../libs/jwt.js";
 import { toFinanceDateTime } from "../../utils/financeDateTime.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 const toNum = (v, def = 0) => {
   const n = Number(v ?? def);
@@ -220,23 +221,35 @@ export const createObligation = async (req, res) => {
     } = req.body || {};
 
     if (!["receivable", "payable"].includes(direction)) {
+      notifyFail("obligation.create_failed", "direction debe ser receivable o payable", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "direction debe ser receivable o payable" });
     }
 
     const amt = roundMoney(amount);
-    if (amt <= 0) return res.status(400).json({ message: "Monto inválido" });
+    if (amt <= 0) {
+      notifyFail("obligation.create_failed", "Monto inválido", { req, httpStatus: 400 });
+      return res.status(400).json({ message: "Monto inválido" });
+    }
 
     let resolvedName = String(partyName || "").trim();
     let resolvedCustomerId = customerId ? Number(customerId) : null;
 
     if (partyType === "customer") {
       if (!resolvedCustomerId) {
+        notifyFail("obligation.create_failed", "Selecciona un cliente", { req, httpStatus: 400 });
         return res.status(400).json({ message: "Selecciona un cliente" });
       }
       const customer = await Customer.findByPk(resolvedCustomerId);
-      if (!customer) return res.status(404).json({ message: "Cliente no encontrado" });
+      if (!customer) {
+        notifyFail("obligation.create_failed", "Cliente no encontrado", { req, httpStatus: 404 });
+        return res.status(404).json({ message: "Cliente no encontrado" });
+      }
       resolvedName = customer.name;
     } else if (!resolvedName) {
+      notifyFail("obligation.create_failed", "Indica el nombre de la persona", { req, httpStatus: 400 });
       return res.status(400).json({ message: "Indica el nombre de la persona" });
     }
 
@@ -311,9 +324,15 @@ export const createObligation = async (req, res) => {
       return mapObligationRow(obligation, fin);
     });
 
+    notifyOk("obligation.created", "Obligación creada", { obligation: result });
     res.status(201).json(result);
   } catch (err) {
     console.error("createObligation error:", err);
+    notifyFail("obligation.create_failed", "Error al registrar préstamo/deuda", {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al registrar préstamo/deuda" });
   }
 };
@@ -326,7 +345,10 @@ export const payObligation = async (req, res) => {
     const { amount, date, method, note } = req.body || {};
 
     const payAmount = roundMoney(amount);
-    if (payAmount <= 0) return res.status(400).json({ message: "Monto inválido" });
+    if (payAmount <= 0) {
+      notifyFail("obligation.pay_failed", "Monto inválido", { req, httpStatus: 400, extra: { obligationId: id } });
+      return res.status(400).json({ message: "Monto inválido" });
+    }
 
     const result = await sequelize.transaction(async (t) => {
       const fin = await getObligationFinancials(id, t);
@@ -433,9 +455,27 @@ export const payObligation = async (req, res) => {
       };
     });
 
+    if (result.status >= 400) {
+      notifyFail("obligation.pay_failed", result.body?.message || "Error al registrar abono", {
+        req,
+        httpStatus: result.status,
+        extra: { obligationId: id },
+      });
+    } else {
+      notifyOk("obligation.paid", `Obligación #${id} pagada`, {
+        obligationId: id,
+        payment: result.body?.payment,
+      });
+    }
     return res.status(result.status).json(result.body);
   } catch (err) {
     console.error("payObligation error:", err);
+    notifyFail("obligation.pay_failed", "Error al registrar abono", {
+      error: err,
+      req,
+      httpStatus: 500,
+      extra: { obligationId: req.params.id },
+    });
     res.status(500).json({ message: "Error al registrar abono" });
   }
 };
@@ -503,9 +543,26 @@ export const cancelObligation = async (req, res) => {
       };
     });
 
+    if (result.status >= 400) {
+      notifyFail("obligation.cancel_failed", result.body?.message || "Error al anular obligación", {
+        req,
+        httpStatus: result.status,
+        extra: { obligationId: req.params.id },
+      });
+    } else {
+      notifyOk("obligation.cancelled", `Obligación #${req.params.id} cancelada`, {
+        obligationId: req.params.id,
+      });
+    }
     return res.status(result.status).json(result.body);
   } catch (err) {
     console.error("cancelObligation error:", err);
+    notifyFail("obligation.cancel_failed", "Error al anular obligación", {
+      error: err,
+      req,
+      httpStatus: 500,
+      extra: { obligationId: req.params.id },
+    });
     res.status(500).json({ message: "Error al anular obligación" });
   }
 };

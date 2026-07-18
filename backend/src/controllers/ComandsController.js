@@ -22,6 +22,7 @@ import {
   readBackupFileSummary,
   backupFilePath,
 } from "../database/insertData.js";
+import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
 
 export const saveBackupController = async (req, res) => {
   try {
@@ -33,6 +34,7 @@ export const saveBackupController = async (req, res) => {
       message +=
         " Advertencia: la BD está vacía; el JSON guardado no tendrá usuarios ni productos. Restaura backup.json desde tu PC antes.";
     }
+    notifyOk("backup.saved", "Backup guardado", { path: backupPath, tables: counts });
     res.json({
       ok: true,
       message,
@@ -41,6 +43,11 @@ export const saveBackupController = async (req, res) => {
     });
   } catch (error) {
     console.error("Error en saveBackupController:", error);
+    notifyFail("backup.save_failed", "Error al guardar el backup", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({
       ok: false,
       message: "Error al guardar el backup",
@@ -53,6 +60,7 @@ export const saveBackupController = async (req, res) => {
 export const uploadBackupController = async (req, res) => {
   try {
     if (!req.file) {
+      notifyFail("backup.upload_failed", "No se envió ningún archivo", { req, httpStatus: 400 });
       return res.status(400).json({
         ok: false,
         message: "No se envió ningún archivo",
@@ -65,6 +73,11 @@ export const uploadBackupController = async (req, res) => {
     try {
       normalized = parseBackupJsonContent(content);
     } catch (err) {
+      notifyFail("backup.upload_failed", err.message || "El archivo no es un backup EdDeli válido", {
+        error: err,
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({
         ok: false,
         message: err.message || "El archivo no es un backup EdDeli válido",
@@ -76,6 +89,7 @@ export const uploadBackupController = async (req, res) => {
 
     console.log("✅ backup.json EdDeli reemplazado en:", savedPath, tables);
 
+    notifyOk("backup.uploaded", "Backup subido", { path: savedPath, tables });
     return res.json({
       ok: true,
       message:
@@ -85,6 +99,11 @@ export const uploadBackupController = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error al subir y reemplazar backup:", error);
+    notifyFail("backup.upload_failed", "Error al reemplazar el backup", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({
       ok: false,
       message: "Error al reemplazar el backup",
@@ -126,6 +145,10 @@ export const reloadBdController = async (req, res) => {
           : "recarga completa (esquema recreado)";
     console.log(`✅ Datos EdDeli insertados — ${modeLabel}`, insertResult.tables);
 
+    notifyOk("database.reloaded", "Base de datos recargada", {
+      resetMode: insertResult.resetMode,
+      tables: insertResult.tables,
+    });
     return res.json({
       ok: true,
       message: `Base de datos restaurada desde backup.json (${modeLabel})`,
@@ -137,6 +160,11 @@ export const reloadBdController = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error en reloadBdController:", error);
+    notifyFail("database.reload_failed", "Error al reiniciar la base de datos", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({
       ok: false,
       message:
@@ -179,6 +207,7 @@ export const deleteLogs = async (req, res) => {
 
     if (b.all === true) {
       const count = await Logs.destroy({ where: {}, truncate: false });
+      notifyOk("log.deleted", "Logs eliminados", { deleted: count, all: true });
       return res.json({ message: "Todos los logs eliminados", deleted: count });
     }
 
@@ -205,6 +234,7 @@ export const deleteLogs = async (req, res) => {
     }
 
     if (Object.keys(where).length === 0) {
+      notifyFail("log.delete_failed", "Indica filtros para eliminar logs", { req, httpStatus: 400 });
       return res.status(400).json({
         message:
           "Indica all, method/methods, ids o filtros (systemContains, endPointContains, actionContains).",
@@ -212,9 +242,11 @@ export const deleteLogs = async (req, res) => {
     }
 
     const deleted = await Logs.destroy({ where });
+    notifyOk("log.deleted", "Logs eliminados", { deleted });
     res.json({ message: "Logs eliminados", deleted });
   } catch (error) {
     console.error("Error al eliminar logs:", error);
+    notifyFail("log.delete_failed", "Error al eliminar logs", { error, req, httpStatus: 500 });
     res.status(500).json({ message: "Error al eliminar logs." });
   }
 };
@@ -223,13 +255,23 @@ export const deleteLogById = async (req, res) => {
   try {
     const id = Number(req.params.id);
     if (!Number.isFinite(id)) {
+      notifyFail("log.entry_delete_failed", "Id inválido", { req, httpStatus: 400 });
       return res.status(400).json({ message: "Id inválido" });
     }
     const deleted = await Logs.destroy({ where: { id } });
-    if (!deleted) return res.status(404).json({ message: "Log no encontrado" });
+    if (!deleted) {
+      notifyFail("log.entry_delete_failed", `Log #${id} no encontrado`, { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Log no encontrado" });
+    }
+    notifyOk("log.entry_deleted", `Log #${id}`, { logId: id });
     res.json({ message: "Log eliminado", deleted: 1 });
   } catch (error) {
     console.error("Error al eliminar log:", error);
+    notifyFail("log.entry_delete_failed", `Error al eliminar log #${req.params.id}`, {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al eliminar log." });
   }
 };
@@ -248,6 +290,7 @@ export const setMainBackupController = async (req, res) => {
   try {
     const { filename } = req.params;
     const { path: savedPath, tables } = await setMainBackupFromStored(filename);
+    notifyOk("backup.set_main", "Backup principal establecido", { path: savedPath, filename });
     res.json({
       ok: true,
       message: "backup.json actualizado desde la copia seleccionada. Usa «Recargar BD» en Comandos para aplicarlo.",
@@ -256,6 +299,11 @@ export const setMainBackupController = async (req, res) => {
     });
   } catch (error) {
     console.error("setMainBackupController:", error);
+    notifyFail("backup.set_main_failed", error.message || "No se pudo establecer como backup fijo", {
+      error,
+      req,
+      httpStatus: 400,
+    });
     res.status(400).json({
       ok: false,
       message: error.message || "No se pudo establecer como backup fijo",
@@ -267,9 +315,15 @@ export const deleteStoredBackupController = async (req, res) => {
   try {
     const { filename } = req.params;
     await deleteStoredBackup(filename);
+    notifyOk("backup.stored_deleted", "Backup almacenado eliminado", { filename });
     res.json({ ok: true, message: "Copia de backup eliminada" });
   } catch (error) {
     console.error("deleteStoredBackupController:", error);
+    notifyFail("backup.stored_delete_failed", error.message || "No se pudo eliminar el backup", {
+      error,
+      req,
+      httpStatus: 400,
+    });
     res.status(400).json({
       ok: false,
       message: error.message || "No se pudo eliminar el backup",
@@ -281,6 +335,11 @@ export const pruneStoredBackupsController = async (req, res) => {
   try {
     const { deletedCount, filename, backupPath, counts } =
       await pruneStoredBackupsAndSaveFresh();
+    notifyOk("backup.pruned", "Backups podados", {
+      deletedCount,
+      filename,
+      path: backupPath,
+    });
     res.json({
       ok: true,
       message:
@@ -294,6 +353,11 @@ export const pruneStoredBackupsController = async (req, res) => {
     });
   } catch (error) {
     console.error("pruneStoredBackupsController:", error);
+    notifyFail("backup.prune_failed", error.message || "No se pudieron limpiar las copias guardadas", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({
       ok: false,
       message: error.message || "No se pudieron limpiar las copias guardadas",

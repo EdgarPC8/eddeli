@@ -24,6 +24,7 @@ import {
 import { slugify } from "../../helpers/functions.js";
 import { Op, fn, col } from "sequelize";
 import { Order, OrderItem } from "../../models/Orders.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 /* =========================
    Utils
 ========================= */
@@ -582,26 +583,37 @@ export const createCatalogEntry = async (req, res) => {
       endsAt = null,
     } = req.body;
 
-    if (!productId)
+    if (!productId) {
+      notifyFail("catalog_entry.create_failed", "productId es obligatorio", { req, httpStatus: 400 });
       return res.status(400).json({ message: "productId es obligatorio" });
+    }
 
     const product = await InventoryProduct.findByPk(productId);
-    if (!product) return res.status(404).json({ message: "Producto no existe" });
+    if (!product) {
+      notifyFail("catalog_entry.create_failed", "Producto no existe", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Producto no existe" });
+    }
 
     // Validar que no exista duplicado por (productId, section, storeId)
     const exists = await Catalog.findOne({
       where: { productId, section, storeId: storeId ?? null },
     });
-    if (exists)
+    if (exists) {
+      notifyFail("catalog_entry.create_failed", "Entrada duplicada en sección/tienda", {
+        req,
+        httpStatus: 409,
+      });
       return res.status(409).json({
         message: "Ya existe una entrada para este producto en esa sección (y tienda).",
       });
+    }
 
     // --- Normalizar / validar minOrderQty ---
     let normalizedMinOrderQty = null;
     if (minOrderQty !== undefined && minOrderQty !== null && minOrderQty !== "") {
       const parsed = Number(minOrderQty);
       if (!Number.isFinite(parsed) || parsed < 1) {
+        notifyFail("catalog_entry.create_failed", "minOrderQty inválido", { req, httpStatus: 400 });
         return res.status(400).json({
           message: "minOrderQty debe ser un número entero mayor o igual a 1",
         });
@@ -626,9 +638,15 @@ export const createCatalogEntry = async (req, res) => {
       endsAt: endsAt ? new Date(endsAt) : null,
     });
 
+    notifyOk("catalog_entry.created", `Catálogo #${row.id}`, { catalog: row });
     res.status(201).json({ message: "Creado", catalog: row });
   } catch (error) {
     console.error("createCatalogEntry error:", error);
+    notifyFail("catalog_entry.create_failed", "Error al crear entrada de catálogo", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al crear entrada de catálogo" });
   }
 };
@@ -638,7 +656,10 @@ export const updateCatalogEntry = async (req, res) => {
   try {
     const { id } = req.params;
     const row = await Catalog.findByPk(id);
-    if (!row) return res.status(404).json({ message: "Entrada no encontrada" });
+    if (!row) {
+      notifyFail("catalog_entry.update_failed", "Entrada no encontrada", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Entrada no encontrada" });
+    }
 
     const {
       productId,
@@ -661,8 +682,10 @@ export const updateCatalogEntry = async (req, res) => {
 
     if (typeof productId !== "undefined") {
       const product = await InventoryProduct.findByPk(productId);
-      if (!product)
+      if (!product) {
+        notifyFail("catalog_entry.update_failed", "Producto no existe", { req, httpStatus: 404 });
         return res.status(404).json({ message: "Producto no existe" });
+      }
       updates.productId = productId;
     }
 
@@ -683,6 +706,7 @@ export const updateCatalogEntry = async (req, res) => {
       } else {
         const parsed = Number(minOrderQty);
         if (!Number.isFinite(parsed) || parsed < 1) {
+          notifyFail("catalog_entry.update_failed", "minOrderQty inválido", { req, httpStatus: 400 });
           return res.status(400).json({
             message: "minOrderQty debe ser un número entero mayor o igual a 1",
           });
@@ -720,15 +744,25 @@ export const updateCatalogEntry = async (req, res) => {
       },
     });
     if (exists) {
+      notifyFail("catalog_entry.update_failed", "Entrada duplicada en sección/tienda", {
+        req,
+        httpStatus: 409,
+      });
       return res.status(409).json({
         message: "Ya existe una entrada para este producto en esa sección (y tienda).",
       });
     }
 
     await row.update(updates);
+    notifyOk("catalog_entry.updated", `Catálogo #${id}`, { catalog: row });
     res.status(200).json({ message: "Actualizado", catalog: row });
   } catch (error) {
     console.error("updateCatalogEntry error:", error);
+    notifyFail("catalog_entry.update_failed", "Error al actualizar entrada de catálogo", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al actualizar entrada de catálogo" });
   }
 };
@@ -740,12 +774,21 @@ export const deleteCatalogEntry = async (req, res) => {
   try {
     const { id } = req.params;
     const row = await Catalog.findByPk(id);
-    if (!row) return res.status(404).json({ message: "Entrada no encontrada" });
+    if (!row) {
+      notifyFail("catalog_entry.delete_failed", "Entrada no encontrada", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Entrada no encontrada" });
+    }
 
     await row.destroy();
+    notifyOk("catalog_entry.deleted", `Catálogo #${id}`, { catalogId: id });
     res.status(200).json({ message: "Eliminado" });
   } catch (error) {
     console.error("deleteCatalogEntry error:", error);
+    notifyFail("catalog_entry.delete_failed", "Error al eliminar entrada de catálogo", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al eliminar entrada de catálogo" });
   }
 };
@@ -756,16 +799,20 @@ export const deleteCatalogEntry = async (req, res) => {
 export const reorderCatalogEntries = async (req, res) => {
   try {
     const { section, items } = req.body || {};
-    if (!section || !Array.isArray(items))
+    if (!section || !Array.isArray(items)) {
+      notifyFail("catalog.reorder_failed", "section e items son requeridos", { req, httpStatus: 400 });
       return res.status(400).json({ message: "section e items son requeridos" });
+    }
 
     const updates = items.map(({ id, position }) =>
       Catalog.update({ position: Number(position) || 0 }, { where: { id, section } })
     );
     await Promise.all(updates);
+    notifyOk("catalog.reordered", "Catálogo reordenado", { section, count: items.length });
     res.status(200).json({ message: "Reordenado" });
   } catch (error) {
     console.error("reorderCatalogEntries error:", error);
+    notifyFail("catalog.reorder_failed", "Error al reordenar catálogo", { error, req, httpStatus: 500 });
     res.status(500).json({ message: "Error al reordenar catálogo" });
   }
 };

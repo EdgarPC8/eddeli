@@ -28,6 +28,7 @@ import {
   createAndPushNotification,
   resolveAdminUserIds,
 } from "../../services/notificationService.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 import { startOfMonth, endOfMonth, format } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -352,16 +353,26 @@ export const createRecurringTemplate = async (req, res) => {
     const body = req.body || {};
 
     const name = String(body.name || "").trim();
-    if (!name) return res.status(400).json({ message: "Indica un nombre" });
+    if (!name) {
+      notifyFail("recurring_template.create_failed", "Indica un nombre", { req, httpStatus: 400 });
+      return res.status(400).json({ message: "Indica un nombre" });
+    }
 
     const baseAmount = roundMoney(body.baseAmount);
-    if (baseAmount < 0) return res.status(400).json({ message: "Monto inválido" });
+    if (baseAmount < 0) {
+      notifyFail("recurring_template.create_failed", "Monto inválido", { req, httpStatus: 400 });
+      return res.status(400).json({ message: "Monto inválido" });
+    }
 
     const frequency = ["monthly", "quarterly", "annual"].includes(body.frequency)
       ? body.frequency
       : "monthly";
 
     if (frequency === "annual" && !body.dueMonth) {
+      notifyFail("recurring_template.create_failed", "Indica el mes de vencimiento anual", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "Indica el mes de vencimiento anual" });
     }
 
@@ -395,9 +406,17 @@ export const createRecurringTemplate = async (req, res) => {
       include: [{ model: Store, as: "store", attributes: ["id", "name"], required: false }],
     });
 
+    notifyOk("recurring_template.created", "Plantilla recurrente creada", {
+      template: mapTemplateRow(full),
+    });
     res.status(201).json(mapTemplateRow(full));
   } catch (err) {
     console.error("createRecurringTemplate error:", err);
+    notifyFail("recurring_template.create_failed", "Error al crear plantilla", {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al crear plantilla" });
   }
 };
@@ -408,7 +427,13 @@ export const updateRecurringTemplate = async (req, res) => {
     await verifyJWT(token);
 
     const template = await RecurringExpenseTemplate.findByPk(req.params.id);
-    if (!template) return res.status(404).json({ message: "Plantilla no encontrada" });
+    if (!template) {
+      notifyFail("recurring_template.update_failed", `Plantilla #${req.params.id} no encontrada`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Plantilla no encontrada" });
+    }
 
     const body = req.body || {};
     const updates = {};
@@ -436,9 +461,17 @@ export const updateRecurringTemplate = async (req, res) => {
       include: [{ model: Store, as: "store", attributes: ["id", "name"], required: false }],
     });
 
+    notifyOk("recurring_template.updated", `Plantilla recurrente #${template.id}`, {
+      template: mapTemplateRow(full),
+    });
     res.json(mapTemplateRow(full));
   } catch (err) {
     console.error("updateRecurringTemplate error:", err);
+    notifyFail("recurring_template.update_failed", `Error al actualizar plantilla #${req.params.id}`, {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al actualizar plantilla" });
   }
 };
@@ -451,8 +484,19 @@ export const updateRecurringOccurrence = async (req, res) => {
     const occ = await RecurringExpenseOccurrence.findByPk(req.params.id, {
       include: [{ model: RecurringExpenseTemplate, as: "template" }],
     });
-    if (!occ) return res.status(404).json({ message: "Cuota no encontrada" });
+    if (!occ) {
+      notifyFail("recurring_occurrence.update_failed", `Cuota #${req.params.id} no encontrada`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Cuota no encontrada" });
+    }
     if (occ.status === "paid") {
+      notifyFail("recurring_occurrence.update_failed", "La cuota ya está pagada", {
+        req,
+        httpStatus: 400,
+        extra: { occurrenceId: occ.id },
+      });
       return res.status(400).json({ message: "La cuota ya está pagada" });
     }
 
@@ -474,9 +518,17 @@ export const updateRecurringOccurrence = async (req, res) => {
       ],
     });
 
+    notifyOk("recurring_occurrence.updated", `Ocurrencia recurrente #${occ.id}`, {
+      occurrence: mapOccurrenceRow(full),
+    });
     res.json(mapOccurrenceRow(full));
   } catch (err) {
     console.error("updateRecurringOccurrence error:", err);
+    notifyFail("recurring_occurrence.update_failed", `Error al actualizar cuota #${req.params.id}`, {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al actualizar cuota" });
   }
 };
@@ -495,20 +547,52 @@ export const payRecurringOccurrence = async (req, res) => {
         },
       ],
     });
-    if (!occ) return res.status(404).json({ message: "Cuota no encontrada" });
-    if (occ.status === "paid") return res.status(400).json({ message: "Ya está pagada" });
+    if (!occ) {
+      notifyFail("recurring_occurrence.pay_failed", `Cuota #${req.params.id} no encontrada`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Cuota no encontrada" });
+    }
+    if (occ.status === "paid") {
+      notifyFail("recurring_occurrence.pay_failed", "Ya está pagada", {
+        req,
+        httpStatus: 400,
+        extra: { occurrenceId: occ.id },
+      });
+      return res.status(400).json({ message: "Ya está pagada" });
+    }
     if (occ.status === "skipped") {
+      notifyFail("recurring_occurrence.pay_failed", "Cuota omitida", {
+        req,
+        httpStatus: 400,
+        extra: { occurrenceId: occ.id },
+      });
       return res.status(400).json({ message: "Cuota omitida" });
     }
 
     const tpl = occ.template;
-    if (!tpl) return res.status(400).json({ message: "Plantilla no encontrada" });
+    if (!tpl) {
+      notifyFail("recurring_occurrence.pay_failed", "Plantilla no encontrada", {
+        req,
+        httpStatus: 400,
+        extra: { occurrenceId: occ.id },
+      });
+      return res.status(400).json({ message: "Plantilla no encontrada" });
+    }
 
     const body = req.body || {};
     const payAmount = roundMoney(
       body.amount ?? occ.actualAmount ?? occ.expectedAmount ?? tpl.baseAmount
     );
-    if (payAmount <= 0) return res.status(400).json({ message: "Monto inválido" });
+    if (payAmount <= 0) {
+      notifyFail("recurring_occurrence.pay_failed", "Monto inválido", {
+        req,
+        httpStatus: 400,
+        extra: { occurrenceId: occ.id },
+      });
+      return res.status(400).json({ message: "Monto inválido" });
+    }
 
     const payDate = toFinanceDateTime(body.date || new Date());
     const storeLabel = tpl.store?.name ? ` — ${tpl.store.name}` : "";
@@ -554,12 +638,21 @@ export const payRecurringOccurrence = async (req, res) => {
       ],
     });
 
+    notifyOk("recurring_occurrence.paid", `Ocurrencia pagada #${result.occurrence.id}`, {
+      occurrence: mapOccurrenceRow(full),
+    });
     res.json({
       message: "Pago registrado en finanzas",
       occurrence: mapOccurrenceRow(full),
     });
   } catch (err) {
     console.error("payRecurringOccurrence error:", err);
+    notifyFail("recurring_occurrence.pay_failed", "Error al registrar pago", {
+      error: err,
+      req,
+      httpStatus: 500,
+      extra: { occurrenceId: req.params.id },
+    });
     res.status(500).json({ message: "Error al registrar pago" });
   }
 };
@@ -570,17 +663,39 @@ export const skipRecurringOccurrence = async (req, res) => {
     await verifyJWT(token);
 
     const occ = await RecurringExpenseOccurrence.findByPk(req.params.id);
-    if (!occ) return res.status(404).json({ message: "Cuota no encontrada" });
-    if (occ.status === "paid") return res.status(400).json({ message: "Ya está pagada" });
+    if (!occ) {
+      notifyFail("recurring_occurrence.skip_failed", `Cuota #${req.params.id} no encontrada`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Cuota no encontrada" });
+    }
+    if (occ.status === "paid") {
+      notifyFail("recurring_occurrence.skip_failed", "Ya está pagada", {
+        req,
+        httpStatus: 400,
+        extra: { occurrenceId: occ.id },
+      });
+      return res.status(400).json({ message: "Ya está pagada" });
+    }
 
     await occ.update({
       status: "skipped",
       note: req.body?.note?.trim() || occ.note,
     });
 
+    notifyOk("recurring_occurrence.skipped", `Ocurrencia omitida #${occ.id}`, {
+      occurrenceId: occ.id,
+    });
     res.json({ message: "Cuota omitida" });
   } catch (err) {
     console.error("skipRecurringOccurrence error:", err);
+    notifyFail("recurring_occurrence.skip_failed", "Error al omitir cuota", {
+      error: err,
+      req,
+      httpStatus: 500,
+      extra: { occurrenceId: req.params.id },
+    });
     res.status(500).json({ message: "Error al omitir cuota" });
   }
 };
@@ -608,9 +723,11 @@ export const generateRecurringOccurrences = async (req, res) => {
       return ensureOccurrencesForTemplates(active, user.accountId, t);
     });
 
+    notifyOk("recurring.occurrences_generated", "Ocurrencias recurrentes generadas", { created });
     res.json({ message: `Se generaron ${created} cuota(s) nueva(s)`, created });
   } catch (err) {
     console.error("generateRecurringOccurrences error:", err);
+    notifyFail("recurring.generate_failed", "Error al generar cuotas", { error: err, req, httpStatus: 500 });
     res.status(500).json({ message: "Error al generar cuotas" });
   }
 };

@@ -4,6 +4,7 @@ import { Account } from "../models/Account.js";
 import { Roles } from "../models/Roles.js";
 import { UserData } from "../models/UserData.js";
 import { UniqueConstraintError } from "sequelize";
+import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
 
 const USER_FIELDS = [
   "ci",
@@ -143,18 +144,28 @@ export const addUser = async (req, res) => {
     await upsertUserAccount(newUser.id, { username, password, roles });
 
     const created = await Users.findByPk(newUser.id, { include: userInclude });
+    const userRow = formatUserRow(created);
+
+    notifyOk("user.created", `Usuario #${newUser.id}`, { user: userRow });
 
     return res.json({
       message: "agregado con éxito",
-      user: formatUserRow(created),
+      user: userRow,
     });
   } catch (error) {
     if (error instanceof UniqueConstraintError || error.name === "SequelizeUniqueConstraintError") {
+      notifyFail("user.create_failed", "Esa cédula ya existe", {
+        error,
+        req,
+        httpStatus: 400,
+        extra: { reason: "duplicate_ci" },
+      });
       return res.status(400).json({
         message: "Esa cédula ya existe",
       });
     }
     console.error("error al crear el usuario:", error);
+    notifyFail("user.create_failed", "Error al crear el usuario", { error, req, httpStatus: 500 });
     return res.status(500).json({
       message: "Error al crear el usuario",
       error: error.message,
@@ -178,12 +189,20 @@ export const updateUserData = async (req, res) => {
     await upsertUserAccount(userId, { username, password, roles });
 
     const updated = await Users.findByPk(userId, { include: userInclude });
+    const userRow = updated ? formatUserRow(updated) : null;
+
+    notifyOk("user.updated", `Usuario #${userId}`, { user: userRow });
 
     return res.json({
       message: "usuario editado con éxito",
-      user: updated ? formatUserRow(updated) : null,
+      user: userRow,
     });
   } catch (error) {
+    notifyFail("user.update_failed", `Error al editar usuario #${req.params.userId}`, {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({
       message: error.message,
     });
@@ -226,14 +245,20 @@ export const getOneUser = async (req, res) => {
 
 export const deleteUser = async (req, res) => {
   try {
+    const userId = req.params.userId;
     await Users.destroy({
-      where: {
-        id: req.params.userId,
-      },
+      where: { id: userId },
     });
+
+    notifyOk("user.deleted", `Usuario #${userId}`, { userId });
 
     res.json({ message: "Usuario eleminado con éxito" });
   } catch (error) {
+    notifyFail("user.delete_failed", `Error al eliminar usuario #${req.params.userId}`, {
+      error,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({
       message: error.message,
     });
@@ -244,6 +269,11 @@ export const addUsersBulk = async (req, res) => {
   let usuarios = req.body;
 
   if (!Array.isArray(usuarios) || usuarios.length === 0) {
+    notifyFail("user.bulk_create_failed", "No hay usuarios para registrar", {
+      req,
+      httpStatus: 400,
+      extra: { reason: "empty_payload" },
+    });
     return res.status(400).json({ message: "No hay usuarios para registrar" });
   }
   usuarios = usuarios.map(({ id, ...rest }) => rest);
@@ -253,12 +283,21 @@ export const addUsersBulk = async (req, res) => {
       returning: true,
     });
 
+    notifyOk("user.bulk_created", `${resultado.length} usuarios creados`, {
+      insertados: resultado.length,
+    });
+
     res.json({
       insertados: resultado.length,
       detalles: resultado,
     });
   } catch (error) {
     console.error("Error al insertar usuarios:", error);
+    notifyFail("user.bulk_create_failed", "Error al insertar usuarios en lote", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ error: "Error interno del servidor" });
   }
 };

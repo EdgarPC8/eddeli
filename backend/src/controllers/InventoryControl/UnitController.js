@@ -1,11 +1,14 @@
 import { InventoryUnit } from "../../models/Inventory.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
   // controllers/inventoryUnitController.js
   export const createUnit = async (req, res) => {
     try {
       const unit = await InventoryUnit.create(req.body);
+      notifyOk("unit.created", `Unidad #${unit.id}`, { unit });
       res.status(201).json(unit);
     } catch (err) {
+      notifyFail("unit.create_failed", "Error al crear unidad", { error: err, req, httpStatus: 500 });
       res.status(500).json({ message: 'Error al crear unidad', error: err });
     }
   };
@@ -23,8 +26,14 @@ import { InventoryUnit } from "../../models/Inventory.js";
     try {
       const { id } = req.params;
       const updated = await InventoryUnit.update(req.body, { where: { id } });
+      notifyOk("unit.updated", `Unidad #${id}`, { unitId: id });
       res.json({ message: 'Unidad actualizada', updated });
     } catch (err) {
+      notifyFail("unit.update_failed", `Error al actualizar unidad #${req.params.id}`, {
+        error: err,
+        req,
+        httpStatus: 500,
+      });
       res.status(500).json({ message: 'Error al actualizar unidad', error: err });
     }
   };
@@ -33,10 +42,15 @@ import { InventoryUnit } from "../../models/Inventory.js";
     try {
       const { id } = req.params;
       await InventoryUnit.destroy({ where: { id } });
+      notifyOk("unit.deleted", `Unidad #${id}`, { unitId: id });
       res.json({ message: 'Unidad eliminada' });
     } catch (err) {
+      notifyFail("unit.delete_failed", `Error al eliminar unidad #${req.params.id}`, {
+        error: err,
+        req,
+        httpStatus: 500,
+      });
       res.status(500).json({ message: 'Error al eliminar unidad', error: err });
     }
   };
-  
   

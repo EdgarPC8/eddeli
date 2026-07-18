@@ -1,6 +1,7 @@
 
 import { sequelize } from '../../database/connection.js';
 import {  InventoryProduct, InventoryRecipe } from '../../models/Inventory.js';
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 // controllers/registerProductionController.js
 
 
@@ -18,6 +19,10 @@ export const registerProductionController = async (req, res) => {
     const insumos = Array.isArray(payload.insumos) ? payload.insumos : [];
 
     if (!intermedio.id || !num(intermedio.gramos)) {
+      notifyFail("production.intermediate_register_failed", "intermedio.id y gramos requeridos", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({
         error: "intermedio.id y intermedio.gramos son requeridos",
       });
@@ -110,9 +115,15 @@ export const registerProductionController = async (req, res) => {
       return resumen;
     });
 
+    notifyOk("production.intermediate_registered", "Producción intermedia", { resumen: result });
     return res.status(200).json({ ok: true, message: "Producción registrada", resumen: result });
   } catch (err) {
     console.error("registerProductionController error:", err);
+    notifyFail("production.intermediate_register_failed", "Error al registrar la producción", {
+      error: err,
+      req,
+      httpStatus: 500,
+    });
     return res.status(500).json({
       ok: false,
       error: "Error al registrar la producción",

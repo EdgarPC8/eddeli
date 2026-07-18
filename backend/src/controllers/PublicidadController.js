@@ -16,6 +16,7 @@ import {
 } from "../models/Publicidad.js";
 import { InventoryProduct, InventoryCategory } from "../models/Inventory.js";
 import { buildMediaCatalog } from "../services/mediaCatalogService.js";
+import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
 
 const { __dirname } = fileDirName(import.meta);
 const IMG_BASE = path.resolve(__dirname, "../img");
@@ -373,6 +374,10 @@ export const createCampaign = async (req, res) => {
       req.body || {};
     if (!String(name || "").trim()) {
       await t.rollback();
+      notifyFail("publicidad_campaign.create_failed", "El nombre es obligatorio", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "El nombre es obligatorio" });
     }
 
@@ -404,6 +409,7 @@ export const createCampaign = async (req, res) => {
     if (json.status === "active") {
       await notifyPublicidadCampaignUpdated(json);
     }
+    notifyOk("publicidad_campaign.created", "Campaña creada", { campaignId: json.id });
     res.status(201).json({
       ...json,
       message: "Campaña creada y guardada correctamente",
@@ -411,6 +417,11 @@ export const createCampaign = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error("createCampaign:", error);
+    notifyFail("publicidad_campaign.create_failed", "Error al crear campaña", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al crear campaña", error: error.message });
   }
 };
@@ -421,6 +432,10 @@ export const updateCampaign = async (req, res) => {
     const row = await PublicidadCampaign.findByPk(req.params.id, { transaction: t });
     if (!row) {
       await t.rollback();
+      notifyFail("publicidad_campaign.update_failed", `Campaña #${req.params.id} no encontrada`, {
+        req,
+        httpStatus: 404,
+      });
       return res.status(404).json({ message: "Campaña no encontrada" });
     }
 
@@ -467,6 +482,7 @@ export const updateCampaign = async (req, res) => {
         });
       }
     }
+    notifyOk("publicidad_campaign.updated", `Campaña #${json.id}`, { campaignId: json.id });
     res.json({
       ...json,
       message: "Campaña actualizada correctamente",
@@ -474,6 +490,11 @@ export const updateCampaign = async (req, res) => {
   } catch (error) {
     await t.rollback();
     console.error("updateCampaign:", error);
+    notifyFail("publicidad_campaign.update_failed", `Error al actualizar campaña #${req.params.id}`, {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al actualizar campaña", error: error.message });
   }
 };
@@ -481,7 +502,13 @@ export const updateCampaign = async (req, res) => {
 export const deleteCampaign = async (req, res) => {
   try {
     const row = await PublicidadCampaign.findByPk(req.params.id);
-    if (!row) return res.status(404).json({ message: "Campaña no encontrada" });
+    if (!row) {
+      notifyFail("publicidad_campaign.delete_failed", `Campaña #${req.params.id} no encontrada`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Campaña no encontrada" });
+    }
     const campaignId = row.id;
     const devices = await PublicidadDevice.findAll({
       where: { campaignId },
@@ -491,9 +518,15 @@ export const deleteCampaign = async (req, res) => {
     for (const d of devices) {
       notifyPublicidadDeviceUpdated(d.deviceId, { campaignId: null, reason: "campaign_deleted" });
     }
+    notifyOk("publicidad_campaign.deleted", `Campaña #${campaignId}`, { campaignId });
     res.json({ ok: true, message: "Campaña eliminada correctamente" });
   } catch (error) {
     console.error("deleteCampaign:", error);
+    notifyFail("publicidad_campaign.delete_failed", `Error al eliminar campaña #${req.params.id}`, {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al eliminar campaña", error: error.message });
   }
 };
@@ -505,6 +538,10 @@ export const registerDevice = async (req, res) => {
   try {
     const deviceId = normalizeDeviceId(req.body?.deviceId);
     if (!deviceId) {
+      notifyFail("publicidad_device.register_failed", "ID de dispositivo inválido", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "ID de dispositivo inválido (use letras, números, - y _)" });
     }
 
@@ -518,6 +555,7 @@ export const registerDevice = async (req, res) => {
         status: "pending",
         lastSeenAt: new Date(),
       });
+      notifyOk("publicidad_device.registered", `Dispositivo ${deviceId}`, { deviceId });
       return res.status(201).json({
         ...deviceToJson(row),
         message: "Dispositivo registrado. Esperando aprobación del administrador.",
@@ -535,12 +573,18 @@ export const registerDevice = async (req, res) => {
       disabled: "Dispositivo deshabilitado.",
     };
 
+    notifyOk("publicidad_device.registered", `Dispositivo ${deviceId}`, { deviceId, status: row.status });
     res.json({
       ...deviceToJson(row),
       message: messages[row.status] || "Estado del dispositivo",
     });
   } catch (error) {
     console.error("registerDevice:", error);
+    notifyFail("publicidad_device.register_failed", "Error al registrar dispositivo", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al registrar dispositivo", error: error.message });
   }
 };
@@ -633,17 +677,32 @@ export const updateDevice = async (req, res) => {
   try {
     const deviceId = normalizeDeviceId(req.params.deviceId);
     if (!deviceId) {
+      notifyFail("publicidad_device.update_failed", "ID de dispositivo inválido", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "ID de dispositivo inválido" });
     }
 
     const row = await PublicidadDevice.findOne({ where: { deviceId } });
-    if (!row) return res.status(404).json({ message: "Dispositivo no encontrado" });
+    if (!row) {
+      notifyFail("publicidad_device.update_failed", `Dispositivo ${deviceId} no encontrado`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Dispositivo no encontrado" });
+    }
 
     const { status, label, notes, campaignId } = req.body || {};
     const patch = {};
     const allowed = new Set(["pending", "approved", "rejected", "disabled"]);
     if (status != null) {
       if (!allowed.has(status)) {
+        notifyFail("publicidad_device.update_failed", "Estado inválido", {
+          req,
+          httpStatus: 400,
+          extra: { deviceId },
+        });
         return res.status(400).json({ message: "Estado inválido" });
       }
       patch.status = status;
@@ -656,10 +715,22 @@ export const updateDevice = async (req, res) => {
       } else {
         const cid = Number(campaignId);
         if (!Number.isFinite(cid)) {
+          notifyFail("publicidad_device.update_failed", "ID de campaña inválido", {
+            req,
+            httpStatus: 400,
+            extra: { deviceId },
+          });
           return res.status(400).json({ message: "ID de campaña inválido" });
         }
         const camp = await PublicidadCampaign.findByPk(cid);
-        if (!camp) return res.status(400).json({ message: "Campaña no encontrada" });
+        if (!camp) {
+          notifyFail("publicidad_device.update_failed", "Campaña no encontrada", {
+            req,
+            httpStatus: 400,
+            extra: { deviceId, campaignId: cid },
+          });
+          return res.status(400).json({ message: "Campaña no encontrada" });
+        }
         patch.campaignId = cid;
       }
     }
@@ -684,12 +755,18 @@ export const updateDevice = async (req, res) => {
       }
     }
 
+    notifyOk("publicidad_device.updated", `Dispositivo ${deviceId}`, { deviceId });
     res.json({
       ...deviceToJson(full || row),
       message: "Dispositivo actualizado",
     });
   } catch (error) {
     console.error("updateDevice:", error);
+    notifyFail("publicidad_device.update_failed", "Error al actualizar dispositivo", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al actualizar dispositivo", error: error.message });
   }
 };
@@ -698,14 +775,30 @@ export const deleteDevice = async (req, res) => {
   try {
     const deviceId = normalizeDeviceId(req.params.deviceId);
     if (!deviceId) {
+      notifyFail("publicidad_device.delete_failed", "ID de dispositivo inválido", {
+        req,
+        httpStatus: 400,
+      });
       return res.status(400).json({ message: "ID de dispositivo inválido" });
     }
     const row = await PublicidadDevice.findOne({ where: { deviceId } });
-    if (!row) return res.status(404).json({ message: "Dispositivo no encontrado" });
+    if (!row) {
+      notifyFail("publicidad_device.delete_failed", `Dispositivo ${deviceId} no encontrado`, {
+        req,
+        httpStatus: 404,
+      });
+      return res.status(404).json({ message: "Dispositivo no encontrado" });
+    }
     await row.destroy();
+    notifyOk("publicidad_device.deleted", `Dispositivo ${deviceId}`, { deviceId });
     res.json({ ok: true, message: "Dispositivo eliminado" });
   } catch (error) {
     console.error("deleteDevice:", error);
+    notifyFail("publicidad_device.delete_failed", "Error al eliminar dispositivo", {
+      error,
+      req,
+      httpStatus: 500,
+    });
     res.status(500).json({ message: "Error al eliminar dispositivo", error: error.message });
   }
 };

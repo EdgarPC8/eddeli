@@ -13,6 +13,7 @@ import {
   normalizeCashCounts,
   resolveCashFromBody,
 } from "../../utils/shiftCashUtils.js";
+import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 const CAJA_POS_TAG = "[CAJA_POS]";
 const to2 = (n) => Number(Number(n || 0).toFixed(2));
@@ -132,8 +133,9 @@ function computeExpectedCash(opening, salesCash, cashOut, cashIn) {
   return to2(opening + salesCash - cashOut + cashIn);
 }
 
-function requireProgrammerRole(req, res) {
+function requireProgrammerRole(req, res, failTypeKey = "shift.update_failed") {
   if (req.user?.loginRol !== PROGRAMMER_ROLE) {
+    notifyFail(failTypeKey, "No tenés permiso para esta acción.", { req, httpStatus: 403 });
     res.status(403).json({ message: "No tenés permiso para esta acción." });
     return false;
   }
@@ -404,12 +406,20 @@ export async function createShiftMovement(req, res) {
     const { direction, category, amount, concept, notes, productId, quantity } = req.body;
 
     const shift = await CashShift.findByPk(id);
-    if (!shift) return res.status(404).json({ message: "Turno no encontrado." });
+    if (!shift) {
+      notifyFail("shift_movement.create_failed", "Turno no encontrado", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Turno no encontrado." });
+    }
     const isProgrammer = req.user.loginRol === PROGRAMMER_ROLE;
     if (!isProgrammer && shift.accountId !== accountId) {
+      notifyFail("shift_movement.create_failed", "Solo puedes registrar movimientos en tu turno", {
+        req,
+        httpStatus: 403,
+      });
       return res.status(403).json({ message: "Solo puedes registrar movimientos en tu turno." });
     }
     if (!isProgrammer && shift.status !== "open") {
+      notifyFail("shift_movement.create_failed", "Turno cerrado", { req, httpStatus: 400 });
       return res.status(400).json({ message: "El turno está cerrado; no se pueden agregar movimientos." });
     }
 
@@ -421,7 +431,10 @@ export async function createShiftMovement(req, res) {
       productId,
       quantity,
     });
-    if (validationError) return res.status(400).json({ message: validationError });
+    if (validationError) {
+      notifyFail("shift_movement.create_failed", validationError, { req, httpStatus: 400 });
+      return res.status(400).json({ message: validationError });
+    }
 
     const amt = to2(amount);
     const conceptTrim = String(concept).trim();
@@ -430,6 +443,10 @@ export async function createShiftMovement(req, res) {
     if (isProgrammer && createdAtBody) {
       const parsed = parseOptionalIsoDate(createdAtBody);
       if (parsed === undefined) {
+        notifyFail("shift_movement.create_failed", "Fecha del movimiento no válida", {
+          req,
+          httpStatus: 400,
+        });
         return res.status(400).json({ message: "Fecha del movimiento no válida." });
       }
       if (parsed) movementCreatedAt = parsed;
@@ -499,6 +516,10 @@ export async function createShiftMovement(req, res) {
     const opening = Number(shift.openingCashTotal || 0);
     const expectedCashTotal = computeExpectedCash(opening, sales.salesCash, cashOut, cashIn);
 
+    notifyOk("shift_movement.created", `Movimiento caja #${movement.id}`, {
+      shiftId: shift.id,
+      movementId: movement.id,
+    });
     res.status(201).json({
       message: "Movimiento registrado.",
       movement: movementToJson(movement),
@@ -509,6 +530,7 @@ export async function createShiftMovement(req, res) {
       },
     });
   } catch (error) {
+    notifyFail("shift_movement.create_failed", error.message, { error, req, httpStatus: 500 });
     res.status(500).json({ message: error.message });
   }
 }
@@ -520,6 +542,11 @@ export async function openShift(req, res) {
 
     const existing = await findOpenShiftForAccount(accountId);
     if (existing) {
+      notifyFail("shift.open_failed", "Ya tienes un turno abierto", {
+        req,
+        httpStatus: 400,
+        extra: { shiftId: existing.id },
+      });
       return res.status(400).json({
         message: "Ya tienes un turno abierto. Ciérralo antes de abrir otro.",
         shiftId: existing.id,
@@ -547,6 +574,7 @@ export async function openShift(req, res) {
         if (activeStores.length === 1) {
           resolvedStoreId = activeStores[0].id;
         } else {
+          notifyFail("shift.open_failed", "Selecciona el local para abrir turno", { req, httpStatus: 400 });
           return res.status(400).json({
             message: "Selecciona el local / panadería desde el que abres el turno.",
             stores: activeStores,
@@ -558,6 +586,7 @@ export async function openShift(req, res) {
         store = await Store.findByPk(resolvedStoreId);
       }
       if (!store || !store.isActive || store.locationKind === "vitrina") {
+        notifyFail("shift.open_failed", "Elige una sucursal propia", { req, httpStatus: 400 });
         return res.status(400).json({
           message: "Elige una sucursal propia (no una vitrina de entrega).",
         });
@@ -565,12 +594,14 @@ export async function openShift(req, res) {
     } else if (resolvedStoreId) {
       store = await Store.findByPk(resolvedStoreId);
       if (!store) {
+        notifyFail("shift.open_failed", "Local no encontrado", { req, httpStatus: 400 });
         return res.status(400).json({ message: "Local no encontrado." });
       }
     }
 
     const resolved = resolveCashFromBody(req.body);
     if (!resolved) {
+      notifyFail("shift.open_failed", "Ingresa el capital inicial en efectivo", { req, httpStatus: 400 });
       return res.status(400).json({
         message: "Ingresa el capital inicial en efectivo.",
       });
@@ -581,6 +612,7 @@ export async function openShift(req, res) {
     if (req.user.loginRol === PROGRAMMER_ROLE && openedAt) {
       const parsed = parseOptionalIsoDate(openedAt);
       if (parsed === undefined) {
+        notifyFail("shift.open_failed", "Fecha de apertura no válida", { req, httpStatus: 400 });
         return res.status(400).json({ message: "Fecha de apertura no válida." });
       }
       if (parsed) openedAtDate = parsed;
@@ -608,11 +640,13 @@ export async function openShift(req, res) {
 
     const withStore = await findOpenShiftForAccount(accountId);
 
+    notifyOk("shift.opened", `Turno #${shift.id}`, { shiftId: shift.id });
     res.status(201).json({
       message: "Turno abierto correctamente.",
       shift: withStore || shift,
     });
   } catch (error) {
+    notifyFail("shift.open_failed", error.message, { error, req, httpStatus: 500 });
     res.status(500).json({ message: error.message });
   }
 }
@@ -624,16 +658,22 @@ export async function closeShift(req, res) {
     const { notes, closedAt } = req.body;
 
     const shift = await CashShift.findByPk(id);
-    if (!shift) return res.status(404).json({ message: "Turno no encontrado." });
+    if (!shift) {
+      notifyFail("shift.close_failed", "Turno no encontrado", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Turno no encontrado." });
+    }
     if (shift.accountId !== accountId) {
+      notifyFail("shift.close_failed", "Solo puedes cerrar tu propio turno", { req, httpStatus: 403 });
       return res.status(403).json({ message: "Solo puedes cerrar tu propio turno." });
     }
     if (shift.status !== "open") {
+      notifyFail("shift.close_failed", "Este turno ya está cerrado", { req, httpStatus: 400 });
       return res.status(400).json({ message: "Este turno ya está cerrado." });
     }
 
     const resolved = resolveCashFromBody(req.body);
     if (!resolved) {
+      notifyFail("shift.close_failed", "Ingresa el efectivo contado al cierre", { req, httpStatus: 400 });
       return res.status(400).json({ message: "Ingresa el efectivo contado al cierre." });
     }
     const { counts, total: closingCashTotal } = resolved;
@@ -649,6 +689,7 @@ export async function closeShift(req, res) {
     if (req.user.loginRol === PROGRAMMER_ROLE && closedAt) {
       const parsed = parseOptionalIsoDate(closedAt);
       if (parsed === undefined) {
+        notifyFail("shift.close_failed", "Fecha de cierre no válida", { req, httpStatus: 400 });
         return res.status(400).json({ message: "Fecha de cierre no válida." });
       }
       if (parsed) closedAtDate = parsed;
@@ -670,6 +711,7 @@ export async function closeShift(req, res) {
       closingNotes: notes || null,
     });
 
+    notifyOk("shift.closed", `Turno #${id} cerrado`, { shiftId: id });
     res.json({
       message: "Turno cerrado correctamente.",
       shift,
@@ -684,6 +726,7 @@ export async function closeShift(req, res) {
       },
     });
   } catch (error) {
+    notifyFail("shift.close_failed", error.message, { error, req, httpStatus: 500 });
     res.status(500).json({ message: error.message });
   }
 }
@@ -1185,7 +1228,10 @@ export async function updateShiftProgrammer(req, res) {
     if (!requireProgrammerRole(req, res)) return;
 
     const shift = await CashShift.findByPk(req.params.id);
-    if (!shift) return res.status(404).json({ message: "Turno no encontrado." });
+    if (!shift) {
+      notifyFail("shift.update_failed", "Turno no encontrado", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Turno no encontrado." });
+    }
 
     const {
       openedAt,
@@ -1203,12 +1249,18 @@ export async function updateShiftProgrammer(req, res) {
 
     if (openedAt !== undefined) {
       const parsed = parseOptionalIsoDate(openedAt);
-      if (parsed === undefined) return res.status(400).json({ message: "Fecha de apertura no válida." });
+      if (parsed === undefined) {
+        notifyFail("shift.update_failed", "Fecha de apertura no válida", { req, httpStatus: 400 });
+        return res.status(400).json({ message: "Fecha de apertura no válida." });
+      }
       if (parsed) patch.openedAt = parsed;
     }
     if (closedAt !== undefined) {
       const parsed = parseOptionalIsoDate(closedAt);
-      if (parsed === undefined) return res.status(400).json({ message: "Fecha de cierre no válida." });
+      if (parsed === undefined) {
+        notifyFail("shift.update_failed", "Fecha de cierre no válida", { req, httpStatus: 400 });
+        return res.status(400).json({ message: "Fecha de cierre no válida." });
+      }
       patch.closedAt = parsed;
     }
     if (openingNotes !== undefined) patch.openingNotes = openingNotes?.trim() || null;
@@ -1242,11 +1294,13 @@ export async function updateShiftProgrammer(req, res) {
     });
 
     await shift.reload();
+    notifyOk("shift.updated", `Turno #${req.params.id}`, { shiftId: req.params.id });
     res.json({
       message: "Turno actualizado.",
       shift: await buildShiftResponse(shift),
     });
   } catch (error) {
+    notifyFail("shift.update_failed", error.message, { error, req, httpStatus: 500 });
     res.status(500).json({ message: error.message });
   }
 }
@@ -1254,13 +1308,17 @@ export async function updateShiftProgrammer(req, res) {
 /** PATCH /shifts/:shiftId/movements/:movementId — editar gasto/movimiento (solo Programador). */
 export async function updateShiftMovementProgrammer(req, res) {
   try {
-    if (!requireProgrammerRole(req, res)) return;
+    if (!requireProgrammerRole(req, res, "shift_movement.update_failed")) return;
 
     const shift = await CashShift.findByPk(req.params.id);
-    if (!shift) return res.status(404).json({ message: "Turno no encontrado." });
+    if (!shift) {
+      notifyFail("shift_movement.update_failed", "Turno no encontrado", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Turno no encontrado." });
+    }
 
     const movement = await CashShiftMovement.findByPk(req.params.movementId);
     if (!movement || movement.shiftId !== shift.id) {
+      notifyFail("shift_movement.update_failed", "Movimiento no encontrado", { req, httpStatus: 404 });
       return res.status(404).json({ message: "Movimiento no encontrado." });
     }
 
@@ -1269,6 +1327,7 @@ export async function updateShiftMovementProgrammer(req, res) {
 
     if (direction != null) {
       if (!["out", "in"].includes(direction)) {
+        notifyFail("shift_movement.update_failed", "Dirección no válida", { req, httpStatus: 400 });
         return res.status(400).json({ message: "Dirección no válida." });
       }
       patch.direction = direction;
@@ -1276,18 +1335,27 @@ export async function updateShiftMovementProgrammer(req, res) {
     if (category != null) patch.category = category;
     if (amount != null) {
       const amt = to2(amount);
-      if (!amt || amt <= 0) return res.status(400).json({ message: "Monto inválido." });
+      if (!amt || amt <= 0) {
+        notifyFail("shift_movement.update_failed", "Monto inválido", { req, httpStatus: 400 });
+        return res.status(400).json({ message: "Monto inválido." });
+      }
       patch.amount = amt;
     }
     if (concept != null) {
       const conceptTrim = String(concept).trim();
-      if (!conceptTrim) return res.status(400).json({ message: "Concepto requerido." });
+      if (!conceptTrim) {
+        notifyFail("shift_movement.update_failed", "Concepto requerido", { req, httpStatus: 400 });
+        return res.status(400).json({ message: "Concepto requerido." });
+      }
       patch.concept = conceptTrim;
     }
     if (notes !== undefined) patch.notes = notes?.trim() || null;
     if (createdAt !== undefined) {
       const parsed = parseOptionalIsoDate(createdAt);
-      if (parsed === undefined) return res.status(400).json({ message: "Fecha no válida." });
+      if (parsed === undefined) {
+        notifyFail("shift_movement.update_failed", "Fecha no válida", { req, httpStatus: 400 });
+        return res.status(400).json({ message: "Fecha no válida." });
+      }
       if (parsed) {
         patch.createdAt = parsed;
         patch.updatedAt = parsed;
@@ -1313,11 +1381,16 @@ export async function updateShiftMovementProgrammer(req, res) {
       }
     });
 
+    notifyOk("shift_movement.updated", `Movimiento caja #${movement.id}`, {
+      shiftId: shift.id,
+      movementId: movement.id,
+    });
     res.json({
       message: "Movimiento actualizado.",
       movement: movementToJson(movement),
     });
   } catch (error) {
+    notifyFail("shift_movement.update_failed", error.message, { error, req, httpStatus: 500 });
     res.status(500).json({ message: error.message });
   }
 }
@@ -1325,13 +1398,17 @@ export async function updateShiftMovementProgrammer(req, res) {
 /** DELETE /shifts/:shiftId/movements/:movementId — eliminar movimiento (solo Programador). */
 export async function deleteShiftMovementProgrammer(req, res) {
   try {
-    if (!requireProgrammerRole(req, res)) return;
+    if (!requireProgrammerRole(req, res, "shift_movement.delete_failed")) return;
 
     const shift = await CashShift.findByPk(req.params.id);
-    if (!shift) return res.status(404).json({ message: "Turno no encontrado." });
+    if (!shift) {
+      notifyFail("shift_movement.delete_failed", "Turno no encontrado", { req, httpStatus: 404 });
+      return res.status(404).json({ message: "Turno no encontrado." });
+    }
 
     const movement = await CashShiftMovement.findByPk(req.params.movementId);
     if (!movement || movement.shiftId !== shift.id) {
+      notifyFail("shift_movement.delete_failed", "Movimiento no encontrado", { req, httpStatus: 404 });
       return res.status(404).json({ message: "Movimiento no encontrado." });
     }
 
@@ -1345,8 +1422,13 @@ export async function deleteShiftMovementProgrammer(req, res) {
       }
     });
 
+    notifyOk("shift_movement.deleted", `Movimiento caja #${req.params.movementId}`, {
+      shiftId: shift.id,
+      movementId: req.params.movementId,
+    });
     res.json({ message: "Movimiento eliminado." });
   } catch (error) {
+    notifyFail("shift_movement.delete_failed", error.message, { error, req, httpStatus: 500 });
     res.status(500).json({ message: error.message });
   }
 }
