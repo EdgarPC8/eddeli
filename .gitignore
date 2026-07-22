@@ -12,15 +12,22 @@ frontend/node_modules/
 backend/.env
 frontend/.env
 
-# Build frontend (artefactos generados)
+# Build intermedio en raptor (el deploy versionado es assets/ + index.html en la raíz)
 frontend/dist/
-assets/
-index.html
 
 # Datos sensibles / backups locales
 backend/src/database/backup.json
 backend/src/backups/
 *.backup.json
+
+# Imágenes de catálogo / subidas (no versionar; viven en cada servidor)
+backend/src/img/sistema/products/
+backend/src/img/sistema/stores/
+backend/src/img/sistema/ads/
+backend/src/img/sistema/qr/
+backend/src/img/photos/
+backend/src/img/qrBank/
+backend/src/img/products/
 
 # Sistema
 .DS_Store
