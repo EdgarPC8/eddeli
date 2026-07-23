@@ -36,6 +36,23 @@ function normalizePayload(body) {
   return { maintenance, subscribed, subscription };
 }
 
+/** Quita módulos/secciones ocultos antes de exponer al frontend. */
+function stripHiddenFromSubscription(subscription) {
+  if (!subscription || typeof subscription !== "object") return subscription;
+  const modules = Array.isArray(subscription.modules)
+    ? subscription.modules
+    : [];
+  const filtered = modules
+    .filter((m) => m && m.status !== "hidden")
+    .map((m) => ({
+      ...m,
+      sections: Array.isArray(m.sections)
+        ? m.sections.filter((s) => s && s.status !== "hidden")
+        : [],
+    }));
+  return { ...subscription, modules: filtered };
+}
+
 export async function getEntitlementResponse() {
   const row = await AppEntitlement.findByPk(1);
   if (!row?.payload) return { ...EMPTY };
@@ -44,7 +61,7 @@ export async function getEntitlementResponse() {
   const out = {
     maintenance: Boolean(payload.maintenance),
     subscribed: Boolean(payload.subscribed),
-    subscription: payload.subscription ?? null,
+    subscription: stripHiddenFromSubscription(payload.subscription ?? null),
     meta: {
       source: row.source,
       syncedAt: row.syncedAt,

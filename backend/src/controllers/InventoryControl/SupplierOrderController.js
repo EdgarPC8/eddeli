@@ -222,9 +222,10 @@ export const updateSupplierOrder = async (req, res) => {
     const isReceived = Boolean(order.receivedAt);
     // Corrección manual de fechas (Programador): no re-dispara movimientos de stock.
     const hasDateOverride = receivedAt !== undefined || paidAt !== undefined;
+    const user = await verifyJWT(getHeaderToken(req));
+    const isProgramador = user?.loginRol === "Programador";
     if (hasDateOverride) {
-      const user = await verifyJWT(getHeaderToken(req));
-      if (user?.loginRol !== "Programador") {
+      if (!isProgramador) {
         notifyFail("supplier_order.update_failed", "No tenés permiso para editar las fechas de entrega y pago", {
           req,
           httpStatus: 403,
@@ -234,12 +235,127 @@ export const updateSupplierOrder = async (req, res) => {
           .json({ message: "No tenés permiso para editar las fechas de entrega y pago" });
       }
     }
-    if (isReceived && !hasDateOverride) {
+
+    /** Programador: editar ítems/precios de pedido recibido con saldo (modal completo). */
+    const wantsReceivedItemsEdit =
+      isReceived &&
+      !hasDateOverride &&
+      Array.isArray(items) &&
+      items.length > 0 &&
+      isProgramador;
+
+    if (isReceived && !hasDateOverride && !wantsReceivedItemsEdit) {
       notifyFail("supplier_order.update_failed", "No se puede editar un pedido ya recibido", {
         req,
         httpStatus: 400,
       });
       return res.status(400).json({ message: "No se puede editar un pedido ya recibido" });
+    }
+
+    if (wantsReceivedItemsEdit) {
+      const fullForPay = await SupplierOrder.findByPk(id, { include: orderIncludes });
+      const [formatted] = await formatSupplierOrdersList([fullForPay]);
+      if (toNum(formatted?.remainingAmount) <= 0.009) {
+        notifyFail(
+          "supplier_order.update_failed",
+          "No se puede editar un pedido proveedor ya liquidado",
+          { req, httpStatus: 400 }
+        );
+        return res.status(400).json({
+          message: "No se puede editar un pedido proveedor ya liquidado",
+        });
+      }
+
+      await sequelize.transaction(async (t) => {
+        const oldItems = await SupplierOrderItem.findAll({
+          where: { orderId: order.id },
+          transaction: t,
+        });
+        const oldQtyByProduct = new Map();
+        for (const it of oldItems) {
+          const pid = Number(it.productId);
+          oldQtyByProduct.set(pid, toNum(oldQtyByProduct.get(pid)) + toNum(it.quantity));
+        }
+
+        const normalized = [];
+        const newQtyByProduct = new Map();
+        for (const row of items) {
+          const productId = Number(row.productId);
+          const quantity = toNum(row.quantity);
+          if (!productId || quantity <= 0) throw new Error("Ítem inválido");
+          const unitPrice = toNum(row.unitPrice ?? row.price, 0);
+          if (unitPrice < 0) throw new Error("Precio unitario inválido");
+          const taxRate = Math.max(0, toNum(row.taxRate, 0));
+          normalized.push({ productId, quantity, unitPrice, taxRate });
+          newQtyByProduct.set(
+            productId,
+            toNum(newQtyByProduct.get(productId)) + quantity
+          );
+        }
+
+        const allProductIds = new Set([
+          ...oldQtyByProduct.keys(),
+          ...newQtyByProduct.keys(),
+        ]);
+        for (const productId of allProductIds) {
+          const delta =
+            toNum(newQtyByProduct.get(productId)) - toNum(oldQtyByProduct.get(productId));
+          if (delta === 0) continue;
+          const product = await InventoryProduct.findByPk(productId, { transaction: t });
+          if (!product) throw new Error(`Producto #${productId} no encontrado`);
+          await product.update(
+            { stock: toNum(product.stock) + delta },
+            { transaction: t }
+          );
+          await InventoryMovement.create(
+            {
+              productId,
+              type: delta > 0 ? "entrada" : "salida",
+              reason: delta > 0 ? "ENTRADA_COMPRA" : "AJUSTE_SALIDA",
+              quantity: Math.abs(delta),
+              description:
+                delta > 0
+                  ? `Ajuste recepción pedido proveedor #${order.id}`
+                  : `Ajuste reducción pedido proveedor #${order.id}`,
+              price: 0,
+              referenceType: "supplier_order",
+              referenceId: order.id,
+              createdBy: user.accountId,
+              date: order.receivedAt || nowApp(),
+            },
+            { transaction: t }
+          );
+        }
+
+        await order.update(
+          {
+            ...(supplierId != null ? { supplierId: Number(supplierId) } : {}),
+            ...(date ? { date: new Date(date) } : {}),
+            ...(notes !== undefined ? { notes: notes || null } : {}),
+          },
+          { transaction: t }
+        );
+
+        await SupplierOrderItem.destroy({ where: { orderId: order.id }, transaction: t });
+        for (const row of normalized) {
+          await SupplierOrderItem.create(
+            {
+              orderId: order.id,
+              productId: row.productId,
+              quantity: row.quantity,
+              unitPrice: row.unitPrice,
+              taxRate: row.taxRate,
+            },
+            { transaction: t }
+          );
+        }
+      });
+
+      const full = await SupplierOrder.findByPk(id, { include: orderIncludes });
+      notifyOk("supplier_order.updated", `Pedido proveedor #${id} (corrección post-recibo)`, {
+        supplierOrderId: Number(id),
+      });
+      return res.json((await formatSupplierOrdersList([full]))[0]);
     }
 
     await sequelize.transaction(async (t) => {
