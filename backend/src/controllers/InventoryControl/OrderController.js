@@ -2,7 +2,7 @@ import { verifyJWT, getHeaderToken } from "../../libs/jwt.js";
 
 import { InventoryMovement, InventoryProduct } from "../../models/Inventory.js";
 import { Customer, Order, OrderItem } from "../../models/Orders.js";
-import { Income } from "../../models/Finance.js";
+import { Income, ItemGroupItem, Payment } from "../../models/Finance.js";
 import { findOpenShiftForAccount } from "./ShiftController.js";
 import { format } from 'date-fns';
 import { de, es } from 'date-fns/locale';
@@ -17,6 +17,13 @@ import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+
+/** Total cobrable de una línea (cantidad − dañado − regalo) × precio. */
+function orderItemBillableTotal(item) {
+  const qty = num(item?.quantity);
+  const billable = Math.max(0, qty - num(item?.damagedQty) - num(item?.giftQty));
+  return Number((billable * num(item?.price)).toFixed(2));
+}
 
 const CAJA_POS_TAG = "[CAJA_POS]";
 
@@ -1516,7 +1523,7 @@ export const getOrderStatusWorkbench = async (req, res) => {
       order: [["date", "DESC"]],
     });
 
-    const formatted = formatOrdersList(orders).map((order) => ({
+    const formatted = (await formatOrdersList(orders)).map((order) => ({
       ...order,
       ERP_order_items: order.ERP_order_items.map((item) => ({
         ...item,
@@ -1557,25 +1564,171 @@ export const getOrderStatusWorkbench = async (req, res) => {
 };
 
 // Obtener pedidos con items y cliente. Query opcional: ?from=YYYY-MM-DD&to=YYYY-MM-DD
-function formatOrdersList(orders) {
-  return orders.map((order) => {
-    const formattedItems = order.ERP_order_items.map((item) => ({
-      ...item.toJSON(),
-      paidAt: item.paidAt
-        ? format(new Date(item.paidAt), "dd/MM/yyyy HH:mm:ss", { locale: es })
-        : null,
-      deliveredAt: item.deliveredAt
-        ? format(new Date(item.deliveredAt), "dd/MM/yyyy HH:mm:ss", { locale: es })
-        : null,
-    }));
+/**
+ * Formatea pedidos de cliente e incluye paidAmount/remainingAmount según abonos
+ * de grupos de cobranzas (misma lógica que proveedores: progreso por monto).
+ */
+async function formatOrdersList(orders) {
+  const list = Array.isArray(orders) ? orders : [];
+  const baseRows = list.map((order) => {
+    const itemsSrc = order.ERP_order_items || [];
+    const formattedItems = itemsSrc.map((item) => {
+      const raw = typeof item.toJSON === "function" ? item.toJSON() : { ...item };
+      return {
+        ...raw,
+        paidAt: item.paidAt
+          ? format(new Date(item.paidAt), "dd/MM/yyyy HH:mm:ss", { locale: es })
+          : null,
+        deliveredAt: item.deliveredAt
+          ? format(new Date(item.deliveredAt), "dd/MM/yyyy HH:mm:ss", { locale: es })
+          : null,
+      };
+    });
 
+    const orderJson = typeof order.toJSON === "function" ? order.toJSON() : { ...order };
     return {
-      ...order.toJSON(),
+      ...orderJson,
       orderKind: "customer",
       date: format(new Date(order.date), "dd/MM/yyyy HH:mm:ss", { locale: es }),
       createdAt: format(new Date(order.createdAt), "dd/MM/yyyy HH:mm:ss", { locale: es }),
       updatedAt: format(new Date(order.updatedAt), "dd/MM/yyyy HH:mm:ss", { locale: es }),
       ERP_order_items: formattedItems,
+    };
+  });
+
+  const allItemIds = [];
+  const itemBillableById = new Map();
+  const orderIdByItemId = new Map();
+
+  for (const row of baseRows) {
+    for (const it of row.ERP_order_items || []) {
+      const id = Number(it.id);
+      if (!Number.isFinite(id)) continue;
+      allItemIds.push(id);
+      itemBillableById.set(id, orderItemBillableTotal(it));
+      orderIdByItemId.set(id, Number(row.id));
+    }
+  }
+
+  /** groupId -> paidAmount (pagos completed) */
+  const paidByGroupId = new Map();
+  /** groupId -> Map<itemId, billable> (todos los ítems del grupo) */
+  const groupItemTotals = new Map();
+
+  if (allItemIds.length > 0) {
+    const linkRows = await ItemGroupItem.findAll({
+      where: { orderItemId: { [Op.in]: allItemIds } },
+      attributes: ["groupId", "orderItemId"],
+    });
+    const groupIds = [
+      ...new Set(
+        linkRows
+          .map((r) => Number(r.groupId))
+          .filter((gid) => Number.isFinite(gid))
+      ),
+    ];
+
+    if (groupIds.length > 0) {
+      const [allGroupLinks, payments] = await Promise.all([
+        ItemGroupItem.findAll({
+          where: { groupId: { [Op.in]: groupIds } },
+          attributes: ["groupId", "orderItemId"],
+        }),
+        Payment.findAll({
+          where: { groupId: { [Op.in]: groupIds }, status: "completed" },
+          attributes: ["groupId", "amount"],
+        }),
+      ]);
+
+      const missingItemIds = [
+        ...new Set(
+          allGroupLinks
+            .map((r) => Number(r.orderItemId))
+            .filter((id) => Number.isFinite(id) && !itemBillableById.has(id))
+        ),
+      ];
+      if (missingItemIds.length > 0) {
+        const extraItems = await OrderItem.findAll({
+          where: { id: { [Op.in]: missingItemIds } },
+          attributes: ["id", "quantity", "price", "damagedQty", "giftQty"],
+        });
+        for (const it of extraItems) {
+          itemBillableById.set(Number(it.id), orderItemBillableTotal(it));
+        }
+      }
+
+      for (const r of allGroupLinks) {
+        const gid = Number(r.groupId);
+        const iid = Number(r.orderItemId);
+        if (!Number.isFinite(gid) || !Number.isFinite(iid)) continue;
+        if (!groupItemTotals.has(gid)) groupItemTotals.set(gid, new Map());
+        groupItemTotals.get(gid).set(iid, num(itemBillableById.get(iid) || 0));
+      }
+
+      for (const p of payments) {
+        const gid = Number(p.groupId);
+        if (!Number.isFinite(gid)) continue;
+        paidByGroupId.set(
+          gid,
+          Number(((paidByGroupId.get(gid) || 0) + num(p.amount)).toFixed(2))
+        );
+      }
+    }
+  }
+
+  /** Abono atribuido a cada pedido (proporción del grupo + ítems pagados fuera de grupo). */
+  const paidByOrderId = new Map();
+
+  for (const [gid, itemMap] of groupItemTotals.entries()) {
+    const groupTotal = Number(
+      [...itemMap.values()].reduce((s, v) => s + num(v), 0).toFixed(2)
+    );
+    const groupPaid = num(paidByGroupId.get(gid) || 0);
+    if (groupTotal <= 0 || groupPaid <= 0) continue;
+
+    const shareByOrder = new Map();
+    for (const [iid, lineTotal] of itemMap.entries()) {
+      const oid = orderIdByItemId.get(iid);
+      if (!Number.isFinite(oid)) continue;
+      shareByOrder.set(oid, Number(((shareByOrder.get(oid) || 0) + num(lineTotal)).toFixed(2)));
+    }
+    for (const [oid, share] of shareByOrder.entries()) {
+      const alloc = Number(((groupPaid * share) / groupTotal).toFixed(2));
+      paidByOrderId.set(
+        oid,
+        Number(((paidByOrderId.get(oid) || 0) + alloc).toFixed(2))
+      );
+    }
+  }
+
+  return baseRows.map((row) => {
+    const items = row.ERP_order_items || [];
+    const totalAmount = Number(
+      items.reduce((s, it) => s + orderItemBillableTotal(it), 0).toFixed(2)
+    );
+
+    let paidAmount = num(paidByOrderId.get(Number(row.id)) || 0);
+
+    // Piso: ítems ya marcados como pagados (legacy / cierre de grupo).
+    const paidAtFloor = Number(
+      items
+        .filter((it) => !!it.paidAt)
+        .reduce((s, it) => s + orderItemBillableTotal(it), 0)
+        .toFixed(2)
+    );
+    if (paidAmount <= 0.009 && items.length > 0 && items.every((it) => !!it.paidAt)) {
+      paidAmount = totalAmount;
+    } else {
+      paidAmount = Number(Math.max(paidAmount, paidAtFloor).toFixed(2));
+    }
+    paidAmount = Number(Math.min(paidAmount, totalAmount).toFixed(2));
+    const remainingAmount = Number(Math.max(0, totalAmount - paidAmount).toFixed(2));
+
+    return {
+      ...row,
+      totalAmount,
+      paidAmount,
+      remainingAmount,
     };
   });
 }
@@ -1626,7 +1779,7 @@ export const getAllOrders = async (req, res) => {
         include,
         order: [["date", "DESC"]],
       });
-      return res.json(formatOrdersList(orders));
+      return res.json(await formatOrdersList(orders));
     }
 
     const { count, rows } = await Order.findAndCountAll({
@@ -1639,7 +1792,7 @@ export const getAllOrders = async (req, res) => {
     });
 
     return sendPaginated(res, {
-      rows: formatOrdersList(rows),
+      rows: await formatOrdersList(rows),
       total: count,
       page: pagination.page,
       pageSize: pagination.pageSize,

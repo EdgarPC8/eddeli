@@ -6,7 +6,7 @@ import { Account } from "./Account.js";
 import { InventoryProduct, Store } from "./Inventory.js";
 
 // ✅ Ajusta a tu proyecto real:
-import { OrderItem, Customer, Supplier, SupplierOrder } from "./Orders.js";
+import { OrderItem, Customer, Supplier, SupplierOrder, SupplierOrderItem } from "./Orders.js";
 
 // =====================================================
 // 1) GRUPO de ítems (deuda agrupada)
@@ -186,6 +186,13 @@ export const SupplierOrderPayment = sequelize.define("ERP_finance_supplier_order
     comment: "Proveedor",
   },
 
+  /** Si el abono viene de una paca/cartón multi-pedido */
+  supplierPackId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: "Paca/cartón de compra (opcional)",
+  },
+
   date: {
     type: DataTypes.DATE,
     allowNull: false,
@@ -223,6 +230,92 @@ export const SupplierOrderPayment = sequelize.define("ERP_finance_supplier_order
 
   createdBy: {
     type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+});
+
+// =====================================================
+// 5b) PACA / CARTÓN de compra a proveedor
+// Agrupa líneas (incluso de pedidos distintos) con un valor total
+// que se reparte en precio unitario. Al pagar se desglosa por pedido.
+// =====================================================
+export const SupplierPack = sequelize.define("ERP_finance_supplier_packs", {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+
+  supplierId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+
+  concept: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    defaultValue: "Paca / cartón",
+  },
+
+  packAmount: {
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    comment: "Valor total de la paca",
+  },
+
+  /** carton = paca con reprecio; order_group = agrupar pedidos para abonar (sin tocar precios) */
+  kind: {
+    type: DataTypes.ENUM("carton", "order_group"),
+    allowNull: false,
+    defaultValue: "carton",
+  },
+
+  /** JSON array de supplierOrderId (grupos de pago por pedido) */
+  memberOrderIds: {
+    type: DataTypes.TEXT,
+    allowNull: true,
+  },
+
+  status: {
+    type: DataTypes.ENUM("open", "closed", "cancelled"),
+    allowNull: false,
+    defaultValue: "open",
+  },
+
+  createdBy: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+  },
+});
+
+export const SupplierPackItem = sequelize.define("ERP_finance_supplier_pack_items", {
+  id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+
+  packId: { type: DataTypes.INTEGER, allowNull: false },
+
+  supplierOrderId: { type: DataTypes.INTEGER, allowNull: false },
+
+  supplierOrderItemId: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    unique: true,
+    comment: "Una línea solo puede estar en una paca",
+  },
+
+  quantity: {
+    type: DataTypes.DECIMAL(12, 3),
+    allowNull: false,
+  },
+
+  allocatedUnitPrice: {
+    type: DataTypes.DECIMAL(10, 4),
+    allowNull: false,
+  },
+
+  /** Precio unitario de la línea antes de armar la paca (para desglosar). */
+  previousUnitPrice: {
+    type: DataTypes.DECIMAL(10, 4),
+    allowNull: true,
+  },
+
+  allocatedLineTotal: {
+    type: DataTypes.DECIMAL(10, 2),
     allowNull: false,
   },
 });
@@ -553,6 +646,31 @@ SupplierOrder.hasMany(SupplierOrderPayment, {
   onDelete: "CASCADE",
 });
 SupplierOrderPayment.belongsTo(Expense, { foreignKey: "expenseId", as: "expense" });
+
+SupplierPack.belongsTo(Account, { foreignKey: "createdBy" });
+SupplierPack.belongsTo(Supplier, { foreignKey: "supplierId", as: "supplier" });
+SupplierPack.hasMany(SupplierPackItem, {
+  foreignKey: "packId",
+  as: "items",
+  onDelete: "CASCADE",
+});
+SupplierPackItem.belongsTo(SupplierPack, { foreignKey: "packId", as: "pack" });
+SupplierPackItem.belongsTo(SupplierOrder, {
+  foreignKey: "supplierOrderId",
+  as: "supplierOrder",
+});
+SupplierPackItem.belongsTo(SupplierOrderItem, {
+  foreignKey: "supplierOrderItemId",
+  as: "orderItem",
+});
+SupplierOrderPayment.belongsTo(SupplierPack, {
+  foreignKey: "supplierPackId",
+  as: "pack",
+});
+SupplierPack.hasMany(SupplierOrderPayment, {
+  foreignKey: "supplierPackId",
+  as: "payments",
+});
 
 FinancialObligation.belongsTo(Account, { foreignKey: "createdBy" });
 FinancialObligation.hasMany(ObligationPayment, {

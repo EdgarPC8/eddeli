@@ -11,7 +11,7 @@ import { Customer, Order, OrderItem, Supplier, SupplierOrder, SupplierOrderItem 
 import { TaskPlan, TaskItem } from "../models/Tasks.js";
 import { PublicidadCampaign, PublicidadPlaylistItem, PublicidadDevice } from "../models/Publicidad.js";
 import { MediaAsset } from "../models/MediaAsset.js";
-import { ItemGroup, ItemGroupItem, FinancialObligation, ObligationPayment, Income, Expense, Payment, SupplierOrderPayment, RecurringExpenseTemplate, RecurringExpenseOccurrence } from "../models/Finance.js";
+import { ItemGroup, ItemGroupItem, FinancialObligation, ObligationPayment, Income, Expense, Payment, SupplierOrderPayment, SupplierPack, SupplierPackItem, RecurringExpenseTemplate, RecurringExpenseOccurrence } from "../models/Finance.js";
 import { DocumentAttachment } from "../models/DocumentAttachment.js";
 import { NotificationProgram, NotificationDispatchLog } from "../models/NotificationProgram.js";
 import { Notifications } from "../models/Notifications.js";
@@ -84,6 +84,8 @@ const MODELS_TO_SYNC = [
   RecurringExpenseTemplate,
   Payment,
   ItemGroupItem,
+  SupplierPack,
+  SupplierPackItem,
   SupplierOrderPayment,
   ObligationPayment,
   RecurringExpenseOccurrence,
