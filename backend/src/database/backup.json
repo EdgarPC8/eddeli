@@ -149682,6 +149682,98 @@
       "updatedAt": "2026-07-27T21:40:49.000Z"
     }
   ],
+  "InventoryBatch": [
+    {
+      "id": 1,
+      "productId": 171,
+      "code": null,
+      "quantityInitial": 4,
+      "quantityRemaining": 4,
+      "expiresAt": "2026-09-15",
+      "manufacturedAt": "2026-07-07",
+      "receivedAt": "2026-07-27T16:09:03.000Z",
+      "notes": null,
+      "status": "active",
+      "createdBy": 1,
+      "createdAt": "2026-07-27T16:09:03.000Z",
+      "updatedAt": "2026-07-27T16:09:03.000Z"
+    },
+    {
+      "id": 2,
+      "productId": 270,
+      "code": null,
+      "quantityInitial": 10,
+      "quantityRemaining": 10,
+      "expiresAt": "2026-09-30",
+      "manufacturedAt": null,
+      "receivedAt": "2026-07-27T21:19:04.000Z",
+      "notes": "Paca «Paca chicharon y cuero de soya» · pedido proveedor #24",
+      "status": "active",
+      "createdBy": null,
+      "createdAt": "2026-07-27T21:38:19.000Z",
+      "updatedAt": "2026-07-27T21:38:19.000Z"
+    },
+    {
+      "id": 3,
+      "productId": 271,
+      "code": null,
+      "quantityInitial": 10,
+      "quantityRemaining": 10,
+      "expiresAt": "2026-09-30",
+      "manufacturedAt": null,
+      "receivedAt": "2026-07-27T21:19:04.000Z",
+      "notes": "Paca «Paca chicharon y cuero de soya» · pedido proveedor #24",
+      "status": "active",
+      "createdBy": null,
+      "createdAt": "2026-07-27T21:38:19.000Z",
+      "updatedAt": "2026-07-27T21:38:19.000Z"
+    },
+    {
+      "id": 4,
+      "productId": 272,
+      "code": null,
+      "quantityInitial": 10,
+      "quantityRemaining": 10,
+      "expiresAt": "2026-10-30",
+      "manufacturedAt": "2026-07-21",
+      "receivedAt": "2026-07-27T21:19:04.000Z",
+      "notes": "Paca «Paca chifle de dulce y camote» · pedido proveedor #24",
+      "status": "active",
+      "createdBy": null,
+      "createdAt": "2026-07-27T21:38:19.000Z",
+      "updatedAt": "2026-07-27T21:38:19.000Z"
+    },
+    {
+      "id": 5,
+      "productId": 273,
+      "code": null,
+      "quantityInitial": 10,
+      "quantityRemaining": 10,
+      "expiresAt": "2026-08-30",
+      "manufacturedAt": "2026-06-16",
+      "receivedAt": "2026-07-27T21:19:04.000Z",
+      "notes": "Paca «Paca chifles de sal» · pedido proveedor #24",
+      "status": "active",
+      "createdBy": null,
+      "createdAt": "2026-07-27T21:38:19.000Z",
+      "updatedAt": "2026-07-27T21:38:19.000Z"
+    },
+    {
+      "id": 6,
+      "productId": 274,
+      "code": null,
+      "quantityInitial": 10,
+      "quantityRemaining": 10,
+      "expiresAt": "2026-10-30",
+      "manufacturedAt": "2026-07-21",
+      "receivedAt": "2026-07-27T21:19:04.000Z",
+      "notes": "Paca «Paca chifle de dulce y camote» · pedido proveedor #24",
+      "status": "active",
+      "createdBy": null,
+      "createdAt": "2026-07-27T21:38:19.000Z",
+      "updatedAt": "2026-07-27T21:38:19.000Z"
+    }
+  ],
   "CashShift": [
     {
       "id": 1,

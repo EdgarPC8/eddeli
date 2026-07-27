@@ -9,13 +9,31 @@ async function setForeignKeyChecks(enabled) {
 
 async function truncateTable(model) {
   const tableName = resolveTableName(model);
-  await sequelize.query(`TRUNCATE TABLE \`${tableName}\``);
+  try {
+    await sequelize.query(`TRUNCATE TABLE \`${tableName}\``);
+  } catch (err) {
+    const msg = String(err?.message || err).toLowerCase();
+    if (msg.includes("doesn't exist") || msg.includes("does not exist") || msg.includes("no existe")) {
+      await model.sync();
+      return;
+    }
+    throw err;
+  }
 }
 
 async function dropAndSyncTable(model) {
   const tableName = resolveTableName(model);
   await sequelize.query(`DROP TABLE IF EXISTS \`${tableName}\``);
-  await model.sync();
+  try {
+    await model.sync();
+  } catch (e) {
+    const code = e?.parent?.code || e?.original?.code || "";
+    const msg = String(e?.parent?.sqlMessage || e?.message || e);
+    // Índices ya existentes no deben tumbar el restore.
+    if (code !== "ER_DUP_KEYNAME" && !msg.includes("Duplicate key name")) {
+      throw e;
+    }
+  }
 }
 
 /**
