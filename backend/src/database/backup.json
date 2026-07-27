@@ -67,12 +67,12 @@
       "roleId": 2
     },
     {
-      "accountId": 1,
-      "roleId": 4
-    },
-    {
       "accountId": 248,
       "roleId": 2
+    },
+    {
+      "accountId": 1,
+      "roleId": 4
     }
   ],
   "UserData": [
@@ -11326,9 +11326,9 @@
       ],
       "handlerType": "stock_min",
       "active": 1,
-      "lastRunAt": "2026-07-27T20:45:53.000Z",
+      "lastRunAt": "2026-07-27T21:46:15.000Z",
       "createdAt": "2026-06-24T16:33:10.000Z",
-      "updatedAt": "2026-07-27T20:45:53.000Z"
+      "updatedAt": "2026-07-27T21:46:15.000Z"
     }
   ],
   "NotificationDispatchLog": [
@@ -14951,7 +14951,7 @@
       "categoryId": 26,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 49,
+      "stock": 41,
       "minStock": 0,
       "price": "0.15",
       "supplierPrice": "0.00",
@@ -14967,7 +14967,7 @@
       "genericProductId": null,
       "purchasePresentation": null,
       "createdAt": "2025-12-05T16:25:33.000Z",
-      "updatedAt": "2026-07-27T21:03:11.000Z"
+      "updatedAt": "2026-07-27T21:40:49.000Z"
     },
     {
       "id": 72,
@@ -16232,7 +16232,7 @@
       "categoryId": 26,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 33,
+      "stock": 17,
       "minStock": 0,
       "price": "0.15",
       "supplierPrice": "0.00",
@@ -16261,7 +16261,7 @@
       "genericProductId": null,
       "purchasePresentation": null,
       "createdAt": "2026-06-08T16:31:03.000Z",
-      "updatedAt": "2026-07-27T21:03:11.000Z"
+      "updatedAt": "2026-07-27T21:40:49.000Z"
     },
     {
       "id": 118,
@@ -16420,7 +16420,7 @@
       "categoryId": 26,
       "standardWeightGrams": 0,
       "netWeight": 0,
-      "stock": 27,
+      "stock": 23,
       "minStock": 0,
       "price": "0.15",
       "supplierPrice": "0.00",
@@ -16441,7 +16441,7 @@
       "genericProductId": null,
       "purchasePresentation": null,
       "createdAt": "2026-06-10T19:43:58.000Z",
-      "updatedAt": "2026-07-27T21:10:25.000Z"
+      "updatedAt": "2026-07-27T21:40:49.000Z"
     },
     {
       "id": 124,
@@ -149550,21 +149550,6 @@
       "id": 8540,
       "productId": 270,
       "quantity": 10,
-      "description": "Recepción pedido #24 · lote #1 (vence 2026-09-30)",
-      "price": 4,
-      "type": "entrada",
-      "reason": "ENTRADA_COMPRA",
-      "referenceType": "inventory_batch",
-      "referenceId": 1,
-      "date": "2026-07-27T21:19:04.000Z",
-      "createdBy": 1,
-      "createdAt": "2026-07-27T21:19:04.000Z",
-      "updatedAt": "2026-07-27T21:19:04.000Z"
-    },
-    {
-      "id": 8541,
-      "productId": 271,
-      "quantity": 10,
       "description": "Recepción pedido #24 · lote #2 (vence 2026-09-30)",
       "price": 4,
       "type": "entrada",
@@ -149577,10 +149562,10 @@
       "updatedAt": "2026-07-27T21:19:04.000Z"
     },
     {
-      "id": 8542,
-      "productId": 272,
+      "id": 8541,
+      "productId": 271,
       "quantity": 10,
-      "description": "Recepción pedido #24 · lote #3 (vence 2026-10-30)",
+      "description": "Recepción pedido #24 · lote #3 (vence 2026-09-30)",
       "price": 4,
       "type": "entrada",
       "reason": "ENTRADA_COMPRA",
@@ -149592,10 +149577,10 @@
       "updatedAt": "2026-07-27T21:19:04.000Z"
     },
     {
-      "id": 8543,
-      "productId": 273,
+      "id": 8542,
+      "productId": 272,
       "quantity": 10,
-      "description": "Recepción pedido #24 · lote #4 (vence 2026-08-30)",
+      "description": "Recepción pedido #24 · lote #4 (vence 2026-10-30)",
       "price": 4,
       "type": "entrada",
       "reason": "ENTRADA_COMPRA",
@@ -149607,15 +149592,30 @@
       "updatedAt": "2026-07-27T21:19:04.000Z"
     },
     {
-      "id": 8544,
-      "productId": 274,
+      "id": 8543,
+      "productId": 273,
       "quantity": 10,
-      "description": "Recepción pedido #24 · lote #5 (vence 2026-10-30)",
+      "description": "Recepción pedido #24 · lote #5 (vence 2026-08-30)",
       "price": 4,
       "type": "entrada",
       "reason": "ENTRADA_COMPRA",
       "referenceType": "inventory_batch",
       "referenceId": 5,
+      "date": "2026-07-27T21:19:04.000Z",
+      "createdBy": 1,
+      "createdAt": "2026-07-27T21:19:04.000Z",
+      "updatedAt": "2026-07-27T21:19:04.000Z"
+    },
+    {
+      "id": 8544,
+      "productId": 274,
+      "quantity": 10,
+      "description": "Recepción pedido #24 · lote #6 (vence 2026-10-30)",
+      "price": 4,
+      "type": "entrada",
+      "reason": "ENTRADA_COMPRA",
+      "referenceType": "inventory_batch",
+      "referenceId": 6,
       "date": "2026-07-27T21:19:04.000Z",
       "createdBy": 1,
       "createdAt": "2026-07-27T21:19:04.000Z",
@@ -149635,6 +149635,51 @@
       "createdBy": 1,
       "createdAt": "2026-07-27T21:19:04.000Z",
       "updatedAt": "2026-07-27T21:19:04.000Z"
+    },
+    {
+      "id": 8546,
+      "productId": 117,
+      "quantity": 16,
+      "description": "Venta POS · pedido #1970",
+      "price": null,
+      "type": "salida",
+      "reason": "SALIDA_VENTA",
+      "referenceType": "order",
+      "referenceId": 1970,
+      "date": "2026-07-27T21:40:49.000Z",
+      "createdBy": 1,
+      "createdAt": "2026-07-27T21:40:49.000Z",
+      "updatedAt": "2026-07-27T21:40:49.000Z"
+    },
+    {
+      "id": 8547,
+      "productId": 71,
+      "quantity": 8,
+      "description": "Venta POS · pedido #1970",
+      "price": null,
+      "type": "salida",
+      "reason": "SALIDA_VENTA",
+      "referenceType": "order",
+      "referenceId": 1970,
+      "date": "2026-07-27T21:40:49.000Z",
+      "createdBy": 1,
+      "createdAt": "2026-07-27T21:40:49.000Z",
+      "updatedAt": "2026-07-27T21:40:49.000Z"
+    },
+    {
+      "id": 8548,
+      "productId": 123,
+      "quantity": 4,
+      "description": "Venta POS · pedido #1970",
+      "price": null,
+      "type": "salida",
+      "reason": "SALIDA_VENTA",
+      "referenceType": "order",
+      "referenceId": 1970,
+      "date": "2026-07-27T21:40:49.000Z",
+      "createdBy": 1,
+      "createdAt": "2026-07-27T21:40:49.000Z",
+      "updatedAt": "2026-07-27T21:40:49.000Z"
     }
   ],
   "CashShift": [
@@ -180853,6 +180898,20 @@
       "financeIncomeId": null,
       "createdAt": "2026-07-27T21:10:25.000Z",
       "updatedAt": "2026-07-27T21:10:25.000Z"
+    },
+    {
+      "id": 1970,
+      "customerId": 34,
+      "status": "pagado",
+      "notes": "[CAJA_POS] [CONTADO] Venta mostrador sin datos de cliente (consumidor final)",
+      "shiftId": 50,
+      "paymentMethod": "efectivo",
+      "paidAt": "2026-07-27T21:40:49.000Z",
+      "documentType": "consumidor_final",
+      "date": "2026-07-27T21:40:49.000Z",
+      "financeIncomeId": null,
+      "createdAt": "2026-07-27T21:40:49.000Z",
+      "updatedAt": "2026-07-27T21:40:49.000Z"
     }
   ],
   "OrderItem": [
@@ -229995,6 +230054,45 @@
       "replacedQty": 0,
       "deliveredAt": "2026-07-27T21:10:25.000Z",
       "paidAt": "2026-07-27T21:10:25.000Z"
+    },
+    {
+      "id": 3819,
+      "orderId": 1970,
+      "productId": 117,
+      "quantity": 16,
+      "price": 0.125,
+      "soldQty": 16,
+      "damagedQty": 0,
+      "giftQty": 0,
+      "replacedQty": 0,
+      "deliveredAt": "2026-07-27T21:40:49.000Z",
+      "paidAt": "2026-07-27T21:40:49.000Z"
+    },
+    {
+      "id": 3820,
+      "orderId": 1970,
+      "productId": 71,
+      "quantity": 8,
+      "price": 0.125,
+      "soldQty": 8,
+      "damagedQty": 0,
+      "giftQty": 0,
+      "replacedQty": 0,
+      "deliveredAt": "2026-07-27T21:40:49.000Z",
+      "paidAt": "2026-07-27T21:40:49.000Z"
+    },
+    {
+      "id": 3821,
+      "orderId": 1970,
+      "productId": 123,
+      "quantity": 4,
+      "price": 0.125,
+      "soldQty": 4,
+      "damagedQty": 0,
+      "giftQty": 0,
+      "replacedQty": 0,
+      "deliveredAt": "2026-07-27T21:40:49.000Z",
+      "paidAt": "2026-07-27T21:40:49.000Z"
     }
   ],
   "Supplier": [
@@ -231960,7 +232058,7 @@
       "lotCode": null,
       "expiresAt": "2026-09-30",
       "manufacturedAt": null,
-      "inventoryBatchId": 1
+      "inventoryBatchId": 2
     },
     {
       "id": 484,
@@ -231974,7 +232072,7 @@
       "lotCode": null,
       "expiresAt": "2026-09-30",
       "manufacturedAt": null,
-      "inventoryBatchId": 2
+      "inventoryBatchId": 3
     },
     {
       "id": 485,
@@ -231988,7 +232086,7 @@
       "lotCode": null,
       "expiresAt": "2026-10-30",
       "manufacturedAt": "2026-07-21",
-      "inventoryBatchId": 3
+      "inventoryBatchId": 4
     },
     {
       "id": 486,
@@ -232002,7 +232100,7 @@
       "lotCode": null,
       "expiresAt": "2026-08-30",
       "manufacturedAt": "2026-06-16",
-      "inventoryBatchId": 4
+      "inventoryBatchId": 5
     },
     {
       "id": 487,
@@ -232016,7 +232114,7 @@
       "lotCode": null,
       "expiresAt": "2026-10-30",
       "manufacturedAt": "2026-07-21",
-      "inventoryBatchId": 5
+      "inventoryBatchId": 6
     }
   ],
   "TaskPlan": [],
@@ -293425,6 +293523,48 @@
       "createdBy": 1,
       "createdAt": "2026-07-27T21:10:25.000Z",
       "updatedAt": "2026-07-27T21:10:25.000Z"
+    },
+    {
+      "id": 3653,
+      "date": "2026-07-27T21:40:49.000Z",
+      "amount": "2.00",
+      "concept": "Venta POS Pan Enrollado x16 (Ord #1970)",
+      "category": "Venta",
+      "referenceId": 3819,
+      "referenceType": "order_item",
+      "status": "paid",
+      "counterpartyName": null,
+      "createdBy": 1,
+      "createdAt": "2026-07-27T21:40:49.000Z",
+      "updatedAt": "2026-07-27T21:40:49.000Z"
+    },
+    {
+      "id": 3654,
+      "date": "2026-07-27T21:40:49.000Z",
+      "amount": "1.00",
+      "concept": "Venta POS Pan de Dulce x8 (Ord #1970)",
+      "category": "Venta",
+      "referenceId": 3820,
+      "referenceType": "order_item",
+      "status": "paid",
+      "counterpartyName": null,
+      "createdBy": 1,
+      "createdAt": "2026-07-27T21:40:49.000Z",
+      "updatedAt": "2026-07-27T21:40:49.000Z"
+    },
+    {
+      "id": 3655,
+      "date": "2026-07-27T21:40:49.000Z",
+      "amount": "0.50",
+      "concept": "Venta POS Pan de Chocolate x4 (Ord #1970)",
+      "category": "Venta",
+      "referenceId": 3821,
+      "referenceType": "order_item",
+      "status": "paid",
+      "counterpartyName": null,
+      "createdBy": 1,
+      "createdAt": "2026-07-27T21:40:49.000Z",
+      "updatedAt": "2026-07-27T21:40:49.000Z"
     }
   ],
   "Store": [
@@ -329346,6 +329486,15 @@
       "description": "El Programador Edgars Torres realizó: Crear pay",
       "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
       "date": "2026-07-27T21:19:10.000Z"
+    },
+    {
+      "id": 3464,
+      "httpMethod": "POST",
+      "action": "Cobro en caja",
+      "endPoint": "/eddeliapi/orders/pos/checkout",
+      "description": "El Programador Edgars Torres realizó: Cobro en caja",
+      "system": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+      "date": "2026-07-27T21:40:49.000Z"
     }
   ],
   "AppSettings": [
