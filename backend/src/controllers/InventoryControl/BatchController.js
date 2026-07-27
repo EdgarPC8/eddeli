@@ -12,7 +12,19 @@ let schemaReady = false;
 
 export async function ensureInventoryBatchesSchema() {
   if (schemaReady) return;
-  await InventoryBatch.sync();
+  try {
+    const [tables] = await sequelize.query("SHOW TABLES LIKE 'ERP_inventory_batches'");
+    if (!Array.isArray(tables) || tables.length === 0) {
+      await InventoryBatch.sync();
+    }
+  } catch (e) {
+    const code = e?.parent?.code || e?.original?.code || "";
+    const msg = String(e?.parent?.sqlMessage || e?.message || e);
+    // Índices ya creados: no tumbar listado/recepción de lotes.
+    if (code !== "ER_DUP_KEYNAME" && !msg.includes("Duplicate key name")) {
+      console.warn("ensureInventoryBatchesSchema sync:", msg);
+    }
+  }
   // Columna agregada después del release inicial.
   try {
     const [cols] = await sequelize.query("SHOW COLUMNS FROM `ERP_inventory_batches` LIKE 'manufacturedAt'");
@@ -103,19 +115,17 @@ function shapeBatch(row, warnDays = 30) {
 }
 
 /**
- * Alertas de vencimiento para el dashboard (solo lotes con stock).
+ * Alertas de vencimiento para el dashboard (lotes con stock).
+ * Incluye vigentes (gris/verde) para el velocímetro de vida útil.
  */
 export async function computeBatchesDashboardAlerts(warnDays = 30) {
   const days = Math.min(90, Math.max(1, Number(warnDays) || 30));
   await ensureInventoryBatchesSchema();
-  const today = todayKey();
-  const warnUntil = format(addDays(parseISO(today), days), "yyyy-MM-dd");
 
   const rows = await InventoryBatch.findAll({
     where: {
       status: "active",
       quantityRemaining: { [Op.gt]: 0 },
-      expiresAt: { [Op.lte]: warnUntil },
     },
     include: [
       {
@@ -128,18 +138,20 @@ export async function computeBatchesDashboardAlerts(warnDays = 30) {
       ["expiresAt", "ASC"],
       ["id", "ASC"],
     ],
-    limit: 200,
+    limit: 300,
   });
 
   const expired = [];
   const expiring = [];
+  const ok = [];
   for (const row of rows) {
     const shaped = shapeBatch(row, days);
     if (shaped.depleted) continue;
     if (shaped.expired) expired.push(shaped);
     else if (shaped.expiring) expiring.push(shaped);
+    else ok.push(shaped);
   }
-  return { expired, expiring, warnDays: days };
+  return { expired, expiring, ok, warnDays: days };
 }
 
 /**

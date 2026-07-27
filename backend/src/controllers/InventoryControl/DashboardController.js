@@ -35,7 +35,7 @@ const emptyRecurring = {
   overdue: [],
 };
 
-const emptyBatchesAlerts = { expired: [], expiring: [], warnDays: 30 };
+const emptyBatchesAlerts = { expired: [], expiring: [], ok: [], warnDays: 30 };
 
 /** Solo productos en alerta de stock (sin cargar catálogo completo). */
 async function fetchProductsStockAlerts() {
