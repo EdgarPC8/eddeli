@@ -152,6 +152,17 @@ export const SupplierOrderItem = sequelize.define("ERP_supplier_order_items", {
     defaultValue: 0,
     comment: "% IVA aplicado al ítem (0 = sin IVA)",
   },
+  /** Agrupa líneas en una paca del pedido (no es SupplierPack de cobranzas). */
+  packKey: { type: DataTypes.STRING(64), allowNull: true },
+  packName: { type: DataTypes.STRING(120), allowNull: true },
+  /** Código de lote / lote del proveedor. */
+  lotCode: { type: DataTypes.STRING(80), allowNull: true },
+  /** Fecha de vencimiento del lote (al recibir se crea InventoryBatch). */
+  expiresAt: { type: DataTypes.DATEONLY, allowNull: true },
+  /** Fecha de elaboración (opcional). */
+  manufacturedAt: { type: DataTypes.DATEONLY, allowNull: true },
+  /** Lote de inventario creado al recibir. */
+  inventoryBatchId: { type: DataTypes.INTEGER, allowNull: true },
 }, {
   timestamps: false,
 });

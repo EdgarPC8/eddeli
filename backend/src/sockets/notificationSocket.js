@@ -25,3 +25,13 @@ export const sendNotificationToUser = (userId, notification) => {
     io.to(`user_${userId}`).emit("newNotification", notification);
   }
 };
+
+/** Aviso global: entitlement / mantenimiento cambió (gestor push o pull). */
+export const broadcastEntitlementUpdated = (payload = {}) => {
+  if (!io) return;
+  io.emit("entitlementUpdated", {
+    maintenance: Boolean(payload.maintenance),
+    subscribed: Boolean(payload.subscribed),
+    at: new Date().toISOString(),
+  });
+};

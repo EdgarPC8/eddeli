@@ -232,12 +232,21 @@ function sumYearTotals(monthsMap) {
   return totals;
 }
 
-async function fetchOrdersInRange(start, end) {
+async function fetchOrdersInRange(start, end, { light = false } = {}) {
   return Order.findAll({
     where: { date: { [Op.between]: [start, end] } },
+    attributes: light ? ["id", "date", "notes", "customerId"] : undefined,
     include: [
-      { model: Customer, as: "ERP_customer", attributes: ["id", "name"] },
-      { model: OrderItem, as: "ERP_order_items" },
+      ...(light
+        ? []
+        : [{ model: Customer, as: "ERP_customer", attributes: ["id", "name"] }]),
+      {
+        model: OrderItem,
+        as: "ERP_order_items",
+        attributes: light
+          ? ["id", "quantity", "price", "deliveredAt", "soldQty"]
+          : undefined,
+      },
     ],
     order: [["date", "ASC"]],
   });
@@ -413,7 +422,7 @@ export const getCalendarYearSummary = async (req, res) => {
     const end = endOfDay(endOfMonth(new Date(year, 11, 1)));
 
     const [orders, expenses] = await Promise.all([
-      fetchOrdersInRange(start, end),
+      fetchOrdersInRange(start, end, { light: true }),
       fetchExpensesInRange(start, end),
     ]);
 
@@ -454,7 +463,7 @@ export const getCalendarMonthSummary = async (req, res) => {
     }
 
     const [orders, expenses] = await Promise.all([
-      fetchOrdersInRange(range.start, range.end),
+      fetchOrdersInRange(range.start, range.end, { light: true }),
       fetchExpensesInRange(range.start, range.end),
     ]);
 

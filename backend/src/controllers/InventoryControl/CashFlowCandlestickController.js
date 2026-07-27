@@ -6,16 +6,24 @@ import {
   endOfMonth,
   startOfDay,
   endOfDay,
-  eachDayOfInterval,
-  eachWeekOfInterval,
-  eachMonthOfInterval,
   addDays,
   addWeeks,
   addMonths,
+  differenceInCalendarDays,
+  differenceInCalendarWeeks,
+  differenceInCalendarMonths,
 } from "date-fns";
 import { es } from "date-fns/locale";
+import { Op } from "sequelize";
 import { Income, Expense } from "../../models/Finance.js";
-import { toFinanceDayKey, financeBucketKey, toChartBusinessDay, buildFinanceDateWhere } from "../../utils/financeDateUtils.js";
+import {
+  toFinanceDayKey,
+  financeBucketKey,
+  toChartBusinessDay,
+  parseFinanceDayKey,
+  dayKeyStartUtc,
+  buildFinanceDateColumnWhere,
+} from "../../utils/financeDateUtils.js";
 
 const VALID_GRANULARITY = new Set(["day", "week", "month"]);
 
@@ -61,39 +69,45 @@ function bucketMeta(date, granularity) {
   };
 }
 
-function buildAllBuckets(granularity, firstTs, lastTs) {
-  const start =
-    granularity === "day"
-      ? startOfDay(firstTs)
-      : granularity === "week"
-        ? startOfWeek(firstTs, { weekStartsOn: 1 })
-        : startOfMonth(firstTs);
-  const end =
-    granularity === "day"
-      ? endOfDay(lastTs)
-      : granularity === "week"
-        ? endOfWeek(lastTs, { weekStartsOn: 1 })
-        : endOfMonth(lastTs);
+function alignedStart(firstTs, granularity) {
+  if (granularity === "day") return startOfDay(firstTs);
+  if (granularity === "week") return startOfWeek(firstTs, { weekStartsOn: 1 });
+  return startOfMonth(firstTs);
+}
 
-  const seen = new Set();
-  const buckets = [];
+function alignedEnd(lastTs, granularity) {
+  if (granularity === "day") return endOfDay(lastTs);
+  if (granularity === "week") return endOfWeek(lastTs, { weekStartsOn: 1 });
+  return endOfMonth(lastTs);
+}
 
-  const pushBucket = (d) => {
-    const meta = bucketMeta(d, granularity);
-    if (seen.has(meta.key)) return;
-    seen.add(meta.key);
-    buckets.push(meta);
-  };
-
-  if (granularity === "day") {
-    for (const d of eachDayOfInterval({ start, end })) pushBucket(d);
-  } else if (granularity === "week") {
-    for (const ws of eachWeekOfInterval({ start, end }, { weekStartsOn: 1 })) pushBucket(ws);
-  } else {
-    for (const m of eachMonthOfInterval({ start, end })) pushBucket(m);
+function countBuckets(granularity, firstTs, lastTs) {
+  const start = alignedStart(firstTs, granularity);
+  const end = alignedEnd(lastTs, granularity);
+  if (granularity === "day") return differenceInCalendarDays(end, start) + 1;
+  if (granularity === "week") {
+    return differenceInCalendarWeeks(end, start, { weekStartsOn: 1 }) + 1;
   }
+  return differenceInCalendarMonths(end, start) + 1;
+}
 
-  return buckets;
+function nthBucketDate(granularity, firstTs, index) {
+  const start = alignedStart(firstTs, granularity);
+  if (granularity === "day") return addDays(start, index);
+  if (granularity === "week") return addWeeks(start, index);
+  return addMonths(start, index);
+}
+
+/** Solo construye la ventana visible (no itera todo el historial día a día). */
+function buildWindowBuckets(granularity, firstTs, lastTs, limit, offset) {
+  const totalCandles = countBuckets(granularity, firstTs, lastTs);
+  const sliceEnd = Math.max(0, totalCandles - offset);
+  const sliceStart = Math.max(0, sliceEnd - limit);
+  const buckets = [];
+  for (let i = sliceStart; i < sliceEnd; i += 1) {
+    buckets.push(bucketMeta(nthBucketDate(granularity, firstTs, i), granularity));
+  }
+  return { buckets, totalCandles, sliceStart };
 }
 
 function openingBalanceBefore(movements, beforeDate) {
@@ -147,6 +161,73 @@ function buildCandles(movements, buckets, granularity) {
   return candles;
 }
 
+async function sumAmountWhere(Model, dateWhere) {
+  const total = await Model.sum("amount", { where: dateWhere });
+  return toNum(total);
+}
+
+async function fetchDateBoundsFixed(Model) {
+  const { fn, col } = Model.sequelize;
+  const row = await Model.findOne({
+    attributes: [
+      [fn("MIN", col("date")), "minDate"],
+      [fn("MAX", col("date")), "maxDate"],
+      [fn("SUM", col("amount")), "total"],
+    ],
+    raw: true,
+  });
+  return {
+    minDate: row?.minDate ? new Date(row.minDate) : null,
+    maxDate: row?.maxDate ? new Date(row.maxDate) : null,
+    total: toNum(row?.total),
+  };
+}
+
+async function fetchMovementsInDayRange(startKey, endKey) {
+  const rangeWhere = buildFinanceDateColumnWhere(startKey, endKey) || {};
+
+  const [incomes, expenses] = await Promise.all([
+    Income.findAll({
+      attributes: ["date", "amount"],
+      where: rangeWhere,
+      order: [["date", "ASC"]],
+      raw: true,
+    }),
+    Expense.findAll({
+      attributes: ["date", "amount"],
+      where: rangeWhere,
+      order: [["date", "ASC"]],
+      raw: true,
+    }),
+  ]);
+
+  return [
+    ...incomes.map((r) => ({
+      dayKey: toFinanceDayKey(r.date),
+      ts: new Date(r.date),
+      delta: toNum(r.amount),
+    })),
+    ...expenses.map((r) => ({
+      dayKey: toFinanceDayKey(r.date),
+      ts: new Date(r.date),
+      delta: -toNum(r.amount),
+    })),
+  ]
+    .filter((m) => m.dayKey)
+    .sort((a, b) => a.ts - b.ts);
+}
+
+async function netBalanceBeforeDayKey(dayKey) {
+  const before = dayKeyStartUtc(dayKey);
+  if (!before) return 0;
+  const dateWhere = { date: { [Op.lt]: before } };
+  const [inc, exp] = await Promise.all([
+    sumAmountWhere(Income, dateWhere),
+    sumAmountWhere(Expense, dateWhere),
+  ]);
+  return round2(inc - exp);
+}
+
 export const getCashFlowCandles = async (req, res) => {
   try {
     const granularity = VALID_GRANULARITY.has(req.query.granularity)
@@ -156,27 +237,21 @@ export const getCashFlowCandles = async (req, res) => {
     const limit = Math.min(50, Math.max(5, parseInt(req.query.limit, 10) || 25));
     const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
 
-    const [incomes, expenses] = await Promise.all([
-      Income.findAll({ attributes: ["date", "amount"], raw: true }),
-      Expense.findAll({ attributes: ["date", "amount"], raw: true }),
+    const [incomeBounds, expenseBounds] = await Promise.all([
+      fetchDateBoundsFixed(Income),
+      fetchDateBoundsFixed(Expense),
     ]);
 
-    const movements = [
-      ...incomes.map((r) => ({
-        dayKey: toFinanceDayKey(r.date),
-        ts: new Date(r.date),
-        delta: toNum(r.amount),
-      })),
-      ...expenses.map((r) => ({
-        dayKey: toFinanceDayKey(r.date),
-        ts: new Date(r.date),
-        delta: -toNum(r.amount),
-      })),
-    ]
-      .filter((m) => m.dayKey)
-      .sort((a, b) => a.ts - b.ts);
+    const currentBalance = round2(incomeBounds.total - expenseBounds.total);
 
-    if (!movements.length) {
+    const candidates = [
+      incomeBounds.minDate,
+      expenseBounds.minDate,
+      incomeBounds.maxDate,
+      expenseBounds.maxDate,
+    ].filter((d) => d && !Number.isNaN(d.getTime()));
+
+    if (!candidates.length) {
       return res.json({
         granularity,
         candles: [],
@@ -189,30 +264,55 @@ export const getCashFlowCandles = async (req, res) => {
       });
     }
 
-    const allBuckets = buildAllBuckets(
+    const firstTs = new Date(Math.min(...candidates.map((d) => d.getTime())));
+    const lastTs = new Date(Math.max(...candidates.map((d) => d.getTime())));
+
+    const { buckets: windowBuckets, totalCandles, sliceStart } = buildWindowBuckets(
       granularity,
-      movements[0].ts,
-      movements[movements.length - 1].ts
+      firstTs,
+      lastTs,
+      limit,
+      offset,
     );
 
-    const totalCandles = allBuckets.length;
-    const sliceEnd = Math.max(0, totalCandles - offset);
-    const sliceStart = Math.max(0, sliceEnd - limit);
-    const windowBuckets = allBuckets.slice(sliceStart, sliceEnd);
-    const candles = buildCandles(movements, windowBuckets, granularity);
+    if (!windowBuckets.length) {
+      return res.json({
+        granularity,
+        candles: [],
+        openingBalance: 0,
+        totalCandles,
+        hasMore: sliceStart > 0,
+        limit,
+        offset,
+        currentBalance,
+      });
+    }
 
-    const openingBalance = windowBuckets.length
-      ? openingBalanceBefore(movements, windowBuckets[0].start)
-      : 0;
+    const windowStartKey =
+      toFinanceDayKey(windowBuckets[0].start) || format(windowBuckets[0].start, "yyyy-MM-dd");
+    const lastBucket = windowBuckets[windowBuckets.length - 1];
+    const windowEndKey =
+      toFinanceDayKey(addDays(lastBucket.end, -1)) ||
+      format(addDays(lastBucket.end, -1), "yyyy-MM-dd");
 
-    let currentBalance = 0;
-    for (const m of movements) currentBalance += m.delta;
+    const [openingBalance, windowMovements] = await Promise.all([
+      netBalanceBeforeDayKey(windowStartKey),
+      fetchMovementsInDayRange(windowStartKey, windowEndKey),
+    ]);
+
+    const seedTs = addDays(parseFinanceDayKey(windowStartKey) || windowBuckets[0].start, -1);
+    const seededMovements =
+      openingBalance !== 0
+        ? [{ dayKey: toFinanceDayKey(seedTs), ts: seedTs, delta: openingBalance }, ...windowMovements]
+        : windowMovements;
+
+    const candles = buildCandles(seededMovements, windowBuckets, granularity);
 
     return res.json({
       granularity,
       candles,
       openingBalance: round2(openingBalance),
-      currentBalance: round2(currentBalance),
+      currentBalance,
       totalCandles,
       hasMore: sliceStart > 0,
       limit,

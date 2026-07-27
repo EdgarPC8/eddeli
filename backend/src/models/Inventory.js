@@ -441,6 +441,57 @@ InventoryMovement.belongsTo(InventoryProduct, { foreignKey: 'productId' });
 InventoryUnit.hasMany(InventoryProduct, { foreignKey: 'unitId' });
 InventoryProduct.belongsTo(InventoryUnit, { foreignKey: 'unitId' });
 
+/** Lotes de inventario con fecha de vencimiento (stock por lote + historial). */
+export const InventoryBatch = sequelize.define(
+  "ERP_inventory_batches",
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    productId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: { model: "ERP_inventory_products", key: "id" },
+      onUpdate: "CASCADE",
+      onDelete: "CASCADE",
+    },
+    code: { type: DataTypes.STRING(80), allowNull: true },
+    quantityInitial: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 0 },
+    quantityRemaining: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 0 },
+    /** Fecha de vencimiento / caducidad (obligatoria). */
+    expiresAt: { type: DataTypes.DATEONLY, allowNull: false },
+    /** Fecha de elaboración (opcional; sirve para calcular vida útil). */
+    manufacturedAt: { type: DataTypes.DATEONLY, allowNull: true },
+    /** Cuándo se recibió / registró el lote. */
+    receivedAt: { type: DataTypes.DATE, allowNull: false },
+    notes: { type: DataTypes.TEXT, allowNull: true },
+    status: {
+      type: DataTypes.ENUM("active", "depleted"),
+      allowNull: false,
+      defaultValue: "active",
+    },
+    createdBy: { type: DataTypes.INTEGER, allowNull: true },
+  },
+  {
+    timestamps: true,
+    indexes: [
+      { fields: ["productId"] },
+      { fields: ["expiresAt"] },
+      { fields: ["status"] },
+      { fields: ["productId", "expiresAt"] },
+    ],
+  },
+);
+
+InventoryProduct.hasMany(InventoryBatch, {
+  foreignKey: "productId",
+  as: "batches",
+  onDelete: "CASCADE",
+});
+InventoryBatch.belongsTo(InventoryProduct, {
+  foreignKey: "productId",
+  as: "product",
+});
+InventoryBatch.belongsTo(Account, { foreignKey: "createdBy", as: "creator" });
+
 // Insumo genérico ↔ presentaciones / marcas
 InventoryProduct.belongsTo(InventoryProduct, {
   as: 'genericProduct',

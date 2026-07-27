@@ -29,6 +29,16 @@ export const getExpensesForChart = async (req, res) => {
 
     const expenses = await Expense.findAll({
       where,
+      attributes: [
+        "id",
+        "date",
+        "amount",
+        "concept",
+        "category",
+        "createdBy",
+        "referenceId",
+        "referenceType",
+      ],
       include: [
         {
           model: InventoryProduct,
@@ -46,31 +56,27 @@ export const getExpensesForChart = async (req, res) => {
       order: [["date", "ASC"]],
     });
 
-const shaped = expenses.map((e) => {
-  const product = e.ERP_inventory_product;
-  // Base común siempre:
-  const item = {
-    id: e.id,
-    date: e.date,                               // YYYY-MM-DD
-    amount: Number(e.amount ?? 0),
-    concept: e.concept ?? null,
-    category: e.category ?? null,
-    createdBy: e.createdBy ?? null,
-  };
+    const shaped = expenses.map((e) => {
+      const product = e.ERP_inventory_product;
+      const item = {
+        id: e.id,
+        date: e.date,
+        amount: Number(e.amount ?? 0),
+        concept: e.concept ?? null,
+        category: e.category ?? null,
+        createdBy: e.createdBy ?? null,
+      };
 
-  // Solo si realmente está asociado a un producto
-  if (e.referenceId) {
-    item.referenceId = e.referenceId;
-    item.referenceType = e.referenceType ?? null;
-    item.productName = product?.name || `Producto #${e.referenceId}`;
-    item.productType = product?.type ?? null;
-    item.isGenericIngredient = Boolean(product?.isGenericIngredient);
-    item.genericProductId = product?.genericProductId ?? null;
-  }
-  return item;
-
-});
-
+      if (e.referenceId) {
+        item.referenceId = e.referenceId;
+        item.referenceType = e.referenceType ?? null;
+        item.productName = product?.name || `Producto #${e.referenceId}`;
+        item.productType = product?.type ?? null;
+        item.isGenericIngredient = Boolean(product?.isGenericIngredient);
+        item.genericProductId = product?.genericProductId ?? null;
+      }
+      return item;
+    });
 
     return res.json(shaped);
   } catch (error) {
@@ -144,16 +150,28 @@ export const getCustomerSalesSummary = async (req, res) => {
 
   try {
     const customers = await Customer.findAll({
+      attributes: ["id", "name", "phone", "email"],
       include: [
         {
           model: Order,
           as: "ERP_orders",
           required: false,
           where: walkInPosOrderExcludeWhere(Op),
+          attributes: ["id", "date", "createdAt", "updatedAt", "notes"],
           include: [
             {
               model: OrderItem,
               as: "ERP_order_items",
+              attributes: [
+                "id",
+                "productId",
+                "quantity",
+                "price",
+                "paidAt",
+                "deliveredAt",
+                "damagedQty",
+                "giftQty",
+              ],
               include: [
                 {
                   model: InventoryProduct,
@@ -210,12 +228,18 @@ export const getCustomerSalesSummary = async (req, res) => {
               totalQuantity: 0,
               totalPrice: 0,
               totalAmount: 0,
+              pendingQuantity: 0,
+              pendingAmount: 0,
             });
           }
           const agg = productMap.get(key);
           agg.totalQuantity += qty;
           agg.totalPrice += price;
           agg.totalAmount += amt;
+          if (!item.paidAt) {
+            agg.pendingQuantity += qty;
+            agg.pendingAmount += amt;
+          }
         });
       });
 
@@ -245,9 +269,10 @@ export const getCustomerSalesSummary = async (req, res) => {
         totalAmount,
         totalOrdersNoPaid,
         totalAmountDeuda,
-        revenuePending,  // deuda estimada global
+        revenuePending,
         lastOrderAt,
-        orders,
+        ordersCount: orders.length,
+        // Sin `orders` anidados: el front usa productSummary (payload ~10× más liviano).
         productSummary,
       };
     });
@@ -755,8 +780,14 @@ export const getWeeklySales = async (req, res) => {
 
 export const getOrderAnalytics = async (req, res) => {
   try {
+    // Solo ids + flags de pago/entrega (sin productos ni montos).
     const orders = await Order.findAll({
-      include: { model: OrderItem, as: "ERP_order_items" }
+      attributes: ["id"],
+      include: {
+        model: OrderItem,
+        as: "ERP_order_items",
+        attributes: ["paidAt", "deliveredAt"],
+      },
     });
 
     let totalUnpaid = 0;
@@ -765,10 +796,11 @@ export const getOrderAnalytics = async (req, res) => {
     let totalDeliveredUnpaid = 0;
 
     for (const order of orders) {
-      const items = order.ERP_order_items;
+      const items = order.ERP_order_items || [];
+      if (!items.length) continue;
 
-      const allPaid = items.every(i => !!i.paidAt);
-      const allDelivered = items.every(i => !!i.deliveredAt);
+      const allPaid = items.every((i) => !!i.paidAt);
+      const allDelivered = items.every((i) => !!i.deliveredAt);
 
       if (!allPaid) totalUnpaid += 1;
       if (allPaid && !allDelivered) totalPaidUndelivered += 1;
@@ -777,14 +809,13 @@ export const getOrderAnalytics = async (req, res) => {
     }
 
     const analyticsData = [
-      { id: 'unpaidOrders', label: 'No Pagados', value: totalUnpaid },
-      { id: 'paidUndeliveredOrders', label: 'Pagados no Entregados', value: totalPaidUndelivered },
-      { id: 'unpaidUndeliveredOrders', label: 'No Pagados ni Entregados', value: totalUnpaidUndelivered },
-      { id: 'deliveredUnpaidOrders', label: 'Entregados no Pagados', value: totalDeliveredUnpaid }
+      { id: "unpaidOrders", label: "No Pagados", value: totalUnpaid },
+      { id: "paidUndeliveredOrders", label: "Pagados no Entregados", value: totalPaidUndelivered },
+      { id: "unpaidUndeliveredOrders", label: "No Pagados ni Entregados", value: totalUnpaidUndelivered },
+      { id: "deliveredUnpaidOrders", label: "Entregados no Pagados", value: totalDeliveredUnpaid },
     ];
 
     res.json(analyticsData);
-
   } catch (error) {
     console.error("Error en getOrderAnalytics:", error);
     res.status(500).json({ message: "Error al calcular estadísticas", error });

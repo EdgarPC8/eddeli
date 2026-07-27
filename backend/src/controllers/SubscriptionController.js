@@ -4,6 +4,7 @@ import {
   pullEntitlementFromGestor,
 } from "../services/entitlementService.js";
 import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
+import { broadcastEntitlementUpdated } from "../sockets/notificationSocket.js";
 
 /** GET — lo que usa el frontend EdDeli (sin llamar al gestor). */
 export async function getSubscription(req, res, next) {
@@ -23,6 +24,7 @@ export async function getSubscription(req, res, next) {
 export async function putEntitlementFromGestor(req, res, next) {
   try {
     const data = await saveEntitlement(req.body, "gestor_push");
+    broadcastEntitlementUpdated(data);
     notifyOk("subscription.entitlement_updated", "Entitlement actualizado", data);
     res.json({ ok: true, ...data });
   } catch (err) {
@@ -39,6 +41,7 @@ export async function putEntitlementFromGestor(req, res, next) {
 export async function pullSubscription(req, res, next) {
   try {
     const data = await pullEntitlementFromGestor();
+    broadcastEntitlementUpdated(data);
     notifyOk("subscription.pulled", "Suscripción sincronizada", data);
     res.json({ ok: true, ...data });
   } catch (err) {

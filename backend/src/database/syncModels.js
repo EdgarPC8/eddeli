@@ -6,7 +6,7 @@ import { License } from "../models/License.js";
 import { Logs } from "../models/Logs.js";
 import { CashShift } from "../models/CashShift.js";
 import { CashShiftMovement } from "../models/CashShiftMovement.js";
-import { InventoryProduct, InventoryMovement, InventoryCategory, InventoryUnit, InventoryRecipe, HomeProduct, Catalog, Store, StoreProduct, ProductCompareGroup, ProductCompareGroupItem, PricingTierGroup } from "../models/Inventory.js";
+import { InventoryProduct, InventoryMovement, InventoryCategory, InventoryUnit, InventoryRecipe, HomeProduct, Catalog, Store, StoreProduct, ProductCompareGroup, ProductCompareGroupItem, PricingTierGroup, InventoryBatch } from "../models/Inventory.js";
 import { Customer, Order, OrderItem, Supplier, SupplierOrder, SupplierOrderItem } from "../models/Orders.js";
 import { TaskPlan, TaskItem } from "../models/Tasks.js";
 import { PublicidadCampaign, PublicidadPlaylistItem, PublicidadDevice } from "../models/Publicidad.js";
@@ -55,6 +55,7 @@ const MODELS_TO_SYNC = [
 
   // ── FK a tablas del grupo anterior ──
   InventoryMovement,
+  InventoryBatch,
   InventoryRecipe,
   HomeProduct,
   StoreProduct,

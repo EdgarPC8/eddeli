@@ -5,8 +5,8 @@ import {
   parseISO,
   isValid,
 } from "date-fns";
-import { Op, fn, col, where } from "sequelize";
-import { toAppDayKey, getAppTimezone } from "./appDateTime.js";
+import { Op } from "sequelize";
+import { toAppDayKey, getAppTimezone, zonedDateTimeToUtc } from "./appDateTime.js";
 
 const DATE_ONLY_RE = /^(\d{4}-\d{2}-\d{2})/;
 
@@ -43,24 +43,60 @@ export function parseFinanceDayParam(value) {
   return parseFinanceDayKey(String(value).slice(0, 10));
 }
 
-export function buildFinanceDateColumnWhere(startInput, endInput) {
-  const resolveKey = (v) => {
-    if (v == null || v === "") return null;
-    if (v instanceof Date) return toAppDayKey(v);
-    const raw = String(v).slice(0, 10);
-    if (DATE_ONLY_RE.test(raw)) return raw;
-    return toAppDayKey(v);
-  };
+function resolveDayKey(v) {
+  if (v == null || v === "") return null;
+  if (v instanceof Date) return toAppDayKey(v);
+  const raw = String(v).slice(0, 10);
+  if (DATE_ONLY_RE.test(raw)) return raw;
+  return toAppDayKey(v);
+}
 
-  const start = resolveKey(startInput);
-  const end = resolveKey(endInput);
+/** Inicio del día civil (00:00:00) en zona de la app → UTC Date. */
+export function dayKeyStartUtc(dayKey) {
+  const [y, m, d] = String(dayKey).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return zonedDateTimeToUtc(y, m, d, 0, 0, 0);
+}
+
+/** Inicio del día siguiente (límite exclusivo) en zona de la app → UTC Date. */
+export function dayKeyEndExclusiveUtc(dayKey) {
+  const [y, m, d] = String(dayKey).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  // Date.UTC maneja desborde de mes/día.
+  const next = new Date(Date.UTC(y, m - 1, d + 1, 12, 0, 0));
+  return zonedDateTimeToUtc(
+    next.getUTCFullYear(),
+    next.getUTCMonth() + 1,
+    next.getUTCDate(),
+    0,
+    0,
+    0,
+  );
+}
+
+/**
+ * Filtro por columna `date` usable con índice (sin DATE(date)).
+ * Rango semiabierto: start 00:00 inclusive → end+1 00:00 exclusive.
+ */
+export function buildFinanceDateColumnWhere(startInput, endInput) {
+  const start = resolveDayKey(startInput);
+  const end = resolveDayKey(endInput);
   if (!start && !end) return null;
 
-  const dateExpr = fn("DATE", col("date"));
-  if (start && end) return where(dateExpr, { [Op.between]: [start, end] });
-  if (start) return where(dateExpr, { [Op.gte]: start });
-  if (end) return where(dateExpr, { [Op.lte]: end });
-  return null;
+  if (start && end) {
+    const from = dayKeyStartUtc(start);
+    const toEx = dayKeyEndExclusiveUtc(end);
+    if (!from || !toEx) return null;
+    return { date: { [Op.gte]: from, [Op.lt]: toEx } };
+  }
+  if (start) {
+    const from = dayKeyStartUtc(start);
+    if (!from) return null;
+    return { date: { [Op.gte]: from } };
+  }
+  const toEx = dayKeyEndExclusiveUtc(end);
+  if (!toEx) return null;
+  return { date: { [Op.lt]: toEx } };
 }
 
 export function buildFinanceDateWhere(startDate, endDate) {

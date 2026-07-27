@@ -815,6 +815,11 @@ export const openPresentationMovement = async (req, res) => {
         err.statusCode = 400;
         throw err;
       }
+      if (presentation.isGenericIngredient) {
+        const err = new Error("Un insumo genérico no se abre como presentación.");
+        err.statusCode = 400;
+        throw err;
+      }
 
       const generic = await InventoryProduct.findByPk(presentation.genericProductId, {
         include: [{ model: InventoryUnit }],
@@ -822,7 +827,7 @@ export const openPresentationMovement = async (req, res) => {
         lock: t.LOCK.UPDATE,
       });
 
-      if (!generic?.isGenericIngredient) {
+      if (!generic?.isGenericIngredient || generic.type !== "raw") {
         const err = new Error("El insumo genérico asociado no es válido.");
         err.statusCode = 400;
         throw err;

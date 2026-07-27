@@ -8,15 +8,85 @@ import {
   SupplierOrder,
   SupplierOrderItem,
 } from "../../models/Orders.js";
-import { InventoryProduct, InventoryMovement } from "../../models/Inventory.js";
+import { InventoryProduct, InventoryMovement, InventoryBatch } from "../../models/Inventory.js";
 import { Expense, SupplierOrderPayment } from "../../models/Finance.js";
 import { getHeaderToken, verifyJWT } from "../../libs/jwt.js";
 import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
+import { ensureInventoryBatchesSchema } from "./BatchController.js";
 
 const toNum = (v, d = 0) => {
   const n = Number(v ?? d);
   return Number.isFinite(n) ? n : d;
 };
+
+let supplierItemLotSchemaReady = false;
+
+async function ensureSupplierOrderItemLotSchema() {
+  if (supplierItemLotSchemaReady) return;
+  const cols = [
+    ["packKey", "VARCHAR(64) NULL"],
+    ["packName", "VARCHAR(120) NULL"],
+    ["lotCode", "VARCHAR(80) NULL"],
+    ["expiresAt", "DATE NULL"],
+    ["manufacturedAt", "DATE NULL"],
+    ["inventoryBatchId", "INT NULL"],
+  ];
+  for (const [name, ddl] of cols) {
+    try {
+      const [found] = await sequelize.query(
+        `SHOW COLUMNS FROM \`ERP_supplier_order_items\` LIKE '${name}'`,
+      );
+      if (!Array.isArray(found) || found.length === 0) {
+        await sequelize.query(
+          `ALTER TABLE \`ERP_supplier_order_items\` ADD COLUMN \`${name}\` ${ddl}`,
+        );
+      }
+    } catch (e) {
+      console.warn(`ensureSupplierOrderItemLotSchema ${name}:`, e?.message || e);
+    }
+  }
+  supplierItemLotSchemaReady = true;
+}
+
+function parseDayOnly(raw) {
+  if (raw == null || raw === "") return null;
+  const s = String(raw).slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
+/** Campos de paca/lote por línea (pedido proveedor). */
+function itemPackLotFields(row = {}) {
+  const packKey = row.packKey != null && String(row.packKey).trim()
+    ? String(row.packKey).trim().slice(0, 64)
+    : null;
+  const packName = row.packName != null && String(row.packName).trim()
+    ? String(row.packName).trim().slice(0, 120)
+    : null;
+  const lotCode = row.lotCode != null && String(row.lotCode).trim()
+    ? String(row.lotCode).trim().slice(0, 80)
+    : null;
+  const expiresAt = parseDayOnly(row.expiresAt);
+  const manufacturedAt = parseDayOnly(row.manufacturedAt);
+  if (manufacturedAt && expiresAt && manufacturedAt > expiresAt) {
+    throw new Error("La fecha de elaboración no puede ser posterior al vencimiento");
+  }
+  return { packKey, packName, lotCode, expiresAt, manufacturedAt };
+}
+
+function buildItemCreatePayload(orderId, row) {
+  const productId = Number(row.productId);
+  const quantity = toNum(row.quantity);
+  if (!productId || quantity <= 0) throw new Error("Ítem inválido en el pedido");
+  const lot = itemPackLotFields(row);
+  return {
+    orderId,
+    productId,
+    quantity,
+    unitPrice: toNum(row.unitPrice ?? row.price, 0),
+    taxRate: Math.max(0, toNum(row.taxRate, 0)),
+    ...lot,
+  };
+}
 
 function parseRangeDate(value, endOfDay = false) {
   if (!value || typeof value !== "string") return null;
@@ -119,6 +189,7 @@ async function formatSupplierOrdersList(orders) {
 
 export const getSupplierOrders = async (req, res) => {
   try {
+    await ensureSupplierOrderItemLotSchema();
     const fromDate = parseRangeDate(req.query.from, false);
     const toDate = parseRangeDate(req.query.to, true);
     const where = {};
@@ -142,6 +213,7 @@ export const getSupplierOrders = async (req, res) => {
 
 export const createSupplierOrder = async (req, res) => {
   try {
+    await ensureSupplierOrderItemLotSchema();
     const token = getHeaderToken(req);
     await verifyJWT(token);
     const { supplierId, date, notes, items = [] } = req.body || {};
@@ -172,22 +244,10 @@ export const createSupplierOrder = async (req, res) => {
       );
 
       for (const row of items) {
-        const productId = Number(row.productId);
-        const quantity = toNum(row.quantity);
-        if (!productId || quantity <= 0) throw new Error("Ítem inválido en el pedido");
-        const product = await InventoryProduct.findByPk(productId, { transaction: t });
-        if (!product) throw new Error(`Producto #${productId} no encontrado`);
-
-        await SupplierOrderItem.create(
-          {
-            orderId: order.id,
-            productId,
-            quantity,
-            unitPrice: toNum(row.unitPrice ?? row.price ?? product.price, 0),
-            taxRate: Math.max(0, toNum(row.taxRate, 0)),
-          },
-          { transaction: t }
-        );
+        const payload = buildItemCreatePayload(order.id, row);
+        const product = await InventoryProduct.findByPk(payload.productId, { transaction: t });
+        if (!product) throw new Error(`Producto #${payload.productId} no encontrado`);
+        await SupplierOrderItem.create(payload, { transaction: t });
       }
       return order.id;
     });
@@ -208,6 +268,7 @@ export const createSupplierOrder = async (req, res) => {
 
 export const updateSupplierOrder = async (req, res) => {
   try {
+    await ensureSupplierOrderItemLotSchema();
     const { id } = req.params;
     const { supplierId, date, notes, items, receivedAt, paidAt } = req.body || {};
     const order = await SupplierOrder.findByPk(id);
@@ -280,16 +341,12 @@ export const updateSupplierOrder = async (req, res) => {
         const normalized = [];
         const newQtyByProduct = new Map();
         for (const row of items) {
-          const productId = Number(row.productId);
-          const quantity = toNum(row.quantity);
-          if (!productId || quantity <= 0) throw new Error("Ítem inválido");
-          const unitPrice = toNum(row.unitPrice ?? row.price, 0);
-          if (unitPrice < 0) throw new Error("Precio unitario inválido");
-          const taxRate = Math.max(0, toNum(row.taxRate, 0));
-          normalized.push({ productId, quantity, unitPrice, taxRate });
+          const payload = buildItemCreatePayload(order.id, row);
+          if (payload.unitPrice < 0) throw new Error("Precio unitario inválido");
+          normalized.push(payload);
           newQtyByProduct.set(
-            productId,
-            toNum(newQtyByProduct.get(productId)) + quantity
+            payload.productId,
+            toNum(newQtyByProduct.get(payload.productId)) + payload.quantity
           );
         }
 
@@ -338,16 +395,7 @@ export const updateSupplierOrder = async (req, res) => {
 
         await SupplierOrderItem.destroy({ where: { orderId: order.id }, transaction: t });
         for (const row of normalized) {
-          await SupplierOrderItem.create(
-            {
-              orderId: order.id,
-              productId: row.productId,
-              quantity: row.quantity,
-              unitPrice: row.unitPrice,
-              taxRate: row.taxRate,
-            },
-            { transaction: t }
-          );
+          await SupplierOrderItem.create(row, { transaction: t });
         }
       });
 
@@ -373,19 +421,8 @@ export const updateSupplierOrder = async (req, res) => {
       if (!isReceived && Array.isArray(items)) {
         await SupplierOrderItem.destroy({ where: { orderId: order.id }, transaction: t });
         for (const row of items) {
-          const productId = Number(row.productId);
-          const quantity = toNum(row.quantity);
-          if (!productId || quantity <= 0) throw new Error("Ítem inválido");
-          await SupplierOrderItem.create(
-            {
-              orderId: order.id,
-              productId,
-              quantity,
-              unitPrice: toNum(row.unitPrice ?? row.price, 0),
-              taxRate: Math.max(0, toNum(row.taxRate, 0)),
-            },
-            { transaction: t }
-          );
+          const payload = buildItemCreatePayload(order.id, row);
+          await SupplierOrderItem.create(payload, { transaction: t });
         }
       }
     });
@@ -521,6 +558,8 @@ export const deleteSupplierOrder = async (req, res) => {
 
 export const markSupplierOrderReceived = async (req, res) => {
   try {
+    await ensureSupplierOrderItemLotSchema();
+    await ensureInventoryBatchesSchema();
     const token = getHeaderToken(req);
     const user = await verifyJWT(token);
     const order = await SupplierOrder.findByPk(req.params.id, {
@@ -544,7 +583,101 @@ export const markSupplierOrderReceived = async (req, res) => {
     const receivedAt = req.body?.receivedAt ? new Date(req.body.receivedAt) : new Date();
 
     await sequelize.transaction(async (t) => {
-      for (const item of order.ERP_supplier_order_items || []) {
+      const items = order.ERP_supplier_order_items || [];
+
+      // Agrupar líneas con vencimiento → 1 lote por (producto + paca + lote + fechas).
+      const batchGroups = new Map();
+      const plainItems = [];
+
+      for (const item of items) {
+        const qty = toNum(item.quantity);
+        if (qty <= 0) continue;
+        const expiresAt = parseDayOnly(item.expiresAt);
+        if (expiresAt) {
+          const key = [
+            item.productId,
+            item.packKey || "",
+            item.lotCode || "",
+            expiresAt,
+            parseDayOnly(item.manufacturedAt) || "",
+          ].join("|");
+          if (!batchGroups.has(key)) {
+            batchGroups.set(key, {
+              productId: item.productId,
+              packKey: item.packKey || null,
+              packName: item.packName || null,
+              lotCode: item.lotCode || null,
+              expiresAt,
+              manufacturedAt: parseDayOnly(item.manufacturedAt),
+              quantity: 0,
+              unitPriceSum: 0,
+              itemIds: [],
+            });
+          }
+          const g = batchGroups.get(key);
+          g.quantity += qty;
+          g.unitPriceSum += toNum(item.unitPrice) * qty;
+          g.itemIds.push(item.id);
+        } else {
+          plainItems.push(item);
+        }
+      }
+
+      for (const g of batchGroups.values()) {
+        const product = await InventoryProduct.findByPk(g.productId, {
+          transaction: t,
+          lock: t.LOCK.UPDATE,
+        });
+        if (!product) continue;
+
+        const batch = await InventoryBatch.create(
+          {
+            productId: g.productId,
+            code: g.lotCode,
+            quantityInitial: g.quantity,
+            quantityRemaining: g.quantity,
+            expiresAt: g.expiresAt,
+            manufacturedAt: g.manufacturedAt,
+            receivedAt,
+            notes: g.packName
+              ? `Paca «${g.packName}» · pedido proveedor #${order.id}`
+              : `Pedido proveedor #${order.id}`,
+            status: "active",
+            createdBy: user.accountId,
+          },
+          { transaction: t },
+        );
+
+        await product.update(
+          { stock: toNum(product.stock) + g.quantity },
+          { transaction: t },
+        );
+
+        await InventoryMovement.create(
+          {
+            productId: product.id,
+            type: "entrada",
+            reason: "ENTRADA_COMPRA",
+            quantity: g.quantity,
+            description: g.lotCode
+              ? `Recepción pedido #${order.id} · lote ${g.lotCode} (vence ${g.expiresAt})`
+              : `Recepción pedido #${order.id} · lote #${batch.id} (vence ${g.expiresAt})`,
+            price: g.unitPriceSum,
+            referenceType: "inventory_batch",
+            referenceId: batch.id,
+            createdBy: user.accountId,
+            date: receivedAt,
+          },
+          { transaction: t },
+        );
+
+        await SupplierOrderItem.update(
+          { inventoryBatchId: batch.id },
+          { where: { id: { [Op.in]: g.itemIds } }, transaction: t },
+        );
+      }
+
+      for (const item of plainItems) {
         const product = await InventoryProduct.findByPk(item.productId, { transaction: t });
         if (!product) continue;
         const qty = toNum(item.quantity);
@@ -565,7 +698,7 @@ export const markSupplierOrderReceived = async (req, res) => {
             createdBy: user.accountId,
             date: receivedAt,
           },
-          { transaction: t }
+          { transaction: t },
         );
       }
 
@@ -586,7 +719,7 @@ export const markSupplierOrderReceived = async (req, res) => {
       req,
       httpStatus: 500,
     });
-    res.status(500).json({ message: "Error al marcar pedido como recibido" });
+    res.status(500).json({ message: error.message || "Error al marcar pedido como recibido" });
   }
 };
 

@@ -10,6 +10,7 @@ import { es } from 'date-fns/locale';
 import { OrderItem } from "../../models/Orders.js";
 import { ItemGroup, ItemGroupItem, Payment } from "../../models/Finance.js";
 import { toFinanceDateTime } from "../../utils/financeDateTime.js";
+import { buildFinanceDateColumnWhere } from "../../utils/financeDateUtils.js";
 import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 /**
@@ -106,9 +107,10 @@ export const getFinanceSummary = async (req, res) => {
     const now = new Date();
     const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
     const monthEnd = format(endOfMonth(now), "yyyy-MM-dd");
+    const monthDateWhere = buildFinanceDateColumnWhere(monthStart, monthEnd) || {};
     const [monthIncomeRaw, monthExpenseRaw] = await Promise.all([
-      Income.sum("amount", { where: { date: { [Op.between]: [monthStart, monthEnd] } } }),
-      Expense.sum("amount", { where: { date: { [Op.between]: [monthStart, monthEnd] } } }),
+      Income.sum("amount", { where: monthDateWhere }),
+      Expense.sum("amount", { where: monthDateWhere }),
     ]);
     const monthIncome = Number(monthIncomeRaw || 0);
     const monthExpense = Number(monthExpenseRaw || 0);

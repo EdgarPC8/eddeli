@@ -20,6 +20,13 @@ const sequelize = new Sequelize(DB_NAME, DB_USER, DB_PASS, {
   dialect: "mysql",
   timezone: "-05:00",
   logging: process.env.DB_LOGGING === "1" ? console.log : false,
+  // El dashboard dispara muchas peticiones en paralelo; el default (max≈5) las encola ~10–20s.
+  pool: {
+    max: Number(process.env.DB_POOL_MAX || 25),
+    min: Number(process.env.DB_POOL_MIN || 2),
+    acquire: Number(process.env.DB_POOL_ACQUIRE || 60000),
+    idle: Number(process.env.DB_POOL_IDLE || 10000),
+  },
 });
 
 export { sequelize };

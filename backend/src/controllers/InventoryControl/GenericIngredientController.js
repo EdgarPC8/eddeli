@@ -327,18 +327,23 @@ async function ensureFrequentPresentations(summary) {
 
         if (!row && item.linkExistingByName) {
           row = await InventoryProduct.findOne({
-            where: { type: "raw", name: item.linkExistingByName },
+            where: {
+              name: item.linkExistingByName,
+              type: { [Op.in]: ["final", "raw"] },
+            },
           });
         }
 
         if (!row) {
-          row = await InventoryProduct.findOne({ where: { type: "raw", name: item.name } });
+          row = await InventoryProduct.findOne({
+            where: { name: item.name, type: { [Op.in]: ["final", "raw"] } },
+          });
         }
 
         if (!row) {
           await InventoryProduct.create({
             name: item.name,
-            type: "raw",
+            type: "final",
             unitId,
             categoryId: family?.id,
             stock: 0,
@@ -376,6 +381,8 @@ async function ensureFrequentPresentations(summary) {
           purchasePresentation: item.purchasePresentation,
           categoryId: family?.id || row.categoryId,
         };
+        // Modelo nuevo: empaque de compra = tipo final (no lo convierte a insumo).
+        if (row.type !== "final") patch.type = "final";
         if (item.name && row.id !== generic.id) patch.name = item.name;
         if (unitId) patch.unitId = unitId;
         await row.update(patch);
@@ -455,26 +462,58 @@ export const getGenericIngredientsWorkbench = async (req, res) => {
       brandedByGeneric.get(gid).push(shapeProductRow(b));
     }
 
-    const recipeCounts = {};
-    if (genericIds.length) {
-      const lines = await InventoryRecipe.findAll({
-        where: { productRawId: { [Op.in]: genericIds } },
-        attributes: ["productRawId"],
-      });
+    const recipeMetaByRawId = new Map();
+    const collectRecipeMeta = (lines) => {
       for (const line of lines) {
-        recipeCounts[line.productRawId] = (recipeCounts[line.productRawId] || 0) + 1;
+        const rawId = line.productRawId;
+        if (!recipeMetaByRawId.has(rawId)) {
+          recipeMetaByRawId.set(rawId, { count: 0, names: new Set() });
+        }
+        const meta = recipeMetaByRawId.get(rawId);
+        meta.count += 1;
+        const finalName = line.finalProduct?.name;
+        if (finalName) meta.names.add(finalName);
       }
+    };
+
+    if (genericIds.length) {
+      const genericRecipeLines = await InventoryRecipe.findAll({
+        where: { productRawId: { [Op.in]: genericIds } },
+        attributes: ["productRawId", "productFinalId"],
+        include: [{ model: InventoryProduct, as: "finalProduct", attributes: ["id", "name"] }],
+      });
+      collectRecipeMeta(genericRecipeLines);
     }
 
-    const unlinkedRaw = await InventoryProduct.findAll({
+    const unlinkedPacks = await InventoryProduct.findAll({
       where: {
-        type: "raw",
+        type: "final",
         isGenericIngredient: false,
         genericProductId: null,
       },
       include: productInclude,
       order: [["name", "ASC"]],
     });
+
+    const unlinkedIds = unlinkedPacks.map((p) => p.id);
+    if (unlinkedIds.length) {
+      // Los finales no suelen ser productRawId; se deja por si hay datos raros.
+      const unlinkedRecipeLines = await InventoryRecipe.findAll({
+        where: { productRawId: { [Op.in]: unlinkedIds } },
+        attributes: ["productRawId", "productFinalId"],
+        include: [{ model: InventoryProduct, as: "finalProduct", attributes: ["id", "name"] }],
+      });
+      collectRecipeMeta(unlinkedRecipeLines);
+    }
+
+    const shapeRecipeMeta = (productId) => {
+      const meta = recipeMetaByRawId.get(productId);
+      if (!meta) return { recipeLines: 0, inRecipes: [] };
+      return {
+        recipeLines: meta.count,
+        inRecipes: Array.from(meta.names).sort((a, b) => a.localeCompare(b, "es")),
+      };
+    };
 
     const data = [];
     for (const g of generics) {
@@ -483,10 +522,12 @@ export const getGenericIngredientsWorkbench = async (req, res) => {
       const presentationsGrams = presentations.reduce((s, p) => s + Number(p.stockGrams || 0), 0);
       const totalGrams = round2(ownGrams + presentationsGrams);
       const display = gramsToDisplayInUnit(totalGrams, g.InventoryUnit);
+      const recipes = shapeRecipeMeta(g.id);
 
       data.push({
         ...shapeProductRow(g),
-        recipeLines: recipeCounts[g.id] || 0,
+        recipeLines: recipes.recipeLines,
+        inRecipes: recipes.inRecipes,
         presentations,
         presentationCount: presentations.length,
         totalStockGrams: totalGrams,
@@ -498,7 +539,10 @@ export const getGenericIngredientsWorkbench = async (req, res) => {
 
     res.json({
       generics: data,
-      unlinkedProducts: unlinkedRaw.map(shapeProductRow),
+      unlinkedProducts: unlinkedPacks.map((p) => ({
+        ...shapeProductRow(p),
+        ...shapeRecipeMeta(p.id),
+      })),
     });
   } catch (error) {
     console.error("getGenericIngredientsWorkbench:", error);
@@ -597,12 +641,16 @@ export const createPresentation = async (req, res) => {
         notifyFail("presentation.create_failed", "Producto no encontrado", { req, httpStatus: 404 });
         return res.status(404).json({ message: "Producto no encontrado." });
       }
-      if (existing.isGenericIngredient) {
-        notifyFail("presentation.create_failed", "No puedes enlazar otro insumo genérico", {
-          req,
-          httpStatus: 400,
+      if (existing.isGenericIngredient || existing.type !== "final") {
+        notifyFail(
+          "presentation.create_failed",
+          "Solo se enlazan productos tipo final (ej. Quintal de harina)",
+          { req, httpStatus: 400 },
+        );
+        return res.status(400).json({
+          message:
+            "Solo se enlazan productos tipo final (ej. Quintal de harina). El genérico ya es el insumo.",
         });
-        return res.status(400).json({ message: "No puedes enlazar otro insumo genérico." });
       }
       if (existing.genericProductId && existing.genericProductId !== genericId) {
         notifyFail("presentation.create_failed", "Producto ya enlazado a otro insumo", {
@@ -622,13 +670,12 @@ export const createPresentation = async (req, res) => {
         });
       }
 
-      const family = await ensureFamilyCategory(generic.name);
       await existing.update({
         genericProductId: genericId,
         isGenericIngredient: false,
+        type: "final",
         name: name?.trim() || existing.name,
         purchasePresentation: purchasePresentation || existing.purchasePresentation,
-        categoryId: categoryId || family?.id || existing.categoryId,
       });
 
       const full = await InventoryProduct.findByPk(existing.id, { include: productInclude });
@@ -651,7 +698,7 @@ export const createPresentation = async (req, res) => {
     const row = await InventoryProduct.create({
       name: name.trim(),
       purchasePresentation: purchasePresentation || null,
-      type: "raw",
+      type: "final",
       unitId: Number(unitId || generic.unitId),
       categoryId: categoryId || family?.id,
       stock: Number(stock ?? 0),
@@ -676,6 +723,8 @@ export const createPresentation = async (req, res) => {
 
 /**
  * PATCH /inventory/generic-ingredients/presentations/:productId/link
+ * Enlaza un producto tipo final (quintal, arroba…) a un insumo genérico.
+ * No cambia el tipo: sigue siendo final.
  */
 export const linkPresentation = async (req, res) => {
   try {
@@ -688,11 +737,28 @@ export const linkPresentation = async (req, res) => {
       InventoryProduct.findByPk(genericId),
     ]);
 
-    if (!product || product.type !== "raw") {
+    if (!product) {
       notifyFail("presentation.link_failed", "Producto no encontrado", { req, httpStatus: 404 });
       return res.status(404).json({ message: "Producto no encontrado." });
     }
-    if (!generic?.isGenericIngredient) {
+    if (product.isGenericIngredient) {
+      notifyFail("presentation.link_failed", "No se puede enlazar un insumo genérico", {
+        req,
+        httpStatus: 400,
+      });
+      return res.status(400).json({ message: "No se puede enlazar un insumo genérico como empaque." });
+    }
+    // Nuevo modelo: tipo final. Se acepta raw legado ya existente para no romper datos viejos.
+    if (product.type !== "final" && product.type !== "raw") {
+      notifyFail("presentation.link_failed", "Solo productos tipo final (o raw legado)", {
+        req,
+        httpStatus: 400,
+      });
+      return res.status(400).json({
+        message: "Enlaza un producto tipo final (ej. Quintal de harina).",
+      });
+    }
+    if (!generic?.isGenericIngredient || generic.type !== "raw") {
       notifyFail("presentation.link_failed", "Insumo genérico no encontrado", { req, httpStatus: 404 });
       return res.status(404).json({ message: "Insumo genérico no encontrado." });
     }
@@ -706,13 +772,15 @@ export const linkPresentation = async (req, res) => {
       });
     }
 
-    const family = await ensureFamilyCategory(generic.name);
-    await product.update({
+    const patch = {
       genericProductId: genericId,
       isGenericIngredient: false,
       purchasePresentation: purchasePresentation ?? product.purchasePresentation,
-      categoryId: family?.id || product.categoryId,
-    });
+    };
+    // Si era raw legado, pásalo a final (empaque de compra).
+    if (product.type === "raw") patch.type = "final";
+
+    await product.update(patch);
 
     const full = await InventoryProduct.findByPk(product.id, { include: productInclude });
     notifyOk("presentation.linked", `Presentación #${productId} vinculada`, {

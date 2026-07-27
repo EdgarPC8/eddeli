@@ -1,13 +1,15 @@
+import { Op, literal } from "sequelize";
 import { getFinanceSummary } from "./FinanceController.js";
 import {
   getOrderAnalytics,
   getIncomeExpenseBreakdown,
 } from "./AnalyticsController.js";
 import { getFinanceWorkbenchAll } from "./OrderGroupFinanceController.js";
-import { getAllProducts } from "./ProductController.js";
+import { InventoryProduct } from "../../models/Inventory.js";
 import { invokeController, buildProductsStockAlerts } from "../../utils/invokeController.js";
 import { computeObligationsDashboardData } from "./LoanObligationController.js";
 import { computeRecurringDashboardData } from "./RecurringExpenseController.js";
+import { computeBatchesDashboardAlerts } from "./BatchController.js";
 
 const emptyObligations = {
   summary: { totalReceivable: 0, totalPayable: 0, openCount: 0 },
@@ -33,6 +35,22 @@ const emptyRecurring = {
   overdue: [],
 };
 
+const emptyBatchesAlerts = { expired: [], expiring: [], warnDays: 30 };
+
+/** Solo productos en alerta de stock (sin cargar catálogo completo). */
+async function fetchProductsStockAlerts() {
+  const products = await InventoryProduct.findAll({
+    attributes: ["id", "name", "price", "stock", "minStock", "type", "isActive"],
+    where: {
+      [Op.or]: [
+        { stock: { [Op.lte]: 0 } },
+        literal("`stock` > 0 AND `stock` <= `minStock`"),
+      ],
+    },
+  });
+  return buildProductsStockAlerts(products);
+}
+
 /**
  * GET /finance/dashboard/hero — solo lo necesario para las cards superiores.
  * Rápido: summary + obligaciones (préstamos/deudas de las cards).
@@ -57,40 +75,26 @@ export const getFinanceDashboardHero = async (req, res) => {
 };
 
 /**
- * GET /finance/dashboard/rest — paneles inferiores (stock, estados, cobranzas, etc.).
- * No repite summary ni obligations (ya vinieron en /hero).
+ * GET /finance/dashboard/rest — paneles inferiores (stock, estados, etc.).
+ * Sin workbench completo (la tabla de clientes lo pide aparte).
  */
 export const getFinanceDashboardRest = async (req, res) => {
   try {
-    const [
-      overView,
-      incomeExpenseBreakdown,
-      workbench,
-      products,
-      recurring,
-    ] = await Promise.all([
-      invokeController(getOrderAnalytics, req),
-      invokeController(getIncomeExpenseBreakdown, req),
-      invokeController(getFinanceWorkbenchAll, req),
-      invokeController(getAllProducts, { ...req, query: { ...req.query, all: "true" } }),
-      computeRecurringDashboardData(),
-    ]);
-
-    const productsList = Array.isArray(products)
-      ? products
-      : products?.products ?? products?.data ?? [];
+    const [overView, incomeExpenseBreakdown, productsStock, recurring, batchesAlerts] =
+      await Promise.all([
+        invokeController(getOrderAnalytics, req),
+        invokeController(getIncomeExpenseBreakdown, req),
+        fetchProductsStockAlerts(),
+        computeRecurringDashboardData(),
+        computeBatchesDashboardAlerts(30),
+      ]);
 
     return res.json({
       overView: Array.isArray(overView) ? overView : [],
       incomeExpenseBreakdown: incomeExpenseBreakdown ?? {},
-      workbench: {
-        customers: workbench?.customers ?? [],
-        orders: workbench?.orders ?? [],
-        groups: workbench?.groups ?? [],
-        payments: workbench?.payments ?? [],
-      },
-      productsStock: buildProductsStockAlerts(productsList),
+      productsStock: productsStock ?? { agotados: [], porAgotarse: [] },
       recurring: recurring ?? emptyRecurring,
+      batchesAlerts: batchesAlerts ?? emptyBatchesAlerts,
     });
   } catch (error) {
     console.error("getFinanceDashboardRest:", error);
@@ -105,7 +109,7 @@ export const getFinanceDashboardRest = async (req, res) => {
  */
 export const getFinanceDashboard = async (req, res) => {
   try {
-    const [hero, rest] = await Promise.all([
+    const [hero, rest, workbench] = await Promise.all([
       (async () => {
         const [summary, obligations] = await Promise.all([
           invokeController(getFinanceSummary, req),
@@ -114,30 +118,23 @@ export const getFinanceDashboard = async (req, res) => {
         return { summary, obligations };
       })(),
       (async () => {
-        const [
-          overView,
-          incomeExpenseBreakdown,
-          workbench,
-          products,
-          recurring,
-        ] = await Promise.all([
-          invokeController(getOrderAnalytics, req),
-          invokeController(getIncomeExpenseBreakdown, req),
-          invokeController(getFinanceWorkbenchAll, req),
-          invokeController(getAllProducts, { ...req, query: { ...req.query, all: "true" } }),
-          computeRecurringDashboardData(),
-        ]);
-        const productsList = Array.isArray(products)
-          ? products
-          : products?.products ?? products?.data ?? [];
+        const [overView, incomeExpenseBreakdown, productsStock, recurring, batchesAlerts] =
+          await Promise.all([
+            invokeController(getOrderAnalytics, req),
+            invokeController(getIncomeExpenseBreakdown, req),
+            fetchProductsStockAlerts(),
+            computeRecurringDashboardData(),
+            computeBatchesDashboardAlerts(30),
+          ]);
         return {
           overView,
           incomeExpenseBreakdown,
-          workbench,
-          productsStock: buildProductsStockAlerts(productsList),
+          productsStock,
           recurring,
+          batchesAlerts,
         };
       })(),
+      invokeController(getFinanceWorkbenchAll, req),
     ]);
 
     return res.json({
@@ -145,12 +142,13 @@ export const getFinanceDashboard = async (req, res) => {
       overView: Array.isArray(rest.overView) ? rest.overView : [],
       incomeExpenseBreakdown: rest.incomeExpenseBreakdown ?? {},
       workbench: {
-        customers: rest.workbench?.customers ?? [],
-        orders: rest.workbench?.orders ?? [],
-        groups: rest.workbench?.groups ?? [],
-        payments: rest.workbench?.payments ?? [],
+        customers: workbench?.customers ?? [],
+        orders: workbench?.orders ?? [],
+        groups: workbench?.groups ?? [],
+        payments: workbench?.payments ?? [],
       },
       productsStock: rest.productsStock ?? { agotados: [], porAgotarse: [] },
+      batchesAlerts: rest.batchesAlerts ?? emptyBatchesAlerts,
       obligations: hero.obligations ?? emptyObligations,
       recurring: rest.recurring ?? emptyRecurring,
       expenses: [],

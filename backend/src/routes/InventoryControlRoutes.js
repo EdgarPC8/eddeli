@@ -46,6 +46,15 @@ import {
   deleteUnit,
 } from '../controllers/InventoryControl/UnitController.js';
 
+import {
+  getBatches,
+  getBatchesSummary,
+  createBatch,
+  updateBatch,
+  writeOffBatch,
+  deleteBatch,
+} from '../controllers/InventoryControl/BatchController.js';
+
 
 import {
   registerMovement,
@@ -285,6 +294,16 @@ router.post('/units', isAuthenticated, createUnit);                 // Crear uni
 router.get('/units', isAuthenticated, getAllUnits);                 // Listar unidades
 router.put('/units/:id', isAuthenticated, updateUnit);              // Editar unidad
 router.delete('/units/:id', isAuthenticated, deleteUnit);           // Eliminar unidad
+
+// ----------------------------------
+// 📦 LOTES Y VENCIMIENTOS
+// ----------------------------------
+router.get('/batches/summary', isAuthenticated, getBatchesSummary);
+router.get('/batches', isAuthenticated, getBatches);
+router.post('/batches', isAuthenticated, createBatch);
+router.put('/batches/:id', isAuthenticated, updateBatch);
+router.post('/batches/:id/write-off', isAuthenticated, writeOffBatch);
+router.delete('/batches/:id', isAuthenticated, deleteBatch);
 
 
 
