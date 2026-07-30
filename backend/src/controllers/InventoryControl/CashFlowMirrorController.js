@@ -17,7 +17,7 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 import { Income, Expense } from "../../models/Finance.js";
-import { financeBucketKey, buildFinanceDateColumnWhere } from "../../utils/financeDateUtils.js";
+import { financeBucketKey, buildPaddedFinanceDateColumnWhere, filterByFinanceDayKeyRange } from "../../utils/financeDateUtils.js";
 const VALID_GRANULARITY = new Set(["day", "week", "month"]);
 
 function round2(n) {
@@ -156,10 +156,10 @@ export const getCashFlowMirror = async (req, res) => {
 
     const bucketMap = buildEmptyBuckets(granularity, start, end);
 
-    const rangeWhere = buildFinanceDateColumnWhere(start, end);
-    const dateClause = rangeWhere ? { [Op.and]: [rangeWhere] } : {};
+    const padded = buildPaddedFinanceDateColumnWhere(startIso, endIso, 1);
+    const dateClause = padded?.where ? { [Op.and]: [padded.where] } : {};
 
-    const [incomes, expenses] = await Promise.all([
+    const [incomesRaw, expensesRaw] = await Promise.all([
       Income.findAll({
         where: dateClause,
         attributes: ["date", "amount"],
@@ -171,6 +171,13 @@ export const getCashFlowMirror = async (req, res) => {
         raw: true,
       }),
     ]);
+
+    const incomes = padded
+      ? filterByFinanceDayKeyRange(incomesRaw, padded.startKey, padded.endKey)
+      : incomesRaw;
+    const expenses = padded
+      ? filterByFinanceDayKeyRange(expensesRaw, padded.startKey, padded.endKey)
+      : expensesRaw;
 
     for (const row of incomes) {
       addToBucket(bucketMap, row.date, granularity, "income", row.amount);

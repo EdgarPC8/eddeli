@@ -74,9 +74,38 @@ export function dayKeyEndExclusiveUtc(dayKey) {
   );
 }
 
+/** Desplaza una clave YYYY-MM-DD por N días civiles (calendario UTC). */
+export function shiftFinanceDayKey(dayKey, deltaDays) {
+  const [y, m, d] = String(dayKey || "").split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const next = new Date(Date.UTC(y, m - 1, d + Number(deltaDays || 0)));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, "0")}-${String(next.getUTCDate()).padStart(2, "0")}`;
+}
+
+export function resolveFinanceDayKeyBounds(startInput, endInput) {
+  const start = resolveDayKey(startInput);
+  const end = resolveDayKey(endInput);
+  if (!start && !end) return null;
+  const startKey = start || end;
+  const endKey = end || start;
+  return { startKey, endKey };
+}
+
+export function financeDayKeyInInclusiveRange(dayKey, startKey, endKey) {
+  if (!dayKey) return false;
+  if (startKey && dayKey < startKey) return false;
+  if (endKey && dayKey > endKey) return false;
+  return true;
+}
+
 /**
  * Filtro por columna `date` usable con índice (sin DATE(date)).
- * Rango semiabierto: start 00:00 inclusive → end+1 00:00 exclusive.
+ * Rango semiabierto civil (zona app): start 00:00 inclusive → end+1 00:00 exclusive.
+ *
+ * Nota: `toAppDayKey` trata medianoche UTC como día calendario UTC (date-only).
+ * Ese instante queda FUERA del rango civil Guayaquil del mismo YYYY-MM-DD.
+ * Usa `buildPaddedFinanceDateColumnWhere` + `filterByFinanceDayKeyRange` cuando
+ * el listado/totales deben coincidir con el bucket del mirror.
  */
 export function buildFinanceDateColumnWhere(startInput, endInput) {
   const start = resolveDayKey(startInput);
@@ -97,6 +126,27 @@ export function buildFinanceDateColumnWhere(startInput, endInput) {
   const toEx = dayKeyEndExclusiveUtc(end);
   if (!toEx) return null;
   return { date: { [Op.lt]: toEx } };
+}
+
+/**
+ * Amplía el WHERE SQL ±padDays y expone startKey/endKey para filtrar en JS
+ * con toFinanceDayKey (misma regla que el gráfico Flujo).
+ */
+export function buildPaddedFinanceDateColumnWhere(startInput, endInput, padDays = 1) {
+  const bounds = resolveFinanceDayKeyBounds(startInput, endInput);
+  if (!bounds) return null;
+  const fromKey = shiftFinanceDayKey(bounds.startKey, -Math.abs(padDays));
+  const toKey = shiftFinanceDayKey(bounds.endKey, Math.abs(padDays));
+  const where = buildFinanceDateColumnWhere(fromKey || bounds.startKey, toKey || bounds.endKey);
+  if (!where) return null;
+  return { where, startKey: bounds.startKey, endKey: bounds.endKey };
+}
+
+export function filterByFinanceDayKeyRange(rows, startKey, endKey, getDate = (r) => r?.date) {
+  if (!Array.isArray(rows)) return [];
+  return rows.filter((r) =>
+    financeDayKeyInInclusiveRange(toFinanceDayKey(getDate(r)), startKey, endKey)
+  );
 }
 
 export function buildFinanceDateWhere(startDate, endDate) {
