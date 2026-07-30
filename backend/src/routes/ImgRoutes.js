@@ -11,6 +11,7 @@ import {
   deleteImage,
   scanImages as scanImagesController,
   downloadFolderZip,
+  checkImagesExist,
 } from "../controllers/ImgController.js";
 import { isAuthenticated } from "../middlewares/authMiddelware.js";
 import {     
@@ -30,6 +31,11 @@ router.get(
   downloadFolderZip
 );
 
+router.post(
+  "/check-exists",
+  isAuthenticated,
+  checkImagesExist
+);
 
 router.post(
   "/upload",

@@ -96,4 +96,47 @@ export const uploadImage = async (req, res) => {
       files: req.imageScan.files,
     });
   };
+
+/** POST body: { paths: string[] } → cuáles ya existen bajo src/img */
+export const checkImagesExist = async (req, res) => {
+  try {
+    const raw = Array.isArray(req.body?.paths) ? req.body.paths : [];
+    const existing = [];
+    const missing = [];
+    const invalid = [];
+
+    for (const item of raw) {
+      try {
+        const rel = safeRelPath(item);
+        if (!rel) {
+          invalid.push(String(item || ""));
+          continue;
+        }
+        const abs = path.resolve(IMG_BASE_DIR, rel);
+        if (!abs.startsWith(IMG_BASE_DIR)) {
+          invalid.push(rel);
+          continue;
+        }
+        if (fs.existsSync(abs) && fs.statSync(abs).isFile()) existing.push(rel);
+        else missing.push(rel);
+      } catch {
+        invalid.push(String(item || ""));
+      }
+    }
+
+    return res.json({
+      ok: true,
+      existing,
+      missing,
+      invalid,
+      totals: {
+        existing: existing.length,
+        missing: missing.length,
+        invalid: invalid.length,
+      },
+    });
+  } catch (e) {
+    return res.status(400).json({ ok: false, message: e.message });
+  }
+};
   

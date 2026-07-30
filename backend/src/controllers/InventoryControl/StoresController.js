@@ -66,7 +66,9 @@ export const createStore = async (req, res) => {
     }
 
     const kind = String(payload.locationKind || "vitrina").trim().toLowerCase();
-    payload.locationKind = kind === "propia" ? "propia" : "vitrina";
+    if (kind === "propia") payload.locationKind = "propia";
+    else if (kind === "bodega") payload.locationKind = "bodega";
+    else payload.locationKind = "vitrina";
 
     const padCode = (v, fallback = "001") => {
       const d = String(v ?? "").replace(/\D/g, "").slice(-3);
@@ -104,6 +106,10 @@ export const createStore = async (req, res) => {
     delete payload.moveImage;
 
     const row = await Store.create(payload);
+    if (row.locationKind === "propia") {
+      const { ensureDefaultCashRegisters } = await import("../../models/CashRegister.js");
+      await ensureDefaultCashRegisters(row);
+    }
     notifyOk("store.created", `Local #${row.id}`, { store: row });
     return res.status(201).json({ message: "Creado", store: row });
   } catch (error) {
@@ -209,7 +215,9 @@ export const updateStore = async (req, res) => {
 
     if ("locationKind" in updates) {
       const kind = String(updates.locationKind || "vitrina").trim().toLowerCase();
-      updates.locationKind = kind === "propia" ? "propia" : "vitrina";
+      if (kind === "propia") updates.locationKind = "propia";
+      else if (kind === "bodega") updates.locationKind = "bodega";
+      else updates.locationKind = "vitrina";
     }
 
     const padCode = (v, fallback = "001") => {
@@ -232,6 +240,11 @@ export const updateStore = async (req, res) => {
     // 3️⃣ Actualiza BD
     // ===============================
     await row.update(updates);
+
+    if (row.locationKind === "propia") {
+      const { ensureDefaultCashRegisters } = await import("../../models/CashRegister.js");
+      await ensureDefaultCashRegisters(row);
+    }
 
     notifyOk("store.updated", `Local #${id}`, { store: row });
 
@@ -258,7 +271,7 @@ export const getStores = async (req, res) => {
     }
 
     const kindFilter = String(kind || locationKind || "").trim().toLowerCase();
-    if (kindFilter === "propia" || kindFilter === "vitrina") {
+    if (kindFilter === "propia" || kindFilter === "vitrina" || kindFilter === "bodega") {
       where.locationKind = kindFilter;
     }
 

@@ -8,11 +8,17 @@ import {
   SupplierOrder,
   SupplierOrderItem,
 } from "../../models/Orders.js";
-import { InventoryProduct, InventoryMovement, InventoryBatch } from "../../models/Inventory.js";
+import { InventoryProduct, InventoryMovement, InventoryBatch, Store } from "../../models/Inventory.js";
 import { Expense, SupplierOrderPayment } from "../../models/Finance.js";
 import { getHeaderToken, verifyJWT } from "../../libs/jwt.js";
 import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 import { ensureInventoryBatchesSchema } from "./BatchController.js";
+import { getAppSettingsSync } from "../../services/appSettingsService.js";
+import {
+  adjustStoreStock,
+  getDefaultStockStoreId,
+  storeHoldsInventory,
+} from "../../services/storeStockService.js";
 
 const toNum = (v, d = 0) => {
   const n = Number(v ?? d);
@@ -45,7 +51,59 @@ async function ensureSupplierOrderItemLotSchema() {
       console.warn(`ensureSupplierOrderItemLotSchema ${name}:`, e?.message || e);
     }
   }
+  try {
+    const [found] = await sequelize.query(
+      "SHOW COLUMNS FROM `ERP_supplier_orders` LIKE 'receivedStoreId'",
+    );
+    if (!Array.isArray(found) || found.length === 0) {
+      await sequelize.query(
+        "ALTER TABLE `ERP_supplier_orders` ADD COLUMN `receivedStoreId` INT NULL",
+      );
+    }
+  } catch (e) {
+    console.warn("ensureSupplierOrder receivedStoreId:", e?.message || e);
+  }
+  try {
+    await sequelize.query(
+      "ALTER TABLE `ERP_supplier_order_items` MODIFY COLUMN `unitPrice` DECIMAL(14,6) NOT NULL DEFAULT 0",
+    );
+  } catch (e) {
+    console.warn("ensureSupplierOrder unitPrice precision:", e?.message || e);
+  }
   supplierItemLotSchemaReady = true;
+}
+
+/** null = stock general (sin multistock). Número = local inventariable. */
+async function resolveReceiveStoreId(body, { transaction, requireExplicit = false } = {}) {
+  const multi = getAppSettingsSync()?.multiStockEnabled !== false;
+  if (!multi) return null;
+
+  let sid =
+    body?.storeId != null && body.storeId !== ""
+      ? Number(body.storeId)
+      : null;
+  if (!Number.isFinite(sid) || sid <= 0) {
+    if (requireExplicit) {
+      throw new Error("Con multistock debes indicar Bodega o una sucursal para recibir.");
+    }
+    sid = await getDefaultStockStoreId({ transaction });
+  }
+  const store = await Store.findByPk(sid, { transaction });
+  if (!store || !storeHoldsInventory(store.locationKind)) {
+    throw new Error("El local de recepción debe ser Bodega o sucursal propia.");
+  }
+  return Number(store.id);
+}
+
+async function applyReceiveQty({ product, qty, storeId, transaction }) {
+  if (storeId) {
+    await adjustStoreStock(storeId, product.id, qty, {
+      transaction,
+      allowNegative: qty < 0,
+    });
+    return;
+  }
+  await product.update({ stock: toNum(product.stock) + qty }, { transaction });
 }
 
 function parseDayOnly(raw) {
@@ -360,10 +418,16 @@ export const updateSupplierOrder = async (req, res) => {
           if (delta === 0) continue;
           const product = await InventoryProduct.findByPk(productId, { transaction: t });
           if (!product) throw new Error(`Producto #${productId} no encontrado`);
-          await product.update(
-            { stock: toNum(product.stock) + delta },
-            { transaction: t }
-          );
+          const stockStoreId =
+            order.receivedStoreId != null
+              ? Number(order.receivedStoreId)
+              : await resolveReceiveStoreId({}, { transaction, requireExplicit: false });
+          await applyReceiveQty({
+            product,
+            qty: delta,
+            storeId: stockStoreId,
+            transaction: t,
+          });
           await InventoryMovement.create(
             {
               productId,
@@ -583,6 +647,10 @@ export const markSupplierOrderReceived = async (req, res) => {
     const receivedAt = req.body?.receivedAt ? new Date(req.body.receivedAt) : new Date();
 
     await sequelize.transaction(async (t) => {
+      const receiveStoreId = await resolveReceiveStoreId(req.body || {}, {
+        transaction: t,
+        requireExplicit: getAppSettingsSync()?.multiStockEnabled !== false,
+      });
       const items = order.ERP_supplier_order_items || [];
 
       // Agrupar líneas con vencimiento → 1 lote por (producto + paca + lote + fechas).
@@ -648,10 +716,12 @@ export const markSupplierOrderReceived = async (req, res) => {
           { transaction: t },
         );
 
-        await product.update(
-          { stock: toNum(product.stock) + g.quantity },
-          { transaction: t },
-        );
+        await applyReceiveQty({
+          product,
+          qty: g.quantity,
+          storeId: receiveStoreId,
+          transaction: t,
+        });
 
         await InventoryMovement.create(
           {
@@ -683,7 +753,12 @@ export const markSupplierOrderReceived = async (req, res) => {
         const qty = toNum(item.quantity);
         if (qty <= 0) continue;
 
-        await product.update({ stock: toNum(product.stock) + qty }, { transaction: t });
+        await applyReceiveQty({
+          product,
+          qty,
+          storeId: receiveStoreId,
+          transaction: t,
+        });
 
         await InventoryMovement.create(
           {
@@ -704,6 +779,7 @@ export const markSupplierOrderReceived = async (req, res) => {
 
       order.receivedAt = receivedAt;
       order.status = "recibido";
+      if (receiveStoreId) order.receivedStoreId = receiveStoreId;
       await order.save({ transaction: t });
     });
 

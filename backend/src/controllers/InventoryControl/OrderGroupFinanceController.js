@@ -80,6 +80,21 @@ const toNum = (v, def = 0) => {
   const assertProgrammerRole = (user) =>
     user?.loginRol === "Programador";
 
+  /**
+   * Si el grupo ya tiene abonos (group_payment), esos son la fuente de verdad.
+   * Borra incomes por ítem (order_item) del mismo grupo para no sumar el doble.
+   */
+  const stripDuplicateOrderItemIncomes = async (itemIds, t) => {
+    if (!itemIds?.length) return 0;
+    return Income.destroy({
+      where: {
+        referenceType: "order_item",
+        referenceId: { [Op.in]: itemIds },
+      },
+      transaction: t,
+    });
+  };
+
   const getGroupFinancials = async (groupId, t, excludePaymentId = null) => {
     const group = await ItemGroup.findByPk(groupId, { transaction: t });
     if (!group) return null;
@@ -112,8 +127,13 @@ const toNum = (v, def = 0) => {
       paid = Number((paid + toNum(p.amount)).toFixed(2));
     }
 
+    // Evitar doble conteo: abono de grupo + "Pago ítem #…" del mismo pedido
+    if (paid > 0 && itemIds.length > 0) {
+      await stripDuplicateOrderItemIncomes(itemIds, t);
+    }
+
     const remaining = Number(Math.max(0, total - paid).toFixed(2));
-    return { group, items, total, paid, remaining };
+    return { group, items, total, paid, remaining, itemIds };
   };
 
   const syncGroupAfterPayments = async (groupId, t) => {
@@ -506,6 +526,10 @@ const toNum = (v, def = 0) => {
           },
           { transaction: t }
         );
+
+        // El abono del grupo reemplaza incomes sueltos por ítem (evita sumar el doble)
+        const groupItemIds = items.map((it) => it.id);
+        await stripDuplicateOrderItemIncomes(groupItemIds, t);
 
         console.log("[payItemGroup] abono registrado OK", {
           groupId: group.id,

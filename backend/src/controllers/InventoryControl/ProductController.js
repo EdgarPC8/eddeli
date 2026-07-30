@@ -16,6 +16,11 @@ import {
 import fileDirName from "../../libs/file-dirname.js";
 import { normalizePackageTiersStrict } from "../../utils/productPricingUtils.js";
 import { parsePagination, sendPaginated } from "../../utils/pagination.js";
+import {
+  getDefaultStockStoreId,
+  setStoreStockAbsolute,
+  listProductStoreStocks,
+} from "../../services/storeStockService.js";
 
 const PRODUCT_TYPE_ORDER = literal(
   `CASE \`${InventoryProduct.tableName}\`.\`type\` WHEN 'final' THEN 1 WHEN 'intermediate' THEN 2 ELSE 3 END`,
@@ -389,7 +394,7 @@ const isImageInUseElsewhere = async (filename, currentProductId = null) => {
 export const patchProductStock = async (req, res) => {
   try {
     const { id } = req.params;
-    const { stock, minStock } = req.body ?? {};
+    const { stock, minStock, storeId } = req.body ?? {};
 
     const row = await InventoryProduct.findByPk(id);
     if (!row) {
@@ -404,15 +409,6 @@ export const patchProductStock = async (req, res) => {
     const prevMinStock = Number(row.minStock ?? 0);
     const updates = {};
 
-    if (stock !== undefined && stock !== null && stock !== "") {
-      const n = Number(stock);
-      if (!Number.isFinite(n) || n < 0) {
-        notifyFail("product.stock_adjust_failed", "Stock inválido", { req, httpStatus: 400 });
-        return res.status(400).json({ message: "Stock inválido" });
-      }
-      updates.stock = n;
-    }
-
     if (minStock !== undefined && minStock !== null && minStock !== "") {
       const n = Number(minStock);
       if (!Number.isFinite(n) || n < 0) {
@@ -422,22 +418,40 @@ export const patchProductStock = async (req, res) => {
       updates.minStock = n;
     }
 
-    if (!Object.keys(updates).length) {
+    let nextStock = prevStock;
+    if (stock !== undefined && stock !== null && stock !== "") {
+      const n = Number(stock);
+      if (!Number.isFinite(n) || n < 0) {
+        notifyFail("product.stock_adjust_failed", "Stock inválido", { req, httpStatus: 400 });
+        return res.status(400).json({ message: "Stock inválido" });
+      }
+      const targetStoreId =
+        storeId != null && storeId !== "" ? Number(storeId) : await getDefaultStockStoreId();
+      const result = await setStoreStockAbsolute(targetStoreId, row.id, n, {
+        allowNegative: false,
+      });
+      nextStock = result.productStock;
+      await row.reload();
+    }
+
+    if (!Object.keys(updates).length && (stock === undefined || stock === null || stock === "")) {
       notifyFail("product.stock_adjust_failed", "Indica stock y/o minStock", { req, httpStatus: 400 });
       return res.status(400).json({ message: "Indica stock y/o minStock" });
     }
 
-    await row.update(updates);
-    await row.reload();
+    if (Object.keys(updates).length) {
+      await row.update(updates);
+      await row.reload();
+    }
 
-    const nextStock = Number(row.stock ?? 0);
+    nextStock = Number(row.stock ?? nextStock);
     const nextMinStock = Number(row.minStock ?? 0);
 
     logger({
       httpMethod: "PATCH",
       endPoint: `/inventory/products/${id}/stock`,
       action: "Ajuste directo de stock (dashboard)",
-      description: `Producto #${id} "${row.name}": stock ${prevStock} → ${nextStock}, minStock ${prevMinStock} → ${nextMinStock}. Sin movimiento de inventario.`,
+      description: `Producto #${id} "${row.name}": stock ${prevStock} → ${nextStock}, minStock ${prevMinStock} → ${nextMinStock}. Stock por local (bodega/default).`,
       system: req.headers["user-agent"] || "dashboard",
     });
 
@@ -458,6 +472,7 @@ export const patchProductStock = async (req, res) => {
         type: row.type,
         isActive: row.isActive,
       },
+      storeStocks: await listProductStoreStocks(row.id),
     });
   } catch (error) {
     console.error("patchProductStock:", error);
@@ -467,6 +482,24 @@ export const patchProductStock = async (req, res) => {
       httpStatus: 500,
     });
     return res.status(500).json({ message: "Error al actualizar stock", error: error.message });
+  }
+};
+
+/** GET /inventory/products/:id/store-stocks — desglose por local */
+export const getProductStoreStocks = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const row = await InventoryProduct.findByPk(id, { attributes: ["id", "name", "stock"] });
+    if (!row) return res.status(404).json({ message: "Producto no encontrado" });
+    const storeStocks = await listProductStoreStocks(row.id);
+    res.json({
+      productId: row.id,
+      name: row.name,
+      stockTotal: Number(row.stock ?? 0),
+      storeStocks,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 };
 

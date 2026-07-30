@@ -5,6 +5,11 @@ import { CashShiftMovement } from "../../models/CashShiftMovement.js";
 import { Order, OrderItem, Customer } from "../../models/Orders.js";
 import { Users } from "../../models/Users.js";
 import { InventoryProduct, InventoryMovement, Store } from "../../models/Inventory.js";
+import {
+  CashRegister,
+  ensureDefaultCashRegisters,
+  padEmissionCode,
+} from "../../models/CashRegister.js";
 import { Expense } from "../../models/Finance.js";
 import { toAppDateTime, nowApp } from "../../utils/appDateTime.js";
 import {
@@ -57,7 +62,13 @@ export async function findOpenShiftForAccount(accountId) {
           "address",
           "establishmentCode",
           "emissionPointCode",
+          "locationKind",
         ],
+      },
+      {
+        model: CashRegister,
+        as: "activeCashRegister",
+        attributes: ["id", "name", "code", "emissionPointCode", "storeId", "isActive"],
       },
     ],
     order: [["openedAt", "DESC"]],
@@ -281,8 +292,50 @@ async function buildShiftResponse(shift) {
   const opening = Number(shift.openingCashTotal || 0);
   const expectedCash = computeExpectedCash(opening, sales.salesCash, cashOut, cashIn);
 
+  let cashRegisters = [];
+  if (shift.storeId) {
+    const store =
+      shift.store ||
+      (await Store.findByPk(shift.storeId, {
+        attributes: ["id", "emissionPointCode", "locationKind"],
+      }));
+    if (store) {
+      const regs = await ensureDefaultCashRegisters(store);
+      cashRegisters = regs
+        .filter((r) => r.isActive !== false)
+        .map((r) => ({
+          id: r.id,
+          storeId: r.storeId,
+          name: r.name,
+          code: r.code,
+          emissionPointCode: r.emissionPointCode,
+          isActive: r.isActive,
+          position: r.position,
+        }));
+      if (cashRegisters.length === 0) {
+        const allActive = await CashRegister.findAll({
+          where: { storeId: shift.storeId, isActive: true },
+          order: [
+            ["position", "ASC"],
+            ["id", "ASC"],
+          ],
+        });
+        cashRegisters = allActive.map((r) => ({
+          id: r.id,
+          storeId: r.storeId,
+          name: r.name,
+          code: r.code,
+          emissionPointCode: r.emissionPointCode,
+          isActive: r.isActive,
+          position: r.position,
+        }));
+      }
+    }
+  }
+
   return {
     ...shift.toJSON(),
+    cashRegisters,
     sales,
     cashMovements: {
       cashOut,
@@ -538,7 +591,7 @@ export async function createShiftMovement(req, res) {
 export async function openShift(req, res) {
   try {
     const { accountId, userId } = req.user;
-    const { notes, openedAt, storeId } = req.body;
+    const { notes, openedAt, storeId, cashRegisterId } = req.body;
 
     const existing = await findOpenShiftForAccount(accountId);
     if (existing) {
@@ -563,6 +616,7 @@ export async function openShift(req, res) {
         "establishmentCode",
         "emissionPointCode",
         "locationKind",
+        "isActive",
       ],
     });
 
@@ -581,14 +635,20 @@ export async function openShift(req, res) {
           });
         }
       }
-      store = activeStores.find((s) => s.id === resolvedStoreId) || null;
+      store = activeStores.find((s) => Number(s.id) === Number(resolvedStoreId)) || null;
       if (!store) {
         store = await Store.findByPk(resolvedStoreId);
       }
-      if (!store || !store.isActive || store.locationKind === "vitrina") {
+      const isActiveVal =
+        store &&
+        (store.isActive === true || store.isActive === 1 || store.isActive === "1");
+      const isPropia =
+        store && String(store.locationKind || "").toLowerCase() === "propia";
+      if (!store || !isPropia || !isActiveVal) {
         notifyFail("shift.open_failed", "Elige una sucursal propia", { req, httpStatus: 400 });
         return res.status(400).json({
-          message: "Elige una sucursal propia (no una vitrina de entrega).",
+          message:
+            "Elige una sucursal propia activa (no bodega ni vitrina). Créala o actívala en Locales.",
         });
       }
     } else if (resolvedStoreId) {
@@ -621,14 +681,45 @@ export async function openShift(req, res) {
     const establishmentCode = store
       ? padSriCode(store.establishmentCode, "001")
       : null;
-    const emissionPointCode = store
-      ? padSriCode(store.emissionPointCode, "001")
-      : null;
+
+    let registers = [];
+    let activeRegister = null;
+    if (store) {
+      registers = await ensureDefaultCashRegisters(store);
+      registers = registers.filter((r) => r.isActive !== false);
+      if (registers.length === 0) {
+        registers = await CashRegister.findAll({
+          where: { storeId: store.id, isActive: true },
+          order: [
+            ["position", "ASC"],
+            ["id", "ASC"],
+          ],
+        });
+      }
+      const wantedId =
+        cashRegisterId != null && cashRegisterId !== "" ? Number(cashRegisterId) : null;
+      if (wantedId) {
+        activeRegister = registers.find((r) => r.id === wantedId) || null;
+        if (!activeRegister) {
+          notifyFail("shift.open_failed", "Caja no válida para este local", { req, httpStatus: 400 });
+          return res.status(400).json({ message: "La caja seleccionada no pertenece a este local." });
+        }
+      } else {
+        activeRegister = registers[0] || null;
+      }
+    }
+
+    const emissionPointCode = activeRegister
+      ? padEmissionCode(activeRegister.emissionPointCode, store ? padSriCode(store.emissionPointCode, "001") : "001")
+      : store
+        ? padSriCode(store.emissionPointCode, "001")
+        : null;
 
     const shift = await CashShift.create({
       accountId,
       userId,
       storeId: store?.id ?? null,
+      activeCashRegisterId: activeRegister?.id ?? null,
       establishmentCode,
       emissionPointCode,
       status: "open",
@@ -643,10 +734,56 @@ export async function openShift(req, res) {
     notifyOk("shift.opened", `Turno #${shift.id}`, { shiftId: shift.id });
     res.status(201).json({
       message: "Turno abierto correctamente.",
-      shift: withStore || shift,
+      shift: withStore ? await buildShiftResponse(withStore) : shift,
     });
   } catch (error) {
     notifyFail("shift.open_failed", error.message, { error, req, httpStatus: 500 });
+    res.status(500).json({ message: error.message });
+  }
+}
+
+/** PATCH /shifts/:id/active-register — cambia la caja POS del turno abierto */
+export async function setActiveCashRegister(req, res) {
+  try {
+    const { accountId } = req.user;
+    const { id } = req.params;
+    const cashRegisterId = Number(req.body?.cashRegisterId);
+
+    if (!Number.isFinite(cashRegisterId)) {
+      return res.status(400).json({ message: "cashRegisterId es obligatorio." });
+    }
+
+    const shift = await CashShift.findByPk(id);
+    if (!shift) return res.status(404).json({ message: "Turno no encontrado." });
+    if (shift.accountId !== accountId && !ADMIN_ROLES.has(req.user.loginRol)) {
+      return res.status(403).json({ message: "No autorizado." });
+    }
+    if (shift.status !== "open") {
+      return res.status(400).json({ message: "El turno ya está cerrado." });
+    }
+    if (!shift.storeId) {
+      return res.status(400).json({ message: "Este turno no está ligado a un local." });
+    }
+
+    const register = await CashRegister.findByPk(cashRegisterId);
+    if (!register || register.storeId !== shift.storeId || !register.isActive) {
+      return res.status(400).json({ message: "Caja no válida para este local." });
+    }
+
+    shift.activeCashRegisterId = register.id;
+    shift.emissionPointCode = padEmissionCode(register.emissionPointCode, shift.emissionPointCode);
+    await shift.save();
+
+    const refreshed = await findOpenShiftForAccount(shift.accountId);
+    notifyOk("shift.active_register", `Turno #${shift.id} → caja #${register.id}`, {
+      shiftId: shift.id,
+      cashRegisterId: register.id,
+    });
+    res.json({
+      message: "Caja activa actualizada.",
+      shift: refreshed ? await buildShiftResponse(refreshed) : null,
+    });
+  } catch (error) {
     res.status(500).json({ message: error.message });
   }
 }

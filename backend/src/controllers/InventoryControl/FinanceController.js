@@ -14,6 +14,39 @@ import { buildFinanceDateColumnWhere } from "../../utils/financeDateUtils.js";
 import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 /**
+ * Si un grupo ya tiene abonos (group_payment), borra incomes "order_item" de esos
+ * ítems para no sumar el doble en Finanzas (liquidación + Pago ítem #…).
+ */
+async function stripOrderItemIncomesWhenGroupAlreadyPaid() {
+  try {
+    const paidGroupRows = await Payment.findAll({
+      where: { status: "completed" },
+      attributes: ["groupId"],
+      raw: true,
+    });
+    const groupIds = [...new Set(paidGroupRows.map((r) => Number(r.groupId)).filter(Boolean))];
+    if (!groupIds.length) return;
+
+    const links = await ItemGroupItem.findAll({
+      where: { groupId: { [Op.in]: groupIds } },
+      attributes: ["orderItemId"],
+      raw: true,
+    });
+    const itemIds = [...new Set(links.map((l) => Number(l.orderItemId)).filter(Boolean))];
+    if (!itemIds.length) return;
+
+    await Income.destroy({
+      where: {
+        referenceType: "order_item",
+        referenceId: { [Op.in]: itemIds },
+      },
+    });
+  } catch (e) {
+    console.warn("stripOrderItemIncomesWhenGroupAlreadyPaid:", e?.message || e);
+  }
+}
+
+/**
  * Ingresos futuros / por cobrar: alineado con cobranzas por grupos.
  * - Ítems en un grupo abierto: solo el saldo (total líneas − abonos), no el bruto del ítem.
  * - Ítems sin grupo: cantidad cobrable × precio si paidAt es null.
@@ -33,6 +66,7 @@ export const getFinanceSummary = async (req, res) => {
   };
 
   try {
+    await stripOrderItemIncomesWhenGroupAlreadyPaid();
     const [totalIncome, totalExpense, groupLinks, openGroups, completedPayments] = await Promise.all([
       Income.sum('amount'),
       Expense.sum('amount'),
@@ -281,6 +315,7 @@ export const createExpense = async (req, res) => {
 /** Obtener todos los ingresos */
 export const getAllIncomes = async (req, res) => {
   try {
+    await stripOrderItemIncomesWhenGroupAlreadyPaid();
     const incomes = await Income.findAll({
       include: [{ model: Account }],
       order: [

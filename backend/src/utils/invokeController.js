@@ -34,21 +34,54 @@ function pickProductStockFields(p) {
   };
 }
 
+/**
+ * Bandas de alerta respecto al mínimo M:
+ * - agotados: stock ≤ 0
+ * - critico / porAgotarse: 0 < stock ≤ M
+ * - bajo: M < stock ≤ 1.5×M
+ * - precaucion: 1.5×M < stock ≤ 2×M
+ * (stock > 2×M o M≤0 con stock>0 → sin alerta)
+ */
+export function classifyStockAlertBand(stockRaw, minRaw) {
+  const stock = Number(stockRaw ?? 0);
+  const min = Number(minRaw ?? 0);
+  if (stock <= 0) return "agotados";
+  if (!(min > 0)) return null;
+  if (stock <= min) return "critico";
+  if (stock <= min * 1.5) return "bajo";
+  if (stock <= min * 2) return "precaucion";
+  return null;
+}
+
 export function buildProductsStockAlerts(products = []) {
   const list = Array.isArray(products) ? products : [];
-  const agotados = list
-    .filter((p) => Number(p.stock ?? 0) <= 0)
-    .map(pickProductStockFields)
-    .sort((a, b) => String(a.name).localeCompare(String(b.name), "es"));
+  const agotados = [];
+  const critico = [];
+  const bajo = [];
+  const precaucion = [];
 
-  const porAgotarse = list
-    .filter((p) => {
-      const stock = Number(p.stock ?? 0);
-      const min = Number(p.minStock ?? 0);
-      return stock > 0 && stock <= min;
-    })
-    .map(pickProductStockFields)
-    .sort((a, b) => a.stock - b.stock || a.minStock - b.minStock);
+  for (const p of list) {
+    const band = classifyStockAlertBand(p.stock, p.minStock);
+    if (!band) continue;
+    const row = pickProductStockFields(p);
+    if (band === "agotados") agotados.push(row);
+    else if (band === "critico") critico.push(row);
+    else if (band === "bajo") bajo.push(row);
+    else if (band === "precaucion") precaucion.push(row);
+  }
 
-  return { agotados, porAgotarse };
+  agotados.sort((a, b) => String(a.name).localeCompare(String(b.name), "es"));
+  const byStock = (a, b) => a.stock - b.stock || a.minStock - b.minStock;
+  critico.sort(byStock);
+  bajo.sort(byStock);
+  precaucion.sort(byStock);
+
+  return {
+    agotados,
+    /** @deprecated alias de critico (compat UI antigua) */
+    porAgotarse: critico,
+    critico,
+    bajo,
+    precaucion,
+  };
 }

@@ -20,6 +20,12 @@ import {
 import { Op, fn, col, literal } from "sequelize";
 import { parsePagination, sendPaginated } from "../../utils/pagination.js";
 import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
+import {
+  adjustStoreStock,
+  getDefaultStockStoreId,
+  setStoreStockAbsolute,
+  getStoreStockQty,
+} from "../../services/storeStockService.js";
 
 // helpers
 const startOfDay = (d) => {
@@ -606,39 +612,42 @@ const MOVEMENT_TYPES = ["entrada", "salida", "ajuste", "produccion"];
 const AJUSTE_REASONS_DB = new Set(["AJUSTE_ENTRADA", "AJUSTE_SALIDA"]);
 
 /**
- * ENTRADA: suma cantidad al stock (compras, devoluciones, otras entradas).
- * @param {import("sequelize").Model} product InventoryProduct
- * @param {number} qtyDelta cantidad a sumar (>= 0 esperado)
+ * ENTRADA: suma cantidad al stock del local (default bodega).
  */
-async function applyMovementEntrada(product, qtyDelta, transaction) {
-  product.stock = parseFloat(product.stock) + qtyDelta;
-  await product.save({ transaction });
+async function applyMovementEntrada(product, qtyDelta, transaction, storeId) {
+  const sid = storeId || (await getDefaultStockStoreId({ transaction }));
+  await adjustStoreStock(sid, product.id, qtyDelta, { transaction, allowNegative: false });
+  await product.reload({ transaction });
 }
 
 /**
- * PRODUCCIÓN: mismo efecto contable que entrada — incrementa stock del producto fabricado.
- * (El desglose de insumos va por otros flujos: registerProductionFinalFromPayload, etc.)
+ * PRODUCCIÓN: incrementa stock del producto fabricado en el local.
  */
-async function applyMovementProduccion(product, qtyDelta, transaction) {
-  product.stock = parseFloat(product.stock) + qtyDelta;
-  await product.save({ transaction });
+async function applyMovementProduccion(product, qtyDelta, transaction, storeId) {
+  const sid = storeId || (await getDefaultStockStoreId({ transaction }));
+  await adjustStoreStock(sid, product.id, qtyDelta, { transaction, allowNegative: false });
+  await product.reload({ transaction });
 }
 
 /**
- * SALIDA: resta cantidad del stock (venta, consumo interno, merma, etc.)
+ * SALIDA: resta del stock del local.
  */
-async function applyMovementSalida(product, qtyDelta, transaction) {
-  product.stock = parseFloat(product.stock) - qtyDelta;
-  await product.save({ transaction });
+async function applyMovementSalida(product, qtyDelta, transaction, storeId) {
+  const sid = storeId || (await getDefaultStockStoreId({ transaction }));
+  await adjustStoreStock(sid, product.id, -qtyDelta, { transaction, allowNegative: false });
+  await product.reload({ transaction });
 }
 
 /**
- * AJUSTE: `nuevoStockAbsoluto` reemplaza el stock (inventario físico / conteo).
- * No es un delta: el front envía el valor final deseado en `quantity`.
+ * AJUSTE: cantidad absoluta en el local (default bodega); el total del producto es la suma.
  */
-async function applyMovementAjuste(product, nuevoStockAbsoluto, transaction) {
-  product.stock = nuevoStockAbsoluto;
-  await product.save({ transaction });
+async function applyMovementAjuste(product, nuevoStockAbsoluto, transaction, storeId) {
+  const sid = storeId || (await getDefaultStockStoreId({ transaction }));
+  await setStoreStockAbsolute(sid, product.id, nuevoStockAbsoluto, {
+    transaction,
+    allowNegative: false,
+  });
+  await product.reload({ transaction });
 }
 
 /**
@@ -960,6 +969,7 @@ async function applyMovementRecord(
     referenceType,
     referenceId,
     date: movementDateInput,
+    storeId: storeIdInput,
   },
   user,
   transaction,
@@ -1000,17 +1010,24 @@ async function applyMovementRecord(
     throw err;
   }
 
-  const stockAntes = parseFloat(product.stock) || 0;
+  const stockStoreId =
+    storeIdInput != null && storeIdInput !== ""
+      ? Number(storeIdInput)
+      : await getDefaultStockStoreId({ transaction });
+
+  const stockAntes = stockStoreId
+    ? await getStoreStockQty(stockStoreId, productId, { transaction })
+    : parseFloat(product.stock) || 0;
   const reasonParaDb = normalizeMovementReason(type, reason, stockAntes, qty);
 
   if (type === "entrada") {
-    await applyMovementEntrada(product, qty, transaction);
+    await applyMovementEntrada(product, qty, transaction, stockStoreId);
   } else if (type === "produccion") {
-    await applyMovementProduccion(product, qty, transaction);
+    await applyMovementProduccion(product, qty, transaction, stockStoreId);
   } else if (type === "salida") {
-    await applyMovementSalida(product, qty, transaction);
+    await applyMovementSalida(product, qty, transaction, stockStoreId);
   } else if (type === "ajuste") {
-    await applyMovementAjuste(product, qty, transaction);
+    await applyMovementAjuste(product, qty, transaction, stockStoreId);
   }
 
   let expenseId = null;

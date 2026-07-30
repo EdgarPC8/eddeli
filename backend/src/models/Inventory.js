@@ -293,11 +293,12 @@ export const Store = sequelize.define(
     isActive: { type: DataTypes.BOOLEAN, defaultValue: true },     // visible en home/lista
 
     /**
-     * propia = tu panadería / caja (turno + códigos SRI 001/002)
-     * vitrina = local ajeno donde entregas producto para que vendan
+     * propia = sucursal con turno/caja
+     * vitrina = local ajeno (sin stock inventariable)
+     * bodega = almacén (stock, sin turno/caja)
      */
     locationKind: {
-      type: DataTypes.ENUM("propia", "vitrina"),
+      type: DataTypes.ENUM("propia", "vitrina", "bodega"),
       allowNull: false,
       defaultValue: "vitrina",
     },

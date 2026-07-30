@@ -57,6 +57,15 @@ export const AppSettings = sequelize.define(
       allowNull: false,
       defaultValue: true,
     },
+    /**
+     * Stock por local (bodega / sucursales).
+     * true = multistock; false = stock general editable en Productos.
+     */
+    multiStockEnabled: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
   },
   { timestamps: true },
 );

@@ -92,7 +92,13 @@ export const getFinanceDashboardRest = async (req, res) => {
     return res.json({
       overView: Array.isArray(overView) ? overView : [],
       incomeExpenseBreakdown: incomeExpenseBreakdown ?? {},
-      productsStock: productsStock ?? { agotados: [], porAgotarse: [] },
+      productsStock: productsStock ?? {
+        agotados: [],
+        porAgotarse: [],
+        critico: [],
+        bajo: [],
+        precaucion: [],
+      },
       recurring: recurring ?? emptyRecurring,
       batchesAlerts: batchesAlerts ?? emptyBatchesAlerts,
     });
@@ -147,7 +153,13 @@ export const getFinanceDashboard = async (req, res) => {
         groups: workbench?.groups ?? [],
         payments: workbench?.payments ?? [],
       },
-      productsStock: rest.productsStock ?? { agotados: [], porAgotarse: [] },
+      productsStock: rest.productsStock ?? {
+        agotados: [],
+        porAgotarse: [],
+        critico: [],
+        bajo: [],
+        precaucion: [],
+      },
       batchesAlerts: rest.batchesAlerts ?? emptyBatchesAlerts,
       obligations: hero.obligations ?? emptyObligations,
       recurring: rest.recurring ?? emptyRecurring,

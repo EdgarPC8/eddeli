@@ -2,6 +2,7 @@ import { DataTypes } from "sequelize";
 import { sequelize } from "../database/connection.js";
 import { Users } from "./Users.js";
 import { Store } from "./Inventory.js";
+import { CashRegister } from "./CashRegister.js";
 
 /** Turno de caja: apertura con capital inicial y cierre con arqueo. */
 export const CashShift = sequelize.define(
@@ -12,6 +13,8 @@ export const CashShift = sequelize.define(
     userId: { type: DataTypes.INTEGER, allowNull: false },
     /** Local / panadería desde la que opera este turno */
     storeId: { type: DataTypes.INTEGER, allowNull: true },
+    /** Caja activa del local para ventas POS en este turno */
+    activeCashRegisterId: { type: DataTypes.INTEGER, allowNull: true },
     /** Snapshot SRI al abrir (por si el Store cambia después) */
     establishmentCode: { type: DataTypes.STRING(3), allowNull: true },
     emissionPointCode: { type: DataTypes.STRING(3), allowNull: true },
@@ -53,3 +56,12 @@ Users.hasMany(CashShift, { foreignKey: "userId", as: "cashShifts" });
 
 CashShift.belongsTo(Store, { foreignKey: "storeId", as: "store" });
 Store.hasMany(CashShift, { foreignKey: "storeId", as: "cashShifts" });
+
+CashShift.belongsTo(CashRegister, {
+  foreignKey: "activeCashRegisterId",
+  as: "activeCashRegister",
+});
+CashRegister.hasMany(CashShift, {
+  foreignKey: "activeCashRegisterId",
+  as: "activeShifts",
+});

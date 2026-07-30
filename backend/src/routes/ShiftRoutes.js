@@ -11,6 +11,7 @@ import {
   getShiftMovements,
   getShifts,
   openShift,
+  setActiveCashRegister,
   updateShiftMovementProgrammer,
   updateShiftProgrammer,
 } from "../controllers/InventoryControl/ShiftController.js";
@@ -23,6 +24,7 @@ router.get("/reports/daily", isAuthenticated, getDailyShiftReport);
 router.get("/", isAuthenticated, getShifts);
 router.get("/:id/movements", isAuthenticated, getShiftMovements);
 router.post("/:id/movements", isAuthenticated, createShiftMovement);
+router.patch("/:id/active-register", isAuthenticated, setActiveCashRegister);
 router.patch("/:id", isAuthenticated, requireProgrammer, updateShiftProgrammer);
 router.patch("/:id/movements/:movementId", isAuthenticated, requireProgrammer, updateShiftMovementProgrammer);
 router.delete("/:id/movements/:movementId", isAuthenticated, requireProgrammer, deleteShiftMovementProgrammer);

@@ -30,6 +30,7 @@ export const DEFAULT_APP_SETTINGS = {
   showPublicCatalog: true,
   showPublicStoresPropia: true,
   showPublicStoresVitrina: true,
+  multiStockEnabled: true,
 };
 
 let cache = { ...DEFAULT_APP_SETTINGS };
@@ -143,6 +144,7 @@ async function ensureAppSettingsSchema() {
     ["showPublicCatalog", true],
     ["showPublicStoresPropia", true],
     ["showPublicStoresVitrina", true],
+    ["multiStockEnabled", true],
   ];
   for (const [col, def] of boolCols) {
     if (!table[col]) {
@@ -180,6 +182,7 @@ export async function loadAppSettings() {
     showPublicCatalog: asBool(raw.showPublicCatalog, true),
     showPublicStoresPropia: asBool(raw.showPublicStoresPropia, true),
     showPublicStoresVitrina: asBool(raw.showPublicStoresVitrina, true),
+    multiStockEnabled: asBool(raw.multiStockEnabled, true),
   };
   ensureStandardAssetDirs(cache.mediaFolderPrefix);
   return cache;
@@ -191,6 +194,7 @@ export async function updateAppSettings(payload) {
     "showPublicCatalog",
     "showPublicStoresPropia",
     "showPublicStoresVitrina",
+    "multiStockEnabled",
   ]) {
     if (key in patch) patch[key] = asBool(patch[key], true);
   }
@@ -207,6 +211,7 @@ export async function updateAppSettings(payload) {
     showPublicCatalog: asBool(raw.showPublicCatalog, true),
     showPublicStoresPropia: asBool(raw.showPublicStoresPropia, true),
     showPublicStoresVitrina: asBool(raw.showPublicStoresVitrina, true),
+    multiStockEnabled: asBool(raw.multiStockEnabled, true),
   };
   return cache;
 }
@@ -238,5 +243,6 @@ export function toPublicSettings(data = cache) {
     showPublicCatalog: asBool(data.showPublicCatalog, true),
     showPublicStoresPropia: asBool(data.showPublicStoresPropia, true),
     showPublicStoresVitrina: asBool(data.showPublicStoresVitrina, true),
+    multiStockEnabled: asBool(data.multiStockEnabled, true),
   };
 }

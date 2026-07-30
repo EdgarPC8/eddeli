@@ -9,6 +9,7 @@ import {
   updateProduct,
   deleteProduct,
   patchProductStock,
+  getProductStoreStocks,
 } from '../controllers/InventoryControl/ProductController.js';
 
 import {
@@ -99,6 +100,17 @@ import {
   updateStore,
   deleteStore,
 } from "../controllers/InventoryControl/StoresController.js";
+import {
+  listCashRegisters,
+  createCashRegister,
+  updateCashRegister,
+  deactivateCashRegister,
+} from "../controllers/InventoryControl/CashRegisterController.js";
+import {
+  transferStock,
+  getStocksByStore,
+  getBodegaInfo,
+} from "../controllers/InventoryControl/StoreStockController.js";
 // CatalogController: CRUD admin + template-items (diseño promocional)
 import {
   getCatalogEntries,
@@ -197,6 +209,15 @@ router.post("/stores/", isAuthenticated, edDeliUploadSingle, createStore);
 router.put("/stores/:id", isAuthenticated, edDeliUploadSingle, updateStore);
 router.delete("/stores/:id", isAuthenticated, deleteStore);
 
+router.get("/stores/:storeId/registers", isAuthenticated, listCashRegisters);
+router.post("/stores/:storeId/registers", isAuthenticated, createCashRegister);
+router.put("/registers/:id", isAuthenticated, updateCashRegister);
+router.delete("/registers/:id", isAuthenticated, deactivateCashRegister);
+
+router.get("/bodega", isAuthenticated, getBodegaInfo);
+router.get("/stores/:storeId/stocks", isAuthenticated, getStocksByStore);
+router.post("/store-stocks/transfer", isAuthenticated, transferStock);
+
 // ----------------------------------
 // 🔁 Home Products
 // ----------------------------------
@@ -227,6 +248,7 @@ router.delete('/suppliers/:id', isAuthenticated, deleteSupplier);
 router.post('/products', isAuthenticated, edDeliUploadSingle, createProduct);            // Crear producto
 router.get('/products', isAuthenticated, getAllProducts);           // Obtener todos los productos
 router.patch('/products/:id/stock', isAuthenticated, requireProgrammer, patchProductStock);
+router.get('/products/:id/store-stocks', isAuthenticated, getProductStoreStocks);
 router.put('/products/:id', isAuthenticated, edDeliUploadSingle, updateProduct);        // Editar producto
 router.delete('/products/:id', isAuthenticated, deleteProduct);     // Eliminar producto
 

@@ -39,6 +39,14 @@ import { ensureEntitlementTable } from "./src/services/entitlementService.js";
 import { ensureCustomerNameSchema } from "./src/services/customerNameService.js";
 import { Store } from "./src/models/Inventory.js";
 import { CashShift } from "./src/models/CashShift.js";
+import { CashRegister, seedDefaultCashRegistersForOwnStores } from "./src/models/CashRegister.js";
+import { Order } from "./src/models/Orders.js";
+import { StoreStock } from "./src/models/StoreStock.js";
+import {
+  ensureStoreLocationKindEnum,
+  ensureBodegaStore,
+  migrateGlobalStockToBodega,
+} from "./src/services/storeStockService.js";
 
 import NotificationProgramRoutes from "./src/routes/NotificationProgramRoutes.js";
 import { startNotificationScheduler } from "./src/services/notificationScheduler.js";
@@ -131,8 +139,15 @@ export async function main() {
     await ensureEntitlementTable();
     // Columnas nuevas de locales (001/002) y turno ligado al local
     await Store.sync({ alter: true });
+    await ensureStoreLocationKindEnum();
+    await CashRegister.sync({ alter: true });
     await CashShift.sync({ alter: true });
+    await Order.sync({ alter: true });
+    await StoreStock.sync({ alter: true });
     await ensureCustomerNameSchema();
+    await seedDefaultCashRegistersForOwnStores();
+    await ensureBodegaStore();
+    await migrateGlobalStockToBodega();
 
     // ═══════════════════════════════════════════════════════════════════
     // ⚠️  SOLO DESARROLLO — Reset total (borra tablas y carga backup.json)

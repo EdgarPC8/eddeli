@@ -43,6 +43,7 @@ export async function putAppSettings(req, res) {
       "showPublicCatalog",
       "showPublicStoresPropia",
       "showPublicStoresVitrina",
+      "multiStockEnabled",
     ];
     const patch = {};
     for (const key of allowed) {
