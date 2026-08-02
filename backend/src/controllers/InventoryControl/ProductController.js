@@ -450,8 +450,10 @@ export const patchProductStock = async (req, res) => {
     logger({
       httpMethod: "PATCH",
       endPoint: `/inventory/products/${id}/stock`,
-      action: "Ajuste directo de stock (dashboard)",
-      description: `Producto #${id} "${row.name}": stock ${prevStock} → ${nextStock}, minStock ${prevMinStock} → ${nextMinStock}. Stock por local (bodega/default).`,
+      action: "Ajuste directo de stock (dashboard / local)",
+      description: `Producto #${id} "${row.name}": stock ${prevStock} → ${nextStock}, minStock ${prevMinStock} → ${nextMinStock}.${
+        storeId != null && storeId !== "" ? ` Local #${storeId}.` : " Stock por local (bodega/default)."
+      } Sin movimiento de inventario.`,
       system: req.headers["user-agent"] || "dashboard",
     });
 

@@ -36,6 +36,24 @@ export async function ensureStoreLocationKindEnum() {
   }
 }
 
+/** Columna isVisible en ERP_stores (vitrina pública vs operativo). */
+export async function ensureStoreIsVisibleColumn() {
+  try {
+    const [cols] = await sequelize.query(`SHOW COLUMNS FROM \`ERP_stores\` LIKE 'isVisible'`);
+    if (Array.isArray(cols) && cols.length) return;
+    await sequelize.query(
+      "ALTER TABLE `ERP_stores` ADD COLUMN `isVisible` TINYINT(1) NOT NULL DEFAULT 1 AFTER `isActive`",
+    );
+    // Locales inactivos no deben verse en home
+    await sequelize.query(
+      "UPDATE `ERP_stores` SET `isVisible` = 0 WHERE `isActive` = 0 OR `isActive` IS NULL",
+    );
+    console.log("[storeStock] Columna isVisible añadida a ERP_stores.");
+  } catch (err) {
+    console.warn("[storeStock] ensureStoreIsVisibleColumn:", err.message);
+  }
+}
+
 /** Obtiene o crea el local Bodega. */
 export async function ensureBodegaStore({ transaction } = {}) {
   let bodega = await Store.findOne({

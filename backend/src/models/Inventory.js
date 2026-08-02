@@ -290,7 +290,9 @@ export const Store = sequelize.define(
 
     // Meta UI / ordenamiento y visibilidad
     position: { type: DataTypes.INTEGER, defaultValue: 0 },        // orden en lista
-    isActive: { type: DataTypes.BOOLEAN, defaultValue: true },     // visible en home/lista
+    isActive: { type: DataTypes.BOOLEAN, defaultValue: true },     // operativo (turno, stock, movimientos)
+    /** Vitrina pública (home / punto de venta). Si isActive=false → forzar false. */
+    isVisible: { type: DataTypes.BOOLEAN, defaultValue: true },
 
     /**
      * propia = sucursal con turno/caja
@@ -325,6 +327,7 @@ export const Store = sequelize.define(
     timestamps: true, // createdAt, updatedAt
     indexes: [
       { fields: ["isActive"] },
+      { fields: ["isVisible"] },
       { fields: ["position"] },
       { fields: ["city"] },
       { fields: ["province"] },
@@ -356,13 +359,49 @@ export const StoreProduct = sequelize.define("ERP_store_products", {
   },
 
   isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+
+  /** Organización visual dentro del local (no afecta stock). */
+  exhibidorId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    comment: "Exhibidor del local; null = sin asignar. El stock sigue siendo por local.",
+  },
 }, {
   timestamps: true,
   indexes: [
     { unique: true, fields: ["storeId", "productId"] },
     { fields: ["isActive"] },
+    { fields: ["exhibidorId"] },
   ],
 });
+
+/**
+ * Exhibidor = zona/estante del local solo para organizar productos.
+ * No lleva cantidad de stock (el stock es StoreStock por local).
+ */
+export const StoreExhibidor = sequelize.define(
+  "ERP_store_exhibidores",
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    storeId: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      references: { model: "ERP_stores", key: "id" },
+      onDelete: "CASCADE",
+      onUpdate: "CASCADE",
+    },
+    name: { type: DataTypes.STRING(120), allowNull: false },
+    position: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 0 },
+    isActive: { type: DataTypes.BOOLEAN, allowNull: false, defaultValue: true },
+  },
+  {
+    timestamps: true,
+    indexes: [
+      { fields: ["storeId", "position"] },
+      { fields: ["storeId", "isActive"] },
+    ],
+  },
+);
 
 
 Store.belongsToMany(InventoryProduct, {
@@ -380,6 +419,12 @@ InventoryProduct.belongsToMany(Store, {
 // StoreProduct ↔ InventoryProduct
 StoreProduct.belongsTo(InventoryProduct, { foreignKey: 'productId' });
 InventoryProduct.hasMany(StoreProduct, { foreignKey: 'productId' });
+
+Store.hasMany(StoreExhibidor, { foreignKey: "storeId", as: "exhibidores", onDelete: "CASCADE" });
+StoreExhibidor.belongsTo(Store, { foreignKey: "storeId", as: "store" });
+
+StoreExhibidor.hasMany(StoreProduct, { foreignKey: "exhibidorId", as: "storeProducts" });
+StoreProduct.belongsTo(StoreExhibidor, { foreignKey: "exhibidorId", as: "exhibidor" });
 
 // InventoryProduct ↔ Category / Unit
 InventoryProduct.belongsTo(InventoryCategory, { foreignKey: 'categoryId' });

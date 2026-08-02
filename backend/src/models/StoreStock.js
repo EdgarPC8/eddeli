@@ -5,7 +5,8 @@ import { InventoryProduct, Store } from "./Inventory.js";
 /**
  * Stock de un producto en un local (propia / bodega).
  * El stock general del producto = suma de filas por local.
- * exhibidorId queda reservado para fase 2 (null = en el local sin exhibidor).
+ * exhibidorId en esta tabla NO se usa para organización (queda null);
+ * la organización va en ERP_store_products.exhibidorId.
  */
 export const StoreStock = sequelize.define(
   "ERP_store_stocks",

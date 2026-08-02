@@ -154,6 +154,13 @@ import {
 } 
 from '../controllers/InventoryControl/StoreProductsController.js';
 
+import {
+  listStoreExhibidores,
+  createStoreExhibidor,
+  updateStoreExhibidor,
+  deleteStoreExhibidor,
+} from "../controllers/InventoryControl/StoreExhibidorController.js";
+
 const router = express.Router();
 
 
@@ -162,6 +169,12 @@ router.get("/stores/:storeId/products", getProductsByStore);
 router.post("/stores/:storeId/products", isAuthenticated, addProductsToStore);
 router.delete("/stores/:storeId/products/:productId", isAuthenticated, removeProductFromStore);
 router.patch("/stores/:storeId/products/:productId", isAuthenticated, toggleStoreProduct);
+
+// Exhibidores del local (organización; no stock)
+router.get("/stores/:storeId/exhibidores", isAuthenticated, listStoreExhibidores);
+router.post("/stores/:storeId/exhibidores", isAuthenticated, createStoreExhibidor);
+router.put("/stores/:storeId/exhibidores/:exhibidorId", isAuthenticated, updateStoreExhibidor);
+router.delete("/stores/:storeId/exhibidores/:exhibidorId", isAuthenticated, deleteStoreExhibidor);
 
 // tiendas que tienen un producto (opcional)
 // router.get("/products/:productId/stores", getStoresByProduct);

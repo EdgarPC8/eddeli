@@ -64,6 +64,15 @@ export const createStore = async (req, res) => {
     if ("isActive" in payload) {
       payload.isActive = String(payload.isActive) === "true";
     }
+    if ("isVisible" in payload) {
+      payload.isVisible = String(payload.isVisible) === "true";
+    }
+    // Inactivo ⇒ no visible en home/punto de venta
+    if (payload.isActive === false) {
+      payload.isVisible = false;
+    } else if (payload.isVisible == null) {
+      payload.isVisible = true;
+    }
 
     const kind = String(payload.locationKind || "vitrina").trim().toLowerCase();
     if (kind === "propia") payload.locationKind = "propia";
@@ -210,6 +219,16 @@ export const updateStore = async (req, res) => {
     if ("isActive" in updates) {
       updates.isActive = String(updates.isActive) === "true";
     }
+    if ("isVisible" in updates) {
+      updates.isVisible = String(updates.isVisible) === "true";
+    }
+    // Inactivo ⇒ forzar no visible (bodega/sucursal apagada no sale en home)
+    const nextActive =
+      "isActive" in updates ? updates.isActive : row.isActive !== false && row.isActive !== 0;
+    if (!nextActive) {
+      updates.isVisible = false;
+    }
+
     if ("name" in updates && updates.name != null) updates.name = String(updates.name).trim();
     if ("address" in updates && updates.address != null) updates.address = String(updates.address).trim();
 
@@ -261,13 +280,19 @@ export const updateStore = async (req, res) => {
 
 export const getStores = async (req, res) => {
   try {
-    const { isActive, kind, locationKind } = req.query;
+    const { isActive, isVisible, kind, locationKind } = req.query;
 
     const where = {};
     if (isActive === "true" || isActive === true) {
       where.isActive = true;
     } else if (isActive === "false" || isActive === false) {
       where.isActive = false;
+    }
+
+    if (isVisible === "true" || isVisible === true) {
+      where.isVisible = true;
+    } else if (isVisible === "false" || isVisible === false) {
+      where.isVisible = false;
     }
 
     const kindFilter = String(kind || locationKind || "").trim().toLowerCase();
