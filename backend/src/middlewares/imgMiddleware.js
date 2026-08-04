@@ -128,12 +128,10 @@ export const makeImageUpload = ({
   fieldName = "file",
   allowedExt = DEFAULT_ALLOWED_EXT,
   maxMB = DEFAULT_MAX_MB,
-  // resolver la carpeta destino:
-  // por defecto toma req.body.folder || req.query.folder || ""
-  folderResolver = (req) => req.body?.folder || req.query?.folder || "",
+  // resolver la carpeta destino (query primero: multer a veces aún no tiene body en destination)
+  folderResolver = (req) => req.query?.folder || req.body?.folder || "",
   // resolver nombre:
-  // por defecto toma req.body.name || req.query.name || autogenerado
-  nameResolver = (req, file) => req.body?.name || req.query?.name || defaultFileName(file?.originalname),
+  nameResolver = (req, file) => req.query?.name || req.body?.name || defaultFileName(file?.originalname),
   // si quieres forzar replace en server:
   forceReplace = null, // true/false/null (null = depende de req)
 } = {}) => {
@@ -177,7 +175,7 @@ export const makeImageUpload = ({
             ? true
             : forceReplace === false
               ? false
-              : String(req.body?.replace ?? req.query?.replace ?? "false").toLowerCase() === "true";
+              : String(req.query?.replace ?? req.body?.replace ?? "false").toLowerCase() === "true";
 
         // si existe y replace=true, elimina primero
         if (replace && fs.existsSync(fullPath)) {

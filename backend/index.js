@@ -36,15 +36,8 @@ import SriBillingRoutes from "./src/routes/SriBillingRoutes.js";
 import { loadAppSettings } from "./src/services/appSettingsService.js";
 import { loadSriBillingSettings } from "./src/services/sriBillingService.js";
 import { ensureEntitlementTable } from "./src/services/entitlementService.js";
-import { ensureCustomerNameSchema } from "./src/services/customerNameService.js";
-import { Store, StoreExhibidor, StoreProduct } from "./src/models/Inventory.js";
-import { CashShift } from "./src/models/CashShift.js";
-import { CashRegister, seedDefaultCashRegistersForOwnStores } from "./src/models/CashRegister.js";
-import { Order } from "./src/models/Orders.js";
-import { StoreStock } from "./src/models/StoreStock.js";
+import { seedDefaultCashRegistersForOwnStores } from "./src/models/CashRegister.js";
 import {
-  ensureStoreLocationKindEnum,
-  ensureStoreIsVisibleColumn,
   ensureBodegaStore,
   migrateGlobalStockToBodega,
 } from "./src/services/storeStockService.js";
@@ -137,18 +130,8 @@ export async function main() {
     await sequelize.authenticate();
     await loadAppSettings();
     await loadSriBillingSettings();
-    await ensureEntitlementTable();
-    // Columnas nuevas de locales (001/002) y turno ligado al local
-    await Store.sync({ alter: true });
-    await StoreExhibidor.sync({ alter: true });
-    await StoreProduct.sync({ alter: true });
-    await ensureStoreLocationKindEnum();
-    await ensureStoreIsVisibleColumn();
-    await CashRegister.sync({ alter: true });
-    await CashShift.sync({ alter: true });
-    await Order.sync({ alter: true });
-    await StoreStock.sync({ alter: true });
-    await ensureCustomerNameSchema();
+    // Sin sync({ alter }) en arranque: el esquema se alinea a mano con `npm run db:sync`.
+    await ensureEntitlementTable({ alter: false });
     await seedDefaultCashRegistersForOwnStores();
     await ensureBodegaStore();
     await migrateGlobalStockToBodega();

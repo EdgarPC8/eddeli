@@ -994,7 +994,7 @@ export const getFinanceWorkbenchAll = async (req, res) => {
     const result = await sequelize.transaction(async (t) => {
       // 1) Clientes + pedidos + items + producto
       const customers = await Customer.findAll({
-        attributes: ["id", "name", "phone", "email"],
+        attributes: ["id", "name", "phone", "email", "cedula", "identType", "firstName", "secondName", "firstLastName", "secondLastName", "address"],
         include: [
           {
             model: Order,
@@ -1183,6 +1183,13 @@ export const getFinanceWorkbenchAll = async (req, res) => {
         name: c.name,
         phone: c.phone ?? null,
         email: c.email ?? null,
+        cedula: c.cedula ?? null,
+        identType: c.identType ?? null,
+        firstName: c.firstName ?? null,
+        secondName: c.secondName ?? null,
+        firstLastName: c.firstLastName ?? null,
+        secondLastName: c.secondLastName ?? null,
+        address: c.address ?? null,
         debtTotal: Number(toNum(debtByCustomerId.get(c.id) || 0).toFixed(2)),
       }));
 

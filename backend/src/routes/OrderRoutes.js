@@ -45,6 +45,10 @@ import {
   markSupplierOrderPaid,
 } from "../controllers/InventoryControl/SupplierOrderController.js";
 import {
+  exportOrdersMonth,
+  importOrdersMonth,
+} from "../controllers/InventoryControl/OrderMonthTransferController.js";
+import {
   getSupplierPayablesWorkbench,
   paySupplierOrder,
   updateSupplierOrderPayment,
@@ -188,6 +192,12 @@ router.post("/supplier-payables/packs/:packId/pay", isAuthenticated, paySupplier
 router.post("/supplier-payables/orders/:orderId/pay", isAuthenticated, paySupplierOrder);
 router.put("/supplier-payables/payments/:paymentId", isAuthenticated, updateSupplierOrderPayment);
 router.delete("/supplier-payables/payments/:paymentId", isAuthenticated, deleteSupplierOrderPayment);
+
+// =====================================================
+// ✅ TRANSFERENCIA MES (export/import JSON clientes + proveedores)
+// =====================================================
+router.get("/month-transfer/export", isAuthenticated, exportOrdersMonth);
+router.post("/month-transfer/import", isAuthenticated, importOrdersMonth);
 
 // =====================================================
 // ✅ ÓRDENES (LO TUYO NORMAL)

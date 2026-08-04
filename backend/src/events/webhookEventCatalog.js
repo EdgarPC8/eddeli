@@ -133,6 +133,9 @@ const EXPLICIT_RULES = [
   { method: "PUT", pattern: /^\/orders\/order-items\/\d+\/programmer-dashboard\/?$/, type_key: "order_item.programmer_corrected", name: (req) => nameWithEntity("Corrección ítem", req, "itemId") },
   { method: "PATCH", pattern: /^\/orders\/order-items\/\d+\/programmer-dashboard\/?$/, type_key: "order_item.programmer_corrected", name: (req) => nameWithEntity("Corrección ítem", req, "itemId") },
 
+  { method: "GET", pattern: /^\/orders\/month-transfer\/export\/?$/, type_key: "orders.month_exported", name: "Export pedidos del mes" },
+  { method: "POST", pattern: /^\/orders\/month-transfer\/import\/?$/, type_key: "orders.month_imported", name: "Import pedidos del mes" },
+
   { method: "POST", pattern: /^\/orders\/customers\/?$/, type_key: "customer.created", name: "Cliente creado" },
   { method: "PUT", pattern: /^\/orders\/customers\/\d+\/?$/, type_key: "customer.updated", name: (req) => nameWithEntity("Cliente", req, "id") },
   { method: "DELETE", pattern: /^\/orders\/customers\/\d+\/?$/, type_key: "customer.deleted", name: (req) => nameWithEntity("Cliente", req, "id") },
