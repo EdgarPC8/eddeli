@@ -19,6 +19,7 @@ import {
   storeHoldsInventory,
 } from "../../services/storeStockService.js";
 import { getAppSettingsSync } from "../../services/appSettingsService.js";
+import { consumeBatchesFefo } from "../../services/batchStockService.js";
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
@@ -261,6 +262,13 @@ export const posCheckout = async (req, res) => {
             allowNegative: false,
           });
           await product.reload({ transaction: t });
+
+          await consumeBatchesFefo({
+            productId,
+            quantity: qty,
+            storeId: stockStoreId,
+            transaction: t,
+          });
 
           await InventoryMovement.create(
             {
@@ -835,6 +843,13 @@ export const closeOrderItemLogistics = async (req, res) => {
       product.stock = num(product.stock) - totalDeltaOut;
       await product.save({ transaction: t });
 
+      await consumeBatchesFefo({
+        productId: product.id,
+        quantity: totalDeltaOut,
+        storeId: null,
+        transaction: t,
+      });
+
       const createMov = async (qty, reason, desc) => {
         if (qty <= 0) return;
         await InventoryMovement.create({
@@ -1149,6 +1164,13 @@ export const markItemAsDelivered = async (req, res) => {
         }
         await product.update({ stock: num(product.stock) - qty }, { transaction: t });
       }
+
+      await consumeBatchesFefo({
+        productId: product.id,
+        quantity: qty,
+        storeId: deliverStoreId || null,
+        transaction: t,
+      });
 
       await InventoryMovement.create(
         {

@@ -53,6 +53,8 @@ import {
   createBatch,
   updateBatch,
   writeOffBatch,
+  closeBatch,
+  splitBatch,
   deleteBatch,
 } from '../controllers/InventoryControl/BatchController.js';
 
@@ -338,6 +340,8 @@ router.get('/batches', isAuthenticated, getBatches);
 router.post('/batches', isAuthenticated, createBatch);
 router.put('/batches/:id', isAuthenticated, updateBatch);
 router.post('/batches/:id/write-off', isAuthenticated, writeOffBatch);
+router.post('/batches/:id/close', isAuthenticated, closeBatch);
+router.post('/batches/:id/split', isAuthenticated, splitBatch);
 router.delete('/batches/:id', isAuthenticated, deleteBatch);
 
 

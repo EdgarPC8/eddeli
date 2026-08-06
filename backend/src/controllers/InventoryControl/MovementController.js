@@ -26,6 +26,7 @@ import {
   setStoreStockAbsolute,
   getStoreStockQty,
 } from "../../services/storeStockService.js";
+import { consumeBatchesFefo } from "../../services/batchStockService.js";
 
 // helpers
 const startOfDay = (d) => {
@@ -636,6 +637,12 @@ async function applyMovementSalida(product, qtyDelta, transaction, storeId) {
   const sid = storeId || (await getDefaultStockStoreId({ transaction }));
   await adjustStoreStock(sid, product.id, -qtyDelta, { transaction, allowNegative: false });
   await product.reload({ transaction });
+  await consumeBatchesFefo({
+    productId: product.id,
+    quantity: qtyDelta,
+    storeId: sid,
+    transaction,
+  });
 }
 
 /**
@@ -643,11 +650,22 @@ async function applyMovementSalida(product, qtyDelta, transaction, storeId) {
  */
 async function applyMovementAjuste(product, nuevoStockAbsoluto, transaction, storeId) {
   const sid = storeId || (await getDefaultStockStoreId({ transaction }));
+  const before = await getStoreStockQty(sid, product.id, { transaction });
   await setStoreStockAbsolute(sid, product.id, nuevoStockAbsoluto, {
     transaction,
     allowNegative: false,
   });
   await product.reload({ transaction });
+  const after = Number(nuevoStockAbsoluto) || 0;
+  const dropped = before - after;
+  if (dropped > 0.0001) {
+    await consumeBatchesFefo({
+      productId: product.id,
+      quantity: dropped,
+      storeId: sid,
+      transaction,
+    });
+  }
 }
 
 /**

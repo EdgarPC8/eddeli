@@ -33,12 +33,13 @@ import ComandsRoutes from "./src/routes/ComandsRoutes.js";
 import AppSettingsRoutes from "./src/routes/AppSettingsRoutes.js";
 import SubscriptionRoutes from "./src/routes/SubscriptionRoutes.js";
 import SriBillingRoutes from "./src/routes/SriBillingRoutes.js";
-import { loadAppSettings } from "./src/services/appSettingsService.js";
+import { loadAppSettings, getAppSettingsSync } from "./src/services/appSettingsService.js";
 import { loadSriBillingSettings } from "./src/services/sriBillingService.js";
 import { ensureEntitlementTable } from "./src/services/entitlementService.js";
 import { seedDefaultCashRegistersForOwnStores } from "./src/models/CashRegister.js";
 import {
   ensureBodegaStore,
+  ensureSingleLocalOwnStore,
   migrateGlobalStockToBodega,
 } from "./src/services/storeStockService.js";
 
@@ -132,9 +133,14 @@ export async function main() {
     await loadSriBillingSettings();
     // Sin sync({ alter }) en arranque: el esquema se alinea a mano con `npm run db:sync`.
     await ensureEntitlementTable({ alter: false });
+    // Multistock: Bodega + migración. Un solo local: asegurar un local «propia» para turno.
+    if (getAppSettingsSync()?.multiStockEnabled) {
+      await ensureBodegaStore();
+      await migrateGlobalStockToBodega();
+    } else {
+      await ensureSingleLocalOwnStore();
+    }
     await seedDefaultCashRegistersForOwnStores();
-    await ensureBodegaStore();
-    await migrateGlobalStockToBodega();
 
     // ═══════════════════════════════════════════════════════════════════
     // ⚠️  SOLO DESARROLLO — Reset total (borra tablas y carga backup.json)

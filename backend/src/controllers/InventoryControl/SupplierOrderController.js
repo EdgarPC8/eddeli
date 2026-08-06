@@ -701,6 +701,7 @@ export const markSupplierOrderReceived = async (req, res) => {
         const batch = await InventoryBatch.create(
           {
             productId: g.productId,
+            storeId: receiveStoreId || null,
             code: g.lotCode,
             quantityInitial: g.quantity,
             quantityRemaining: g.quantity,

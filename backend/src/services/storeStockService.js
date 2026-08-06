@@ -2,6 +2,7 @@ import { Op } from "sequelize";
 import { sequelize } from "../database/connection.js";
 import { InventoryProduct, Store } from "../models/Inventory.js";
 import { StoreStock } from "../models/StoreStock.js";
+import { getAppSettingsSync } from "./appSettingsService.js";
 
 const BODEGA_NAME = "Bodega";
 
@@ -54,8 +55,12 @@ export async function ensureStoreIsVisibleColumn() {
   }
 }
 
-/** Obtiene o crea el local Bodega. */
+/** Obtiene o crea el local Bodega (solo multistock). Sin multistock → local de operación. */
 export async function ensureBodegaStore({ transaction } = {}) {
+  if (!getAppSettingsSync()?.multiStockEnabled) {
+    return ensureSingleLocalOwnStore({ transaction });
+  }
+
   let bodega = await Store.findOne({
     where: { locationKind: "bodega" },
     order: [["id", "ASC"]],
@@ -91,8 +96,66 @@ export async function ensureBodegaStore({ transaction } = {}) {
 }
 
 export async function getDefaultStockStoreId({ transaction } = {}) {
+  if (!getAppSettingsSync()?.multiStockEnabled) {
+    const store = await ensureSingleLocalOwnStore({ transaction });
+    return store.id;
+  }
   const bodega = await ensureBodegaStore({ transaction });
   return bodega.id;
+}
+
+/**
+ * Modo un solo local (multiStock desactivado): no exige Bodega.
+ * Si el único local quedó como «bodega», lo pasa a «propia» para poder abrir turno/caja.
+ */
+export async function ensureSingleLocalOwnStore({ transaction } = {}) {
+  const propia = await Store.findOne({
+    where: { locationKind: "propia", isActive: true },
+    order: [["id", "ASC"]],
+    transaction,
+  });
+  if (propia) return propia;
+
+  const anyActive = await Store.findOne({
+    where: { isActive: true },
+    order: [["id", "ASC"]],
+    transaction,
+  });
+  if (anyActive) {
+    const patch = {
+      locationKind: "propia",
+      isActive: true,
+      establishmentCode: anyActive.establishmentCode || "001",
+      emissionPointCode: anyActive.emissionPointCode || "001",
+    };
+    // Evitar que el único local se siga mostrando como «Bodega».
+    if (/^bodega/i.test(String(anyActive.name || "").trim())) {
+      patch.name = "Local principal";
+      patch.address = anyActive.address || "";
+      patch.description = "Local de operación (modo un solo local).";
+    }
+    await anyActive.update(patch, { transaction });
+    console.log(
+      `[storeStock] Modo un local: «${anyActive.name}» (#${anyActive.id}) → sucursal propia.`,
+    );
+    return anyActive;
+  }
+
+  const created = await Store.create(
+    {
+      name: "Local principal",
+      address: "",
+      description: "Local de operación (modo un solo local).",
+      locationKind: "propia",
+      isActive: true,
+      position: 0,
+      establishmentCode: "001",
+      emissionPointCode: "001",
+    },
+    { transaction },
+  );
+  console.log(`[storeStock] Modo un local: creado Local principal #${created.id}.`);
+  return created;
 }
 
 export async function sumProductStoreStock(productId, { transaction } = {}) {

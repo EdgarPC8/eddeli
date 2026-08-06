@@ -499,6 +499,14 @@ export const InventoryBatch = sequelize.define(
       onUpdate: "CASCADE",
       onDelete: "CASCADE",
     },
+    /** Local / bodega del lote (multistock). Null = sin asignar o modo un local. */
+    storeId: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
+      references: { model: "ERP_stores", key: "id" },
+      onUpdate: "CASCADE",
+      onDelete: "SET NULL",
+    },
     code: { type: DataTypes.STRING(80), allowNull: true },
     quantityInitial: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 0 },
     quantityRemaining: { type: DataTypes.FLOAT, allowNull: false, defaultValue: 0 },
@@ -535,6 +543,14 @@ InventoryProduct.hasMany(InventoryBatch, {
 InventoryBatch.belongsTo(InventoryProduct, {
   foreignKey: "productId",
   as: "product",
+});
+InventoryBatch.belongsTo(Store, {
+  foreignKey: "storeId",
+  as: "store",
+});
+Store.hasMany(InventoryBatch, {
+  foreignKey: "storeId",
+  as: "batches",
 });
 InventoryBatch.belongsTo(Account, { foreignKey: "createdBy", as: "creator" });
 
