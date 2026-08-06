@@ -4,12 +4,14 @@
 import axios from "axios";
 import { AppEntitlement } from "../models/AppEntitlement.js";
 import { subscription as gestorConfig } from "../config/subscription-api.js";
+import { updateAppSettings } from "./appSettingsService.js";
 
 const GESTOR_SYNC_SECRET = process.env.GESTOR_SYNC_SECRET || "";
 
 const EMPTY = {
   maintenance: false,
   subscribed: false,
+  features: [],
   subscription: null,
 };
 
@@ -27,13 +29,25 @@ function coerceJson(value) {
   return null;
 }
 
+function normalizeFeatures(raw) {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((f) => f && typeof f === "object" && f.key)
+    .map((f) => ({
+      key: String(f.key),
+      name: f.name != null ? String(f.name) : String(f.key),
+      status: f.status != null ? String(f.status) : "planned",
+    }));
+}
+
 function normalizePayload(body) {
   const parsed = coerceJson(body);
   if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
   const subscribed = Boolean(parsed.subscribed);
   const maintenance = Boolean(parsed.maintenance);
   const subscription = parsed.subscription ?? null;
-  return { maintenance, subscribed, subscription };
+  const features = normalizeFeatures(parsed.features);
+  return { maintenance, subscribed, subscription, features };
 }
 
 /** Quita módulos/secciones ocultos antes de exponer al frontend. */
@@ -53,6 +67,31 @@ function stripHiddenFromSubscription(subscription) {
   return { ...subscription, modules: filtered };
 }
 
+function stripHiddenFeatures(features) {
+  if (!Array.isArray(features)) return [];
+  return features.filter((f) => f && f.status !== "hidden");
+}
+
+function featureIsUnlocked(status) {
+  return status === "active" || status === "developer";
+}
+
+/**
+ * Side-effects: el gestor BLOQUEA / DESBLOQUEA; no enciende la opción por el cliente.
+ * - multi_stock bloqueado → fuerza multiStockEnabled=false
+ * - multi_stock desbloqueado → no toca el flag (el cliente lo activa en Configuración)
+ */
+async function applyFeatureSideEffects(features) {
+  if (!Array.isArray(features)) return;
+
+  const multi = features.find((f) => f && f.key === "multi_stock");
+  if (!multi) return;
+
+  if (!featureIsUnlocked(multi.status)) {
+    await updateAppSettings({ multiStockEnabled: false });
+  }
+}
+
 export async function getEntitlementResponse() {
   const row = await AppEntitlement.findByPk(1);
   if (!row?.payload) return { ...EMPTY };
@@ -61,6 +100,7 @@ export async function getEntitlementResponse() {
   const out = {
     maintenance: Boolean(payload.maintenance),
     subscribed: Boolean(payload.subscribed),
+    features: stripHiddenFeatures(normalizeFeatures(payload.features)),
     subscription: stripHiddenFromSubscription(payload.subscription ?? null),
     meta: {
       source: row.source,
@@ -102,6 +142,12 @@ export async function saveEntitlement(rawPayload, source = "gestor_push") {
     syncedAt: new Date(),
   });
 
+  try {
+    await applyFeatureSideEffects(payload.features);
+  } catch (err) {
+    console.error("[entitlement] applyFeatureSideEffects:", err?.message || err);
+  }
+
   return getEntitlementResponse();
 }
 
@@ -135,4 +181,20 @@ export async function ensureEntitlementTable({ alter = false } = {}) {
       syncedAt: null,
     },
   });
+}
+
+/** Gate de feature desde el payload crudo (incluye hidden). */
+export async function getFeatureGate(key) {
+  const row = await AppEntitlement.findByPk(1);
+  const payload = coerceJson(row?.payload) || EMPTY;
+  const features = normalizeFeatures(payload.features);
+  const f = features.find((x) => x.key === key);
+  if (!f) {
+    return { present: false, status: "hidden", unlocked: false };
+  }
+  return {
+    present: true,
+    status: f.status,
+    unlocked: featureIsUnlocked(f.status),
+  };
 }

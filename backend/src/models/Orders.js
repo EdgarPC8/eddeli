@@ -108,6 +108,12 @@ export const OrderItem = sequelize.define("ERP_order_items", {
     allowNull: true,
     comment: "Fecha cuando quedó totalmente pagado (último pago)",
   },
+  /** Agrupa líneas en una paca del pedido a cliente. */
+  packKey: { type: DataTypes.STRING(64), allowNull: true },
+  packName: { type: DataTypes.STRING(120), allowNull: true },
+  lotCode: { type: DataTypes.STRING(80), allowNull: true },
+  expiresAt: { type: DataTypes.DATEONLY, allowNull: true },
+  manufacturedAt: { type: DataTypes.DATEONLY, allowNull: true },
   
   
 }, {

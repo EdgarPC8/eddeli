@@ -21,6 +21,7 @@ import {
   HomeProduct,
   Store,
   Catalog,
+  StoreExhibidor,
   StoreProduct,
   ProductCompareGroup,
   ProductCompareGroupItem,
@@ -105,6 +106,8 @@ export const BACKUP_TABLE_ENTRIES = [
   { key: "InventoryBatch", model: InventoryBatch },
   { key: "Store", model: Store },
   { key: "CashRegister", model: CashRegister },
+  // StoreExhibidor tras Store y antes de StoreStock / StoreProduct (FK exhibidorId)
+  { key: "StoreExhibidor", model: StoreExhibidor },
   { key: "CashShift", model: CashShift, sanitize: "CashShift" },
   { key: "CashShiftMovement", model: CashShiftMovement },
   { key: "Customer", model: Customer },
@@ -484,6 +487,28 @@ export function prepareBackupForRestore(jsonData) {
         next.emissionPointCode = "001";
       }
       return next;
+    });
+  }
+
+  // Backups viejos sin StoreExhibidor: anula exhibidorId huérfanos.
+  const exhibidores = Array.isArray(data.StoreExhibidor) ? data.StoreExhibidor : [];
+  const validExhibidorIds = new Set(exhibidores.map((e) => e?.id).filter((id) => id != null));
+  if (Array.isArray(data.StoreProduct)) {
+    data.StoreProduct = data.StoreProduct.map((row) => {
+      if (!row || row.exhibidorId == null) return row;
+      if (!validExhibidorIds.has(row.exhibidorId)) {
+        return { ...row, exhibidorId: null };
+      }
+      return row;
+    });
+  }
+  if (Array.isArray(data.StoreStock)) {
+    data.StoreStock = data.StoreStock.map((row) => {
+      if (!row || row.exhibidorId == null) return row;
+      if (!validExhibidorIds.has(row.exhibidorId)) {
+        return { ...row, exhibidorId: null };
+      }
+      return row;
     });
   }
 

@@ -16,11 +16,18 @@ import {
 import { SupplierOrderPayment } from "../../models/Finance.js";
 import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
-const CAJA_POS_TAG = "[CAJA_POS]";
 const IMPORT_TAG = "[IMPORT_MES]";
+const CAJA_POS_TAG = "[CAJA_POS]";
+const SALE_CREDITO_TAG = "[CREDITO]";
 
-const nonCajaPosNotesWhere = {
-  [Op.or]: [{ notes: null }, { notes: { [Op.notLike]: `%${CAJA_POS_TAG}%` } }],
+/** Export de pedidos: manuales + crédito de caja (sin contado POS). */
+const pedidosListNotesWhere = {
+  [Op.or]: [
+    { notes: null },
+    { notes: { [Op.notLike]: `%${CAJA_POS_TAG}%` } },
+    { notes: { [Op.like]: `%${SALE_CREDITO_TAG}%` } },
+    { paymentMethod: "credito" },
+  ],
 };
 
 const toNum = (v, fallback = 0) => {
@@ -115,7 +122,7 @@ export const exportOrdersMonth = async (req, res) => {
     const [customerRows, supplierRows] = await Promise.all([
       Order.findAll({
         where: {
-          ...nonCajaPosNotesWhere,
+          ...pedidosListNotesWhere,
           date: { [Op.gte]: from, [Op.lte]: to },
         },
         include: [

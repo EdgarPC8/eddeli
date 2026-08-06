@@ -22,7 +22,7 @@ import {
   payObligation,
   cancelObligation,
 } from "../controllers/InventoryControl/LoanObligationController.js";
-import { getProductSeriesCharts } from "../controllers/InventoryControl/ProductSeriesController.js";
+import { getProductSeriesCharts, getProductSeriesDetail } from "../controllers/InventoryControl/ProductSeriesController.js";
 import { getCashFlowMirror } from "../controllers/InventoryControl/CashFlowMirrorController.js";
 import { getCashFlowCandles } from "../controllers/InventoryControl/CashFlowCandlestickController.js";
 import {
@@ -72,6 +72,7 @@ router.get("/getCustomerSalesSummary", ...adminOnly, getCustomerSalesSummary);
 router.get("/getOrdersForCharts", ...adminOnly, getOrdersForCharts);
 router.get("/getExpensesForChart", ...adminOnly, getExpensesForChart);
 router.get("/product-series", ...adminOnly, getProductSeriesCharts);
+router.get("/product-series/detail", ...adminOnly, getProductSeriesDetail);
 router.get("/cash-flow-mirror", ...adminOnly, getCashFlowMirror);
 router.get("/cash-flow-candles", ...adminOnly, getCashFlowCandles);
 

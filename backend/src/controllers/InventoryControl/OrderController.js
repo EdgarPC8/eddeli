@@ -23,6 +23,7 @@ import { getAppSettingsSync } from "../../services/appSettingsService.js";
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 let orderItemDeliverSchemaReady = false;
+let orderItemPackSchemaReady = false;
 
 async function ensureOrderItemDeliverSchema() {
   if (orderItemDeliverSchemaReady) return;
@@ -39,6 +40,74 @@ async function ensureOrderItemDeliverSchema() {
     console.warn("ensureOrderItemDeliverSchema:", e?.message || e);
   }
   orderItemDeliverSchemaReady = true;
+}
+
+async function ensureOrderItemPackSchema() {
+  if (orderItemPackSchemaReady) return;
+  const cols = [
+    ["packKey", "VARCHAR(64) NULL"],
+    ["packName", "VARCHAR(120) NULL"],
+    ["lotCode", "VARCHAR(80) NULL"],
+    ["expiresAt", "DATE NULL"],
+    ["manufacturedAt", "DATE NULL"],
+  ];
+  for (const [name, ddl] of cols) {
+    try {
+      const [found] = await sequelize.query(
+        `SHOW COLUMNS FROM \`ERP_order_items\` LIKE '${name}'`,
+      );
+      if (!Array.isArray(found) || found.length === 0) {
+        await sequelize.query(
+          `ALTER TABLE \`ERP_order_items\` ADD COLUMN \`${name}\` ${ddl}`,
+        );
+      }
+    } catch (e) {
+      console.warn(`ensureOrderItemPackSchema ${name}:`, e?.message || e);
+    }
+  }
+  orderItemPackSchemaReady = true;
+}
+
+function parseDayOnly(raw) {
+  if (raw == null || raw === "") return null;
+  const s = String(raw).slice(0, 10);
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
+function itemPackLotFields(row = {}) {
+  const packKey =
+    row.packKey != null && String(row.packKey).trim()
+      ? String(row.packKey).trim().slice(0, 64)
+      : null;
+  const packName =
+    row.packName != null && String(row.packName).trim()
+      ? String(row.packName).trim().slice(0, 120)
+      : null;
+  const lotCode =
+    row.lotCode != null && String(row.lotCode).trim()
+      ? String(row.lotCode).trim().slice(0, 80)
+      : null;
+  const expiresAt = parseDayOnly(row.expiresAt);
+  const manufacturedAt = parseDayOnly(row.manufacturedAt);
+  if (manufacturedAt && expiresAt && manufacturedAt > expiresAt) {
+    throw new Error("La fecha de elaboración no puede ser posterior al vencimiento");
+  }
+  return { packKey, packName, lotCode, expiresAt, manufacturedAt };
+}
+
+function buildCustomerItemPayload(orderId, row) {
+  const productId = Number(row.productId);
+  const quantity = num(row.quantity);
+  const price = num(row.price ?? row.unitPrice);
+  if (!productId || quantity <= 0) throw new Error("Ítem inválido en el pedido");
+  if (!Number.isFinite(price) || price < 0) throw new Error("Precio inválido en el pedido");
+  return {
+    orderId,
+    productId,
+    quantity,
+    price,
+    ...itemPackLotFields(row),
+  };
 }
 
 /** null = stock general; número = local inventariable. */
@@ -68,18 +137,27 @@ function orderItemBillableTotal(item) {
 }
 
 const CAJA_POS_TAG = "[CAJA_POS]";
+const SALE_CREDITO_TAG = "[CREDITO]";
 
-/** Pedidos manuales/calendario: notes NULL o sin marca de caja POS. */
-const nonCajaPosNotesWhere = {
+/**
+ * Pedidos del calendario/listado:
+ * - pedidos manuales (sin [CAJA_POS])
+ * - ventas de caja a crédito ([CREDITO] o paymentMethod credito)
+ * Se excluyen ventas de caja al contado (efectivo/transferencia).
+ */
+const pedidosListNotesWhere = {
   [Op.or]: [
     { notes: null },
     { notes: { [Op.notLike]: `%${CAJA_POS_TAG}%` } },
+    { notes: { [Op.like]: `%${SALE_CREDITO_TAG}%` } },
+    { paymentMethod: "credito" },
   ],
 };
 
 /** POST /orders/pos/checkout — venta desde caja con turno abierto. */
 export const posCheckout = async (req, res) => {
   try {
+    await ensureOrderItemPackSchema();
     const token = getHeaderToken(req);
     const user = await verifyJWT(token);
     const { accountId } = user;
@@ -252,6 +330,7 @@ const CAJA_POS_TAG_EXPORT = "[CAJA_POS]";
 /** GET /orders/pos/sales — ventas de caja para facturación e impresión. */
 export const getPosSales = async (req, res) => {
   try {
+    await ensureOrderItemPackSchema();
     const limit = Math.min(Number(req.query.limit) || 200, 500);
     const orders = await Order.findAll({
       where: {
@@ -1139,6 +1218,7 @@ export const createCustomer = async (req, res) => {
 // Crear un nuevo pedido
 export const createOrder = async (req, res) => {
   try {
+    await ensureOrderItemPackSchema();
     const { customerId, notes, date, items } = req.body;
 
     if (!customerId || !items || items.length === 0) {
@@ -1153,16 +1233,7 @@ export const createOrder = async (req, res) => {
     });
 
     const createdItems = await Promise.all(
-      items.map((item) =>
-        OrderItem.create({
-          orderId: order.id,
-          productId: item.productId,
-          quantity: item.quantity,
-          price: item.price,
-          statusEntrega: false,
-          statusPago: false,
-        })
-      )
+      items.map((item) => OrderItem.create(buildCustomerItemPayload(order.id, item)))
     );
 
     notifyOk("order.created", `Pedido #${order.id}`, { orderId: order.id, customerId });
@@ -1174,7 +1245,7 @@ export const createOrder = async (req, res) => {
   } catch (error) {
     console.error("createOrder:", error);
     notifyFail("order.create_failed", "Error al crear pedido", { error, req, httpStatus: 500 });
-    res.status(500).json({ message: "Error al crear pedido" });
+    res.status(500).json({ message: error?.message || "Error al crear pedido" });
   }
 };
 
@@ -1253,8 +1324,7 @@ export const deleteOrder = async (req, res) => {
 export const updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    // Permitimos updates parciales solo en estos campos
-    const { customerId, notes, date } = req.body ?? {};
+    const { customerId, notes, date, items } = req.body ?? {};
 
     const token = getHeaderToken(req);
     const user = await verifyJWT(token);
@@ -1265,7 +1335,6 @@ export const updateOrder = async (req, res) => {
       return res.status(404).json({ message: 'Pedido no encontrado' });
     }
 
-    // Bloqueo por estado si no es Admin/Programador
     const isPrivileged = ['Administrador', 'Programador'].includes(user?.loginRol);
     if (['entregado', 'pagado'].includes(order.status) && !isPrivileged) {
       notifyFail("order.update_failed", `No tiene permisos para editar pedidos ${order.status}`, {
@@ -1278,11 +1347,9 @@ export const updateOrder = async (req, res) => {
       });
     }
 
-    // Construimos el payload de actualización SOLO con campos presentes
     const updates = {};
 
     if (typeof customerId !== 'undefined') {
-      // Validación simple
       if (customerId === null || Number.isNaN(Number(customerId))) {
         notifyFail("order.update_failed", "customerId inválido", { req, httpStatus: 400, extra: { orderId: id } });
         return res.status(400).json({ message: 'customerId inválido' });
@@ -1291,22 +1358,20 @@ export const updateOrder = async (req, res) => {
     }
 
     if (typeof notes !== 'undefined') {
-      // Sanitizar/limitar si quieres (ej. longitud)
       updates.notes = String(notes);
     }
 
     if (typeof date !== 'undefined') {
-      // Acepta Date ISO o string "YYYY-MM-DDTHH:mm:ss"
       const parsed = new Date(date);
       if (isNaN(parsed.getTime())) {
         notifyFail("order.update_failed", "Formato de fecha inválido", { req, httpStatus: 400, extra: { orderId: id } });
         return res.status(400).json({ message: 'Formato de fecha inválido' });
       }
-      updates.date = parsed; // Sequelize DATE/DATETIME
+      updates.date = parsed;
     }
 
-    // Si no hay nada que actualizar:
-    if (Object.keys(updates).length === 0) {
+    const hasItems = Array.isArray(items);
+    if (!hasItems && Object.keys(updates).length === 0) {
       notifyFail("order.update_failed", "No se enviaron campos válidos para actualizar", {
         req,
         httpStatus: 400,
@@ -1315,14 +1380,61 @@ export const updateOrder = async (req, res) => {
       return res.status(400).json({ message: 'No se enviaron campos válidos para actualizar' });
     }
 
-    await order.update(updates);
+    if (hasItems) {
+      await ensureOrderItemPackSchema();
+      if (items.length === 0) {
+        notifyFail("order.update_failed", "El pedido debe tener al menos un producto", {
+          req,
+          httpStatus: 400,
+          extra: { orderId: id },
+        });
+        return res.status(400).json({ message: 'El pedido debe tener al menos un producto' });
+      }
+    }
+
+    await sequelize.transaction(async (transaction) => {
+      if (Object.keys(updates).length > 0) {
+        await order.update(updates, { transaction });
+      }
+
+      if (!hasItems) return;
+
+      const existing = await OrderItem.findAll({
+        where: { orderId: order.id },
+        transaction,
+      });
+      const byId = new Map(existing.map((it) => [Number(it.id), it]));
+      const keepIds = new Set();
+
+      for (const row of items) {
+        const payload = buildCustomerItemPayload(order.id, row);
+        const rowId = row?.id != null ? Number(row.id) : null;
+        const found = Number.isFinite(rowId) ? byId.get(rowId) : null;
+        if (found) {
+          await found.update(payload, { transaction });
+          keepIds.add(Number(found.id));
+        } else {
+          const created = await OrderItem.create(payload, { transaction });
+          keepIds.add(Number(created.id));
+        }
+      }
+
+      for (const it of existing) {
+        if (!keepIds.has(Number(it.id))) {
+          await it.destroy({ transaction });
+        }
+      }
+    });
 
     notifyOk("order.updated", `Pedido #${id}`, { orderId: Number(id) });
     return res.json({ message: "Pedido actualizado correctamente", order });
   } catch (error) {
     console.error('Error al actualizar pedido:', error);
     notifyFail("order.update_failed", "Error al actualizar pedido", { error, req, httpStatus: 500 });
-    return res.status(500).json({ message: 'Error al actualizar pedido', error: String(error?.message || error) });
+    return res.status(500).json({
+      message: error?.message || 'Error al actualizar pedido',
+      error: String(error?.message || error),
+    });
   }
 };
 
@@ -1644,8 +1756,9 @@ export const programmerDashboardOrderItemCorrection = async (req, res) => {
 
 export const getOrderStatusWorkbench = async (req, res) => {
   try {
+    await ensureOrderItemPackSchema();
     const orders = await Order.findAll({
-      where: nonCajaPosNotesWhere,
+      where: pedidosListNotesWhere,
       include: [
         { model: Customer, as: "ERP_customer" },
         {
@@ -1883,12 +1996,13 @@ function parseRangeDate(value, endOfDay = false) {
 
 export const getAllOrders = async (req, res) => {
   try {
+    await ensureOrderItemPackSchema();
     const fromDate = parseRangeDate(req.query.from, false);
     const toDate = parseRangeDate(req.query.to, true);
     const pagination = parsePagination(req, { defaultPageSize: 100 });
 
     const where = {
-      ...nonCajaPosNotesWhere,
+      ...pedidosListNotesWhere,
     };
     if (fromDate || toDate) {
       where.date = {};
