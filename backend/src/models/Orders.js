@@ -68,7 +68,7 @@ export const OrderItem = sequelize.define("ERP_order_items", {
   orderId: { type: DataTypes.INTEGER, allowNull: false },
   productId: { type: DataTypes.INTEGER, allowNull: false },
   quantity: { type: DataTypes.FLOAT, allowNull: false },
-  price: { type: DataTypes.FLOAT, allowNull: false },
+  price: { type: DataTypes.DECIMAL(14, 6), allowNull: false },
   soldQty: {
     type: DataTypes.FLOAT,
     allowNull: false,

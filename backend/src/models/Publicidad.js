@@ -75,7 +75,7 @@ export const PublicidadPlaylistItem = sequelize.define(
     title: { type: DataTypes.STRING(200), allowNull: false },
     subtitle: { type: DataTypes.STRING(300), allowNull: true },
     mediaPath: { type: DataTypes.STRING(500), allowNull: true },
-    price: { type: DataTypes.DECIMAL(10, 2), allowNull: true },
+    price: { type: DataTypes.DECIMAL(14, 6), allowNull: true },
     /** Tamaño del título en px (nombre producto / mensaje texto). */
     titleFontSize: { type: DataTypes.INTEGER, allowNull: true },
     /** Estilo tipográfico: default, rounded, outline, shadow3d, rounded3d */

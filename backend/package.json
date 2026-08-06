@@ -18,6 +18,7 @@
     "db:patch:backup": "node scripts/patch-backup-schema.js",
     "db:migrate:paths-to-sistema": "node scripts/migrate-eddeli-paths-to-sistema.js",
     "db:seed:panes-group": "node scripts/seed-panes-pricing-group.js",
+    "db:merge:yema-to-sal": "node scripts/merge-pan-de-yema-into-pan-de-sal.mjs",
     "db:migrate:tramos": "node scripts/migrate-tramos-from-categories.js",
     "db:reset": "node scripts/reset-database.js",
     "db:check-backup": "node scripts/check-backup.js",

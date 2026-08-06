@@ -304,13 +304,13 @@ export const SupplierPackItem = sequelize.define("ERP_finance_supplier_pack_item
   },
 
   allocatedUnitPrice: {
-    type: DataTypes.DECIMAL(10, 4),
+    type: DataTypes.DECIMAL(14, 6),
     allowNull: false,
   },
 
   /** Precio unitario de la línea antes de armar la paca (para desglosar). */
   previousUnitPrice: {
-    type: DataTypes.DECIMAL(10, 4),
+    type: DataTypes.DECIMAL(14, 6),
     allowNull: true,
   },
 

@@ -15,6 +15,7 @@ import {
 } from "../../models/Inventory.js";
 import fileDirName from "../../libs/file-dirname.js";
 import { normalizePackageTiersStrict } from "../../utils/productPricingUtils.js";
+import { toStorageMoney } from "../../utils/moneyPrecision.js";
 import { parsePagination, sendPaginated } from "../../utils/pagination.js";
 import {
   getDefaultStockStoreId,
@@ -69,6 +70,7 @@ function productUniqueErrorMessage(error) {
   return null;
 }
 
+const PRODUCT_MONEY_FIELDS = ["price", "supplierPrice", "distributorPrice"];
 const PRODUCT_NUMERIC_FIELDS = [
   "standardWeightGrams",
   "netWeight",
@@ -92,7 +94,11 @@ function normalizeProductNumericFields(payload, { fillMissing = false } = {}) {
       continue;
     }
     const n = Number(raw);
-    payload[key] = Number.isFinite(n) ? n : 0;
+    if (!Number.isFinite(n)) {
+      payload[key] = 0;
+      continue;
+    }
+    payload[key] = PRODUCT_MONEY_FIELDS.includes(key) ? toStorageMoney(n) : n;
   }
 }
 

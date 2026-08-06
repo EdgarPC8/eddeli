@@ -58,6 +58,8 @@ import {
   deleteBatch,
 } from '../controllers/InventoryControl/BatchController.js';
 
+import { getInventoryValueSummary } from '../controllers/InventoryControl/InventoryValueController.js';
+
 
 import {
   registerMovement,
@@ -343,6 +345,11 @@ router.post('/batches/:id/write-off', isAuthenticated, writeOffBatch);
 router.post('/batches/:id/close', isAuthenticated, closeBatch);
 router.post('/batches/:id/split', isAuthenticated, splitBatch);
 router.delete('/batches/:id', isAuthenticated, deleteBatch);
+
+// ----------------------------------
+// 💰 VALOR DE INVENTARIO
+// ----------------------------------
+router.get('/value-summary', isAuthenticated, getInventoryValueSummary);
 
 
 

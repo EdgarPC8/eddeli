@@ -28,7 +28,7 @@ export const InventoryMovement = sequelize.define('ERP_inventory_movements', {
   description: { type: DataTypes.TEXT },
 
   // costo unitario (para entradas/producción y para valorar pérdidas)
-  price: { type: DataTypes.FLOAT, allowNull: true },
+  price: { type: DataTypes.DECIMAL(14, 6), allowNull: true },
 
   type: { type: DataTypes.ENUM("entrada", "salida", "ajuste", "produccion"), allowNull: false },
 
@@ -149,16 +149,16 @@ export const InventoryProduct = sequelize.define('ERP_inventory_products', {
   stock: { type: DataTypes.FLOAT, defaultValue: 0 },
   minStock: { type: DataTypes.FLOAT, defaultValue: 0 },
 
-  // 💰 Precios
+  // 💰 Precios (hasta 6 decimales en BD; pantalla según config de la app)
   /** Precio de venta al público (lo que normalmente vale). */
-  price: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
+  price: { type: DataTypes.DECIMAL(14, 6), defaultValue: 0 },
   /** Precio al que el proveedor vende a la panadería. */
-  supplierPrice: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
+  supplierPrice: { type: DataTypes.DECIMAL(14, 6), defaultValue: 0 },
   wholesaleRules: defineJsonField("wholesaleRules"),
   /** Tramos opcionales: [{ qty, totalPrice }] — ej. 2 pans = $0.25 */
   packageTiers: defineJsonField("packageTiers"),
   /** Precio para que distribuidores revendan. */
-  distributorPrice: { type: DataTypes.DECIMAL(10,2), defaultValue: 0 },
+  distributorPrice: { type: DataTypes.DECIMAL(14, 6), defaultValue: 0 },
   taxRate: { type: DataTypes.DECIMAL(5,2), defaultValue: 0 }, // % IVA
   // 📦 Identificadores
   sku: { type: DataTypes.STRING(64), unique: true, allowNull: true },
@@ -195,7 +195,7 @@ export const HomeProduct = sequelize.define("ERP_home_products", {
   name: { type: DataTypes.STRING, allowNull: false },          // título que se muestra
   description: { type: DataTypes.TEXT, allowNull: true },      // descripción corta
   imageUrl: { type: DataTypes.STRING(500), allowNull: true },  // imagen para el home
-  priceOverride: { type: DataTypes.FLOAT, allowNull: true },   // precio opcional para mostrar (si difiere)
+  priceOverride: { type: DataTypes.DECIMAL(14, 6), allowNull: true },   // precio opcional para mostrar (si difiere)
 
   // Meta para vitrina
   section: {
@@ -250,7 +250,7 @@ section: {
 
   isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
 
-  priceOverride: { type: DataTypes.DECIMAL(10,2), allowNull: true },
+  priceOverride: { type: DataTypes.DECIMAL(14, 6), allowNull: true },
   wholesaleOverrideRules: { type: DataTypes.JSON, allowNull: true },
 
   // Control temporal y sucursal (opcional)

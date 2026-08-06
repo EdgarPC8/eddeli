@@ -66,6 +66,27 @@ export const AppSettings = sequelize.define(
       allowNull: false,
       defaultValue: true,
     },
+    /** En selects de producto: mostrar chip de costo (precio proveedor del catálogo). */
+    showProductCostInSelect: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    /**
+     * Decimales a mostrar en pantalla para montos (0–6).
+     * En BD se guardan hasta 6; esto solo afecta visualización.
+     */
+    moneyDisplayDecimals: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 2,
+    },
+    /** Redondeo al mostrar: up | down | nearest */
+    moneyRoundingMode: {
+      type: DataTypes.STRING(16),
+      allowNull: false,
+      defaultValue: "up",
+    },
   },
   { timestamps: true },
 );

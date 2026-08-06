@@ -4,6 +4,10 @@ import { DataTypes } from "sequelize";
 import fs from "fs";
 import path from "path";
 import fileDirName from "../libs/file-dirname.js";
+import {
+  normalizeMoneyDisplayDecimals,
+  normalizeMoneyRoundingMode,
+} from "../utils/moneyPrecision.js";
 
 const { __dirname } = fileDirName(import.meta);
 const IMG_BASE = path.resolve(__dirname, "../img");
@@ -31,6 +35,9 @@ export const DEFAULT_APP_SETTINGS = {
   showPublicStoresPropia: true,
   showPublicStoresVitrina: true,
   multiStockEnabled: true,
+  showProductCostInSelect: false,
+  moneyDisplayDecimals: 2,
+  moneyRoundingMode: "up",
 };
 
 let cache = { ...DEFAULT_APP_SETTINGS };
@@ -145,6 +152,7 @@ async function ensureAppSettingsSchema() {
     ["showPublicStoresPropia", true],
     ["showPublicStoresVitrina", true],
     ["multiStockEnabled", true],
+    ["showProductCostInSelect", false],
   ];
   for (const [col, def] of boolCols) {
     if (!table[col]) {
@@ -153,6 +161,61 @@ async function ensureAppSettingsSchema() {
         allowNull: false,
         defaultValue: def,
       });
+    }
+  }
+  if (!table.moneyDisplayDecimals) {
+    await qi.addColumn("app_settings", "moneyDisplayDecimals", {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 2,
+    });
+  }
+  if (!table.moneyRoundingMode) {
+    await qi.addColumn("app_settings", "moneyRoundingMode", {
+      type: DataTypes.STRING(16),
+      allowNull: false,
+      defaultValue: "up",
+    });
+  }
+}
+
+/** Amplía columnas de precio a DECIMAL(14,6) si aún no lo son. */
+export async function ensureInventoryProductMoneySchema() {
+  const qi = sequelize.getQueryInterface();
+  const targets = [
+    { table: "ERP_inventory_products", cols: ["price", "supplierPrice", "distributorPrice"] },
+    { table: "ERP_inventory_movements", cols: ["price"] },
+    { table: "ERP_home_products", cols: ["priceOverride"] },
+    { table: "ERP_catalog", cols: ["priceOverride"] },
+    { table: "ERP_order_items", cols: ["price"] },
+    { table: "ERP_supplier_order_items", cols: ["unitPrice"] },
+    {
+      table: "ERP_finance_supplier_pack_items",
+      cols: ["allocatedUnitPrice", "previousUnitPrice"],
+    },
+    { table: "ERP_publicidad_playlist_items", cols: ["price"] },
+  ];
+
+  for (const { table, cols } of targets) {
+    let desc;
+    try {
+      desc = await qi.describeTable(table);
+    } catch {
+      continue;
+    }
+    for (const col of cols) {
+      if (!desc[col]) continue;
+      const type = String(desc[col].type || "");
+      if (/\(14\s*,\s*6\)/i.test(type)) continue;
+      try {
+        await qi.changeColumn(table, col, {
+          type: DataTypes.DECIMAL(14, 6),
+          allowNull: desc[col].allowNull !== false,
+          defaultValue: desc[col].defaultValue ?? null,
+        });
+      } catch (e) {
+        console.warn(`ensureInventoryProductMoneySchema ${table}.${col}:`, e?.message || e);
+      }
     }
   }
 }
@@ -169,6 +232,7 @@ function asBool(value, fallback = true) {
 
 export async function loadAppSettings() {
   await ensureAppSettingsSchema();
+  await ensureInventoryProductMoneySchema();
   await AppSettings.sync();
   let row = await AppSettings.findByPk(1);
   if (!row) {
@@ -183,6 +247,9 @@ export async function loadAppSettings() {
     showPublicStoresPropia: asBool(raw.showPublicStoresPropia, true),
     showPublicStoresVitrina: asBool(raw.showPublicStoresVitrina, true),
     multiStockEnabled: asBool(raw.multiStockEnabled, true),
+    showProductCostInSelect: asBool(raw.showProductCostInSelect, false),
+    moneyDisplayDecimals: normalizeMoneyDisplayDecimals(raw.moneyDisplayDecimals, 2),
+    moneyRoundingMode: normalizeMoneyRoundingMode(raw.moneyRoundingMode, "up"),
   };
   ensureStandardAssetDirs(cache.mediaFolderPrefix);
   return cache;
@@ -198,6 +265,21 @@ export async function updateAppSettings(payload) {
   ]) {
     if (key in patch) patch[key] = asBool(patch[key], true);
   }
+  if ("showProductCostInSelect" in patch) {
+    patch.showProductCostInSelect = asBool(patch.showProductCostInSelect, false);
+  }
+  if ("moneyDisplayDecimals" in patch) {
+    patch.moneyDisplayDecimals = normalizeMoneyDisplayDecimals(
+      patch.moneyDisplayDecimals,
+      2,
+    );
+  }
+  if ("moneyRoundingMode" in patch) {
+    patch.moneyRoundingMode = normalizeMoneyRoundingMode(
+      patch.moneyRoundingMode,
+      "up",
+    );
+  }
   let row = await AppSettings.findByPk(1);
   if (!row) {
     row = await AppSettings.create({ id: 1, ...DEFAULT_APP_SETTINGS, ...patch });
@@ -212,6 +294,9 @@ export async function updateAppSettings(payload) {
     showPublicStoresPropia: asBool(raw.showPublicStoresPropia, true),
     showPublicStoresVitrina: asBool(raw.showPublicStoresVitrina, true),
     multiStockEnabled: asBool(raw.multiStockEnabled, true),
+    showProductCostInSelect: asBool(raw.showProductCostInSelect, false),
+    moneyDisplayDecimals: normalizeMoneyDisplayDecimals(raw.moneyDisplayDecimals, 2),
+    moneyRoundingMode: normalizeMoneyRoundingMode(raw.moneyRoundingMode, "up"),
   };
   return cache;
 }
@@ -244,5 +329,8 @@ export function toPublicSettings(data = cache) {
     showPublicStoresPropia: asBool(data.showPublicStoresPropia, true),
     showPublicStoresVitrina: asBool(data.showPublicStoresVitrina, true),
     multiStockEnabled: asBool(data.multiStockEnabled, true),
+    showProductCostInSelect: asBool(data.showProductCostInSelect, false),
+    moneyDisplayDecimals: normalizeMoneyDisplayDecimals(data.moneyDisplayDecimals, 2),
+    moneyRoundingMode: normalizeMoneyRoundingMode(data.moneyRoundingMode, "up"),
   };
 }
