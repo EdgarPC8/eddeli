@@ -11,6 +11,7 @@ import { getAppSettingsSync } from "../../services/appSettingsService.js";
 import {
   adjustStoreStock,
   getDefaultStockStoreId,
+  getStoreStockQty,
   storeHoldsInventory,
 } from "../../services/storeStockService.js";
 import {
@@ -264,6 +265,13 @@ export const createBatch = async (req, res) => {
       ? toNum(req.body.unitCost)
       : null;
     const createExpense = Boolean(req.body?.createExpense);
+    /** assign = solo fechas sobre stock ya existente; add = suma stock (entrada). */
+    const stockModeRaw = String(req.body?.stockMode || req.body?.mode || "add")
+      .trim()
+      .toLowerCase();
+    const stockMode = stockModeRaw === "assign" || stockModeRaw === "existing"
+      ? "assign"
+      : "add";
     const receivedAtRaw = req.body?.receivedAt;
     const receivedAt = receivedAtRaw
       ? new Date(receivedAtRaw)
@@ -337,56 +345,73 @@ export const createBatch = async (req, res) => {
         { transaction: t },
       );
 
-      if (resolvedStoreId) {
-        await adjustStoreStock(resolvedStoreId, productId, quantity, {
-          transaction: t,
-          allowNegative: false,
-        });
+      if (stockMode === "assign") {
+        // Solo registra el lote sobre stock que ya existe. No suma ni crea entrada de compra.
+        let available = toNum(product.stock);
+        if (resolvedStoreId) {
+          available = await getStoreStockQty(resolvedStoreId, productId, { transaction: t });
+        }
+        if (quantity > available + 1e-9) {
+          const err = new Error(
+            `No hay suficiente stock sin lote para asignar. Disponible: ${available}, pedido: ${quantity}.`,
+          );
+          err.statusCode = 400;
+          throw err;
+        }
       } else {
-        product.stock = round4(toNum(product.stock) + quantity);
-        await product.save({ transaction: t });
-      }
+        if (resolvedStoreId) {
+          await adjustStoreStock(resolvedStoreId, productId, quantity, {
+            transaction: t,
+            allowNegative: false,
+          });
+        } else {
+          product.stock = round4(toNum(product.stock) + quantity);
+          await product.save({ transaction: t });
+        }
 
-      const priceTotal =
-        unitCost != null && unitCost >= 0 ? round4(unitCost * quantity) : null;
+        const priceTotal =
+          unitCost != null && unitCost >= 0 ? round4(unitCost * quantity) : null;
 
-      await InventoryMovement.create(
-        {
-          productId,
-          quantity,
-          type: "entrada",
-          reason: createExpense && priceTotal != null ? "ENTRADA_COMPRA" : "ENTRADA_OTRA",
-          description: code
-            ? `Entrada lote ${code} (vence ${expiresAt})`
-            : `Entrada lote #${batch.id} (vence ${expiresAt})`,
-          price: priceTotal,
-          referenceType: "inventory_batch",
-          referenceId: batch.id,
-          createdBy: user?.accountId ?? null,
-          date: Number.isNaN(receivedAt.getTime()) ? nowApp() : receivedAt,
-        },
-        { transaction: t },
-      );
-
-      if (createExpense && priceTotal != null && priceTotal > 0) {
-        await Expense.create(
+        await InventoryMovement.create(
           {
-            date: Number.isNaN(receivedAt.getTime()) ? nowApp() : receivedAt,
-            amount: priceTotal,
-            concept: `Compra lote ${code || `#${batch.id}`} — ${product.name}`,
-            category: "Compras",
-            referenceId: product.id,
-            referenceType: "inventory_entry",
+            productId,
+            quantity,
+            type: "entrada",
+            reason: createExpense && priceTotal != null ? "ENTRADA_COMPRA" : "ENTRADA_OTRA",
+            description: code
+              ? `Entrada lote ${code} (vence ${expiresAt})`
+              : `Entrada lote #${batch.id} (vence ${expiresAt})`,
+            price: priceTotal,
+            referenceType: "inventory_batch",
+            referenceId: batch.id,
             createdBy: user?.accountId ?? null,
+            date: Number.isNaN(receivedAt.getTime()) ? nowApp() : receivedAt,
           },
           { transaction: t },
         );
+
+        if (createExpense && priceTotal != null && priceTotal > 0) {
+          await Expense.create(
+            {
+              date: Number.isNaN(receivedAt.getTime()) ? nowApp() : receivedAt,
+              amount: priceTotal,
+              concept: `Compra lote ${code || `#${batch.id}`} — ${product.name}`,
+              category: "Compras",
+              referenceId: product.id,
+              referenceType: "inventory_entry",
+              createdBy: user?.accountId ?? null,
+            },
+            { transaction: t },
+          );
+        }
       }
 
-      return { batch, product };
+      return { batch, product, stockMode };
     });
 
-    onInventoryStockChanged(productId).catch(() => {});
+    if (result.stockMode !== "assign") {
+      onInventoryStockChanged(productId).catch(() => {});
+    }
 
     const shaped = shapeBatch(
       await InventoryBatch.findByPk(result.batch.id, {
