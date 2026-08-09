@@ -2129,13 +2129,21 @@ async function formatOrdersList(orders) {
       if (!Number.isFinite(oid)) continue;
       shareByOrder.set(oid, Number(((shareByOrder.get(oid) || 0) + num(lineTotal)).toFixed(2)));
     }
-    for (const [oid, share] of shareByOrder.entries()) {
-      const alloc = Number(((groupPaid * share) / groupTotal).toFixed(2));
+    const entries = [...shareByOrder.entries()];
+    let allocated = 0;
+    entries.forEach(([oid, share], idx) => {
+      const alloc =
+        idx === entries.length - 1
+          ? Number((groupPaid - allocated).toFixed(2))
+          : Number(((groupPaid * share) / groupTotal).toFixed(2));
+      if (idx < entries.length - 1) {
+        allocated = Number((allocated + alloc).toFixed(2));
+      }
       paidByOrderId.set(
         oid,
         Number(((paidByOrderId.get(oid) || 0) + alloc).toFixed(2))
       );
-    }
+    });
   }
 
   return baseRows.map((row) => {

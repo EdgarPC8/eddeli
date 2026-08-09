@@ -102,17 +102,34 @@ function normalizeItems(rawItems, pricesIncludeTax) {
   return rawItems.map((it) => {
     const taxRate = Number(it.taxRate);
     const rate = Number.isFinite(taxRate) ? taxRate : 15;
+    const qty = Number(it.qty);
     let unitPrice = Number(it.unitPrice);
-    if (pricesIncludeTax && Number.isFinite(unitPrice) && rate > 0) {
-      unitPrice = unitPrice / (1 + rate / 100);
-    }
-    return {
+    const row = {
       description: it.description,
-      qty: it.qty,
+      qty,
       unitPrice,
       taxRate: rate,
       code: it.code,
     };
+    // Precio CON IVA (Caja): redondear bruto a 2, base/IVA a 2 (IVA absorbe residual).
+    if (pricesIncludeTax && Number.isFinite(unitPrice) && Number.isFinite(qty) && qty > 0) {
+      if (rate > 0) {
+        const gross = Number((qty * unitPrice).toFixed(2));
+        const lineBase = Number((gross / (1 + rate / 100)).toFixed(2));
+        const lineTax = Number((gross - lineBase).toFixed(2));
+        row.lineBase = lineBase;
+        row.lineTax = lineTax;
+        row.unitPrice = lineBase / qty;
+        row.unitPriceXml = lineBase / qty;
+      } else {
+        const gross = Number((qty * unitPrice).toFixed(2));
+        row.lineBase = gross;
+        row.lineTax = 0;
+        row.unitPrice = qty > 0 ? gross / qty : unitPrice;
+        row.unitPriceXml = row.unitPrice;
+      }
+    }
+    return row;
   });
 }
 

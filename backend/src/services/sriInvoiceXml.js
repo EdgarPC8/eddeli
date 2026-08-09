@@ -21,6 +21,13 @@ function money4(n) {
   return x.toFixed(4);
 }
 
+/** Redondeo a 2 decimales (nearest), igual que Number(n.toFixed(2)). */
+export function round2(n) {
+  const x = Number(n);
+  if (!Number.isFinite(x)) return 0;
+  return Number(x.toFixed(2));
+}
+
 /** Mapea tasa IVA → código porcentaje SRI. */
 export function ivaCodigo(rate) {
   const r = Number(rate);
@@ -34,7 +41,9 @@ export function ivaCodigo(rate) {
 }
 
 /**
- * unitPrice se interpreta SIN IVA (base imponible unitaria).
+ * unitPrice se interpreta SIN IVA (base imponible unitaria),
+ * salvo que el ítem traiga lineBase/lineTax ya calculados (p. ej. precios con IVA).
+ * Cada línea se redondea a 2 decimales; base + IVA = total de línea.
  */
 export function computeInvoiceTotals(items) {
   const lines = [];
@@ -58,11 +67,23 @@ export function computeInvoiceTotals(items) {
       throw Object.assign(new Error(`Ítem ${idx + 1}: falta descripción`), { status: 400 });
     }
 
-    const lineBase = qty * unitPrice;
-    const lineTax = lineBase * (rate / 100);
+    let lineBase;
+    let lineTax;
+    if (raw.lineBase != null && raw.lineTax != null) {
+      lineBase = round2(raw.lineBase);
+      lineTax = round2(raw.lineTax);
+    } else if (rate > 0) {
+      lineBase = round2(qty * unitPrice);
+      const lineTotal = round2(lineBase * (1 + rate / 100));
+      lineTax = round2(lineTotal - lineBase);
+    } else {
+      lineBase = round2(qty * unitPrice);
+      lineTax = 0;
+    }
+
     const iva = ivaCodigo(rate);
-    subtotal += lineBase;
-    taxTotal += lineTax;
+    subtotal = round2(subtotal + lineBase);
+    taxTotal = round2(taxTotal + lineTax);
 
     const bucketKey = `${iva.codigoPorcentaje}`;
     const prev = taxBuckets.get(bucketKey) || {
@@ -72,14 +93,21 @@ export function computeInvoiceTotals(items) {
       valor: 0,
       tarifa: iva.tarifa,
     };
-    prev.baseImponible += lineBase;
-    prev.valor += lineTax;
+    prev.baseImponible = round2(prev.baseImponible + lineBase);
+    prev.valor = round2(prev.valor + lineTax);
     taxBuckets.set(bucketKey, prev);
+
+    const unitForXml =
+      Number.isFinite(Number(raw.unitPriceXml)) && Number(raw.unitPriceXml) >= 0
+        ? Number(raw.unitPriceXml)
+        : qty > 0
+          ? lineBase / qty
+          : unitPrice;
 
     lines.push({
       description: desc,
       qty,
-      unitPrice,
+      unitPrice: unitForXml,
       taxRate: rate,
       lineBase,
       lineTax,
@@ -93,7 +121,7 @@ export function computeInvoiceTotals(items) {
     taxBuckets: [...taxBuckets.values()],
     subtotal,
     taxTotal,
-    total: subtotal + taxTotal,
+    total: round2(subtotal + taxTotal),
   };
 }
 
