@@ -92,6 +92,7 @@ export const uploadImage = async (req, res) => {
     return res.json({
       ok: true,
       folder: req.imageScan.folderRel,
+      folders: req.imageScan.folders || [],
       totals: req.imageScan.totals,
       files: req.imageScan.files,
     });

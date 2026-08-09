@@ -36,6 +36,12 @@ import {
   deleteSupplier,
 } from "../controllers/InventoryControl/SupplierController.js";
 import {
+  listSupplierProductCodes,
+  resolveSupplierProductCode,
+  upsertSupplierProductCodes,
+  deleteSupplierProductCode,
+} from "../controllers/InventoryControl/SupplierProductCodeController.js";
+import {
   getSupplierOrders,
   createSupplierOrder,
   updateSupplierOrder,
@@ -174,6 +180,11 @@ router.get("/suppliers", isAuthenticated, getAllSuppliers);
 router.post("/suppliers", isAuthenticated, createSupplier);
 router.put("/suppliers/:id", isAuthenticated, updateSupplier);
 router.delete("/suppliers/:id", isAuthenticated, deleteSupplier);
+
+router.get("/supplier-product-codes", isAuthenticated, listSupplierProductCodes);
+router.get("/supplier-product-codes/resolve", isAuthenticated, resolveSupplierProductCode);
+router.post("/supplier-product-codes/upsert", isAuthenticated, upsertSupplierProductCodes);
+router.delete("/supplier-product-codes/:id", isAuthenticated, deleteSupplierProductCode);
 
 router.get("/supplier-orders", isAuthenticated, getSupplierOrders);
 router.post("/supplier-orders", isAuthenticated, createSupplierOrder);

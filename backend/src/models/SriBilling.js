@@ -55,7 +55,7 @@ export const SriBillingSettings = sequelize.define(
      * Texto corto para uso futuro en XML.
      */
     taxRegime: { type: DataTypes.STRING(80), allowNull: true },
-    /** Próximo secuencial de factura (sin ceros a la izquierda en BD) */
+    /** Próximo secuencial solo de facturas electrónicas tipo 01 (no pedidos/notas de venta) */
     nextInvoiceSequential: {
       type: DataTypes.INTEGER,
       allowNull: false,

@@ -87,6 +87,15 @@ export const AppSettings = sequelize.define(
       allowNull: false,
       defaultValue: "up",
     },
+    /**
+     * Pedidos: si al entregar falta stock, Admin/Programador puede ajustar
+     * (movimiento tipo ajuste) y completar la entrega.
+     */
+    ordersAllowDeliverStockAdjust: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
   },
   { timestamps: true },
 );

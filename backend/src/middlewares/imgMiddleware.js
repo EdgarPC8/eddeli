@@ -50,10 +50,21 @@ const safeRelPath = (rel = "") => {
   return s;
 };
 
+/** Normaliza carpeta de consulta: "img", "/img/", "img/sistema" → "", "sistema". */
+export const normalizeImgFolderQuery = (rel = "") => {
+  let s = toPosix(rel).replace(/^\/+|\/+$/g, "");
+  if (!s || /^img$/i.test(s)) return "";
+  if (/^img\//i.test(s)) s = s.replace(/^img\//i, "");
+  return safeRelPath(s);
+};
+
 const joinSafe = (base, rel) => {
   const safe = safeRelPath(rel);
   const full = path.resolve(base, safe);
-  if (!full.startsWith(base)) throw new Error("Ruta inválida: fuera de la carpeta base");
+  const baseNorm = path.resolve(base);
+  if (full !== baseNorm && !full.startsWith(baseNorm + path.sep)) {
+    throw new Error("Ruta inválida: fuera de la carpeta base");
+  }
   return full;
 };
 
@@ -306,35 +317,49 @@ export const deleteImage = ({
 // ==============================
 // Recibe:
 // - folder: subcarpeta desde donde escanear ("" = todo src/img)
-// - maxDepth: límite de profundidad
+// - maxDepth: límite de profundidad (archivos bajo la carpeta actual)
 // - includeNonImages: si true incluye todo (no solo imágenes)
 //
 // Devuelve en req.imageScan:
+// - folders: carpetas hijas inmediatas [{ relPath, name }]
 // - files: [{ relPath, name, ext, sizeBytes, sizeHuman, mtime, ctime }]
-// - totals: totalFiles, totalSizeBytes, totalSizeHuman
+// - totals: totalFiles, totalSizeBytes, totalSizeHuman, totalFolders
 export const scanImages = ({
   folderResolver = (req) => req.query?.folder || req.body?.folder || "",
-  maxDepthResolver = (req) => Number(req.query?.maxDepth ?? 10),
+  maxDepthResolver = (req) => Number(req.query?.maxDepth ?? 30),
   includeNonImagesResolver = (req) => String(req.query?.includeNonImages ?? "false").toLowerCase() === "true",
   allowedExt = DEFAULT_ALLOWED_EXT,
 } = {}) => {
-  const walk = async (rootFull, rootRel, depth, maxDepth, includeNonImages) => {
+  const walkFiles = async (rootFull, rootRel, depth, maxDepth, includeNonImages) => {
     if (depth > maxDepth) return [];
 
-    const entries = await fsp.readdir(rootFull, { withFileTypes: true }).catch(() => []);
+    let entries = [];
+    try {
+      entries = await fsp.readdir(rootFull, { withFileTypes: true });
+    } catch {
+      return [];
+    }
     const out = [];
 
     for (const ent of entries) {
+      if (ent.name === ".DS_Store" || ent.name === "Thumbs.db") continue;
       const full = path.join(rootFull, ent.name);
-      const rel = path.join(rootRel, ent.name).replace(/\\/g, "/");
-
-      // ignora cosas raras (por seguridad)
-      // (si quieres permitir todo, comenta esto)
+      const rel = toPosix(path.join(rootRel || "", ent.name));
       if (rel.includes("..")) continue;
 
-      if (ent.isDirectory()) {
-        out.push(...(await walk(full, rel, depth + 1, maxDepth, includeNonImages)));
-      } else if (ent.isFile()) {
+      let isDir = ent.isDirectory();
+      let isFile = ent.isFile();
+      // Algunos FS / symlinks: reforzar con stat
+      if (!isDir && !isFile) {
+        const st = await fsp.stat(full).catch(() => null);
+        if (!st) continue;
+        isDir = st.isDirectory();
+        isFile = st.isFile();
+      }
+
+      if (isDir) {
+        out.push(...(await walkFiles(full, rel, depth + 1, maxDepth, includeNonImages)));
+      } else if (isFile) {
         const ext = path.extname(ent.name).toLowerCase();
         const isImg = allowedExt?.has ? allowedExt.has(ext) : true;
         if (!includeNonImages && !isImg) continue;
@@ -358,35 +383,73 @@ export const scanImages = ({
     return out;
   };
 
+  const listChildFolders = async (rootFull, rootRel) => {
+    let entries = [];
+    try {
+      entries = await fsp.readdir(rootFull, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+    const folders = [];
+    for (const ent of entries) {
+      if (ent.name.startsWith(".")) continue;
+      const full = path.join(rootFull, ent.name);
+      let isDir = ent.isDirectory();
+      if (!isDir && !ent.isFile()) {
+        const st = await fsp.stat(full).catch(() => null);
+        isDir = Boolean(st?.isDirectory());
+      }
+      if (!isDir) continue;
+      const rel = toPosix(path.join(rootRel || "", ent.name));
+      if (rel.includes("..")) continue;
+      folders.push({ relPath: rel, name: ent.name });
+    }
+    folders.sort((a, b) => a.name.localeCompare(b.name, "es"));
+    return folders;
+  };
+
   return async (req, res, next) => {
     try {
-      const folderRel = safeRelPath(folderResolver(req) || "");
-      const maxDepth = Math.max(0, Math.min(50, maxDepthResolver(req)));
+      const folderRel = normalizeImgFolderQuery(folderResolver(req) || "");
+      const rawDepth = maxDepthResolver(req);
+      const maxDepth = Number.isFinite(rawDepth)
+        ? Math.max(0, Math.min(80, rawDepth))
+        : 30;
       const includeNonImages = includeNonImagesResolver(req);
 
       const startFull = joinSafe(IMG_BASE_DIR, folderRel);
-      // si no existe, responde vacío (no error)
       const st = await fsp.stat(startFull).catch(() => null);
       if (!st || !st.isDirectory()) {
         req.imageScan = {
           baseDir: IMG_BASE_DIR,
           folderRel,
+          folders: [],
           files: [],
-          totals: { totalFiles: 0, totalSizeBytes: 0, totalSizeHuman: formatBytes(0) },
+          totals: {
+            totalFiles: 0,
+            totalFolders: 0,
+            totalSizeBytes: 0,
+            totalSizeHuman: formatBytes(0),
+          },
         };
         return next();
       }
 
-      const files = await walk(startFull, folderRel, 0, maxDepth, includeNonImages);
+      const [folders, files] = await Promise.all([
+        listChildFolders(startFull, folderRel),
+        walkFiles(startFull, folderRel, 0, maxDepth, includeNonImages),
+      ]);
 
       const totalSizeBytes = files.reduce((acc, f) => acc + (f.sizeBytes || 0), 0);
 
       req.imageScan = {
         baseDir: IMG_BASE_DIR,
         folderRel,
+        folders,
         files,
         totals: {
           totalFiles: files.length,
+          totalFolders: folders.length,
           totalSizeBytes,
           totalSizeHuman: formatBytes(totalSizeBytes),
         },

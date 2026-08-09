@@ -180,6 +180,32 @@ export const SupplierOrderItem = sequelize.define("ERP_supplier_order_items", {
   timestamps: false,
 });
 
+/**
+ * Código del producto según el proveedor (factura XML / catálogo del proveedor).
+ * Mismo producto puede tener distinto código con otro proveedor.
+ */
+export const SupplierProductCode = sequelize.define(
+  "ERP_supplier_product_codes",
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    supplierId: { type: DataTypes.INTEGER, allowNull: false },
+    productId: { type: DataTypes.INTEGER, allowNull: false },
+    /** codigoPrincipal / codigoAuxiliar del XML o código interno del proveedor */
+    supplierCode: { type: DataTypes.STRING(80), allowNull: false },
+    notes: { type: DataTypes.STRING(200), allowNull: true },
+  },
+  {
+    timestamps: true,
+    indexes: [
+      {
+        unique: true,
+        name: "uniq_supplier_product_code",
+        fields: ["supplierId", "supplierCode"],
+      },
+    ],
+  },
+);
+
 // Relaciones
 Customer.hasMany(Order, { foreignKey: "customerId", as: "ERP_orders" });
 Order.belongsTo(Customer, { foreignKey: "customerId", as: "ERP_customer" });
@@ -210,4 +236,21 @@ InventoryProduct.hasMany(SupplierOrderItem, { foreignKey: 'productId' });
 SupplierOrderItem.belongsTo(InventoryProduct, {
   foreignKey: 'productId',
   as: 'ERP_inventory_product',
+});
+
+Supplier.hasMany(SupplierProductCode, {
+  foreignKey: "supplierId",
+  as: "ERP_supplier_product_codes",
+  onDelete: "CASCADE",
+});
+SupplierProductCode.belongsTo(Supplier, { foreignKey: "supplierId", as: "ERP_supplier" });
+
+InventoryProduct.hasMany(SupplierProductCode, {
+  foreignKey: "productId",
+  as: "ERP_supplier_product_codes",
+  onDelete: "CASCADE",
+});
+SupplierProductCode.belongsTo(InventoryProduct, {
+  foreignKey: "productId",
+  as: "ERP_inventory_product",
 });

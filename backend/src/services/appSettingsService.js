@@ -38,6 +38,7 @@ export const DEFAULT_APP_SETTINGS = {
   showProductCostInSelect: false,
   moneyDisplayDecimals: 2,
   moneyRoundingMode: "up",
+  ordersAllowDeliverStockAdjust: false,
 };
 
 let cache = { ...DEFAULT_APP_SETTINGS };
@@ -153,6 +154,7 @@ async function ensureAppSettingsSchema() {
     ["showPublicStoresVitrina", true],
     ["multiStockEnabled", true],
     ["showProductCostInSelect", false],
+    ["ordersAllowDeliverStockAdjust", false],
   ];
   for (const [col, def] of boolCols) {
     if (!table[col]) {
@@ -248,6 +250,7 @@ export async function loadAppSettings() {
     showPublicStoresVitrina: asBool(raw.showPublicStoresVitrina, true),
     multiStockEnabled: asBool(raw.multiStockEnabled, true),
     showProductCostInSelect: asBool(raw.showProductCostInSelect, false),
+    ordersAllowDeliverStockAdjust: asBool(raw.ordersAllowDeliverStockAdjust, false),
     moneyDisplayDecimals: normalizeMoneyDisplayDecimals(raw.moneyDisplayDecimals, 2),
     moneyRoundingMode: normalizeMoneyRoundingMode(raw.moneyRoundingMode, "up"),
   };
@@ -267,6 +270,12 @@ export async function updateAppSettings(payload) {
   }
   if ("showProductCostInSelect" in patch) {
     patch.showProductCostInSelect = asBool(patch.showProductCostInSelect, false);
+  }
+  if ("ordersAllowDeliverStockAdjust" in patch) {
+    patch.ordersAllowDeliverStockAdjust = asBool(
+      patch.ordersAllowDeliverStockAdjust,
+      false,
+    );
   }
   if ("moneyDisplayDecimals" in patch) {
     patch.moneyDisplayDecimals = normalizeMoneyDisplayDecimals(
@@ -295,6 +304,7 @@ export async function updateAppSettings(payload) {
     showPublicStoresVitrina: asBool(raw.showPublicStoresVitrina, true),
     multiStockEnabled: asBool(raw.multiStockEnabled, true),
     showProductCostInSelect: asBool(raw.showProductCostInSelect, false),
+    ordersAllowDeliverStockAdjust: asBool(raw.ordersAllowDeliverStockAdjust, false),
     moneyDisplayDecimals: normalizeMoneyDisplayDecimals(raw.moneyDisplayDecimals, 2),
     moneyRoundingMode: normalizeMoneyRoundingMode(raw.moneyRoundingMode, "up"),
   };
@@ -330,6 +340,7 @@ export function toPublicSettings(data = cache) {
     showPublicStoresVitrina: asBool(data.showPublicStoresVitrina, true),
     multiStockEnabled: asBool(data.multiStockEnabled, true),
     showProductCostInSelect: asBool(data.showProductCostInSelect, false),
+    ordersAllowDeliverStockAdjust: asBool(data.ordersAllowDeliverStockAdjust, false),
     moneyDisplayDecimals: normalizeMoneyDisplayDecimals(data.moneyDisplayDecimals, 2),
     moneyRoundingMode: normalizeMoneyRoundingMode(data.moneyRoundingMode, "up"),
   };
