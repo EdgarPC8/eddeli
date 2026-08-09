@@ -120,6 +120,12 @@ export const ElectronicInvoice = sequelize.define(
     customerName: { type: DataTypes.STRING(300), allowNull: true },
     customerEmail: { type: DataTypes.STRING(120), allowNull: true },
     subtotal: { type: DataTypes.DECIMAL(14, 4), allowNull: true },
+    /** Impuesto a consumos especiales (ICE); 0 si no aplica */
+    iceTotal: {
+      type: DataTypes.DECIMAL(14, 4),
+      allowNull: false,
+      defaultValue: 0,
+    },
     taxTotal: { type: DataTypes.DECIMAL(14, 4), allowNull: true },
     total: { type: DataTypes.DECIMAL(14, 4), allowNull: true },
     currency: {

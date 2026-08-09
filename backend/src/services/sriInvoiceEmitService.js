@@ -10,6 +10,7 @@ import {
   signWithholdingCertificateXml,
 } from "ec-sri-invoice-signer";
 import { ElectronicInvoice } from "../models/SriBilling.js";
+import { sequelize } from "../database/connection.js";
 import {
   loadSriBillingSettings,
   toPublicSriSettings,
@@ -49,6 +50,18 @@ function ensureInvoicesDir() {
 
 async function ensureInvoiceTable() {
   await ElectronicInvoice.sync();
+  try {
+    const [found] = await sequelize.query(
+      "SHOW COLUMNS FROM `electronic_invoices` LIKE 'iceTotal'",
+    );
+    if (!Array.isArray(found) || found.length === 0) {
+      await sequelize.query(
+        "ALTER TABLE `electronic_invoices` ADD COLUMN `iceTotal` DECIMAL(14,4) NOT NULL DEFAULT 0",
+      );
+    }
+  } catch (e) {
+    console.warn("ensureInvoiceTable iceTotal:", e?.message || e);
+  }
 }
 
 function validateParty(party = {}, { role = "comprador", allowConsumidorFinal = true } = {}) {
@@ -123,11 +136,14 @@ function toPublicInvoice(row) {
     customerName: j.customerName,
     customerEmail: j.customerEmail,
     subtotal: j.subtotal != null ? Number(j.subtotal) : null,
+    iceTotal: j.iceTotal != null ? Number(j.iceTotal) : 0,
     taxTotal: j.taxTotal != null ? Number(j.taxTotal) : null,
     total: j.total != null ? Number(j.total) : null,
     currency: j.currency,
     sriMessage: j.sriMessage,
     payloadJson: j.payloadJson,
+    orderId: j.orderId != null ? Number(j.orderId) : null,
+    customerId: j.customerId != null ? Number(j.customerId) : null,
     createdAt: j.createdAt,
     updatedAt: j.updatedAt,
   };
@@ -146,7 +162,13 @@ async function applyAuthorizationResult(invoice, auth) {
     }
     await invoice.update({
       status: "authorized",
-      authorizationNumber: String(auth.numeroAutorizacion || invoice.accessKey),
+      authorizationNumber: (() => {
+        const raw = auth.numeroAutorizacion == null ? "" : String(auth.numeroAutorizacion).trim();
+        if (/^\d{40,}$/.test(raw)) return raw;
+        const key = invoice.accessKey == null ? "" : String(invoice.accessKey).trim();
+        if (/^\d{40,}$/.test(key)) return key;
+        return raw || key || null;
+      })(),
       authorizedAt,
       sriMessage,
     });

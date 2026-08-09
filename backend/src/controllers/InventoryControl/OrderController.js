@@ -25,6 +25,24 @@ const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 let orderItemDeliverSchemaReady = false;
 let orderItemPackSchemaReady = false;
+let orderSellerSchemaReady = false;
+
+async function ensureOrderSellerSchema() {
+  if (orderSellerSchemaReady) return;
+  try {
+    const [found] = await sequelize.query(
+      "SHOW COLUMNS FROM `ERP_orders` LIKE 'sellerAccountId'",
+    );
+    if (!Array.isArray(found) || found.length === 0) {
+      await sequelize.query(
+        "ALTER TABLE `ERP_orders` ADD COLUMN `sellerAccountId` INT NULL",
+      );
+    }
+  } catch (e) {
+    console.warn("ensureOrderSellerSchema:", e?.message || e);
+  }
+  orderSellerSchemaReady = true;
+}
 
 async function ensureOrderItemDeliverSchema() {
   if (orderItemDeliverSchemaReady) return;
@@ -159,6 +177,7 @@ const pedidosListNotesWhere = {
 export const posCheckout = async (req, res) => {
   try {
     await ensureOrderItemPackSchema();
+    await ensureOrderSellerSchema();
     const token = getHeaderToken(req);
     const user = await verifyJWT(token);
     const { accountId } = user;
@@ -223,6 +242,7 @@ export const posCheckout = async (req, res) => {
           status: isCredit ? "pendiente" : "pagado",
           shiftId: shift.id,
           cashRegisterId: resolvedRegisterId,
+          sellerAccountId: accountId != null ? Number(accountId) : null,
           paymentMethod: isCredit ? "credito" : paymentMethod || "efectivo",
           paidAt: isCredit ? null : now,
           documentType: docType,
@@ -339,6 +359,7 @@ const CAJA_POS_TAG_EXPORT = "[CAJA_POS]";
 export const getPosSales = async (req, res) => {
   try {
     await ensureOrderItemPackSchema();
+    await ensureOrderSellerSchema();
     const limit = Math.min(Number(req.query.limit) || 200, 500);
     const orders = await Order.findAll({
       where: {
@@ -358,6 +379,96 @@ export const getPosSales = async (req, res) => {
       order: [["id", "DESC"]],
       limit,
     });
+
+    const orderIds = orders.map((o) => o.id).filter(Boolean);
+    const sellerIds = [
+      ...new Set(
+        orders
+          .map((o) => Number(o.sellerAccountId))
+          .filter((n) => Number.isFinite(n) && n > 0),
+      ),
+    ];
+
+    let invoiceByOrderId = new Map();
+    try {
+      const { ElectronicInvoice } = await import("../../models/SriBilling.js");
+      await ElectronicInvoice.sync();
+      try {
+        const [found] = await sequelize.query(
+          "SHOW COLUMNS FROM `electronic_invoices` LIKE 'iceTotal'",
+        );
+        if (!Array.isArray(found) || found.length === 0) {
+          await sequelize.query(
+            "ALTER TABLE `electronic_invoices` ADD COLUMN `iceTotal` DECIMAL(14,4) NOT NULL DEFAULT 0",
+          );
+        }
+      } catch (e) {
+        console.warn("getPosSales iceTotal:", e?.message || e);
+      }
+      if (orderIds.length) {
+        const invoices = await ElectronicInvoice.findAll({
+          where: { orderId: { [Op.in]: orderIds }, documentType: "01" },
+          order: [["id", "DESC"]],
+        });
+        for (const inv of invoices) {
+          const oid = Number(inv.orderId);
+          if (!invoiceByOrderId.has(oid)) invoiceByOrderId.set(oid, inv);
+        }
+      }
+    } catch (e) {
+      console.warn("getPosSales invoices:", e?.message || e);
+    }
+
+    let sellerByAccountId = new Map();
+    if (sellerIds.length) {
+      try {
+        const { Account } = await import("../../models/Account.js");
+        const { Users } = await import("../../models/Users.js");
+        const accounts = await Account.findAll({
+          where: { id: { [Op.in]: sellerIds } },
+          include: [{ model: Users, required: false }],
+        });
+        for (const acc of accounts) {
+          const u = acc.users || acc.user || null;
+          const person = u
+            ? [u.firstName, u.firstLastName].filter(Boolean).join(" ").trim()
+            : "";
+          const label = (person || acc.username || `Cuenta #${acc.id}`).toUpperCase();
+          sellerByAccountId.set(Number(acc.id), label);
+        }
+      } catch (e) {
+        console.warn("getPosSales sellers:", e?.message || e);
+      }
+    }
+
+    let defaultEst = "001";
+    let defaultEmi = "001";
+    let defaultEnv = "pruebas";
+    try {
+      const { SriBillingSettings } = await import("../../models/SriBilling.js");
+      const settings = await SriBillingSettings.findByPk(1);
+      if (settings) {
+        defaultEst = String(settings.establishmentCode || "001").padStart(3, "0");
+        defaultEmi = String(settings.emissionPointCode || "001").padStart(3, "0");
+        defaultEnv = settings.environment || "pruebas";
+      }
+    } catch {
+      /* ignore */
+    }
+
+    const sriStatusLabel = (st) => {
+      const map = {
+        draft: "Borrador",
+        signed: "Firmado",
+        sent: "Enviado",
+        authorized: "Autorizado",
+        rejected: "Rechazado",
+        cancelled: "Anulado",
+      };
+      return map[String(st || "").toLowerCase()] || st || "—";
+    };
+    const envLabel = (env) =>
+      String(env || "").toLowerCase() === "produccion" ? "PRODUCCIÓN" : "PRUEBAS";
 
     const data = orders.map((order) => {
       const items = (order.ERP_order_items || []).map((item) => {
@@ -388,6 +499,22 @@ export const getPosSales = async (req, res) => {
       const subtotal = items.reduce((acc, it) => acc + it.subtotal, 0);
       const iva = items.reduce((acc, it) => acc + it.iva, 0);
       const customer = order.ERP_customer;
+      const inv = invoiceByOrderId.get(Number(order.id)) || null;
+      const sellerAccountId =
+        order.sellerAccountId != null ? Number(order.sellerAccountId) : null;
+      const sellerName =
+        (sellerAccountId && sellerByAccountId.get(sellerAccountId)) || "—";
+
+      const establishmentCode = inv
+        ? String(inv.establishmentCode || defaultEst).padStart(3, "0")
+        : defaultEst;
+      const emissionPointCode = inv
+        ? String(inv.emissionPointCode || defaultEmi).padStart(3, "0")
+        : defaultEmi;
+      const sequential = inv?.sequential != null ? Number(inv.sequential) : null;
+      const environment = inv?.environment || defaultEnv;
+      const ice = inv?.iceTotal != null ? Number(inv.iceTotal) : 0;
+
       return {
         id: order.id,
         date: order.date,
@@ -396,6 +523,8 @@ export const getPosSales = async (req, res) => {
         notes: order.notes,
         paymentMethod: order.paymentMethod,
         documentType: order.documentType || inferDocumentTypeFromNotes(order.notes),
+        sellerAccountId,
+        sellerName,
         customer: customer
           ? {
               id: customer.id,
@@ -412,9 +541,42 @@ export const getPosSales = async (req, res) => {
             }
           : null,
         items,
-        subtotal: Number(subtotal.toFixed(2)),
-        iva: Number(iva.toFixed(2)),
-        total: Number(total.toFixed(2)),
+        subtotal: inv?.subtotal != null ? Number(inv.subtotal) : Number(subtotal.toFixed(2)),
+        ice: Number(Number(ice || 0).toFixed(2)),
+        iva: inv?.taxTotal != null ? Number(inv.taxTotal) : Number(iva.toFixed(2)),
+        total: inv?.total != null ? Number(inv.total) : Number(total.toFixed(2)),
+        sri: inv
+          ? {
+              invoiceId: inv.id,
+              status: inv.status,
+              statusLabel: sriStatusLabel(inv.status),
+              environment,
+              environmentLabel: envLabel(environment),
+              establishmentCode,
+              emissionPointCode,
+              estabPtoEmi: `${establishmentCode}-${emissionPointCode}`,
+              sequential,
+              sequentialLabel:
+                sequential != null ? String(sequential).padStart(9, "0") : "—",
+              accessKey: inv.accessKey || null,
+              authorizationNumber: inv.authorizationNumber || null,
+              authorizedAt: inv.authorizedAt || null,
+            }
+          : {
+              invoiceId: null,
+              status: null,
+              statusLabel: "Sin SRI",
+              environment,
+              environmentLabel: envLabel(environment),
+              establishmentCode,
+              emissionPointCode,
+              estabPtoEmi: `${establishmentCode}-${emissionPointCode}`,
+              sequential: null,
+              sequentialLabel: "—",
+              accessKey: null,
+              authorizationNumber: null,
+              authorizedAt: null,
+            },
       };
     });
 

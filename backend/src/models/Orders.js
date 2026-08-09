@@ -43,6 +43,8 @@ export const Order = sequelize.define("ERP_orders", {
   shiftId: { type: DataTypes.INTEGER, allowNull: true },
   /** Caja del local que registró la venta POS */
   cashRegisterId: { type: DataTypes.INTEGER, allowNull: true },
+  /** Cuenta del vendedor / cajero que registró la venta POS */
+  sellerAccountId: { type: DataTypes.INTEGER, allowNull: true },
   paymentMethod: { type: DataTypes.STRING(40), allowNull: true },
   paidAt: { type: DataTypes.DATE, allowNull: true },
   documentType: {

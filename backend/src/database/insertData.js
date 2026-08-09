@@ -630,7 +630,7 @@ export const saveBackup = async ({ updateMainBackup = true } = {}) => {
     const pad = (n) => n.toString().padStart(2, "0");
     const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}_${pad(now.getHours())}-${pad(now.getMinutes())}-${pad(now.getSeconds())}`;
 
-    const backupFileName = `backup-eddeli-${timestamp}.json`;
+    const backupFileName = `backup-${timestamp}.json`;
     const backupPath = resolve(backups, backupFileName);
 
     const payload = JSON.stringify(normalized, null, 2);
@@ -639,7 +639,7 @@ export const saveBackup = async ({ updateMainBackup = true } = {}) => {
       await fs.writeFile(backupFilePath, payload, "utf8");
     }
 
-    console.log("Backup EdDeli guardado en:", backupPath);
+    console.log("Backup guardado en:", backupPath);
     if (updateMainBackup) {
       console.log("backup.json principal actualizado:", backupFilePath);
     }
@@ -651,6 +651,7 @@ export const saveBackup = async ({ updateMainBackup = true } = {}) => {
   }
 };
 
+/** Acepta backup-FECHA.json y legacy backup-eddeli-FECHA.json */
 const STORED_BACKUP_NAME = /^backup(?:-eddeli)?-[\w\-:.]+\.json$/i;
 
 /** Valida nombre y devuelve ruta absoluta dentro de src/backups/. */
@@ -772,11 +773,12 @@ export async function pruneStoredBackupsAndSaveFresh() {
   return { deletedCount, filename, backupPath, counts };
 }
 
-/** Descarga JSON de respaldo EdDeli (GET /eddeliapi/comands/downloadBackup). */
+/** Descarga JSON de respaldo (GET …/comands/downloadBackup). */
 export const downloadBackup = async (req, res) => {
   try {
     const { backupPath } = await saveBackup();
-    res.download(backupPath, "backup-eddeli.json", (err) => {
+    const filename = backupPath.split(/[/\\]/).pop() || `backup-${Date.now()}.json`;
+    res.download(backupPath, filename, (err) => {
       if (err) {
         console.error("Error al enviar el archivo:", err);
         res.status(500).send("Error al enviar el archivo.");

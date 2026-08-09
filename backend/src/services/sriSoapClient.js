@@ -19,7 +19,24 @@ const parser = new XMLParser({
   ignoreAttributes: false,
   removeNSPrefix: true,
   trimValues: true,
+  // Clave acceso / nº autorización SRI (49 dígitos) no caben en Number de JS.
+  numberParseOptions: {
+    hex: false,
+    leadingZeros: true,
+    eNotation: false,
+    skipLike: /^\d{15,}$/,
+  },
 });
+
+/** Claves SRI siempre como dígitos (nunca notación científica). */
+function asSriDigitKey(value, fallback = null) {
+  const raw = value == null ? "" : String(value).trim();
+  if (/^\d{40,}$/.test(raw)) return raw;
+  const fb = fallback == null ? "" : String(fallback).trim();
+  if (/^\d{40,}$/.test(fb)) return fb;
+  if (raw && !/e[+-]?\d+$/i.test(raw)) return raw;
+  return fb || null;
+}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -167,7 +184,7 @@ export async function consultAuthorization(environment, accessKey) {
 
   return {
     estado,
-    numeroAutorizacion: chosen?.numeroAutorizacion || null,
+    numeroAutorizacion: asSriDigitKey(chosen?.numeroAutorizacion, accessKey),
     fechaAutorizacion: chosen?.fechaAutorizacion || null,
     messages: [...new Set(messages)],
     authorizedXml: typeof authorizedXml === "string" ? authorizedXml : null,
