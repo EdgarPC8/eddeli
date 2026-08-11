@@ -256,3 +256,48 @@ SupplierProductCode.belongsTo(InventoryProduct, {
   foreignKey: "productId",
   as: "ERP_inventory_product",
 });
+
+/** Cuotas / calendario de pago — pedido cliente */
+export const OrderPaymentInstallment = sequelize.define(
+  "ERP_order_payment_installments",
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    orderId: { type: DataTypes.INTEGER, allowNull: false },
+    sequence: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+    dueDate: { type: DataTypes.DATEONLY, allowNull: false },
+    amount: { type: DataTypes.DECIMAL(14, 2), allowNull: false, defaultValue: 0 },
+    notes: { type: DataTypes.STRING(255), allowNull: true },
+  },
+  { timestamps: true },
+);
+
+/** Cuotas / calendario de pago — pedido proveedor */
+export const SupplierOrderPaymentInstallment = sequelize.define(
+  "ERP_supplier_order_payment_installments",
+  {
+    id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
+    orderId: { type: DataTypes.INTEGER, allowNull: false },
+    sequence: { type: DataTypes.INTEGER, allowNull: false, defaultValue: 1 },
+    dueDate: { type: DataTypes.DATEONLY, allowNull: false },
+    amount: { type: DataTypes.DECIMAL(14, 2), allowNull: false, defaultValue: 0 },
+    notes: { type: DataTypes.STRING(255), allowNull: true },
+  },
+  { timestamps: true },
+);
+
+Order.hasMany(OrderPaymentInstallment, {
+  foreignKey: "orderId",
+  as: "ERP_order_payment_installments",
+  onDelete: "CASCADE",
+});
+OrderPaymentInstallment.belongsTo(Order, { foreignKey: "orderId", as: "ERP_order" });
+
+SupplierOrder.hasMany(SupplierOrderPaymentInstallment, {
+  foreignKey: "orderId",
+  as: "ERP_supplier_order_payment_installments",
+  onDelete: "CASCADE",
+});
+SupplierOrderPaymentInstallment.belongsTo(SupplierOrder, {
+  foreignKey: "orderId",
+  as: "ERP_supplier_order",
+});

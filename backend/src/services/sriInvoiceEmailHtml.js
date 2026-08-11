@@ -48,6 +48,7 @@ export function buildInvoiceEmailHtml({
   hasPdf = false,
   hasXml = false,
   isTest = false,
+  demoItems = null,
 }) {
   const num = invoiceNumberLabel(invoice);
   const legal = String(settings.legalName || settings.tradeName || app.name || "Emisor").trim();
@@ -68,6 +69,27 @@ export function buildInvoiceEmailHtml({
   const logoBlock = hasLogoCid
     ? `<img src="cid:app-logo" alt="${esc(brand)}" width="120" style="display:block;max-height:56px;width:auto;background:#fff;padding:6px 10px;border-radius:4px" />`
     : `<div style="background:#fff;color:${accent};font-weight:800;font-size:16px;padding:10px 14px;border-radius:4px;display:inline-block">${esc(brand)}</div>`;
+
+  const items = Array.isArray(demoItems) ? demoItems : [];
+  const itemsHtml =
+    items.length > 0
+      ? `<table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin:0 0 18px;border-collapse:collapse;font-size:13px">
+          <tr style="background:#efe6dc">
+            <th align="left" style="padding:8px;border:1px solid #e0d4c6">Producto</th>
+            <th align="right" style="padding:8px;border:1px solid #e0d4c6">Cant.</th>
+            <th align="right" style="padding:8px;border:1px solid #e0d4c6">Total</th>
+          </tr>
+          ${items
+            .map(
+              (it) => `<tr>
+              <td style="padding:8px;border:1px solid #e0d4c6">${esc(it.name)}</td>
+              <td align="right" style="padding:8px;border:1px solid #e0d4c6">${esc(String(it.qty))}</td>
+              <td align="right" style="padding:8px;border:1px solid #e0d4c6">$ ${esc(money(it.total))}</td>
+            </tr>`,
+            )
+            .join("")}
+        </table>`
+      : "";
 
   return `<!DOCTYPE html>
 <html lang="es">
@@ -105,7 +127,7 @@ export function buildInvoiceEmailHtml({
                     : `Su <strong>FACTURA ELECTRÓNICA</strong> número <strong>${esc(num)}</strong> ya está disponible.`
                 }
               </p>
-              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${boxBg};border-radius:6px;margin:0 0 22px">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:${boxBg};border-radius:6px;margin:0 0 18px">
                 <tr>
                   <td style="padding:16px 18px;font-size:13px;line-height:1.7;color:#333">
                     <div><strong>Fecha de emisión:</strong> ${esc(formatDateEc(invoice.authorizedAt || invoice.createdAt))}</div>
@@ -115,6 +137,7 @@ export function buildInvoiceEmailHtml({
                   </td>
                 </tr>
               </table>
+              ${itemsHtml}
               <p style="margin:0 0 8px;font-size:13px;line-height:1.5;color:#444">
                 También hemos adjuntado los archivos oficiales del comprobante: <strong>${esc(attachLabel)}</strong>.
               </p>

@@ -50,17 +50,24 @@ function ensureInvoicesDir() {
 
 async function ensureInvoiceTable() {
   await ElectronicInvoice.sync();
-  try {
-    const [found] = await sequelize.query(
-      "SHOW COLUMNS FROM `electronic_invoices` LIKE 'iceTotal'",
-    );
-    if (!Array.isArray(found) || found.length === 0) {
-      await sequelize.query(
-        "ALTER TABLE `electronic_invoices` ADD COLUMN `iceTotal` DECIMAL(14,4) NOT NULL DEFAULT 0",
+  const cols = [
+    ["iceTotal", "DECIMAL(14,4) NOT NULL DEFAULT 0"],
+    ["ridePdfRelativePath", "VARCHAR(255) NULL"],
+    ["invoiceEmailSentAt", "DATETIME NULL"],
+  ];
+  for (const [name, ddl] of cols) {
+    try {
+      const [found] = await sequelize.query(
+        `SHOW COLUMNS FROM \`electronic_invoices\` LIKE '${name}'`,
       );
+      if (!Array.isArray(found) || found.length === 0) {
+        await sequelize.query(
+          `ALTER TABLE \`electronic_invoices\` ADD COLUMN \`${name}\` ${ddl}`,
+        );
+      }
+    } catch (e) {
+      console.warn(`ensureInvoiceTable ${name}:`, e?.message || e);
     }
-  } catch (e) {
-    console.warn("ensureInvoiceTable iceTotal:", e?.message || e);
   }
 }
 

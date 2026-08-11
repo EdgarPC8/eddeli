@@ -339,18 +339,40 @@ export async function generateSampleInvoicePdf(settings, logoAbsolutePath) {
     payloadJson: {
       items: [
         {
-          code: "DEMO",
-          description: "Producto de demostración",
+          code: "P001",
+          description: "Pan de sal (demo)",
+          qty: 10,
+          unitPrice: 0.5,
+          taxRate: 0,
+          lineBase: 5,
+          lineTax: 0,
+        },
+        {
+          code: "P002",
+          description: "Café americano (demo)",
+          qty: 2,
+          unitPrice: 1.5,
+          taxRate: 15,
+          lineBase: 2.61,
+          lineTax: 0.39,
+        },
+        {
+          code: "P003",
+          description: "Torta porción (demo)",
           qty: 1,
           unitPrice: 100,
           taxRate: 15,
-          lineBase: 100,
+          lineBase: 91.39,
+          lineTax: 13.71,
         },
       ],
     },
   };
+  // Ajustar totales a la suma demo clara
+  sample.subtotal = 100;
+  sample.taxTotal = 15;
+  sample.total = 115;
   const out = await generateAndStoreInvoicePdf(sample, settings, logoAbsolutePath);
-  // Marcar como sample en nombre no es crítico; se deja en invoices/
   return out;
 }
 

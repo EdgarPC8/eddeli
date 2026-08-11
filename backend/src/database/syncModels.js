@@ -9,7 +9,7 @@ import { CashShiftMovement } from "../models/CashShiftMovement.js";
 import { InventoryProduct, InventoryMovement, InventoryCategory, InventoryUnit, InventoryRecipe, HomeProduct, Catalog, Store, StoreExhibidor, StoreProduct, ProductCompareGroup, ProductCompareGroupItem, PricingTierGroup, InventoryBatch } from "../models/Inventory.js";
 import { StoreStock } from "../models/StoreStock.js";
 import { CashRegister } from "../models/CashRegister.js";
-import { Customer, Order, OrderItem, Supplier, SupplierOrder, SupplierOrderItem, SupplierProductCode } from "../models/Orders.js";
+import { Customer, Order, OrderItem, Supplier, SupplierOrder, SupplierOrderItem, SupplierProductCode, OrderPaymentInstallment, SupplierOrderPaymentInstallment } from "../models/Orders.js";
 import { TaskPlan, TaskItem } from "../models/Tasks.js";
 import { PublicidadCampaign, PublicidadPlaylistItem, PublicidadDevice } from "../models/Publicidad.js";
 import { MediaAsset } from "../models/MediaAsset.js";
@@ -70,7 +70,9 @@ const MODELS_TO_SYNC = [
   PricingTierGroup,
   PublicidadPlaylistItem,
   OrderItem,
+  OrderPaymentInstallment,
   SupplierOrderItem,
+  SupplierOrderPaymentInstallment,
   CashShiftMovement,
   NotificationDispatchLog,
 

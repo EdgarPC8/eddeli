@@ -278,6 +278,20 @@ export async function maybeSendAuthorizedInvoiceEmail(invoice, opts = {}) {
     if (pdfAtt) attachments.push(pdfAtt);
     if (xmlAtt) attachments.push(xmlAtt);
 
+    const payloadItems = Array.isArray(invoice?.payloadJson?.items)
+      ? invoice.payloadJson.items
+      : [];
+    const demoItems = payloadItems
+      .map((it) => ({
+        name: String(it.description || it.name || "Producto"),
+        qty: Number(it.qty || it.quantity) || 0,
+        total:
+          it.lineBase != null
+            ? Number(it.lineBase) + Number(it.lineTax || 0)
+            : Number(it.qty || 0) * Number(it.unitPrice || 0),
+      }))
+      .filter((it) => it.qty > 0);
+
     await transport.sendMail({
       from: `"${String(settings.legalName || settings.tradeName || app.alias || "Factura").slice(0, 80)}" <${from}>`,
       to,
@@ -290,6 +304,7 @@ export async function maybeSendAuthorizedInvoiceEmail(invoice, opts = {}) {
         hasLogoCid: Boolean(logoAtt),
         hasPdf: Boolean(pdfAtt),
         hasXml: Boolean(xmlAtt),
+        demoItems: demoItems.length ? demoItems : null,
       }),
       attachments,
     });
@@ -421,6 +436,8 @@ export async function sendSriTestEmail(toAddress) {
     accessKey: "0".repeat(49),
     customerName: "CLIENTE DE PRUEBA",
     total: 115,
+    subtotal: 100,
+    taxTotal: 15,
     authorizedAt: new Date(),
     environment: settings.environment || "pruebas",
   };
@@ -447,6 +464,32 @@ export async function sendSriTestEmail(toAddress) {
     <razonSocialComprador>${sampleInvoice.customerName}</razonSocialComprador>
     <importeTotal>115.00</importeTotal>
   </infoFactura>
+  <detalles>
+    <detalle>
+      <codigoPrincipal>P001</codigoPrincipal>
+      <descripcion>Pan de sal (demo)</descripcion>
+      <cantidad>10.0000</cantidad>
+      <precioUnitario>0.5000</precioUnitario>
+      <descuento>0.00</descuento>
+      <precioTotalSinImpuesto>5.00</precioTotalSinImpuesto>
+    </detalle>
+    <detalle>
+      <codigoPrincipal>P002</codigoPrincipal>
+      <descripcion>Cafe americano (demo)</descripcion>
+      <cantidad>2.0000</cantidad>
+      <precioUnitario>1.3043</precioUnitario>
+      <descuento>0.00</descuento>
+      <precioTotalSinImpuesto>2.61</precioTotalSinImpuesto>
+    </detalle>
+    <detalle>
+      <codigoPrincipal>P003</codigoPrincipal>
+      <descripcion>Torta porcion (demo)</descripcion>
+      <cantidad>1.0000</cantidad>
+      <precioUnitario>91.3900</precioUnitario>
+      <descuento>0.00</descuento>
+      <precioTotalSinImpuesto>91.39</precioTotalSinImpuesto>
+    </detalle>
+  </detalles>
   <!-- XML de demostración para correo de prueba. Nº ${num} -->
 </factura>
 `;
@@ -488,6 +531,11 @@ export async function sendSriTestEmail(toAddress) {
         hasPdf: Boolean(samplePdfPath),
         hasXml: Boolean(sampleXmlPath),
         isTest: true,
+        demoItems: [
+          { name: "Pan de sal (demo)", qty: 10, total: 5 },
+          { name: "Café americano (demo)", qty: 2, total: 3 },
+          { name: "Torta porción (demo)", qty: 1, total: 107 },
+        ],
       }),
       attachments,
     });

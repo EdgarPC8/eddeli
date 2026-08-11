@@ -35,6 +35,9 @@ import {
   Supplier,
   SupplierOrder,
   SupplierOrderItem,
+  SupplierProductCode,
+  OrderPaymentInstallment,
+  SupplierOrderPaymentInstallment,
 } from "../models/Orders.js";
 import {
   Expense,
@@ -113,9 +116,12 @@ export const BACKUP_TABLE_ENTRIES = [
   { key: "Customer", model: Customer },
   { key: "Order", model: Order },
   { key: "OrderItem", model: OrderItem },
+  { key: "OrderPaymentInstallment", model: OrderPaymentInstallment },
   { key: "Supplier", model: Supplier },
   { key: "SupplierOrder", model: SupplierOrder },
   { key: "SupplierOrderItem", model: SupplierOrderItem },
+  { key: "SupplierOrderPaymentInstallment", model: SupplierOrderPaymentInstallment },
+  { key: "SupplierProductCode", model: SupplierProductCode },
   { key: "TaskPlan", model: TaskPlan },
   { key: "TaskItem", model: TaskItem },
   { key: "PublicidadCampaign", model: PublicidadCampaign, sanitize: "PublicidadCampaign" },
