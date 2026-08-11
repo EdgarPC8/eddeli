@@ -68,6 +68,35 @@ export const SriBillingSettings = sequelize.define(
     certificateFileName: { type: DataTypes.STRING(255), allowNull: true },
     certificateUploadedAt: { type: DataTypes.DATE, allowNull: true },
     notes: { type: DataTypes.TEXT, allowNull: true },
+
+    /** Envío automático de factura al correo del cliente al autorizar */
+    enableSendInvoiceEmail: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    smtpHost: { type: DataTypes.STRING(200), allowNull: true },
+    smtpPort: { type: DataTypes.INTEGER, allowNull: true, defaultValue: 587 },
+    smtpSecure: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: false,
+    },
+    smtpUser: { type: DataTypes.STRING(200), allowNull: true },
+    smtpPassEnc: { type: DataTypes.TEXT, allowNull: true },
+    /** Remitente visible (From). Suele ser el mismo correo SMTP. */
+    smtpFrom: { type: DataTypes.STRING(200), allowNull: true },
+    invoiceEmailDailyLimit: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 80,
+    },
+    invoiceEmailsSentDate: { type: DataTypes.DATEONLY, allowNull: true },
+    invoiceEmailsSentCount: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
   },
   { timestamps: true },
 );

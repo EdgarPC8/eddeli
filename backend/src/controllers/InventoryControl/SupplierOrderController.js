@@ -19,6 +19,13 @@ import {
   getDefaultStockStoreId,
   storeHoldsInventory,
 } from "../../services/storeStockService.js";
+import {
+  ensurePaymentScheduleSchema,
+  replaceSupplierInstallments,
+  syncSupplierInstallmentsPreservingPaid,
+  loadSupplierInstallmentsMap,
+  attachInstallmentsToRows,
+} from "../../services/orderPaymentScheduleService.js";
 
 const toNum = (v, d = 0) => {
   const n = Number(v ?? d);
@@ -225,7 +232,7 @@ async function formatSupplierOrdersList(orders) {
     }
   }
 
-  return list.map((order) => {
+  const rowsWithPaid = list.map((order) => {
     const base = formatSupplierOrderBase(order);
     const total = orderTotal(order.ERP_supplier_order_items || []);
     let paid = toNum(paidByOrderId.get(Number(order.id)) || 0);
@@ -243,11 +250,16 @@ async function formatSupplierOrdersList(orders) {
       payments: paymentsByOrderId.get(Number(order.id)) || [],
     };
   });
+
+  await ensurePaymentScheduleSchema();
+  const instMap = await loadSupplierInstallmentsMap(list.map((o) => o.id));
+  return attachInstallmentsToRows(rowsWithPaid, instMap);
 }
 
 export const getSupplierOrders = async (req, res) => {
   try {
     await ensureSupplierOrderItemLotSchema();
+    await ensurePaymentScheduleSchema();
     const fromDate = parseRangeDate(req.query.from, false);
     const toDate = parseRangeDate(req.query.to, true);
     const where = {};
@@ -272,9 +284,10 @@ export const getSupplierOrders = async (req, res) => {
 export const createSupplierOrder = async (req, res) => {
   try {
     await ensureSupplierOrderItemLotSchema();
+    await ensurePaymentScheduleSchema();
     const token = getHeaderToken(req);
     await verifyJWT(token);
-    const { supplierId, date, notes, items = [] } = req.body || {};
+    const { supplierId, date, notes, items = [], paymentInstallments } = req.body || {};
 
     if (!supplierId || !date || !Array.isArray(items) || items.length === 0) {
       notifyFail("supplier_order.create_failed", "Proveedor, fecha e ítems son requeridos", {
@@ -310,6 +323,10 @@ export const createSupplierOrder = async (req, res) => {
       return order.id;
     });
 
+    if (Array.isArray(paymentInstallments)) {
+      await replaceSupplierInstallments(orderId, paymentInstallments || []);
+    }
+
     const full = await SupplierOrder.findByPk(orderId, { include: orderIncludes });
     notifyOk("supplier_order.created", "Pedido a proveedor creado", { supplierOrderId: orderId });
     res.status(201).json((await formatSupplierOrdersList([full]))[0]);
@@ -327,8 +344,9 @@ export const createSupplierOrder = async (req, res) => {
 export const updateSupplierOrder = async (req, res) => {
   try {
     await ensureSupplierOrderItemLotSchema();
+    await ensurePaymentScheduleSchema();
     const { id } = req.params;
-    const { supplierId, date, notes, items, receivedAt, paidAt } = req.body || {};
+    const { supplierId, date, notes, items, receivedAt, paidAt, paymentInstallments } = req.body || {};
     const order = await SupplierOrder.findByPk(id);
     if (!order) {
       notifyFail("supplier_order.update_failed", `Pedido proveedor #${id} no encontrado`, {
@@ -341,6 +359,7 @@ export const updateSupplierOrder = async (req, res) => {
     const isReceived = Boolean(order.receivedAt);
     // Corrección manual de fechas (Programador): no re-dispara movimientos de stock.
     const hasDateOverride = receivedAt !== undefined || paidAt !== undefined;
+    const hasPaymentInstallments = paymentInstallments !== undefined;
     const user = await verifyJWT(getHeaderToken(req));
     const isProgramador = user?.loginRol === "Programador";
     if (hasDateOverride) {
@@ -363,7 +382,7 @@ export const updateSupplierOrder = async (req, res) => {
       items.length > 0 &&
       isProgramador;
 
-    if (isReceived && !hasDateOverride && !wantsReceivedItemsEdit) {
+    if (isReceived && !hasDateOverride && !wantsReceivedItemsEdit && !hasPaymentInstallments) {
       notifyFail("supplier_order.update_failed", "No se puede editar un pedido ya recibido", {
         req,
         httpStatus: 400,
@@ -464,6 +483,14 @@ export const updateSupplierOrder = async (req, res) => {
       });
 
       const full = await SupplierOrder.findByPk(id, { include: orderIncludes });
+      if (paymentInstallments !== undefined) {
+        const [formattedPay] = await formatSupplierOrdersList([full]);
+        await syncSupplierInstallmentsPreservingPaid(
+          id,
+          paymentInstallments,
+          formattedPay?.paidAmount || 0,
+        );
+      }
       notifyOk("supplier_order.updated", `Pedido proveedor #${id} (corrección post-recibo)`, {
         supplierOrderId: Number(id),
       });
@@ -492,6 +519,14 @@ export const updateSupplierOrder = async (req, res) => {
     });
 
     const full = await SupplierOrder.findByPk(id, { include: orderIncludes });
+    if (paymentInstallments !== undefined) {
+      const [formattedPay] = await formatSupplierOrdersList([full]);
+      await syncSupplierInstallmentsPreservingPaid(
+        id,
+        paymentInstallments,
+        formattedPay?.paidAmount || 0,
+      );
+    }
     notifyOk("supplier_order.updated", `Pedido proveedor #${id}`, { supplierOrderId: Number(id) });
     res.json((await formatSupplierOrdersList([full]))[0]);
   } catch (error) {

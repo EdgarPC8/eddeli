@@ -13,6 +13,11 @@ import {
 import { InventoryProduct } from "../../models/Inventory.js";
 import { Expense, SupplierOrderPayment, SupplierPack, SupplierPackItem } from "../../models/Finance.js";
 import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
+import {
+  ensurePaymentScheduleSchema,
+  loadSupplierInstallmentsMap,
+  attachInstallmentsToRows,
+} from "../../services/orderPaymentScheduleService.js";
 
 const toNum = (v, d = 0) => {
   const n = Number(v ?? d);
@@ -333,8 +338,12 @@ export const getSupplierPayablesWorkbench = async (req, res) => {
       };
     });
 
+    await ensurePaymentScheduleSchema();
+    const instMap = await loadSupplierInstallmentsMap(outOrders.map((o) => o.id));
+    const outOrdersWithCredit = attachInstallmentsToRows(outOrders, instMap);
+
     const debtBySupplier = new Map();
-    for (const o of outOrders) {
+    for (const o of outOrdersWithCredit) {
       if (o.remainingAmount <= 0) continue;
       debtBySupplier.set(
         o.supplierId,
@@ -343,13 +352,33 @@ export const getSupplierPayablesWorkbench = async (req, res) => {
     }
 
     const outSuppliers = suppliers
-      .map((s) => ({
-        id: s.id,
-        name: s.name,
-        phone: s.phone ?? null,
-        email: s.email ?? null,
-        debtTotal: toNum(debtBySupplier.get(s.id) || 0),
-      }))
+      .map((s) => {
+        const suppOrders = outOrdersWithCredit.filter(
+          (o) => Number(o.supplierId) === Number(s.id) && toNum(o.remainingAmount) > 0.009
+        );
+        let best = null;
+        let bestAmt = null;
+        let count = 0;
+        for (const o of suppOrders) {
+          if (o.nextCreditDue) {
+            count += o.pendingCreditCount || 0;
+            if (!best || String(o.nextCreditDue) < String(best)) {
+              best = o.nextCreditDue;
+              bestAmt = o.nextCreditAmount;
+            }
+          }
+        }
+        return {
+          id: s.id,
+          name: s.name,
+          phone: s.phone ?? null,
+          email: s.email ?? null,
+          debtTotal: toNum(debtBySupplier.get(s.id) || 0),
+          nextCreditDue: best,
+          nextCreditAmount: bestAmt,
+          pendingCreditCount: count,
+        };
+      })
       .sort((a, b) => {
         const diff = b.debtTotal - a.debtTotal;
         if (diff !== 0) return diff;
@@ -371,7 +400,7 @@ export const getSupplierPayablesWorkbench = async (req, res) => {
 
     return res.json({
       suppliers: outSuppliers,
-      orders: outOrders,
+      orders: outOrdersWithCredit,
       payments: outPayments,
       packs: packs.filter((p) => p.status !== "cancelled"),
     });

@@ -2,6 +2,7 @@ import fs from "fs";
 import fsp from "fs/promises";
 import path from "path";
 import fileDirName from "../libs/file-dirname.js";
+import { sequelize } from "../database/connection.js";
 import { SriBillingSettings } from "../models/SriBilling.js";
 import { encryptSecret, decryptSecret } from "../utils/secretCrypto.js";
 
@@ -9,6 +10,89 @@ const { __dirname } = fileDirName(import.meta);
 
 /** Carpeta privada (NO montada como static). */
 export const SRI_PRIVATE_DIR = path.resolve(__dirname, "../private/sri");
+
+const DEFAULT_EMAIL_DAILY_LIMIT = 80;
+let emailSchemaReady = false;
+
+export async function ensureSriEmailSchema() {
+  if (emailSchemaReady) return;
+  const cols = [
+    ["enableSendInvoiceEmail", "TINYINT(1) NOT NULL DEFAULT 0"],
+    ["smtpHost", "VARCHAR(200) NULL"],
+    ["smtpPort", "INT NULL DEFAULT 587"],
+    ["smtpSecure", "TINYINT(1) NOT NULL DEFAULT 0"],
+    ["smtpUser", "VARCHAR(200) NULL"],
+    ["smtpPassEnc", "TEXT NULL"],
+    ["smtpFrom", "VARCHAR(200) NULL"],
+    ["invoiceEmailDailyLimit", "INT NOT NULL DEFAULT 80"],
+    ["invoiceEmailsSentDate", "DATE NULL"],
+    ["invoiceEmailsSentCount", "INT NOT NULL DEFAULT 0"],
+  ];
+  for (const [name, ddl] of cols) {
+    try {
+      const [found] = await sequelize.query(
+        `SHOW COLUMNS FROM \`sri_billing_settings\` LIKE '${name}'`,
+      );
+      if (!Array.isArray(found) || found.length === 0) {
+        await sequelize.query(
+          `ALTER TABLE \`sri_billing_settings\` ADD COLUMN \`${name}\` ${ddl}`,
+        );
+      }
+    } catch (e) {
+      console.warn(`ensureSriEmailSchema ${name}:`, e?.message || e);
+    }
+  }
+  emailSchemaReady = true;
+}
+
+function todayIsoDate() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Estado de cuota y config de correo (sin secretos). */
+export function getInvoiceEmailQuotaPublic(settingsRow) {
+  const j = typeof settingsRow?.toJSON === "function" ? settingsRow.toJSON() : { ...settingsRow };
+  const limit = Math.max(1, Number(j.invoiceEmailDailyLimit) || DEFAULT_EMAIL_DAILY_LIMIT);
+  const today = todayIsoDate();
+  const sentDate = j.invoiceEmailsSentDate
+    ? String(j.invoiceEmailsSentDate).slice(0, 10)
+    : null;
+  const count = sentDate === today ? Number(j.invoiceEmailsSentCount) || 0 : 0;
+  const remaining = Math.max(0, limit - count);
+  const pct = limit > 0 ? Math.min(100, Math.round((count / limit) * 100)) : 100;
+  let warning = null;
+  if (remaining <= 0) {
+    warning = `Límite diario alcanzado (${count}/${limit}). No se enviarán más facturas por correo hoy.`;
+  } else if (pct >= 80) {
+    warning = `Cerca del límite diario de correos: ${count}/${limit} usados. Quedan ${remaining}.`;
+  }
+  const smtpReady = Boolean(
+    String(j.smtpHost || "").trim() &&
+      String(j.smtpUser || "").trim() &&
+      j.smtpPassEnc &&
+      String(j.smtpFrom || j.smtpUser || "").trim(),
+  );
+  return {
+    enableSendInvoiceEmail: Boolean(j.enableSendInvoiceEmail),
+    smtpHost: j.smtpHost || "",
+    smtpPort: Number(j.smtpPort) || 587,
+    smtpSecure: Boolean(j.smtpSecure),
+    smtpUser: j.smtpUser || "",
+    smtpFrom: j.smtpFrom || "",
+    hasSmtpPassword: Boolean(j.smtpPassEnc),
+    smtpReady,
+    invoiceEmailDailyLimit: limit,
+    invoiceEmailsSentToday: count,
+    invoiceEmailsRemainingToday: remaining,
+    invoiceEmailUsagePct: pct,
+    invoiceEmailWarning: warning,
+    invoiceEmailLimitReached: remaining <= 0,
+  };
+}
 
 export const DEFAULT_SRI_SETTINGS = {
   id: 1,
@@ -32,6 +116,16 @@ export const DEFAULT_SRI_SETTINGS = {
   certificateFileName: null,
   certificateUploadedAt: null,
   notes: null,
+  enableSendInvoiceEmail: false,
+  smtpHost: null,
+  smtpPort: 587,
+  smtpSecure: false,
+  smtpUser: null,
+  smtpPassEnc: null,
+  smtpFrom: null,
+  invoiceEmailDailyLimit: 80,
+  invoiceEmailsSentDate: null,
+  invoiceEmailsSentCount: 0,
 };
 
 export function ensureSriPrivateDir() {
@@ -77,6 +171,7 @@ export function toPublicSriSettings(row) {
     certificateUploadedAt: j.certificateUploadedAt || null,
     readyForInvoicing: isReadyForInvoicing(j),
     updatedAt: j.updatedAt || null,
+    ...getInvoiceEmailQuotaPublic(j),
   };
 }
 
@@ -98,6 +193,7 @@ function isReadyForInvoicing(j) {
 
 export async function loadSriBillingSettings() {
   ensureSriPrivateDir();
+  await ensureSriEmailSchema();
   await SriBillingSettings.sync();
   let row = await SriBillingSettings.findByPk(1);
   if (!row) {
@@ -125,6 +221,13 @@ export async function updateSriBillingSettings(patch = {}) {
     "taxRegime",
     "nextInvoiceSequential",
     "notes",
+    "enableSendInvoiceEmail",
+    "smtpHost",
+    "smtpPort",
+    "smtpSecure",
+    "smtpUser",
+    "smtpFrom",
+    "invoiceEmailDailyLimit",
   ];
   const updates = {};
   for (const key of allowed) {
@@ -162,10 +265,45 @@ export async function updateSriBillingSettings(patch = {}) {
   if (updates.enabled != null) {
     updates.enabled = Boolean(updates.enabled);
   }
+  if (updates.enableSendInvoiceEmail != null) {
+    updates.enableSendInvoiceEmail = Boolean(updates.enableSendInvoiceEmail);
+  }
+  if (updates.smtpSecure != null) {
+    updates.smtpSecure = Boolean(updates.smtpSecure);
+  }
+  if (updates.smtpPort != null) {
+    const p = Number(updates.smtpPort);
+    if (!Number.isFinite(p) || p < 1 || p > 65535) {
+      throw Object.assign(new Error("Puerto SMTP inválido"), { status: 400 });
+    }
+    updates.smtpPort = Math.floor(p);
+  }
+  if (updates.smtpHost != null) {
+    updates.smtpHost = String(updates.smtpHost).trim().slice(0, 200) || null;
+  }
+  if (updates.smtpUser != null) {
+    updates.smtpUser = String(updates.smtpUser).trim().slice(0, 200) || null;
+  }
+  if (updates.smtpFrom != null) {
+    updates.smtpFrom = String(updates.smtpFrom).trim().slice(0, 200) || null;
+  }
+  if (updates.invoiceEmailDailyLimit != null) {
+    const lim = Number(updates.invoiceEmailDailyLimit);
+    if (!Number.isFinite(lim) || lim < 1 || lim > 10000) {
+      throw Object.assign(new Error("Límite diario de correos inválido (1–10000)"), {
+        status: 400,
+      });
+    }
+    updates.invoiceEmailDailyLimit = Math.floor(lim);
+  }
 
-  // Contraseña: solo si viene no vacía
+  // Contraseña certificado: solo si viene no vacía
   if (patch.certificatePassword != null && String(patch.certificatePassword).length > 0) {
     updates.certificatePasswordEnc = encryptSecret(String(patch.certificatePassword));
+  }
+  // Contraseña SMTP: solo si viene no vacía
+  if (patch.smtpPassword != null && String(patch.smtpPassword).length > 0) {
+    updates.smtpPassEnc = encryptSecret(String(patch.smtpPassword));
   }
 
   await row.update(updates);

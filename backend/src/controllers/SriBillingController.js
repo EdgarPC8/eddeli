@@ -13,6 +13,7 @@ import {
   getElectronicInvoiceById,
   refreshInvoiceAuthorization,
 } from "../services/sriInvoiceEmitService.js";
+import { sendSriTestEmail } from "../services/sriInvoiceEmailService.js";
 import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
 
 const upload = multer({
@@ -217,5 +218,32 @@ export async function postRefreshSriInvoice(req, res) {
       extra: { invoiceId: req.params.id },
     });
     res.status(status).json({ message: err.message || "No se pudo consultar la autorización" });
+  }
+}
+
+export async function postTestSriInvoiceEmail(req, res) {
+  try {
+    const result = await sendSriTestEmail(req.body?.to);
+    notifyOk("sri.email.test_sent", "Correo de prueba SRI enviado", {
+      to: result.to,
+      usage: result.usage,
+    });
+    res.json({
+      message: `Correo de prueba enviado a ${result.to}`,
+      ...result,
+      settings: toPublicSriSettings(await loadSriBillingSettings()),
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error("postTestSriInvoiceEmail", err);
+    notifyFail("sri.email.test_failed", err.message || "No se pudo enviar el correo de prueba", {
+      error: err,
+      req,
+      httpStatus: status,
+    });
+    res.status(status).json({
+      message: err.message || "No se pudo enviar el correo de prueba",
+      warning: err.warning || null,
+    });
   }
 }

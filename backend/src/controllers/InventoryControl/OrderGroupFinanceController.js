@@ -15,6 +15,12 @@ import {
   walkInPosOrderExcludeWhere,
 } from "../../utils/posOrderUtils.js";
 import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
+import {
+  ensurePaymentScheduleSchema,
+  loadCustomerInstallmentsMap,
+  applyFifoPaidToInstallments,
+  summarizeNextCredit,
+} from "../../services/orderPaymentScheduleService.js";
 const toNum = (v, def = 0) => {
     const n = Number(v ?? def);
     return Number.isFinite(n) ? n : def;
@@ -1231,6 +1237,58 @@ export const getFinanceWorkbenchAll = async (req, res) => {
             }),
           });
         }
+      }
+
+      await ensurePaymentScheduleSchema();
+      const orderIds = outOrders.map((o) => o.id);
+      const instMap = await loadCustomerInstallmentsMap(orderIds);
+
+      for (const o of outOrders) {
+        let total = 0;
+        let unpaid = 0;
+        for (const it of o.items || []) {
+          const qty = toNum(it.qty ?? it.quantity);
+          const billable = Math.max(0, qty - toNum(it.damagedQty) - toNum(it.giftQty));
+          const line = Number((billable * toNum(it.price)).toFixed(2));
+          total += line;
+          if (!it.paidAt) unpaid += line;
+        }
+        total = Number(total.toFixed(2));
+        unpaid = Number(unpaid.toFixed(2));
+        const paidAmount = Number(Math.max(0, total - unpaid).toFixed(2));
+        const raw = instMap.get(Number(o.id)) || [];
+        const paymentInstallments = applyFifoPaidToInstallments(raw, paidAmount);
+        const credit = summarizeNextCredit(paymentInstallments);
+        o.totalAmount = total;
+        o.paidAmount = paidAmount;
+        o.remainingAmount = unpaid;
+        o.paymentInstallments = paymentInstallments;
+        o.paymentDueDate = credit.nextCreditDue
+          ? credit.nextCreditDue
+          : (paymentInstallments.at(-1)?.dueDate || null);
+        o.nextCreditDue = credit.nextCreditDue;
+        o.nextCreditAmount = credit.nextCreditAmount;
+        o.pendingCreditCount = credit.pendingCreditCount;
+      }
+
+      // Enrich customers with soonest next credit among their orders that still have debt
+      for (const c of outCustomers) {
+        const custOrders = outOrders.filter((o) => Number(o.customerId) === Number(c.id) && toNum(o.remainingAmount) > 0.009);
+        let best = null;
+        let bestAmt = null;
+        let count = 0;
+        for (const o of custOrders) {
+          if (o.nextCreditDue) {
+            count += o.pendingCreditCount || 0;
+            if (!best || String(o.nextCreditDue) < String(best)) {
+              best = o.nextCreditDue;
+              bestAmt = o.nextCreditAmount;
+            }
+          }
+        }
+        c.nextCreditDue = best;
+        c.nextCreditAmount = bestAmt;
+        c.pendingCreditCount = count;
       }
 
       return {

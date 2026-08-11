@@ -14,6 +14,7 @@ import {
   getSriInvoices,
   getSriInvoiceById,
   postRefreshSriInvoice,
+  postTestSriInvoiceEmail,
 } from "../controllers/SriBillingController.js";
 
 const router = Router();
@@ -28,6 +29,12 @@ router.post(
   uploadSriCertificate,
 );
 router.delete("/certificate", isAuthenticated, requireAdminOrProgrammer, deleteSriCertificate);
+router.post(
+  "/test-email",
+  isAuthenticated,
+  requireAdminOrProgrammer,
+  postTestSriInvoiceEmail,
+);
 
 router.get("/invoices", isAuthenticated, requireStaff, getSriInvoices);
 router.post("/invoices/emit", isAuthenticated, requireAdminOrProgrammer, postEmitSriInvoice);

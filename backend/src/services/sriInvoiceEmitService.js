@@ -18,6 +18,7 @@ import {
   SRI_PRIVATE_DIR,
   ensureSriPrivateDir,
 } from "./sriBillingService.js";
+import { maybeSendAuthorizedInvoiceEmail } from "./sriInvoiceEmailService.js";
 import { buildAccessKey } from "./sriAccessKey.js";
 import { buildFacturaXml, computeInvoiceTotals } from "./sriInvoiceXml.js";
 import {
@@ -188,6 +189,18 @@ async function applyAuthorizationResult(invoice, auth) {
       })(),
       authorizedAt,
       sriMessage,
+    });
+    // Envío al cliente (no bloquea ni rompe la autorización SRI)
+    void maybeSendAuthorizedInvoiceEmail(invoice).then((emailResult) => {
+      if (emailResult?.ok) {
+        console.info(
+          `SRI email enviado a ${emailResult.to} (${emailResult.usage?.sentToday}/${emailResult.usage?.limit})`,
+        );
+      } else if (!emailResult?.skipped) {
+        console.warn("SRI email falló:", emailResult?.reason);
+      } else if (emailResult?.limitReached) {
+        console.warn("SRI email omitido por límite:", emailResult.reason);
+      }
     });
   } else if (st === "NO AUTORIZADO" || st === "RECHAZADO") {
     await invoice.update({ status: "rejected", sriMessage });

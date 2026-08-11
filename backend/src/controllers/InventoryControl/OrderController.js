@@ -20,6 +20,13 @@ import {
 } from "../../services/storeStockService.js";
 import { getAppSettingsSync } from "../../services/appSettingsService.js";
 import { consumeBatchesFefo } from "../../services/batchStockService.js";
+import {
+  ensurePaymentScheduleSchema,
+  replaceCustomerInstallments,
+  syncCustomerInstallmentsPreservingPaid,
+  loadCustomerInstallmentsMap,
+  attachInstallmentsToRows,
+} from "../../services/orderPaymentScheduleService.js";
 
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
@@ -38,10 +45,10 @@ async function ensureOrderSellerSchema() {
         "ALTER TABLE `ERP_orders` ADD COLUMN `sellerAccountId` INT NULL",
       );
     }
+    orderSellerSchemaReady = true;
   } catch (e) {
     console.warn("ensureOrderSellerSchema:", e?.message || e);
   }
-  orderSellerSchemaReady = true;
 }
 
 async function ensureOrderItemDeliverSchema() {
@@ -1402,8 +1409,10 @@ export const createCustomer = async (req, res) => {
 // Crear un nuevo pedido
 export const createOrder = async (req, res) => {
   try {
+    await ensureOrderSellerSchema();
     await ensureOrderItemPackSchema();
-    const { customerId, notes, date, items } = req.body;
+    await ensurePaymentScheduleSchema();
+    const { customerId, notes, date, items, paymentInstallments } = req.body;
 
     if (!customerId || !items || items.length === 0) {
       notifyFail("order.create_failed", "Faltan datos del pedido", { req, httpStatus: 400 });
@@ -1419,6 +1428,10 @@ export const createOrder = async (req, res) => {
     const createdItems = await Promise.all(
       items.map((item) => OrderItem.create(buildCustomerItemPayload(order.id, item)))
     );
+
+    if (Array.isArray(paymentInstallments)) {
+      await replaceCustomerInstallments(order.id, paymentInstallments || []);
+    }
 
     notifyOk("order.created", `Pedido #${order.id}`, { orderId: order.id, customerId });
     res.status(201).json({
@@ -1508,7 +1521,7 @@ export const deleteOrder = async (req, res) => {
 export const updateOrder = async (req, res) => {
   try {
     const { id } = req.params;
-    const { customerId, notes, date, items } = req.body ?? {};
+    const { customerId, notes, date, items, paymentInstallments } = req.body ?? {};
 
     const token = getHeaderToken(req);
     const user = await verifyJWT(token);
@@ -1555,7 +1568,8 @@ export const updateOrder = async (req, res) => {
     }
 
     const hasItems = Array.isArray(items);
-    if (!hasItems && Object.keys(updates).length === 0) {
+    const hasPaymentInstallments = paymentInstallments !== undefined;
+    if (!hasItems && Object.keys(updates).length === 0 && !hasPaymentInstallments) {
       notifyFail("order.update_failed", "No se enviaron campos válidos para actualizar", {
         req,
         httpStatus: 400,
@@ -1609,6 +1623,18 @@ export const updateOrder = async (req, res) => {
         }
       }
     });
+
+    if (paymentInstallments !== undefined) {
+      const orderWithItems = await Order.findByPk(id, {
+        include: [{ model: OrderItem, as: "ERP_order_items" }],
+      });
+      const [formatted] = await formatOrdersList([orderWithItems]);
+      await syncCustomerInstallmentsPreservingPaid(
+        id,
+        paymentInstallments,
+        formatted?.paidAmount || 0,
+      );
+    }
 
     notifyOk("order.updated", `Pedido #${id}`, { orderId: Number(id) });
     return res.json({ message: "Pedido actualizado correctamente", order });
@@ -2146,7 +2172,7 @@ async function formatOrdersList(orders) {
     });
   }
 
-  return baseRows.map((row) => {
+  const rowsWithPaid = baseRows.map((row) => {
     const items = row.ERP_order_items || [];
     const totalAmount = Number(
       items.reduce((s, it) => s + orderItemBillableTotal(it), 0).toFixed(2)
@@ -2176,6 +2202,10 @@ async function formatOrdersList(orders) {
       remainingAmount,
     };
   });
+
+  await ensurePaymentScheduleSchema();
+  const instMap = await loadCustomerInstallmentsMap(baseRows.map((r) => r.id));
+  return attachInstallmentsToRows(rowsWithPaid, instMap);
 }
 
 function parseRangeDate(value, endOfDay = false) {
@@ -2188,7 +2218,9 @@ function parseRangeDate(value, endOfDay = false) {
 
 export const getAllOrders = async (req, res) => {
   try {
+    await ensureOrderSellerSchema();
     await ensureOrderItemPackSchema();
+    await ensurePaymentScheduleSchema();
     const fromDate = parseRangeDate(req.query.from, false);
     const toDate = parseRangeDate(req.query.to, true);
     const pagination = parsePagination(req, { defaultPageSize: 100 });
