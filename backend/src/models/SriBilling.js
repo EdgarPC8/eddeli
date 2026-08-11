@@ -164,6 +164,7 @@ export const ElectronicInvoice = sequelize.define(
     },
     xmlRelativePath: { type: DataTypes.STRING(255), allowNull: true },
     ridePdfRelativePath: { type: DataTypes.STRING(255), allowNull: true },
+    invoiceEmailSentAt: { type: DataTypes.DATE, allowNull: true },
     sriMessage: { type: DataTypes.TEXT, allowNull: true },
     payloadJson: { type: DataTypes.JSON, allowNull: true },
   },

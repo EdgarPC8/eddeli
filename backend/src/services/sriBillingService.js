@@ -279,7 +279,16 @@ export async function updateSriBillingSettings(patch = {}) {
     updates.smtpPort = Math.floor(p);
   }
   if (updates.smtpHost != null) {
-    updates.smtpHost = String(updates.smtpHost).trim().slice(0, 200) || null;
+    const host = String(updates.smtpHost).trim().slice(0, 200);
+    if (host && host.includes("@")) {
+      throw Object.assign(
+        new Error(
+          "El servidor SMTP (host) no es tu correo. Para Gmail usa: smtp.gmail.com. El correo va en Usuario / Remitente.",
+        ),
+        { status: 400 },
+      );
+    }
+    updates.smtpHost = host || null;
   }
   if (updates.smtpUser != null) {
     updates.smtpUser = String(updates.smtpUser).trim().slice(0, 200) || null;

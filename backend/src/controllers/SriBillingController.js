@@ -13,7 +13,7 @@ import {
   getElectronicInvoiceById,
   refreshInvoiceAuthorization,
 } from "../services/sriInvoiceEmitService.js";
-import { sendSriTestEmail } from "../services/sriInvoiceEmailService.js";
+import { sendSriTestEmail, sendCustomerInvoiceEmailById } from "../services/sriInvoiceEmailService.js";
 import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
 
 const upload = multer({
@@ -26,6 +26,17 @@ const upload = multer({
   },
 });
 
+const uploadRidePdf = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 12 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const name = String(file.originalname || "").toLowerCase();
+    const mime = String(file.mimetype || "");
+    if (name.endsWith(".pdf") || mime === "application/pdf") cb(null, true);
+    else cb(new Error("Solo se permite PDF"));
+  },
+});
+
 export const sriCertificateUploadMiddleware = (req, res, next) => {
   upload.single("certificate")(req, res, (err) => {
     if (err) {
@@ -35,6 +46,15 @@ export const sriCertificateUploadMiddleware = (req, res, next) => {
         httpStatus: 400,
       });
       return res.status(400).json({ message: err.message || "Error al subir el certificado" });
+    }
+    next();
+  });
+};
+
+export const sriRidePdfUploadMiddleware = (req, res, next) => {
+  uploadRidePdf.single("pdf")(req, res, (err) => {
+    if (err) {
+      return res.status(400).json({ message: err.message || "Error al subir el PDF" });
     }
     next();
   });
@@ -243,6 +263,40 @@ export async function postTestSriInvoiceEmail(req, res) {
     });
     res.status(status).json({
       message: err.message || "No se pudo enviar el correo de prueba",
+      warning: err.warning || null,
+    });
+  }
+}
+
+export async function postSendSriInvoiceEmail(req, res) {
+  try {
+    const result = await sendCustomerInvoiceEmailById(req.params.id, req.file || null, {
+      force: String(req.query?.force || req.body?.force || "") === "1",
+    });
+    if (result.ok) {
+      notifyOk("sri.email.invoice_sent", `Factura #${req.params.id} enviada por correo`, {
+        invoiceId: req.params.id,
+        to: result.to,
+        pdfSource: result.pdfSource,
+      });
+    }
+    res.json({
+      message: result.ok
+        ? `Correo enviado a ${result.to}`
+        : result.reason || "Envío omitido",
+      ...result,
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error("postSendSriInvoiceEmail", err);
+    notifyFail("sri.email.invoice_failed", err.message || "No se pudo enviar el correo", {
+      error: err,
+      req,
+      httpStatus: status,
+      extra: { invoiceId: req.params.id },
+    });
+    res.status(status).json({
+      message: err.message || "No se pudo enviar el correo",
       warning: err.warning || null,
     });
   }

@@ -15,6 +15,8 @@ import {
   getSriInvoiceById,
   postRefreshSriInvoice,
   postTestSriInvoiceEmail,
+  postSendSriInvoiceEmail,
+  sriRidePdfUploadMiddleware,
 } from "../controllers/SriBillingController.js";
 
 const router = Router();
@@ -39,6 +41,13 @@ router.post(
 router.get("/invoices", isAuthenticated, requireStaff, getSriInvoices);
 router.post("/invoices/emit", isAuthenticated, requireAdminOrProgrammer, postEmitSriInvoice);
 router.post("/invoices/:id/refresh", isAuthenticated, requireAdminOrProgrammer, postRefreshSriInvoice);
+router.post(
+  "/invoices/:id/send-email",
+  isAuthenticated,
+  requireStaff,
+  sriRidePdfUploadMiddleware,
+  postSendSriInvoiceEmail,
+);
 router.get("/invoices/:id", isAuthenticated, requireStaff, getSriInvoiceById);
 
 export default router;

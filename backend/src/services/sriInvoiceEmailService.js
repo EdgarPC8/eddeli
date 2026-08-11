@@ -1,17 +1,36 @@
 /**
  * Envío de factura electrónica por correo (SMTP).
- * Respeta enableSendInvoiceEmail + cuota diaria + credenciales SMTP.
+ * Plantilla con logo + resumen; adjuntos PDF + XML.
  */
-import fs from "fs/promises";
+import fs from "fs";
+import fsp from "fs/promises";
 import path from "path";
 import nodemailer from "nodemailer";
+import fileDirName from "../libs/file-dirname.js";
 import { decryptSecret } from "../utils/secretCrypto.js";
 import {
   SRI_PRIVATE_DIR,
   loadSriBillingSettings,
   getInvoiceEmailQuotaPublic,
   ensureSriEmailSchema,
+  ensureSriPrivateDir,
 } from "./sriBillingService.js";
+import { loadAppSettings } from "./appSettingsService.js";
+import {
+  buildInvoiceEmailHtml,
+  invoiceNumberLabel,
+  money,
+} from "./sriInvoiceEmailHtml.js";
+import {
+  generateAndStoreInvoicePdf,
+  generateSampleInvoicePdf,
+  unlinkQuiet,
+} from "./sriInvoiceRidePdf.js";
+import { ElectronicInvoice } from "../models/SriBilling.js";
+import { sequelize } from "../database/connection.js";
+
+const { __dirname } = fileDirName(import.meta);
+const IMG_BASE = path.resolve(__dirname, "../img");
 
 function todayIsoDate() {
   const d = new Date();
@@ -19,17 +38,6 @@ function todayIsoDate() {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
-}
-
-function money(n) {
-  return Number(Number(n || 0).toFixed(2)).toFixed(2);
-}
-
-function invoiceNumberLabel(inv) {
-  const a = String(inv.establishmentCode || "001").padStart(3, "0");
-  const b = String(inv.emissionPointCode || "001").padStart(3, "0");
-  const c = String(Number(inv.sequential) || 0).padStart(9, "0");
-  return `${a}-${b}-${c}`;
 }
 
 async function bumpEmailSentCount(row) {
@@ -51,6 +59,18 @@ async function bumpEmailSentCount(row) {
 
 function buildTransport(settings, passwordPlain) {
   const host = String(settings.smtpHost || "").trim();
+  if (!host) {
+    const err = new Error("Falta el servidor SMTP (host). Para Gmail: smtp.gmail.com");
+    err.status = 400;
+    throw err;
+  }
+  if (host.includes("@")) {
+    const err = new Error(
+      "El servidor SMTP no es tu correo. Para Gmail pon host: smtp.gmail.com. Tu Gmail va en Usuario y Remitente.",
+    );
+    err.status = 400;
+    throw err;
+  }
   const port = Number(settings.smtpPort) || 587;
   const secure = Boolean(settings.smtpSecure) || port === 465;
   const user = String(settings.smtpUser || "").trim();
@@ -62,77 +82,138 @@ function buildTransport(settings, passwordPlain) {
   });
 }
 
-function esc(s) {
-  return String(s ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+async function resolveAppLogoPath() {
+  try {
+    const app = await loadAppSettings();
+    const rel = String(app.logoPath || "").replace(/^\/+/, "");
+    if (!rel || rel.includes("..")) return { app, logoPath: null };
+    const full = path.resolve(IMG_BASE, rel);
+    if (!full.startsWith(IMG_BASE)) return { app, logoPath: null };
+    try {
+      await fsp.access(full);
+      return { app, logoPath: full };
+    } catch {
+      return { app, logoPath: null };
+    }
+  } catch {
+    return { app: { name: "Facturación", alias: "App" }, logoPath: null };
+  }
 }
 
-function buildInvoiceEmailHtml(invoice, settings) {
-  const num = invoiceNumberLabel(invoice);
-  const env =
-    String(invoice.environment || "").toLowerCase() === "produccion"
-      ? "PRODUCCIÓN"
-      : "PRUEBAS";
-  const legal = settings.legalName || settings.tradeName || "Emisor";
-  return `<!DOCTYPE html>
-<html lang="es">
-<head><meta charset="utf-8" /><title>Factura ${num}</title></head>
-<body style="font-family:Arial,Helvetica,sans-serif;color:#111;line-height:1.45">
-  <h2 style="margin:0 0 8px">Factura electrónica ${num}</h2>
-  <p style="margin:0 0 12px;color:#444">${esc(legal)} · Ambiente ${env}</p>
-  <table style="border-collapse:collapse;width:100%;max-width:560px">
-    <tr><td style="padding:4px 0;font-weight:700">Cliente</td><td>${esc(invoice.customerName || "—")}</td></tr>
-    <tr><td style="padding:4px 0;font-weight:700">Identificación</td><td>${esc(invoice.customerIdent || "—")}</td></tr>
-    <tr><td style="padding:4px 0;font-weight:700">Clave de acceso</td><td style="word-break:break-all">${esc(invoice.accessKey || "—")}</td></tr>
-    <tr><td style="padding:4px 0;font-weight:700">Autorización</td><td style="word-break:break-all">${esc(invoice.authorizationNumber || "—")}</td></tr>
-    <tr><td style="padding:4px 0;font-weight:700">Subtotal</td><td>$${money(invoice.subtotal)}</td></tr>
-    <tr><td style="padding:4px 0;font-weight:700">IVA</td><td>$${money(invoice.taxTotal)}</td></tr>
-    <tr><td style="padding:4px 0;font-weight:700">Total</td><td><strong>$${money(invoice.total)}</strong></td></tr>
-  </table>
-  <p style="margin-top:16px;font-size:13px;color:#555">
-    Adjuntamos el XML autorizado de la factura. Conserve este correo como respaldo.
-  </p>
-</body>
-</html>`;
+function logoCidAttachment(logoPath) {
+  if (!logoPath) return null;
+  const ext = path.extname(logoPath).toLowerCase();
+  const contentType =
+    ext === ".png"
+      ? "image/png"
+      : ext === ".webp"
+        ? "image/webp"
+        : ext === ".gif"
+          ? "image/gif"
+          : "image/jpeg";
+  return {
+    filename: `logo${ext || ".jpeg"}`,
+    path: logoPath,
+    cid: "app-logo",
+    contentType,
+    contentDisposition: "inline",
+  };
 }
 
 async function resolveXmlAttachment(invoice) {
   const rel = invoice.xmlRelativePath;
   if (!rel) return null;
   const base = path.basename(String(rel));
-  const full = path.resolve(SRI_PRIVATE_DIR, "invoices", base);
-  try {
-    await fs.access(full);
-    return {
-      filename: `factura-${invoiceNumberLabel(invoice)}.xml`,
-      path: full,
-      contentType: "application/xml",
-    };
-  } catch {
+  const candidates = [
+    path.resolve(SRI_PRIVATE_DIR, "invoices", base),
+    path.resolve(SRI_PRIVATE_DIR, base),
+  ];
+  for (const full of candidates) {
     try {
-      const alt = path.resolve(SRI_PRIVATE_DIR, base);
-      await fs.access(alt);
+      await fsp.access(full);
       return {
         filename: `factura-${invoiceNumberLabel(invoice)}.xml`,
-        path: alt,
+        path: full,
         contentType: "application/xml",
       };
     } catch {
-      return null;
+      /* next */
     }
+  }
+  return null;
+}
+
+async function resolveOrCreatePdfAttachment(invoice, settings, logoPath, uploadedPdf) {
+  // Preferir PDF RIDE subido desde el frontend (mismo de “Descargar”)
+  if (uploadedPdf?.buffer?.length) {
+    try {
+      ensureSriPrivateDir();
+      const invoicesDir = path.join(SRI_PRIVATE_DIR, "invoices");
+      fs.mkdirSync(invoicesDir, { recursive: true });
+      const key = String(invoice.accessKey || invoice.id || Date.now()).replace(/\W/g, "");
+      const filename = `${key || `factura-${invoiceNumberLabel(invoice)}`}-ride.pdf`;
+      const absolutePath = path.join(invoicesDir, filename);
+      await fsp.writeFile(absolutePath, uploadedPdf.buffer);
+      const relativePath = `invoices/${filename}`;
+      if (invoice?.update && typeof invoice.update === "function") {
+        try {
+          await invoice.update({ ridePdfRelativePath: relativePath });
+        } catch (e) {
+          console.warn("No se pudo guardar ridePdfRelativePath:", e?.message || e);
+        }
+      }
+      return {
+        filename: `factura-${invoiceNumberLabel(invoice)}.pdf`,
+        path: absolutePath,
+        contentType: "application/pdf",
+        created: true,
+        source: "ride",
+      };
+    } catch (e) {
+      console.error("guardar PDF RIDE:", e?.message || e);
+    }
+  }
+
+  // Fallback: PDF generado en servidor
+  try {
+    const pdf = await generateAndStoreInvoicePdf(invoice, settings, logoPath);
+    if (invoice?.update && typeof invoice.update === "function") {
+      try {
+        await invoice.update({ ridePdfRelativePath: pdf.relativePath });
+      } catch (e) {
+        console.warn("No se pudo guardar ridePdfRelativePath:", e?.message || e);
+      }
+    }
+    return {
+      filename: `factura-${invoiceNumberLabel(invoice)}.pdf`,
+      path: pdf.absolutePath,
+      contentType: "application/pdf",
+      created: true,
+      source: "server",
+    };
+  } catch (e) {
+    console.error("generateAndStoreInvoicePdf:", e?.message || e);
+    return null;
+  }
+}
+
+async function decryptSmtpPassword(settings) {
+  try {
+    return decryptSecret(settings.smtpPassEnc) || "";
+  } catch {
+    return "";
   }
 }
 
 /**
  * Envía factura autorizada al correo del cliente si la config lo permite.
- * Nunca lanza hacia el emisor SRI: retorna { ok, skipped, reason, warning }.
+ * @param {object} invoice
+ * @param {{ pdfFile?: { buffer: Buffer, originalname?: string } }} [opts]
  */
-export async function maybeSendAuthorizedInvoiceEmail(invoice) {
+export async function maybeSendAuthorizedInvoiceEmail(invoice, opts = {}) {
   try {
     await ensureSriEmailSchema();
+    await ensureInvoiceEmailSentSchema();
     const settings = await loadSriBillingSettings();
     const quota = getInvoiceEmailQuotaPublic(settings);
 
@@ -165,29 +246,59 @@ export async function maybeSendAuthorizedInvoiceEmail(invoice) {
       };
     }
 
-    let password = "";
-    try {
-      password = decryptSecret(settings.smtpPassEnc) || "";
-    } catch {
-      return { ok: false, skipped: true, reason: "No se pudo leer la contraseña SMTP." };
+    if (invoice.invoiceEmailSentAt && !opts.force) {
+      return {
+        ok: false,
+        skipped: true,
+        reason: "Esta factura ya fue enviada por correo.",
+        alreadySent: true,
+      };
     }
+
+    const password = await decryptSmtpPassword(settings);
     if (!password) {
       return { ok: false, skipped: true, reason: "Contraseña SMTP vacía." };
     }
 
+    const { app, logoPath } = await resolveAppLogoPath();
     const from = String(settings.smtpFrom || settings.smtpUser || "").trim();
     const transport = buildTransport(settings, password);
-    const attachment = await resolveXmlAttachment(invoice);
+    const xmlAtt = await resolveXmlAttachment(invoice);
+    const pdfAtt = await resolveOrCreatePdfAttachment(
+      invoice,
+      settings,
+      logoPath,
+      opts.pdfFile || null,
+    );
+    const logoAtt = logoCidAttachment(logoPath);
     const num = invoiceNumberLabel(invoice);
 
+    const attachments = [];
+    if (logoAtt) attachments.push(logoAtt);
+    if (pdfAtt) attachments.push(pdfAtt);
+    if (xmlAtt) attachments.push(xmlAtt);
+
     await transport.sendMail({
-      from: `"${String(settings.legalName || settings.tradeName || "Factura").slice(0, 80)}" <${from}>`,
+      from: `"${String(settings.legalName || settings.tradeName || app.alias || "Factura").slice(0, 80)}" <${from}>`,
       to,
-      subject: `Factura ${num} — ${settings.legalName || settings.tradeName || "Comprobante"}`,
-      text: `Factura ${num} autorizada. Total $${money(invoice.total)}. Clave: ${invoice.accessKey || "—"}`,
-      html: buildInvoiceEmailHtml(invoice, settings),
-      attachments: attachment ? [attachment] : [],
+      subject: `Factura ${num} — ${settings.legalName || settings.tradeName || app.name || "Comprobante"}`,
+      text: `Estimado(a) ${invoice.customerName || "cliente"}, su factura electrónica ${num} ya está disponible. Total $${money(invoice.total)}. Adjuntamos PDF y XML.`,
+      html: buildInvoiceEmailHtml({
+        invoice,
+        settings,
+        app,
+        hasLogoCid: Boolean(logoAtt),
+        hasPdf: Boolean(pdfAtt),
+        hasXml: Boolean(xmlAtt),
+      }),
+      attachments,
     });
+
+    try {
+      await invoice.update({ invoiceEmailSentAt: new Date() });
+    } catch (e) {
+      console.warn("invoiceEmailSentAt:", e?.message || e);
+    }
 
     await bumpEmailSentCount(settings);
     const after = getInvoiceEmailQuotaPublic(await settings.reload());
@@ -195,6 +306,7 @@ export async function maybeSendAuthorizedInvoiceEmail(invoice) {
       ok: true,
       skipped: false,
       to,
+      pdfSource: pdfAtt?.source || null,
       warning: after.invoiceEmailWarning,
       usage: {
         sentToday: after.invoiceEmailsSentToday,
@@ -212,7 +324,54 @@ export async function maybeSendAuthorizedInvoiceEmail(invoice) {
   }
 }
 
-/** Prueba SMTP: envía un correo de verificación (consume 1 del cupo diario). */
+let invoiceEmailSentSchemaReady = false;
+async function ensureInvoiceEmailSentSchema() {
+  if (invoiceEmailSentSchemaReady) return;
+  try {
+    const [found] = await sequelize.query(
+      `SHOW COLUMNS FROM \`electronic_invoices\` LIKE 'invoiceEmailSentAt'`,
+    );
+    if (!Array.isArray(found) || found.length === 0) {
+      await sequelize.query(
+        `ALTER TABLE \`electronic_invoices\` ADD COLUMN \`invoiceEmailSentAt\` DATETIME NULL`,
+      );
+    }
+  } catch (e) {
+    console.warn("ensureInvoiceEmailSentSchema:", e?.message || e);
+  }
+  invoiceEmailSentSchemaReady = true;
+}
+
+/** Endpoint: envía correo con PDF RIDE opcional (multipart). */
+export async function sendCustomerInvoiceEmailById(invoiceId, pdfFile, { force = false } = {}) {
+  await ensureInvoiceEmailSentSchema();
+  const invoice = await ElectronicInvoice.findByPk(Number(invoiceId));
+  if (!invoice) {
+    const err = new Error("Factura no encontrada");
+    err.status = 404;
+    throw err;
+  }
+  if (String(invoice.status || "").toLowerCase() !== "authorized") {
+    const err = new Error("La factura aún no está autorizada por el SRI");
+    err.status = 400;
+    throw err;
+  }
+  const result = await maybeSendAuthorizedInvoiceEmail(invoice, { pdfFile, force });
+  if (!result.ok && !result.skipped) {
+    const err = new Error(result.reason || "No se pudo enviar el correo");
+    err.status = 500;
+    throw err;
+  }
+  if (!result.ok && result.skipped && result.limitReached) {
+    const err = new Error(result.reason);
+    err.status = 429;
+    err.warning = result.warning;
+    throw err;
+  }
+  return result;
+}
+
+/** Prueba SMTP con la misma plantilla visual + PDF de muestra. */
 export async function sendSriTestEmail(toAddress) {
   await ensureSriEmailSchema();
   const settings = await loadSriBillingSettings();
@@ -234,24 +393,109 @@ export async function sendSriTestEmail(toAddress) {
     err.status = 400;
     throw err;
   }
-  let password = "";
-  try {
-    password = decryptSecret(settings.smtpPassEnc) || "";
-  } catch {
-    const err = new Error("No se pudo leer la contraseña SMTP.");
+  const password = await decryptSmtpPassword(settings);
+  if (!password) {
+    const err = new Error("Contraseña SMTP vacía.");
     err.status = 400;
     throw err;
   }
+
+  const { app, logoPath } = await resolveAppLogoPath();
   const from = String(settings.smtpFrom || settings.smtpUser).trim();
   const transport = buildTransport(settings, password);
-  await transport.sendMail({
-    from,
-    to,
-    subject: "Prueba de correo — facturas SRI",
-    text: "Si recibes este mensaje, la configuración SMTP de facturas está correcta.",
-    html: `<p>Si recibes este mensaje, la configuración SMTP de facturas está correcta.</p>
-           <p>Cupo hoy tras esta prueba: se descontará 1 envío del límite diario.</p>`,
-  });
+
+  let samplePdf = null;
+  let samplePdfPath = null;
+  let sampleXmlPath = null;
+  try {
+    samplePdf = await generateSampleInvoicePdf(settings, logoPath);
+    samplePdfPath = samplePdf.absolutePath;
+  } catch (e) {
+    console.warn("PDF de prueba no generado:", e?.message || e);
+  }
+
+  const sampleInvoice = {
+    establishmentCode: settings.establishmentCode || "001",
+    emissionPointCode: settings.emissionPointCode || "001",
+    sequential: 1,
+    accessKey: "0".repeat(49),
+    customerName: "CLIENTE DE PRUEBA",
+    total: 115,
+    authorizedAt: new Date(),
+    environment: settings.environment || "pruebas",
+  };
+
+  try {
+    const invoicesDir = path.join(SRI_PRIVATE_DIR, "invoices");
+    fs.mkdirSync(invoicesDir, { recursive: true });
+    sampleXmlPath = path.join(invoicesDir, `factura-prueba-${Date.now()}.xml`);
+    const num = invoiceNumberLabel(sampleInvoice);
+    const sampleXml = `<?xml version="1.0" encoding="UTF-8"?>
+<factura id="comprobante" version="1.1.0">
+  <infoTributaria>
+    <ambiente>${String(settings.environment || "").toLowerCase() === "produccion" ? "2" : "1"}</ambiente>
+    <tipoEmision>1</tipoEmision>
+    <razonSocial>${String(settings.legalName || "EMISOR DE PRUEBA")}</razonSocial>
+    <ruc>${String(settings.ruc || "0000000000000")}</ruc>
+    <claveAcceso>${sampleInvoice.accessKey}</claveAcceso>
+    <codDoc>01</codDoc>
+    <estab>${sampleInvoice.establishmentCode}</estab>
+    <ptoEmi>${sampleInvoice.emissionPointCode}</ptoEmi>
+    <secuencial>000000001</secuencial>
+  </infoTributaria>
+  <infoFactura>
+    <razonSocialComprador>${sampleInvoice.customerName}</razonSocialComprador>
+    <importeTotal>115.00</importeTotal>
+  </infoFactura>
+  <!-- XML de demostración para correo de prueba. Nº ${num} -->
+</factura>
+`;
+    await fsp.writeFile(sampleXmlPath, sampleXml, "utf8");
+  } catch (e) {
+    console.warn("XML de prueba no generado:", e?.message || e);
+    sampleXmlPath = null;
+  }
+
+  const logoAtt = logoCidAttachment(logoPath);
+  const attachments = [];
+  if (logoAtt) attachments.push(logoAtt);
+  if (samplePdfPath && fs.existsSync(samplePdfPath)) {
+    attachments.push({
+      filename: "factura-prueba.pdf",
+      path: samplePdfPath,
+      contentType: "application/pdf",
+    });
+  }
+  if (sampleXmlPath && fs.existsSync(sampleXmlPath)) {
+    attachments.push({
+      filename: "factura-prueba.xml",
+      path: sampleXmlPath,
+      contentType: "application/xml",
+    });
+  }
+
+  try {
+    await transport.sendMail({
+      from: `"${String(settings.legalName || app.alias || "Factura").slice(0, 80)}" <${from}>`,
+      to,
+      subject: "Prueba de correo — facturas SRI",
+      text: "Correo de prueba de facturas. Si ves el logo y los adjuntos PDF y XML, la configuración está correcta.",
+      html: buildInvoiceEmailHtml({
+        invoice: sampleInvoice,
+        settings,
+        app,
+        hasLogoCid: Boolean(logoAtt),
+        hasPdf: Boolean(samplePdfPath),
+        hasXml: Boolean(sampleXmlPath),
+        isTest: true,
+      }),
+      attachments,
+    });
+  } finally {
+    if (samplePdfPath) await unlinkQuiet(samplePdfPath);
+    if (sampleXmlPath) await unlinkQuiet(sampleXmlPath);
+  }
+
   await bumpEmailSentCount(settings);
   const after = getInvoiceEmailQuotaPublic(await settings.reload());
   return {
