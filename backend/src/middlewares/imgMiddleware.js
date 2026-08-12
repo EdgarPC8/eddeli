@@ -33,7 +33,7 @@ const { __dirname } = fileDirName(import.meta);
 // ==============================
 const IMG_BASE_DIR = path.resolve(__dirname, "../img"); // src/img
 const DEFAULT_ALLOWED_EXT = new Set([".png", ".jpg", ".jpeg", ".webp", ".gif", ".svg"]);
-const DEFAULT_MAX_MB = 8;
+const DEFAULT_MAX_MB = 20;
 
 // ==============================
 // Helpers: seguridad + formato
