@@ -55,6 +55,21 @@ export async function ensurePaymentScheduleSchema() {
   } catch (e) {
     console.warn("ensurePaymentScheduleSchema supplier:", e?.message || e);
   }
+  // Tablas viejas (sync Sequelize) pueden tener createdAt/updatedAt sin DEFAULT.
+  for (const table of [
+    "ERP_order_payment_installments",
+    "ERP_supplier_order_payment_installments",
+  ]) {
+    try {
+      await sequelize.query(
+        `ALTER TABLE \`${table}\`
+         MODIFY \`createdAt\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+         MODIFY \`updatedAt\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP`,
+      );
+    } catch (e) {
+      console.warn(`ensurePaymentScheduleSchema alter ${table}:`, e?.message || e);
+    }
+  }
   schemaReady = true;
 }
 
@@ -165,8 +180,8 @@ async function replaceInstallments(table, orderId, rows, transaction) {
   });
   for (const row of normalized) {
     await sequelize.query(
-      `INSERT INTO \`${table}\` (\`orderId\`, \`sequence\`, \`dueDate\`, \`amount\`, \`notes\`)
-       VALUES (:oid, :seq, :due, :amt, :notes)`,
+      `INSERT INTO \`${table}\` (\`orderId\`, \`sequence\`, \`dueDate\`, \`amount\`, \`notes\`, \`createdAt\`, \`updatedAt\`)
+       VALUES (:oid, :seq, :due, :amt, :notes, NOW(), NOW())`,
       {
         replacements: {
           oid,

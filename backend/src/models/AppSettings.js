@@ -88,13 +88,13 @@ export const AppSettings = sequelize.define(
       defaultValue: "up",
     },
     /**
-     * Pedidos: si al entregar falta stock, Admin/Programador puede ajustar
-     * (movimiento tipo ajuste) y completar la entrega.
+     * Autocompletar stock: en caja (cobrar) y pedidos (entregar), si falta stock
+     * Admin/Programador puede registrar un ajuste y completar.
      */
     ordersAllowDeliverStockAdjust: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
-      defaultValue: false,
+      defaultValue: true,
     },
     /**
      * Formato del detalle de productos en factura / nota de venta (JSON).
