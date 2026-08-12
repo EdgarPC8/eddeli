@@ -53,6 +53,7 @@ export const addAccount = async (req, res) => {
       username,
       password: hashedPassword,
       userId,
+      isActive: req.body?.isActive !== false,
     });
     // Insertar los roles
     if (roles && roles.length > 0) {
@@ -104,6 +105,10 @@ export const updateAccount = async (req, res) => {
     // ✅ Actualizar el username si viene
     if (data.username) {
       cuenta.username = data.username;
+    }
+
+    if (data.isActive !== undefined) {
+      cuenta.isActive = data.isActive !== false && data.isActive !== "false";
     }
 
     // ✅ Solo actualiza la contraseña si se mandó explícitamente
@@ -227,7 +232,7 @@ export const updateAccountUser = async (req, res) => {
 export const getAccounts = async (req, res) => {
   try {
     const data = await Account.findAll({
-      attributes: ["id", "username"], // solo lo necesario de Account
+      attributes: ["id", "username", "isActive"], // solo lo necesario de Account
       include: [
         {
           model: Roles,

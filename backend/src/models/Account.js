@@ -21,6 +21,11 @@ export const Account = sequelize.define(
     userId: {
       type: DataTypes.INTEGER,
     },
+    isActive: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
   },
   {
     timestamps: false,

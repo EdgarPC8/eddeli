@@ -71,6 +71,18 @@ async function ensureSupplierOrderItemLotSchema() {
     console.warn("ensureSupplierOrder receivedStoreId:", e?.message || e);
   }
   try {
+    const [found] = await sequelize.query(
+      "SHOW COLUMNS FROM `ERP_supplier_orders` LIKE 'invoiceNumber'",
+    );
+    if (!Array.isArray(found) || found.length === 0) {
+      await sequelize.query(
+        "ALTER TABLE `ERP_supplier_orders` ADD COLUMN `invoiceNumber` VARCHAR(80) NULL",
+      );
+    }
+  } catch (e) {
+    console.warn("ensureSupplierOrder invoiceNumber:", e?.message || e);
+  }
+  try {
     await sequelize.query(
       "ALTER TABLE `ERP_supplier_order_items` MODIFY COLUMN `unitPrice` DECIMAL(14,6) NOT NULL DEFAULT 0",
     );
@@ -287,7 +299,8 @@ export const createSupplierOrder = async (req, res) => {
     await ensurePaymentScheduleSchema();
     const token = getHeaderToken(req);
     await verifyJWT(token);
-    const { supplierId, date, notes, items = [], paymentInstallments } = req.body || {};
+    const { supplierId, date, notes, items = [], paymentInstallments, invoiceNumber } =
+      req.body || {};
 
     if (!supplierId || !date || !Array.isArray(items) || items.length === 0) {
       notifyFail("supplier_order.create_failed", "Proveedor, fecha e ítems son requeridos", {
@@ -303,12 +316,15 @@ export const createSupplierOrder = async (req, res) => {
       return res.status(404).json({ message: "Proveedor no encontrado" });
     }
 
+    const invoiceNumberClean = String(invoiceNumber || "").trim().slice(0, 80) || null;
+
     const orderId = await sequelize.transaction(async (t) => {
       const order = await SupplierOrder.create(
         {
           supplierId: Number(supplierId),
           date: new Date(date),
           notes: notes || null,
+          invoiceNumber: invoiceNumberClean,
           status: "pendiente",
         },
         { transaction: t }
@@ -346,7 +362,8 @@ export const updateSupplierOrder = async (req, res) => {
     await ensureSupplierOrderItemLotSchema();
     await ensurePaymentScheduleSchema();
     const { id } = req.params;
-    const { supplierId, date, notes, items, receivedAt, paidAt, paymentInstallments } = req.body || {};
+    const { supplierId, date, notes, items, receivedAt, paidAt, paymentInstallments, invoiceNumber } =
+      req.body || {};
     const order = await SupplierOrder.findByPk(id);
     if (!order) {
       notifyFail("supplier_order.update_failed", `Pedido proveedor #${id} no encontrado`, {
@@ -472,6 +489,9 @@ export const updateSupplierOrder = async (req, res) => {
             ...(supplierId != null ? { supplierId: Number(supplierId) } : {}),
             ...(date ? { date: new Date(date) } : {}),
             ...(notes !== undefined ? { notes: notes || null } : {}),
+            ...(invoiceNumber !== undefined
+              ? { invoiceNumber: String(invoiceNumber || "").trim().slice(0, 80) || null }
+              : {}),
           },
           { transaction: t }
         );
@@ -503,6 +523,9 @@ export const updateSupplierOrder = async (req, res) => {
           ...(!isReceived && supplierId != null ? { supplierId: Number(supplierId) } : {}),
           ...(!isReceived && date ? { date: new Date(date) } : {}),
           ...(!isReceived && notes !== undefined ? { notes: notes || null } : {}),
+          ...(invoiceNumber !== undefined
+            ? { invoiceNumber: String(invoiceNumber || "").trim().slice(0, 80) || null }
+            : {}),
           ...(receivedAt !== undefined ? { receivedAt: receivedAt ? new Date(receivedAt) : null } : {}),
           ...(paidAt !== undefined ? { paidAt: paidAt ? new Date(paidAt) : null } : {}),
         },

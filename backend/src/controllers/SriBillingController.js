@@ -14,6 +14,7 @@ import {
   refreshInvoiceAuthorization,
 } from "../services/sriInvoiceEmitService.js";
 import { sendSriTestEmail, sendCustomerInvoiceEmailById } from "../services/sriInvoiceEmailService.js";
+import { lookupPurchaseInvoiceByAccessKey } from "../services/sriPurchaseInvoiceLookup.js";
 import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
 
 const upload = multer({
@@ -67,6 +68,37 @@ export async function getSriBillingSettings(req, res) {
   } catch (err) {
     console.error("getSriBillingSettings", err);
     res.status(500).json({ message: "No se pudo cargar la configuración SRI" });
+  }
+}
+
+/** Busca factura de compra en el SRI por clave de acceso (código de barras RIDE). */
+export async function postLookupPurchaseInvoice(req, res) {
+  try {
+    const result = await lookupPurchaseInvoiceByAccessKey(
+      req.body?.accessKey || req.body?.claveAcceso,
+      req.body?.environment,
+    );
+    res.json({
+      message: "Comprobante encontrado en el SRI",
+      ...result,
+    });
+  } catch (err) {
+    const status = err.status || 500;
+    if (status >= 500) console.error("postLookupPurchaseInvoice", err);
+    notifyFail(
+      "sri.purchase_invoice.lookup_failed",
+      err.message || "No se pudo consultar la factura en el SRI",
+      {
+        error: err,
+        req,
+        httpStatus: status,
+        extra: err.extra || {},
+      },
+    );
+    res.status(status).json({
+      message: err.message || "No se pudo consultar la factura en el SRI",
+      ...(err.extra || {}),
+    });
   }
 }
 

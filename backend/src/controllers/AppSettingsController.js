@@ -60,6 +60,8 @@ export async function putAppSettings(req, res) {
       "moneyDisplayDecimals",
       "moneyRoundingMode",
       "ordersAllowDeliverStockAdjust",
+      "receiptDetailSettings",
+      "themePalette",
     ];
     const patch = {};
     for (const key of allowed) {

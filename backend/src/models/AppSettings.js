@@ -96,6 +96,22 @@ export const AppSettings = sequelize.define(
       allowNull: false,
       defaultValue: false,
     },
+    /**
+     * Formato del detalle de productos en factura / nota de venta (JSON).
+     * Ej: mayúsculas, código, número de línea, etc.
+     */
+    receiptDetailSettings: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    /**
+     * Paleta de colores del sistema (JSON): light / dark / neon.
+     * Si es null, el frontend usa los defaults de Raptor.
+     */
+    themePalette: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
   },
   { timestamps: true },
 );

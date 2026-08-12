@@ -28,6 +28,8 @@ export const DocumentAttachment = sequelize.define(
     mimeType: { type: DataTypes.STRING(120), allowNull: true },
     sizeBytes: { type: DataTypes.INTEGER, allowNull: true },
     label: { type: DataTypes.STRING(200), allowNull: true },
+    /** Nº de factura / documento del proveedor (ej. 001-001-000000123). */
+    invoiceNumber: { type: DataTypes.STRING(80), allowNull: true },
     uploadedBy: { type: DataTypes.INTEGER, allowNull: false },
   },
   {

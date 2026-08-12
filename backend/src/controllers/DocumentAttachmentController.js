@@ -13,6 +13,26 @@ const FILES_BASE_DIR = path.resolve(__dirname, "../files");
 
 const VOUCHER_EXT = new Set([".pdf", ".png", ".jpg", ".jpeg", ".webp"]);
 
+let documentAttachmentSchemaReady = false;
+
+async function ensureDocumentAttachmentSchema() {
+  if (documentAttachmentSchemaReady) return;
+  try {
+    const { sequelize } = await import("../database/connection.js");
+    const [found] = await sequelize.query(
+      "SHOW COLUMNS FROM `ERP_document_attachments` LIKE 'invoiceNumber'",
+    );
+    if (!Array.isArray(found) || found.length === 0) {
+      await sequelize.query(
+        "ALTER TABLE `ERP_document_attachments` ADD COLUMN `invoiceNumber` VARCHAR(80) NULL",
+      );
+    }
+    documentAttachmentSchemaReady = true;
+  } catch (e) {
+    console.warn("ensureDocumentAttachmentSchema invoiceNumber:", e?.message || e);
+  }
+}
+
 function parseLinkExpenseIds(raw) {
   if (!raw) return [];
   try {
@@ -43,6 +63,7 @@ export const documentUploadMiddleware = makeFileUpload({
 
 export const uploadDocument = async (req, res) => {
   try {
+    await ensureDocumentAttachmentSchema();
     if (!req.file?.filename) {
       notifyFail("document.upload_failed", "No se recibió ningún archivo", { req, httpStatus: 400 });
       return res.status(400).json({ message: "No se recibió ningún archivo." });
@@ -59,6 +80,9 @@ export const uploadDocument = async (req, res) => {
       entityIdRaw != null && entityIdRaw !== "" ? Number(entityIdRaw) : null;
     const batchKey = req.body?.batchKey ? String(req.body.batchKey).trim() : null;
     const label = req.body?.label ? String(req.body.label).trim() : null;
+    const invoiceNumber = req.body?.invoiceNumber
+      ? String(req.body.invoiceNumber).trim().slice(0, 80)
+      : null;
 
     if (entityType === "movement_batch" && !batchKey) {
       notifyFail("document.upload_failed", "batchKey requerido para movement_batch", {
@@ -93,6 +117,7 @@ export const uploadDocument = async (req, res) => {
       mimeType: req.file.mimetype || null,
       sizeBytes: req.file.size ?? null,
       label: label || "Comprobante",
+      invoiceNumber: invoiceNumber || null,
       uploadedBy: user.accountId,
     };
 

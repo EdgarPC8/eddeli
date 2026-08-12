@@ -27,6 +27,11 @@ export const Customer = sequelize.define("ERP_customers", {
   phone: { type: DataTypes.STRING },
   address: { type: DataTypes.STRING },
   email: { type: DataTypes.STRING },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+  },
 }, {
   timestamps: true,
 });
@@ -126,10 +131,35 @@ export const OrderItem = sequelize.define("ERP_order_items", {
 export const Supplier = sequelize.define("ERP_suppliers", {
   id: { type: DataTypes.INTEGER, primaryKey: true, autoIncrement: true },
   name: { type: DataTypes.STRING(150), allowNull: false },
+  tradeName: { type: DataTypes.STRING(150), allowNull: true },
+  identType: {
+    type: DataTypes.STRING(2),
+    allowNull: true,
+    defaultValue: "04",
+  },
+  identNumber: { type: DataTypes.STRING(32), allowNull: true },
+  category: { type: DataTypes.STRING(80), allowNull: true },
+  contactName: { type: DataTypes.STRING(120), allowNull: true },
+  contactRole: { type: DataTypes.STRING(80), allowNull: true },
   phone: { type: DataTypes.STRING(40), allowNull: true },
+  whatsapp: { type: DataTypes.STRING(40), allowNull: true },
   email: { type: DataTypes.STRING(120), allowNull: true },
+  invoiceEmail: { type: DataTypes.STRING(120), allowNull: true },
+  website: { type: DataTypes.STRING(200), allowNull: true },
   address: { type: DataTypes.STRING(250), allowNull: true },
+  city: { type: DataTypes.STRING(80), allowNull: true },
+  province: { type: DataTypes.STRING(80), allowNull: true },
+  bankName: { type: DataTypes.STRING(80), allowNull: true },
+  bankAccountType: { type: DataTypes.STRING(40), allowNull: true },
+  bankAccountNumber: { type: DataTypes.STRING(64), allowNull: true },
+  paymentTermDays: { type: DataTypes.INTEGER, allowNull: true },
+  preferredPaymentMethod: { type: DataTypes.STRING(40), allowNull: true },
   notes: { type: DataTypes.TEXT, allowNull: true },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true,
+  },
 }, {
   timestamps: true,
 });
@@ -151,6 +181,8 @@ export const SupplierOrder = sequelize.define("ERP_supplier_orders", {
   paidAt: { type: DataTypes.DATE, allowNull: true },
   paymentMethod: { type: DataTypes.STRING(40), allowNull: true },
   financeExpenseId: { type: DataTypes.INTEGER, allowNull: true },
+  /** Nº de factura del proveedor (XML SRI / digitado). */
+  invoiceNumber: { type: DataTypes.STRING(80), allowNull: true },
 }, {
   timestamps: true,
 });

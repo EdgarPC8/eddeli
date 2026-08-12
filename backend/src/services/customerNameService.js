@@ -107,5 +107,10 @@ export function normalizeCustomerPayload(body = {}) {
     payload.name = composeCustomerFullName(payload);
   }
 
+  if ("isActive" in body) {
+    payload.isActive =
+      body.isActive !== false && body.isActive !== "false" && body.isActive !== 0;
+  }
+
   return payload;
 }

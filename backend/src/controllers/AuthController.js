@@ -47,6 +47,17 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Datos incorrectos" });
     }
 
+    if (account.isActive === false) {
+      notifyFail("auth.login_failed", "Cuenta inactiva", {
+        req,
+        httpStatus: 403,
+        extra: { reason: "account_inactive", accountId: account.id },
+      });
+      return res.status(403).json({
+        message: "Cuenta inactiva. Contacte al administrador.",
+      });
+    }
+
     // Si no se seleccionó un rol y tiene más de uno, devolvemos la lista para que el frontend elija
     if (!selectedRoleId) {
       if (account.roles.length > 1) {
@@ -140,6 +151,15 @@ export const changeRole = async (req, res) => {
         extra: { accountId },
       });
       return res.status(404).json({ message: "Cuenta no encontrada" });
+    }
+
+    if (account.isActive === false) {
+      notifyFail("auth.role_change_failed", "Cuenta inactiva", {
+        req,
+        httpStatus: 403,
+        extra: { accountId, reason: "account_inactive" },
+      });
+      return res.status(403).json({ message: "Cuenta inactiva. Contacte al administrador." });
     }
 
     const hasRole = account.roles.find((r) => r.id === rolId);

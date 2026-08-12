@@ -16,12 +16,19 @@ import {
   postRefreshSriInvoice,
   postTestSriInvoiceEmail,
   postSendSriInvoiceEmail,
+  postLookupPurchaseInvoice,
   sriRidePdfUploadMiddleware,
 } from "../controllers/SriBillingController.js";
 
 const router = Router();
 
 router.get("/settings", isAuthenticated, requireStaff, getSriBillingSettings);
+router.post(
+  "/purchase-invoices/lookup",
+  isAuthenticated,
+  requireStaff,
+  postLookupPurchaseInvoice,
+);
 router.put("/settings", isAuthenticated, requireAdminOrProgrammer, putSriBillingSettings);
 router.post(
   "/certificate",

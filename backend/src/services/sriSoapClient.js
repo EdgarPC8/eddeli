@@ -125,6 +125,91 @@ export async function sendReception(environment, signedXml) {
   };
 }
 
+const COMPROBANTE_ROOT_RE =
+  /<(factura|notaCredito|liquidacionCompra|notaDebito)\b/i;
+
+/** Desescapa entidades XML (&lt; → <, &#xD; → CR). Soporta doble escape del SRI. */
+export function unescapeXmlEntities(value) {
+  let out = String(value || "");
+  for (let i = 0; i < 3; i += 1) {
+    if (!out.includes("&")) break;
+    const next = out
+      // Numéricas primero (SRI mete &#xD; fuera del contenido y rompe el parser)
+      .replace(/&#x([0-9a-fA-F]+);/gi, (_, hex) => {
+        const cp = parseInt(hex, 16);
+        return Number.isFinite(cp) ? String.fromCodePoint(cp) : _;
+      })
+      .replace(/&#([0-9]+);/g, (_, dec) => {
+        const cp = Number(dec);
+        return Number.isFinite(cp) ? String.fromCodePoint(cp) : _;
+      })
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&#0?39;/g, "'")
+      .replace(/&amp;/g, "&");
+    if (next === out) break;
+    out = next;
+  }
+  return out;
+}
+
+function isComprobanteXml(text) {
+  return COMPROBANTE_ROOT_RE.test(String(text || ""));
+}
+
+/**
+ * Normaliza el nodo <comprobante> del SRI (string escapado, #text, CDATA o SOAP crudo).
+ */
+export function coerceAuthorizedComprobanteXml(comprobante, rawSoap) {
+  let xml = null;
+
+  if (typeof comprobante === "string") {
+    xml = unescapeXmlEntities(comprobante.trim());
+  } else if (comprobante && typeof comprobante === "object") {
+    if (typeof comprobante["#text"] === "string") {
+      xml = unescapeXmlEntities(String(comprobante["#text"]).trim());
+    } else if (typeof comprobante.__cdata === "string") {
+      xml = String(comprobante.__cdata).trim();
+    }
+  }
+
+  if (!isComprobanteXml(xml)) {
+    const fromRaw = extractComprobanteXmlFromSoap(rawSoap);
+    if (fromRaw) xml = fromRaw;
+  }
+
+  if (isComprobanteXml(xml)) return String(xml).trim();
+  return null;
+}
+
+/** Extrae el XML del comprobante desde la respuesta SOAP cruda (CDATA o escapado). */
+export function extractComprobanteXmlFromSoap(rawSoap) {
+  const raw = String(rawSoap || "");
+  if (!raw) return null;
+
+  const cdataTag = raw.match(
+    /<(?:\w+:)?comprobante[^>]*>\s*<!\[CDATA\[([\s\S]*?)\]\]>\s*<\/(?:\w+:)?comprobante>/i,
+  );
+  if (cdataTag?.[1]?.trim()) return cdataTag[1].trim();
+
+  // Cualquier CDATA que contenga factura
+  const anyCdata = [...raw.matchAll(/<!\[CDATA\[([\s\S]*?)\]\]>/gi)];
+  for (const m of anyCdata) {
+    const inner = String(m[1] || "").trim();
+    if (isComprobanteXml(inner)) return inner;
+  }
+
+  const plain = raw.match(
+    /<(?:\w+:)?comprobante[^>]*>([\s\S]*?)<\/(?:\w+:)?comprobante>/i,
+  );
+  if (!plain?.[1]) return null;
+  const inner = unescapeXmlEntities(plain[1].trim());
+  if (isComprobanteXml(inner)) return inner.trim();
+  return null;
+}
+
 /**
  * @param {"pruebas"|"produccion"} environment
  * @param {string} accessKey
@@ -150,7 +235,8 @@ export async function consultAuthorization(environment, accessKey) {
     validateStatus: () => true,
   });
 
-  const parsed = parser.parse(String(data || ""));
+  const rawSoap = String(data || "");
+  const parsed = parser.parse(rawSoap);
   const fault = soapFaultMessage(parsed);
   if (fault) {
     return {
@@ -177,17 +263,14 @@ export async function consultAuthorization(environment, accessKey) {
     if (text) messages.push(text);
   }
 
-  let authorizedXml = chosen?.comprobante || null;
-  if (authorizedXml && typeof authorizedXml === "object") {
-    authorizedXml = null;
-  }
+  const authorizedXml = coerceAuthorizedComprobanteXml(chosen?.comprobante, rawSoap);
 
   return {
     estado,
     numeroAutorizacion: asSriDigitKey(chosen?.numeroAutorizacion, accessKey),
     fechaAutorizacion: chosen?.fechaAutorizacion || null,
     messages: [...new Set(messages)],
-    authorizedXml: typeof authorizedXml === "string" ? authorizedXml : null,
+    authorizedXml,
   };
 }
 

@@ -43,10 +43,13 @@ const toPosix = (p = "") => String(p || "").replace(/\\/g, "/").trim();
 const safeRelPath = (rel = "") => {
   const s = toPosix(rel);
   if (!s) return "";
-  if (s.includes("..")) throw new Error("Ruta inválida: contiene '..'");
+  if (s.includes("\0")) throw new Error("Ruta inválida");
+  if (s.split("/").some((seg) => seg === "..")) {
+    throw new Error("Ruta inválida: contiene '..'");
+  }
   if (s.startsWith("/") || s.startsWith("~")) throw new Error("Ruta inválida: absoluta");
-  // permite letras, números, /, -, _, ., y espacios (si quieres quitar espacios, ajusta regex)
-  if (!/^[a-zA-Z0-9/._\- ]+$/.test(s)) throw new Error("Ruta inválida: caracteres no permitidos");
+  // Unicode (á, ñ…), números, /, -, _, ., espacios, (), [], +
+  if (/[<>:"|?*\\]/.test(s)) throw new Error("Ruta inválida: caracteres no permitidos");
   return s;
 };
 

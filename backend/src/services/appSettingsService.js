@@ -8,6 +8,16 @@ import {
   normalizeMoneyDisplayDecimals,
   normalizeMoneyRoundingMode,
 } from "../utils/moneyPrecision.js";
+import {
+  DEFAULT_RECEIPT_DETAIL_SETTINGS,
+  normalizeReceiptDetailSettings,
+  serializeReceiptDetailSettings,
+} from "../utils/receiptDetailSettings.js";
+import {
+  DEFAULT_THEME_PALETTE,
+  normalizeThemePalette,
+  serializeThemePalette,
+} from "../utils/themePaletteSettings.js";
 
 const { __dirname } = fileDirName(import.meta);
 const IMG_BASE = path.resolve(__dirname, "../img");
@@ -39,6 +49,8 @@ export const DEFAULT_APP_SETTINGS = {
   moneyDisplayDecimals: 2,
   moneyRoundingMode: "up",
   ordersAllowDeliverStockAdjust: false,
+  receiptDetailSettings: { ...DEFAULT_RECEIPT_DETAIL_SETTINGS },
+  themePalette: normalizeThemePalette(DEFAULT_THEME_PALETTE),
 };
 
 let cache = { ...DEFAULT_APP_SETTINGS };
@@ -179,6 +191,18 @@ async function ensureAppSettingsSchema() {
       defaultValue: "up",
     });
   }
+  if (!table.receiptDetailSettings) {
+    await qi.addColumn("app_settings", "receiptDetailSettings", {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    });
+  }
+  if (!table.themePalette) {
+    await qi.addColumn("app_settings", "themePalette", {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    });
+  }
 }
 
 /** Amplía columnas de precio a DECIMAL(14,6) si aún no lo son. */
@@ -253,6 +277,8 @@ export async function loadAppSettings() {
     ordersAllowDeliverStockAdjust: asBool(raw.ordersAllowDeliverStockAdjust, false),
     moneyDisplayDecimals: normalizeMoneyDisplayDecimals(raw.moneyDisplayDecimals, 2),
     moneyRoundingMode: normalizeMoneyRoundingMode(raw.moneyRoundingMode, "up"),
+    receiptDetailSettings: normalizeReceiptDetailSettings(raw.receiptDetailSettings),
+    themePalette: normalizeThemePalette(raw.themePalette),
   };
   ensureStandardAssetDirs(cache.mediaFolderPrefix);
   return cache;
@@ -289,6 +315,14 @@ export async function updateAppSettings(payload) {
       "up",
     );
   }
+  if ("receiptDetailSettings" in patch) {
+    patch.receiptDetailSettings = serializeReceiptDetailSettings(
+      patch.receiptDetailSettings,
+    );
+  }
+  if ("themePalette" in patch) {
+    patch.themePalette = serializeThemePalette(patch.themePalette);
+  }
   let row = await AppSettings.findByPk(1);
   if (!row) {
     row = await AppSettings.create({ id: 1, ...DEFAULT_APP_SETTINGS, ...patch });
@@ -307,6 +341,8 @@ export async function updateAppSettings(payload) {
     ordersAllowDeliverStockAdjust: asBool(raw.ordersAllowDeliverStockAdjust, false),
     moneyDisplayDecimals: normalizeMoneyDisplayDecimals(raw.moneyDisplayDecimals, 2),
     moneyRoundingMode: normalizeMoneyRoundingMode(raw.moneyRoundingMode, "up"),
+    receiptDetailSettings: normalizeReceiptDetailSettings(raw.receiptDetailSettings),
+    themePalette: normalizeThemePalette(raw.themePalette),
   };
   return cache;
 }
@@ -343,5 +379,7 @@ export function toPublicSettings(data = cache) {
     ordersAllowDeliverStockAdjust: asBool(data.ordersAllowDeliverStockAdjust, false),
     moneyDisplayDecimals: normalizeMoneyDisplayDecimals(data.moneyDisplayDecimals, 2),
     moneyRoundingMode: normalizeMoneyRoundingMode(data.moneyRoundingMode, "up"),
+    receiptDetailSettings: normalizeReceiptDetailSettings(data.receiptDetailSettings),
+    themePalette: normalizeThemePalette(data.themePalette),
   };
 }
