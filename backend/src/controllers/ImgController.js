@@ -13,9 +13,13 @@ const IMG_BASE_DIR = path.resolve(__dirname, "../img");
 
 const safeRelPath = (rel = "") => {
   const s = String(rel || "").replace(/\\/g, "/").trim();
-  if (s.includes("..")) throw new Error("Ruta inválida");
-  if (s.startsWith("/") || s.startsWith("~")) throw new Error("Ruta inválida");
-  if (!/^[a-zA-Z0-9/._\- ]*$/.test(s)) throw new Error("Ruta inválida");
+  if (!s) return "";
+  if (s.includes("\0")) throw new Error("Ruta inválida");
+  if (s.split("/").some((seg) => seg === "..")) {
+    throw new Error("Ruta inválida: contiene '..'");
+  }
+  if (s.startsWith("/") || s.startsWith("~")) throw new Error("Ruta inválida: absoluta");
+  if (/[<>:"|?*\\]/.test(s)) throw new Error("Ruta inválida: caracteres no permitidos");
   return s;
 };
 

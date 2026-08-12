@@ -271,47 +271,49 @@ export const posCheckout = async (req, res) => {
         });
         if (!product) throw new Error(`Producto #${productId} no encontrado.`);
 
-        if (!isCredit) {
-          const stockStoreId = shift.storeId || (await getDefaultStockStoreId({ transaction: t }));
-          if (!shift.storeId) {
-            throw new Error(
-              "El turno no tiene local asignado. Cierra y abre turno en una sucursal propia para vender con stock.",
-            );
-          }
-          const available = await getStoreStockQty(stockStoreId, productId, { transaction: t });
-          if (available < qty) {
-            throw new Error(
-              `Stock insuficiente en este local para ${product.name}. Disponible: ${available}`,
-            );
-          }
-          await adjustStoreStock(stockStoreId, productId, -qty, {
-            transaction: t,
-            allowNegative: false,
-          });
-          await product.reload({ transaction: t });
-
-          await consumeBatchesFefo({
-            productId,
-            quantity: qty,
-            storeId: stockStoreId,
-            transaction: t,
-          });
-
-          await InventoryMovement.create(
-            {
-              productId: product.id,
-              quantity: qty,
-              type: "salida",
-              reason: "SALIDA_VENTA",
-              referenceType: "order",
-              referenceId: order.id,
-              date: now,
-              createdBy: accountId,
-              description: `Venta POS · pedido #${order.id} · local #${stockStoreId}`,
-            },
-            { transaction: t },
+        // Crédito y contado: el producto ya salió de caja → rebajar stock y marcar entregado.
+        // En crédito solo falta cobro (paidAt null → calendario amarillo).
+        const stockStoreId = shift.storeId || (await getDefaultStockStoreId({ transaction: t }));
+        if (!shift.storeId) {
+          throw new Error(
+            "El turno no tiene local asignado. Cierra y abre turno en una sucursal propia para vender con stock.",
           );
         }
+        const available = await getStoreStockQty(stockStoreId, productId, { transaction: t });
+        if (available < qty) {
+          throw new Error(
+            `Stock insuficiente en este local para ${product.name}. Disponible: ${available}`,
+          );
+        }
+        await adjustStoreStock(stockStoreId, productId, -qty, {
+          transaction: t,
+          allowNegative: false,
+        });
+        await product.reload({ transaction: t });
+
+        await consumeBatchesFefo({
+          productId,
+          quantity: qty,
+          storeId: stockStoreId,
+          transaction: t,
+        });
+
+        await InventoryMovement.create(
+          {
+            productId: product.id,
+            quantity: qty,
+            type: "salida",
+            reason: "SALIDA_VENTA",
+            referenceType: "order",
+            referenceId: order.id,
+            date: now,
+            createdBy: accountId,
+            description: `Venta POS · pedido #${order.id} · local #${stockStoreId}${
+              isCredit ? " · crédito" : ""
+            }`,
+          },
+          { transaction: t },
+        );
 
         const orderItem = await OrderItem.create(
           {
@@ -319,8 +321,8 @@ export const posCheckout = async (req, res) => {
             productId,
             quantity: qty,
             price,
-            soldQty: isCredit ? 0 : qty,
-            deliveredAt: isCredit ? null : now,
+            soldQty: qty,
+            deliveredAt: now,
             paidAt: isCredit ? null : now,
           },
           { transaction: t },
