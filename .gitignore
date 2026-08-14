@@ -10,6 +10,8 @@ frontend/node_modules/
 !frontend/.env.eddeli
 !frontend/.env.store
 backend/.env
+backend/.env.*
+!backend/.env.example
 frontend/.env
 
 # Build intermedio en raptor (el deploy versionado es assets/ + index.html en la raíz)
@@ -18,7 +20,9 @@ frontend/dist/
 # Datos sensibles / backups locales
 backend/src/database/backup.json
 backend/src/backups/
+backend/database.db
 *.backup.json
+backup-tienda.json
 
 # Imágenes de catálogo / subidas (no versionar; viven en cada servidor)
 backend/src/img/sistema/products/
@@ -32,3 +36,4 @@ backend/src/img/products/
 # Sistema
 .DS_Store
 *.log
+*.bak
