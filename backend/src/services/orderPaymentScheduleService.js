@@ -5,8 +5,29 @@
  */
 import { QueryTypes } from "sequelize";
 import { sequelize } from "../database/connection.js";
+import {
+  Customer,
+  Order,
+  OrderItem,
+  Supplier,
+  SupplierOrder,
+  SupplierOrderItem,
+} from "../models/Orders.js";
+import {
+  ItemGroupItem,
+  Payment,
+  SupplierOrderPayment,
+} from "../models/Finance.js";
+import { createAndPushNotification, resolveAdminUserIds } from "./notificationService.js";
+import { getAppTimezone, getZonedParts, nowApp } from "../utils/appDateTime.js";
 
 const money2 = (n) => Number(Number(n || 0).toFixed(2));
+const BILLABLE_EPSILON = 0.009;
+
+function todayDateOnly() {
+  const p = getZonedParts(nowApp(), getAppTimezone());
+  return `${p.year}-${String(p.month).padStart(2, "0")}-${String(p.day).padStart(2, "0")}`;
+}
 
 let schemaReady = false;
 
@@ -21,6 +42,8 @@ export async function ensurePaymentScheduleSchema() {
         \`dueDate\` DATE NOT NULL,
         \`amount\` DECIMAL(14, 2) NOT NULL DEFAULT 0,
         \`notes\` VARCHAR(255) NULL,
+        \`reminderEnabled\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`reminderDaysBefore\` TINYINT NOT NULL DEFAULT 1,
         \`createdAt\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         \`updatedAt\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (\`id\`),
@@ -43,6 +66,8 @@ export async function ensurePaymentScheduleSchema() {
         \`dueDate\` DATE NOT NULL,
         \`amount\` DECIMAL(14, 2) NOT NULL DEFAULT 0,
         \`notes\` VARCHAR(255) NULL,
+        \`reminderEnabled\` TINYINT(1) NOT NULL DEFAULT 0,
+        \`reminderDaysBefore\` TINYINT NOT NULL DEFAULT 1,
         \`createdAt\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
         \`updatedAt\` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY (\`id\`),
@@ -60,6 +85,23 @@ export async function ensurePaymentScheduleSchema() {
     "ERP_order_payment_installments",
     "ERP_supplier_order_payment_installments",
   ]) {
+    for (const [column, definition] of [
+      ["reminderEnabled", "TINYINT(1) NOT NULL DEFAULT 0"],
+      ["reminderDaysBefore", "TINYINT NOT NULL DEFAULT 1"],
+    ]) {
+      try {
+        const [found] = await sequelize.query(
+          `SHOW COLUMNS FROM \`${table}\` LIKE '${column}'`,
+        );
+        if (!Array.isArray(found) || !found.length) {
+          await sequelize.query(
+            `ALTER TABLE \`${table}\` ADD COLUMN \`${column}\` ${definition}`,
+          );
+        }
+      } catch (e) {
+        console.warn(`ensurePaymentScheduleSchema ${table}.${column}:`, e?.message || e);
+      }
+    }
     try {
       await sequelize.query(
         `ALTER TABLE \`${table}\`
@@ -103,6 +145,10 @@ export function normalizeInstallmentInput(rows) {
         dueDate,
         amount,
         notes: r?.notes ? String(r.notes).slice(0, 255) : null,
+      reminderEnabled: r?.reminderEnabled !== false,
+      reminderDaysBefore: [0, 1, 2].includes(Number(r?.reminderDaysBefore))
+        ? Number(r.reminderDaysBefore)
+        : 1,
       };
     })
     .filter(Boolean)
@@ -162,6 +208,10 @@ export function applyFifoPaidToInstallments(installments, orderPaidAmount) {
       dueDate: inst.dueDate,
       amount,
       notes: inst.notes || null,
+      reminderEnabled: Boolean(inst.reminderEnabled),
+      reminderDaysBefore: [0, 1, 2].includes(Number(inst.reminderDaysBefore))
+        ? Number(inst.reminderDaysBefore)
+        : 1,
       paidAmount,
       remainingAmount,
       isPaid,
@@ -180,8 +230,8 @@ async function replaceInstallments(table, orderId, rows, transaction) {
   });
   for (const row of normalized) {
     await sequelize.query(
-      `INSERT INTO \`${table}\` (\`orderId\`, \`sequence\`, \`dueDate\`, \`amount\`, \`notes\`, \`createdAt\`, \`updatedAt\`)
-       VALUES (:oid, :seq, :due, :amt, :notes, NOW(), NOW())`,
+      `INSERT INTO \`${table}\` (\`orderId\`, \`sequence\`, \`dueDate\`, \`amount\`, \`notes\`, \`reminderEnabled\`, \`reminderDaysBefore\`, \`createdAt\`, \`updatedAt\`)
+       VALUES (:oid, :seq, :due, :amt, :notes, :reminderEnabled, :reminderDaysBefore, NOW(), NOW())`,
       {
         replacements: {
           oid,
@@ -189,6 +239,8 @@ async function replaceInstallments(table, orderId, rows, transaction) {
           due: row.dueDate,
           amt: row.amount,
           notes: row.notes,
+          reminderEnabled: row.reminderEnabled ? 1 : 0,
+          reminderDaysBefore: row.reminderDaysBefore,
         },
         transaction,
         type: QueryTypes.INSERT,
@@ -218,7 +270,8 @@ async function loadInstallments(table, orderIds) {
   if (!ids.length) return new Map();
   await ensurePaymentScheduleSchema();
   const rows = await sequelize.query(
-    `SELECT \`id\`, \`orderId\`, \`sequence\`, \`dueDate\`, \`amount\`, \`notes\`
+    `SELECT \`id\`, \`orderId\`, \`sequence\`, \`dueDate\`, \`amount\`, \`notes\`,
+      \`reminderEnabled\`, \`reminderDaysBefore\`
      FROM \`${table}\`
      WHERE \`orderId\` IN (:ids)
      ORDER BY \`orderId\` ASC, \`dueDate\` ASC, \`sequence\` ASC`,
@@ -234,6 +287,10 @@ async function loadInstallments(table, orderIds) {
       dueDate: toDateOnly(r.dueDate),
       amount: money2(r.amount),
       notes: r.notes || null,
+      reminderEnabled: Boolean(r.reminderEnabled),
+      reminderDaysBefore: [0, 1, 2].includes(Number(r.reminderDaysBefore))
+        ? Number(r.reminderDaysBefore)
+        : 1,
     });
   }
   return map;
@@ -315,6 +372,8 @@ export async function syncCustomerInstallmentsPreservingPaid(
       dueDate: l.dueDate,
       amount: l.amount,
       notes: l.notes,
+      reminderEnabled: l.reminderEnabled,
+      reminderDaysBefore: l.reminderDaysBefore,
     })),
     ...clientUnlocked,
   ];
@@ -347,8 +406,207 @@ export async function syncSupplierInstallmentsPreservingPaid(
       dueDate: l.dueDate,
       amount: l.amount,
       notes: l.notes,
+      reminderEnabled: l.reminderEnabled,
+      reminderDaysBefore: l.reminderDaysBefore,
     })),
     ...clientUnlocked,
   ];
   return replaceSupplierInstallments(orderId, finalRows, { transaction });
+}
+
+function orderItemBillableTotal(item) {
+  const quantity = Math.max(0, Number(item?.quantity) || 0);
+  const damaged = Math.max(0, Number(item?.damagedQty) || 0);
+  const gift = Math.max(0, Number(item?.giftQty) || 0);
+  return money2(Math.max(0, quantity - damaged - gift) * (Number(item?.price) || 0));
+}
+
+function supplierOrderTotal(items) {
+  return money2(
+    (items || []).reduce((total, item) => {
+      const gross = (Number(item?.quantity) || 0) * (Number(item?.unitPrice) || 0);
+      const net = Math.max(0, gross - Math.max(0, Number(item?.discount) || 0));
+      return total + net + net * ((Number(item?.taxRate) || 0) / 100);
+    }, 0),
+  );
+}
+
+async function customerPaidAmounts(orders) {
+  const result = new Map();
+  const itemById = new Map();
+  const orderIdByItemId = new Map();
+
+  for (const order of orders) {
+    for (const item of order.ERP_order_items || []) {
+      itemById.set(Number(item.id), item);
+      orderIdByItemId.set(Number(item.id), Number(order.id));
+    }
+  }
+
+  const itemIds = [...itemById.keys()].filter(Boolean);
+  if (!itemIds.length) return result;
+
+  const matchingLinks = await ItemGroupItem.findAll({
+    where: { orderItemId: itemIds },
+    attributes: ["groupId", "orderItemId"],
+  });
+  const groupIds = [...new Set(matchingLinks.map((link) => Number(link.groupId)).filter(Boolean))];
+  if (groupIds.length) {
+    const [allLinks, payments] = await Promise.all([
+      ItemGroupItem.findAll({
+        where: { groupId: groupIds },
+        attributes: ["groupId", "orderItemId"],
+      }),
+      Payment.findAll({
+        where: { groupId: groupIds, status: "completed" },
+        attributes: ["groupId", "amount"],
+      }),
+    ]);
+    const missingIds = [...new Set(
+      allLinks
+        .map((link) => Number(link.orderItemId))
+        .filter((id) => id && !itemById.has(id)),
+    )];
+    if (missingIds.length) {
+      const missing = await OrderItem.findAll({
+        where: { id: missingIds },
+        attributes: ["id", "quantity", "price", "damagedQty", "giftQty"],
+      });
+      for (const item of missing) itemById.set(Number(item.id), item);
+    }
+
+    const totalsByGroup = new Map();
+    for (const link of allLinks) {
+      const groupId = Number(link.groupId);
+      const itemId = Number(link.orderItemId);
+      if (!totalsByGroup.has(groupId)) totalsByGroup.set(groupId, new Map());
+      totalsByGroup.get(groupId).set(itemId, orderItemBillableTotal(itemById.get(itemId)));
+    }
+    const paidByGroup = new Map();
+    for (const payment of payments) {
+      const groupId = Number(payment.groupId);
+      paidByGroup.set(groupId, money2((paidByGroup.get(groupId) || 0) + Number(payment.amount || 0)));
+    }
+    for (const [groupId, itemTotals] of totalsByGroup) {
+      const groupTotal = money2([...itemTotals.values()].reduce((sum, amount) => sum + amount, 0));
+      const groupPaid = paidByGroup.get(groupId) || 0;
+      if (groupTotal <= BILLABLE_EPSILON || groupPaid <= BILLABLE_EPSILON) continue;
+      const shares = new Map();
+      for (const [itemId, amount] of itemTotals) {
+        const orderId = orderIdByItemId.get(itemId);
+        if (orderId) shares.set(orderId, money2((shares.get(orderId) || 0) + amount));
+      }
+      const entries = [...shares.entries()];
+      let allocated = 0;
+      entries.forEach(([orderId, share], index) => {
+        const amount = index === entries.length - 1
+          ? money2(groupPaid - allocated)
+          : money2((groupPaid * share) / groupTotal);
+        allocated = money2(allocated + amount);
+        result.set(orderId, money2((result.get(orderId) || 0) + amount));
+      });
+    }
+  }
+
+  for (const order of orders) {
+    const items = order.ERP_order_items || [];
+    const total = money2(items.reduce((sum, item) => sum + orderItemBillableTotal(item), 0));
+    const paidFloor = money2(
+      items.filter((item) => item.paidAt).reduce((sum, item) => sum + orderItemBillableTotal(item), 0),
+    );
+    let paid = result.get(Number(order.id)) || 0;
+    if (paid <= BILLABLE_EPSILON && items.length && items.every((item) => item.paidAt)) paid = total;
+    else paid = Math.max(paid, paidFloor);
+    result.set(Number(order.id), money2(Math.min(paid, total)));
+  }
+  return result;
+}
+
+async function notifyInstallments(kind, table, targetDate) {
+  const rows = await sequelize.query(
+    `SELECT \`id\`, \`orderId\`
+     FROM \`${table}\`
+     WHERE \`reminderEnabled\` = 1
+       AND DATE_SUB(\`dueDate\`, INTERVAL \`reminderDaysBefore\` DAY) = :targetDate`,
+    { replacements: { targetDate }, type: QueryTypes.SELECT },
+  );
+  if (!rows.length) return 0;
+
+  const orderIds = [...new Set(rows.map((row) => Number(row.orderId)).filter(Boolean))];
+  const [orders, installmentMap, adminUserIds] = await Promise.all([
+    kind === "customer"
+      ? Order.findAll({
+          where: { id: orderIds },
+          include: [
+            { model: Customer, as: "ERP_customer", attributes: ["name"] },
+            { model: OrderItem, as: "ERP_order_items" },
+          ],
+        })
+      : SupplierOrder.findAll({
+          where: { id: orderIds },
+          include: [
+            { model: Supplier, as: "ERP_supplier", attributes: ["name"] },
+            { model: SupplierOrderItem, as: "ERP_supplier_order_items" },
+          ],
+        }),
+    kind === "customer"
+      ? loadCustomerInstallmentsMap(orderIds)
+      : loadSupplierInstallmentsMap(orderIds),
+    resolveAdminUserIds(),
+  ]);
+  if (!adminUserIds.length) return 0;
+
+  const paidAmounts = kind === "customer"
+    ? await customerPaidAmounts(orders)
+    : new Map(
+        (await SupplierOrderPayment.findAll({
+          where: { supplierOrderId: orderIds, status: "completed" },
+          attributes: ["supplierOrderId", "amount"],
+        })).reduce((entries, payment) => {
+          const id = Number(payment.supplierOrderId);
+          entries.set(id, money2((entries.get(id) || 0) + Number(payment.amount || 0)));
+          return entries;
+        }, new Map()),
+      );
+
+  let sent = 0;
+  for (const row of rows) {
+    const order = orders.find((candidate) => Number(candidate.id) === Number(row.orderId));
+    if (!order) continue;
+    const installments = applyFifoPaidToInstallments(
+      installmentMap.get(Number(row.orderId)) || [],
+      paidAmounts.get(Number(row.orderId)) || 0,
+    );
+    const installment = installments.find((candidate) => Number(candidate.id) === Number(row.id));
+    if (!installment || installment.isPaid) continue;
+    const counterparty = kind === "customer"
+      ? order.ERP_customer?.name || "Cliente"
+      : order.ERP_supplier?.name || "Proveedor";
+    const label = kind === "customer" ? "cobro a cliente" : "pago a proveedor";
+    const title = `Recordatorio de cuota: ${label}`;
+    const message = `${counterparty}: pedido #${order.id}, cuota ${installment.sequence} por $${installment.remainingAmount.toFixed(2)} vence el ${installment.dueDate}.`;
+    for (const userId of adminUserIds) {
+      await createAndPushNotification({
+        userId,
+        type: "alert",
+        title,
+        message,
+        link: kind === "customer" ? "/orders" : "/supplier-orders",
+        sourceKey: `payment_installment:${kind}:${installment.id}:${targetDate}`,
+      });
+      sent += 1;
+    }
+  }
+  return sent;
+}
+
+/** Envía recordatorios de cuotas pendientes configurados para la fecha actual. */
+export async function runPaymentInstallmentReminders() {
+  await ensurePaymentScheduleSchema();
+  const targetDate = todayDateOnly();
+  const [customerSent, supplierSent] = await Promise.all([
+    notifyInstallments("customer", "ERP_order_payment_installments", targetDate),
+    notifyInstallments("supplier", "ERP_supplier_order_payment_installments", targetDate),
+  ]);
+  return customerSent + supplierSent;
 }
