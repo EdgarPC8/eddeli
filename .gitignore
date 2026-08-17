@@ -17,11 +17,16 @@ frontend/.env
 # Build intermedio en raptor (el deploy versionado es assets/ + index.html en la raíz)
 frontend/dist/
 
-# Datos sensibles / backups locales
+# Datos sensibles / backups locales (nunca subir dumps con users/hashes)
 backend/src/database/backup.json
 backend/src/backups/
+backend/backup-eddeli-servidor.json
+backup-eddeli-servidor.json
 backend/database.db
 *.backup.json
+backup-*.json
+!backup.json.example
+!**/backup.json.example
 backup-tienda.json
 
 # Imágenes de catálogo / subidas (no versionar; viven en cada servidor)
