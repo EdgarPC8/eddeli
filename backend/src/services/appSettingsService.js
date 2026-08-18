@@ -54,6 +54,12 @@ export const DEFAULT_APP_SETTINGS = {
   cajaAllowCreateProductFromScan: false,
   cajaAllowEditProductFromCart: false,
   cajaSuggestUpdateProductPrice: false,
+  notificationsToastGreeting: false,
+  notificationsToastStock: false,
+  notificationsToastCredit: false,
+  notificationsToastExpiry: false,
+  notificationsCreditEnabled: true,
+  notificationsExpiryEnabled: false,
   receiptDetailSettings: { ...DEFAULT_RECEIPT_DETAIL_SETTINGS },
   themePalette: normalizeThemePalette(DEFAULT_THEME_PALETTE),
 };
@@ -177,6 +183,12 @@ async function ensureAppSettingsSchema() {
     ["cajaAllowCreateProductFromScan", false],
     ["cajaAllowEditProductFromCart", false],
     ["cajaSuggestUpdateProductPrice", false],
+    ["notificationsToastGreeting", false],
+    ["notificationsToastStock", false],
+    ["notificationsToastCredit", false],
+    ["notificationsToastExpiry", false],
+    ["notificationsCreditEnabled", true],
+    ["notificationsExpiryEnabled", false],
   ];
   for (const [col, def] of boolCols) {
     if (!table[col]) {
@@ -290,6 +302,12 @@ export async function loadAppSettings() {
     cajaAllowCreateProductFromScan: asBool(raw.cajaAllowCreateProductFromScan, false),
     cajaAllowEditProductFromCart: asBool(raw.cajaAllowEditProductFromCart, false),
     cajaSuggestUpdateProductPrice: asBool(raw.cajaSuggestUpdateProductPrice, false),
+    notificationsToastGreeting: asBool(raw.notificationsToastGreeting, false),
+    notificationsToastStock: asBool(raw.notificationsToastStock, false),
+    notificationsToastCredit: asBool(raw.notificationsToastCredit, false),
+    notificationsToastExpiry: asBool(raw.notificationsToastExpiry, false),
+    notificationsCreditEnabled: asBool(raw.notificationsCreditEnabled, true),
+    notificationsExpiryEnabled: asBool(raw.notificationsExpiryEnabled, false),
     moneyDisplayDecimals: normalizeMoneyDisplayDecimals(raw.moneyDisplayDecimals, 2),
     moneyRoundingMode: normalizeMoneyRoundingMode(raw.moneyRoundingMode, "up"),
     receiptDetailSettings: normalizeReceiptDetailSettings(raw.receiptDetailSettings),
@@ -348,6 +366,24 @@ export async function updateAppSettings(payload) {
       false,
     );
   }
+  if ("notificationsToastGreeting" in patch) {
+    patch.notificationsToastGreeting = asBool(patch.notificationsToastGreeting, false);
+  }
+  if ("notificationsToastStock" in patch) {
+    patch.notificationsToastStock = asBool(patch.notificationsToastStock, false);
+  }
+  if ("notificationsToastCredit" in patch) {
+    patch.notificationsToastCredit = asBool(patch.notificationsToastCredit, false);
+  }
+  if ("notificationsToastExpiry" in patch) {
+    patch.notificationsToastExpiry = asBool(patch.notificationsToastExpiry, false);
+  }
+  if ("notificationsCreditEnabled" in patch) {
+    patch.notificationsCreditEnabled = asBool(patch.notificationsCreditEnabled, true);
+  }
+  if ("notificationsExpiryEnabled" in patch) {
+    patch.notificationsExpiryEnabled = asBool(patch.notificationsExpiryEnabled, false);
+  }
   if ("moneyDisplayDecimals" in patch) {
     patch.moneyDisplayDecimals = normalizeMoneyDisplayDecimals(
       patch.moneyDisplayDecimals,
@@ -389,6 +425,12 @@ export async function updateAppSettings(payload) {
     cajaAllowCreateProductFromScan: asBool(raw.cajaAllowCreateProductFromScan, false),
     cajaAllowEditProductFromCart: asBool(raw.cajaAllowEditProductFromCart, false),
     cajaSuggestUpdateProductPrice: asBool(raw.cajaSuggestUpdateProductPrice, false),
+    notificationsToastGreeting: asBool(raw.notificationsToastGreeting, false),
+    notificationsToastStock: asBool(raw.notificationsToastStock, false),
+    notificationsToastCredit: asBool(raw.notificationsToastCredit, false),
+    notificationsToastExpiry: asBool(raw.notificationsToastExpiry, false),
+    notificationsCreditEnabled: asBool(raw.notificationsCreditEnabled, true),
+    notificationsExpiryEnabled: asBool(raw.notificationsExpiryEnabled, false),
     moneyDisplayDecimals: normalizeMoneyDisplayDecimals(raw.moneyDisplayDecimals, 2),
     moneyRoundingMode: normalizeMoneyRoundingMode(raw.moneyRoundingMode, "up"),
     receiptDetailSettings: normalizeReceiptDetailSettings(raw.receiptDetailSettings),
@@ -432,6 +474,12 @@ export function toPublicSettings(data = cache) {
     cajaAllowCreateProductFromScan: asBool(data.cajaAllowCreateProductFromScan, false),
     cajaAllowEditProductFromCart: asBool(data.cajaAllowEditProductFromCart, false),
     cajaSuggestUpdateProductPrice: asBool(data.cajaSuggestUpdateProductPrice, false),
+    notificationsToastGreeting: asBool(data.notificationsToastGreeting, false),
+    notificationsToastStock: asBool(data.notificationsToastStock, false),
+    notificationsToastCredit: asBool(data.notificationsToastCredit, false),
+    notificationsToastExpiry: asBool(data.notificationsToastExpiry, false),
+    notificationsCreditEnabled: asBool(data.notificationsCreditEnabled, true),
+    notificationsExpiryEnabled: asBool(data.notificationsExpiryEnabled, false),
     moneyDisplayDecimals: normalizeMoneyDisplayDecimals(data.moneyDisplayDecimals, 2),
     moneyRoundingMode: normalizeMoneyRoundingMode(data.moneyRoundingMode, "up"),
     receiptDetailSettings: normalizeReceiptDetailSettings(data.receiptDetailSettings),
