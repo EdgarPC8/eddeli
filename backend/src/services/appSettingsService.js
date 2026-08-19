@@ -49,6 +49,7 @@ export const DEFAULT_APP_SETTINGS = {
   moneyDisplayDecimals: 2,
   moneyRoundingMode: "up",
   ordersAllowDeliverStockAdjust: true,
+  financeAllowAdminCorrections: true,
   suggestOpenPackOnPosShortage: false,
   cajaAllowCreateProductFromSelect: false,
   cajaAllowCreateProductFromScan: false,
@@ -178,6 +179,7 @@ async function ensureAppSettingsSchema() {
     ["multiStockEnabled", true],
     ["showProductCostInSelect", false],
     ["ordersAllowDeliverStockAdjust", true],
+    ["financeAllowAdminCorrections", true],
     ["suggestOpenPackOnPosShortage", false],
     ["cajaAllowCreateProductFromSelect", false],
     ["cajaAllowCreateProductFromScan", false],
@@ -297,6 +299,7 @@ export async function loadAppSettings() {
     multiStockEnabled: asBool(raw.multiStockEnabled, true),
     showProductCostInSelect: asBool(raw.showProductCostInSelect, false),
     ordersAllowDeliverStockAdjust: asBool(raw.ordersAllowDeliverStockAdjust, true),
+    financeAllowAdminCorrections: asBool(raw.financeAllowAdminCorrections, true),
     suggestOpenPackOnPosShortage: asBool(raw.suggestOpenPackOnPosShortage, false),
     cajaAllowCreateProductFromSelect: asBool(raw.cajaAllowCreateProductFromSelect, false),
     cajaAllowCreateProductFromScan: asBool(raw.cajaAllowCreateProductFromScan, false),
@@ -335,6 +338,9 @@ export async function updateAppSettings(payload) {
       patch.ordersAllowDeliverStockAdjust,
       true,
     );
+  }
+  if ("financeAllowAdminCorrections" in patch) {
+    patch.financeAllowAdminCorrections = asBool(patch.financeAllowAdminCorrections, true);
   }
   if ("suggestOpenPackOnPosShortage" in patch) {
     patch.suggestOpenPackOnPosShortage = asBool(
@@ -420,6 +426,7 @@ export async function updateAppSettings(payload) {
     multiStockEnabled: asBool(raw.multiStockEnabled, true),
     showProductCostInSelect: asBool(raw.showProductCostInSelect, false),
     ordersAllowDeliverStockAdjust: asBool(raw.ordersAllowDeliverStockAdjust, true),
+    financeAllowAdminCorrections: asBool(raw.financeAllowAdminCorrections, true),
     suggestOpenPackOnPosShortage: asBool(raw.suggestOpenPackOnPosShortage, false),
     cajaAllowCreateProductFromSelect: asBool(raw.cajaAllowCreateProductFromSelect, false),
     cajaAllowCreateProductFromScan: asBool(raw.cajaAllowCreateProductFromScan, false),
@@ -469,6 +476,7 @@ export function toPublicSettings(data = cache) {
     multiStockEnabled: asBool(data.multiStockEnabled, true),
     showProductCostInSelect: asBool(data.showProductCostInSelect, false),
     ordersAllowDeliverStockAdjust: asBool(data.ordersAllowDeliverStockAdjust, true),
+    financeAllowAdminCorrections: asBool(data.financeAllowAdminCorrections, true),
     suggestOpenPackOnPosShortage: asBool(data.suggestOpenPackOnPosShortage, false),
     cajaAllowCreateProductFromSelect: asBool(data.cajaAllowCreateProductFromSelect, false),
     cajaAllowCreateProductFromScan: asBool(data.cajaAllowCreateProductFromScan, false),

@@ -97,6 +97,15 @@ export const AppSettings = sequelize.define(
       defaultValue: true,
     },
     /**
+     * Admin/Programador pueden anular cobros/pagos y borrar pedidos
+     * eliminando ingresos/gastos vinculados en finanzas.
+     */
+    financeAllowAdminCorrections: {
+      type: DataTypes.BOOLEAN,
+      allowNull: false,
+      defaultValue: true,
+    },
+    /**
      * Caja: si falta stock al cobrar y el producto es destino de un empaque enlazado
      * con stock, sugerir abrir el empaque antes de bloquear o autocompletar.
      */
