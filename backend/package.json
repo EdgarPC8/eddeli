@@ -10,6 +10,7 @@
     "start": "node index.js",
     "db:sync": "DB_SYNC_ALTER=1 node scripts/sync-schema.js",
     "db:sync:categories": "node scripts/sync-category-schema.js",
+    "db:sync:editor": "node scripts/sync-editor-schema.js",
     "db:migrate:categories": "node scripts/migrate-category-hierarchy.js",
     "db:reorganize:categories": "node scripts/reorganize-categories-products.js",
     "db:repair:json-fields": "node scripts/repair-json-fields.js",

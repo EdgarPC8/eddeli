@@ -55,6 +55,7 @@ export const DEFAULT_APP_SETTINGS = {
   cajaAllowCreateProductFromScan: false,
   cajaAllowEditProductFromCart: false,
   cajaSuggestUpdateProductPrice: false,
+  cajaAllowPercentDiscount: false,
   notificationsToastGreeting: false,
   notificationsToastStock: false,
   notificationsToastCredit: false,
@@ -185,6 +186,7 @@ async function ensureAppSettingsSchema() {
     ["cajaAllowCreateProductFromScan", false],
     ["cajaAllowEditProductFromCart", false],
     ["cajaSuggestUpdateProductPrice", false],
+    ["cajaAllowPercentDiscount", false],
     ["notificationsToastGreeting", false],
     ["notificationsToastStock", false],
     ["notificationsToastCredit", false],
@@ -286,7 +288,14 @@ export async function loadAppSettings() {
   await AppSettings.sync();
   let row = await AppSettings.findByPk(1);
   if (!row) {
-    row = await AppSettings.create({ id: 1, ...DEFAULT_APP_SETTINGS });
+    row = await AppSettings.create({
+      id: 1,
+      ...DEFAULT_APP_SETTINGS,
+      receiptDetailSettings: serializeReceiptDetailSettings(
+        DEFAULT_APP_SETTINGS.receiptDetailSettings,
+      ),
+      themePalette: serializeThemePalette(DEFAULT_APP_SETTINGS.themePalette),
+    });
   }
   row = await migrateSettingsRow(row);
   const raw = row.toJSON();
@@ -305,6 +314,7 @@ export async function loadAppSettings() {
     cajaAllowCreateProductFromScan: asBool(raw.cajaAllowCreateProductFromScan, false),
     cajaAllowEditProductFromCart: asBool(raw.cajaAllowEditProductFromCart, false),
     cajaSuggestUpdateProductPrice: asBool(raw.cajaSuggestUpdateProductPrice, false),
+    cajaAllowPercentDiscount: asBool(raw.cajaAllowPercentDiscount, false),
     notificationsToastGreeting: asBool(raw.notificationsToastGreeting, false),
     notificationsToastStock: asBool(raw.notificationsToastStock, false),
     notificationsToastCredit: asBool(raw.notificationsToastCredit, false),
@@ -372,6 +382,12 @@ export async function updateAppSettings(payload) {
       false,
     );
   }
+  if ("cajaAllowPercentDiscount" in patch) {
+    patch.cajaAllowPercentDiscount = asBool(
+      patch.cajaAllowPercentDiscount,
+      false,
+    );
+  }
   if ("notificationsToastGreeting" in patch) {
     patch.notificationsToastGreeting = asBool(patch.notificationsToastGreeting, false);
   }
@@ -432,6 +448,7 @@ export async function updateAppSettings(payload) {
     cajaAllowCreateProductFromScan: asBool(raw.cajaAllowCreateProductFromScan, false),
     cajaAllowEditProductFromCart: asBool(raw.cajaAllowEditProductFromCart, false),
     cajaSuggestUpdateProductPrice: asBool(raw.cajaSuggestUpdateProductPrice, false),
+    cajaAllowPercentDiscount: asBool(raw.cajaAllowPercentDiscount, false),
     notificationsToastGreeting: asBool(raw.notificationsToastGreeting, false),
     notificationsToastStock: asBool(raw.notificationsToastStock, false),
     notificationsToastCredit: asBool(raw.notificationsToastCredit, false),
@@ -482,6 +499,7 @@ export function toPublicSettings(data = cache) {
     cajaAllowCreateProductFromScan: asBool(data.cajaAllowCreateProductFromScan, false),
     cajaAllowEditProductFromCart: asBool(data.cajaAllowEditProductFromCart, false),
     cajaSuggestUpdateProductPrice: asBool(data.cajaSuggestUpdateProductPrice, false),
+    cajaAllowPercentDiscount: asBool(data.cajaAllowPercentDiscount, false),
     notificationsToastGreeting: asBool(data.notificationsToastGreeting, false),
     notificationsToastStock: asBool(data.notificationsToastStock, false),
     notificationsToastCredit: asBool(data.notificationsToastCredit, false),

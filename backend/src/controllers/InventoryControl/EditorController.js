@@ -1,5 +1,9 @@
 // controllers/EditorController.js
 import { Op } from "sequelize";
+import fs from "fs";
+import fsp from "fs/promises";
+import path from "path";
+import fileDirName from "../../libs/file-dirname.js";
 import {
     EditorTemplate,
     EditorTemplateGroup,
@@ -12,9 +16,23 @@ import {
 import { sequelize } from "../../database/connection.js";
 import { verifyJWT,getHeaderToken } from "../../libs/jwt.js";
 import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
+import { extractTemplateSettings, settingsToMeta } from "../../libs/templateSettings.js";
 
+const { __dirname } = fileDirName(import.meta);
+const IMG_BASE_DIR = path.resolve(__dirname, "../../img");
 
+const psdRelPath = (templateId, app = "eddeli") => {
+  const prefix = String(app || "eddeli").toLowerCase().replace(/[^a-z0-9_-]/g, "");
+  return `${prefix || "eddeli"}/diseno-promocional/psd/template_${templateId}.psd`;
+};
 
+const resolvePsdAbs = (rel) => {
+  const full = path.resolve(IMG_BASE_DIR, rel);
+  if (!full.startsWith(IMG_BASE_DIR + path.sep) && full !== IMG_BASE_DIR) {
+    throw new Error("Ruta PSD inválida");
+  }
+  return full;
+};
 /**
  * Helpers mínimos (reutilizables)
  */
@@ -195,6 +213,13 @@ export const updateTemplateDoc = async (req, res) => {
     if (doc?.backgroundSrc !== undefined) patch.backgroundSrc = doc.backgroundSrc ? String(doc.backgroundSrc) : null;
     if (updatedBy) patch.updatedBy = updatedBy;
 
+    const settings = extractTemplateSettings({
+      doc,
+      layers: layersIn,
+      backgroundSrc: doc?.backgroundSrc ?? tpl.backgroundSrc,
+    });
+    patch.settingsJson = settings;
+
     await tpl.update(patch, { transaction: t });
 
     // 2) BORRAR HIJOS (reemplazo completo)
@@ -361,6 +386,13 @@ export const importTemplate = async (req, res) => {
     };
   };
 
+  const importSettings = extractTemplateSettings({
+    body: req.body,
+    templateJson,
+    layers: layersIn,
+    backgroundSrc: templateJson.backgroundSrc ?? null,
+  });
+
   const t = await sequelize.transaction();
   try {
     // 1) Template
@@ -372,6 +404,7 @@ export const importTemplate = async (req, res) => {
         canvasWidth: toInt(templateJson.canvas?.width, 1920),
         canvasHeight: toInt(templateJson.canvas?.height, 1080),
         backgroundSrc: templateJson.backgroundSrc ?? null,
+        settingsJson: importSettings,
         isDefault: toBool(templateJson.isDefault, false),
         isActive: toBool(templateJson.isActive, true),
         createdBy,
@@ -646,6 +679,11 @@ export const updateTemplate = async (req, res) => {
           canvasWidth: toInt(doc?.canvas?.width, tpl.canvasWidth || 1920),
           canvasHeight: toInt(doc?.canvas?.height, tpl.canvasHeight || 1080),
           backgroundSrc: doc.backgroundSrc ? toRelativeImgPath(doc.backgroundSrc) : null,
+          settingsJson: extractTemplateSettings({
+            doc,
+            layers: layersIn,
+            backgroundSrc: doc.backgroundSrc ?? tpl.backgroundSrc,
+          }),
           updatedBy: updatedBy || null,
         };
 
@@ -768,6 +806,27 @@ export const updateTemplate = async (req, res) => {
       if (req.body.isActive != null) patch.isActive = toBool(req.body.isActive, tpl.isActive);
       if (req.body.isDefault != null) patch.isDefault = toBool(req.body.isDefault, tpl.isDefault);
 
+      if (
+        req.body.templateKind != null ||
+        req.body.requiresProduct != null ||
+        req.body.backgroundMode != null ||
+        req.body.settingsJson != null
+      ) {
+        patch.settingsJson = extractTemplateSettings({
+          body: {
+            settingsJson: {
+              ...(tpl.settingsJson || {}),
+              ...(req.body.settingsJson || {}),
+            },
+            templateKind: req.body.templateKind ?? tpl.settingsJson?.templateKind,
+            requiresProduct: req.body.requiresProduct ?? tpl.settingsJson?.requiresProduct,
+            backgroundMode: req.body.backgroundMode ?? tpl.settingsJson?.backgroundMode,
+          },
+          layers: tpl.layers || [],
+          backgroundSrc: patch.backgroundSrc ?? tpl.backgroundSrc,
+        });
+      }
+
       if (updatedBy) patch.updatedBy = updatedBy;
 
       await tpl.update(patch, { transaction: t });
@@ -827,11 +886,39 @@ const buildResolvedDocFromTemplateRow = (templateRow) => {
     }))
     .sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 
+  const settings = extractTemplateSettings({
+    body: { settingsJson: templateRow.settingsJson },
+    layers,
+    backgroundSrc: templateRow.backgroundSrc,
+  });
+
   return {
     canvas: { width: templateRow.canvasWidth, height: templateRow.canvasHeight },
     backgroundSrc: templateRow.backgroundSrc,
+    meta: {
+      name: templateRow.name,
+      ...settingsToMeta(settings),
+    },
     groups,
     layers,
+  };
+};
+
+const templateSummaryFromRow = (row) => {
+  const settings = extractTemplateSettings({
+    body: { settingsJson: row.settingsJson },
+    layers: row.layers || [],
+    backgroundSrc: row.backgroundSrc,
+  });
+  return {
+    id: row.id,
+    name: row.name,
+    app: row.app,
+    format: row.format,
+    isDefault: row.isDefault,
+    isActive: row.isActive,
+    settingsJson: settings,
+    ...settings,
   };
 };
 
@@ -862,19 +949,85 @@ export const getTemplateResolvedById = async (req, res) => {
 
     return res.json({
       templateId: row.id,
-      template: {
-        id: row.id,
-        name: row.name,
-        app: row.app,
-        format: row.format,
-        isDefault: row.isDefault,
-        isActive: row.isActive,
-      },
+      template: templateSummaryFromRow(row),
       resolved,
     });
   } catch (error) {
     console.error("getTemplateResolvedById error:", error);
     return res.status(500).json({ message: "Error resolviendo template" });
+  }
+};
+
+/** GET /editor/templates/:id/psd — documento Photopea (PSD) */
+export const getTemplatePsd = async (req, res) => {
+  try {
+    const id = toInt(req.params.id, 0);
+    const tpl = await EditorTemplate.findByPk(id);
+    if (!tpl) return res.status(404).json({ message: "Template no encontrado" });
+
+    const psdSrc = tpl.settingsJson?.psdSrc || psdRelPath(id, tpl.app);
+    const abs = resolvePsdAbs(psdSrc);
+
+    if (!fs.existsSync(abs)) {
+      return res.status(404).json({ message: "PSD no encontrado", psdSrc: null });
+    }
+
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.setHeader("Content-Disposition", `inline; filename="template_${id}.psd"`);
+    fs.createReadStream(abs).pipe(res);
+  } catch (error) {
+    console.error("getTemplatePsd error:", error);
+    return res.status(500).json({ message: "Error leyendo PSD" });
+  }
+};
+
+/** PUT /editor/templates/:id/psd — guardar documento Photopea (body binario) */
+export const saveTemplatePsd = async (req, res) => {
+  const id = toInt(req.params.id, 0);
+
+  const token = getHeaderToken(req);
+  let user = null;
+  try {
+    user = await verifyJWT(token);
+  } catch {
+    return res.status(401).json({ message: "No autorizado" });
+  }
+
+  try {
+    const tpl = await EditorTemplate.findByPk(id);
+    if (!tpl) return res.status(404).json({ message: "Template no encontrado" });
+
+    const buffer = req.body;
+    if (!buffer || !Buffer.isBuffer(buffer) || buffer.length < 100) {
+      return res.status(400).json({ message: "PSD inválido o vacío" });
+    }
+
+    const rel = psdRelPath(id, tpl.app);
+    const abs = resolvePsdAbs(rel);
+    await fsp.mkdir(path.dirname(abs), { recursive: true });
+    await fsp.writeFile(abs, buffer);
+
+    const settings = {
+      ...(tpl.settingsJson || {}),
+      psdSrc: rel,
+      editorEngine: "photopea",
+    };
+
+    await tpl.update({
+      settingsJson: settings,
+      updatedBy: user?.accountId ? toInt(user.accountId, null) : null,
+    });
+
+    notifyOk("editor.template_psd_saved", `PSD plantilla #${id}`, { templateId: id, psdSrc: rel });
+    return res.json({ message: "PSD guardado", templateId: id, psdSrc: rel, size: buffer.length });
+  } catch (error) {
+    console.error("saveTemplatePsd error:", error);
+    notifyFail("editor.template_psd_save_failed", `Error guardando PSD #${id}`, {
+      error,
+      req,
+      httpStatus: 500,
+    });
+    return res.status(500).json({ message: "Error guardando PSD" });
   }
 };
 
@@ -936,14 +1089,7 @@ export const getDefaultTemplateResolved = async (req, res) => {
 
     return res.json({
       templateId: row.id,
-      template: {
-        id: row.id,
-        name: row.name,
-        app: row.app,
-        format: row.format,
-        isDefault: row.isDefault,
-        isActive: row.isActive,
-      },
+      template: templateSummaryFromRow(row),
       resolved,
     });
   } catch (error) {
