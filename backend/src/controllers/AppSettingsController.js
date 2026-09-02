@@ -8,6 +8,7 @@ import {
 import { getTimeStatus } from "../services/timeStatusService.js";
 import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
 import { getFeatureGate } from "../services/entitlementService.js";
+import { unifyStockToSingleLocal } from "../services/storeStockService.js";
 
 const IANA_TIMEZONE_RE = /^[A-Za-z_]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?$/;
 
@@ -127,20 +128,35 @@ export async function putAppSettings(req, res) {
         }
       }
 
-      if (!wantOn && currentOn && !isProgrammer) {
-        notifyFail(
-          "app.settings_update_failed",
-          "No se puede desactivar multistock una vez activado",
-          {
+      if (!wantOn && currentOn) {
+        const principalRaw = b.principalStoreId;
+        const principalStoreId =
+          principalRaw != null && principalRaw !== ""
+            ? Number(principalRaw)
+            : null;
+        try {
+          const unified = await unifyStockToSingleLocal({
+            principalStoreId:
+              Number.isFinite(principalStoreId) && principalStoreId > 0
+                ? principalStoreId
+                : undefined,
+          });
+          notifyOk("app.multistock_unified", "Stock unificado en un solo local", {
             req,
-            httpStatus: 403,
-            extra: { reason: "multi_stock_irreversible" },
-          },
-        );
-        return res.status(403).json({
-          message:
-            "Una vez activado el multistock no se puede volver a un solo local. Contactá soporte si necesitás ayuda.",
-        });
+            extra: unified,
+          });
+        } catch (err) {
+          console.error("unifyStockToSingleLocal", err);
+          notifyFail("app.settings_update_failed", "No se pudo unificar el stock", {
+            error: err,
+            req,
+            httpStatus: 400,
+            extra: { reason: "multi_stock_unify_failed" },
+          });
+          return res.status(400).json({
+            message: err.message || "No se pudo unificar el stock en un solo local.",
+          });
+        }
       }
 
       patch.multiStockEnabled = wantOn;

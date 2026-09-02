@@ -1,6 +1,6 @@
 import { Op } from "sequelize";
 import { sequelize } from "../database/connection.js";
-import { InventoryProduct, Store } from "../models/Inventory.js";
+import { InventoryBatch, InventoryProduct, Store } from "../models/Inventory.js";
 import { StoreStock } from "../models/StoreStock.js";
 import { getAppSettingsSync } from "./appSettingsService.js";
 
@@ -468,6 +468,120 @@ export async function transferStoreStockBatch({
       toStoreId: Number(toStoreId),
       count: results.length,
       items: results,
+    };
+  };
+
+  if (transaction) return run(transaction);
+  return sequelize.transaction(run);
+}
+
+/**
+ * Unifica stock de sucursales y bodegas en un solo local (modo un stock general).
+ * Las vitrinas no participan. Si principalStoreId no se indica, usa el local de operación.
+ */
+export async function unifyStockToSingleLocal({ principalStoreId, transaction } = {}) {
+  const run = async (t) => {
+    let principal = null;
+    if (principalStoreId != null && principalStoreId !== "") {
+      const id = Number(principalStoreId);
+      if (!Number.isFinite(id) || id <= 0) {
+        throw new Error("Local principal inválido.");
+      }
+      principal = await Store.findByPk(id, { transaction: t });
+      if (!principal) throw new Error("Local principal no encontrado.");
+      if (!storeHoldsInventory(principal.locationKind)) {
+        throw new Error(
+          "El local principal debe ser una sucursal o bodega del negocio (no vitrina).",
+        );
+      }
+      if (!principal.isActive) {
+        throw new Error("El local principal debe estar activo.");
+      }
+      if (principal.locationKind !== "propia") {
+        await principal.update(
+          {
+            locationKind: "propia",
+            establishmentCode: principal.establishmentCode || "001",
+            emissionPointCode: principal.emissionPointCode || "001",
+          },
+          { transaction: t },
+        );
+      }
+    } else {
+      principal = await ensureSingleLocalOwnStore({ transaction: t });
+    }
+
+    const inventoryStores = await Store.findAll({
+      where: { locationKind: { [Op.in]: ["propia", "bodega"] } },
+      attributes: ["id"],
+      transaction: t,
+    });
+    const inventoryStoreIds = inventoryStores.map((s) => s.id);
+    if (!inventoryStoreIds.includes(principal.id)) {
+      inventoryStoreIds.push(principal.id);
+    }
+
+    const stockRows = await StoreStock.findAll({
+      where: { storeId: { [Op.in]: inventoryStoreIds } },
+      attributes: ["productId", "storeId", "quantity"],
+      transaction: t,
+    });
+
+    const totalsByProduct = new Map();
+    for (const row of stockRows) {
+      const pid = Number(row.productId);
+      totalsByProduct.set(pid, (totalsByProduct.get(pid) || 0) + numStock(row.quantity));
+    }
+
+    const productsWithGlobal = await InventoryProduct.findAll({
+      where: { stock: { [Op.gt]: 0 } },
+      attributes: ["id", "stock"],
+      transaction: t,
+    });
+    for (const p of productsWithGlobal) {
+      if (!totalsByProduct.has(p.id)) {
+        totalsByProduct.set(p.id, numStock(p.stock));
+      }
+    }
+
+    let productsUnified = 0;
+    for (const [productId, total] of totalsByProduct) {
+      await setStoreStockAbsolute(principal.id, productId, total, {
+        transaction: t,
+        allowNegative: false,
+      });
+      for (const sid of inventoryStoreIds) {
+        if (Number(sid) === Number(principal.id)) continue;
+        await setStoreStockAbsolute(sid, productId, 0, {
+          transaction: t,
+          allowNegative: true,
+        });
+      }
+      await syncProductStockFromStores(productId, { transaction: t });
+      productsUnified += 1;
+    }
+
+    try {
+      const otherStoreIds = inventoryStoreIds.filter((id) => Number(id) !== Number(principal.id));
+      const batchWhere = {
+        status: { [Op.ne]: "depleted" },
+        [Op.or]: [{ storeId: null }],
+      };
+      if (otherStoreIds.length) {
+        batchWhere[Op.or].push({ storeId: { [Op.in]: otherStoreIds } });
+      }
+      await InventoryBatch.update({ storeId: principal.id }, { where: batchWhere, transaction: t });
+    } catch (err) {
+      console.warn("[storeStock] unifyStockToSingleLocal batches:", err?.message || err);
+    }
+
+    console.log(
+      `[storeStock] Stock unificado → «${principal.name}» (#${principal.id}), ${productsUnified} productos.`,
+    );
+    return {
+      principalStoreId: principal.id,
+      principalName: principal.name,
+      productsUnified,
     };
   };
 

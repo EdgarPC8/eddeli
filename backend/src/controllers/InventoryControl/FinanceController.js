@@ -10,7 +10,7 @@ import { es } from 'date-fns/locale';
 import { OrderItem } from "../../models/Orders.js";
 import { ItemGroup, ItemGroupItem, Payment } from "../../models/Finance.js";
 import { toFinanceDateTime } from "../../utils/financeDateTime.js";
-import { buildFinanceDateColumnWhere } from "../../utils/financeDateUtils.js";
+import { buildFinanceDateColumnWhere, buildFinanceDateWhere } from "../../utils/financeDateUtils.js";
 import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 /**
@@ -66,10 +66,14 @@ export const getFinanceSummary = async (req, res) => {
   };
 
   try {
+    const { startDate, endDate } = req.query || {};
+    const hasPeriodFilter = Boolean(startDate || endDate);
+    const periodWhere = hasPeriodFilter ? buildFinanceDateWhere(startDate, endDate) : {};
+
     await stripOrderItemIncomesWhenGroupAlreadyPaid();
     const [totalIncome, totalExpense, groupLinks, openGroups, completedPayments] = await Promise.all([
-      Income.sum('amount'),
-      Expense.sum('amount'),
+      Income.sum("amount", hasPeriodFilter ? { where: periodWhere } : {}),
+      Expense.sum("amount", hasPeriodFilter ? { where: periodWhere } : {}),
       ItemGroupItem.findAll({ attributes: ['groupId', 'orderItemId'], raw: true }),
       ItemGroup.findAll({ where: { status: 'open' }, attributes: ['id'], raw: true }),
       Payment.findAll({ where: { status: 'completed' }, attributes: ['groupId', 'amount'], raw: true }),
@@ -139,9 +143,14 @@ export const getFinanceSummary = async (req, res) => {
     const expense = Number(totalExpense || 0);
 
     const now = new Date();
-    const monthStart = format(startOfMonth(now), "yyyy-MM-dd");
-    const monthEnd = format(endOfMonth(now), "yyyy-MM-dd");
-    const monthDateWhere = buildFinanceDateColumnWhere(monthStart, monthEnd) || {};
+    const monthStart = hasPeriodFilter
+      ? String(startDate || endDate).slice(0, 10)
+      : format(startOfMonth(now), "yyyy-MM-dd");
+    const monthEnd = hasPeriodFilter
+      ? String(endDate || startDate).slice(0, 10)
+      : format(endOfMonth(now), "yyyy-MM-dd");
+    const monthDateWhere =
+      hasPeriodFilter ? periodWhere : buildFinanceDateColumnWhere(monthStart, monthEnd) || {};
     const [monthIncomeRaw, monthExpenseRaw] = await Promise.all([
       Income.sum("amount", { where: monthDateWhere }),
       Expense.sum("amount", { where: monthDateWhere }),
@@ -243,7 +252,10 @@ export const getFinanceSummary = async (req, res) => {
       monthExpense,
       monthBalance,
       monthMarginPct,
-      monthLabel: format(now, "MMMM yyyy", { locale: es }),
+      monthLabel: hasPeriodFilter
+        ? `${format(parse(monthStart, "yyyy-MM-dd", new Date()), "d MMM yyyy", { locale: es })} – ${format(parse(monthEnd, "yyyy-MM-dd", new Date()), "d MMM yyyy", { locale: es })}`
+        : format(now, "MMMM yyyy", { locale: es }),
+      periodFiltered: hasPeriodFilter,
       monthIncomeWithPending,
       monthBalanceWithPending,
       monthMarginWithPendingPct,
