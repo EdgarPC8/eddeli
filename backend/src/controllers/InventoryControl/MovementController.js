@@ -888,7 +888,7 @@ export const openPresentationMovement = async (req, res) => {
         presentation.InventoryUnit,
       );
       const totalGrams = round2(gramsPerPack * packs);
-      const targetQty = Number.isInteger(configuredUnits) && configuredUnits > 0
+      const targetQty = Number.isFinite(configuredUnits) && configuredUnits > 0
         ? configuredUnits * packs
         : round2(gramsToProductStockUnits(target, target.InventoryUnit, totalGrams));
 
