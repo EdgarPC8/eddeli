@@ -36,6 +36,8 @@
     "db:images:enrich-goupc:dry": "node scripts/enrich-product-images-from-goupc.js --dry-run",
     "db:images:report": "node scripts/report-product-barcodes-images.js",
     "db:images:report:candidates": "node scripts/report-product-barcodes-images.js --list=barcode-no-img",
+    "db:images:sync-server": "node scripts/sync-product-images-to-server.js",
+    "db:images:sync-server:dry": "node scripts/sync-product-images-to-server.js --dry-run",
     "demo:toasts": "node scripts/demo-notification-toasts.js"
   },
   "keywords": [],

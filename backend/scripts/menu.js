@@ -1,7 +1,7 @@
 /**
- * Menú interactivo de scripts del backend Eddeli.
+ * Menú interactivo de scripts del backend (EdDeli / Store / Tienda).
  *
- * Uso (desde AppsWeb/eddeli/backend):
+ * Uso (desde el backend de la app):
  *   npm run scripts
  *
  * Controles: ↑↓ mover · Enter elegir · Esc / q salir
@@ -10,9 +10,27 @@ import { spawn } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import readline from "node:readline";
+import { readFileSync } from "node:fs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BACKEND_ROOT = path.resolve(__dirname, "..");
+
+function detectAppLabel() {
+  try {
+    const pkg = JSON.parse(
+      readFileSync(path.join(BACKEND_ROOT, "package.json"), "utf8"),
+    );
+    const name = String(pkg.name || "").toLowerCase();
+    if (name.includes("store")) return "Store";
+    if (name.includes("tienda")) return "Tienda";
+    if (name.includes("eddeli")) return "EdDeli";
+    return pkg.name || "Backend";
+  } catch {
+    return "Backend";
+  }
+}
+
+const APP_LABEL = detectAppLabel();
 
 /** @typedef {{ id: string, title: string, desc: string, file: string, args?: string[], env?: Record<string,string>, danger?: 'low'|'med'|'high', write?: boolean }} ScriptItem */
 
@@ -70,74 +88,115 @@ const CATALOG = [
         danger: "med",
       },
       {
-        id: "img-goupc-sim5",
-        title: "Simular Go-UPC · lote de 5 (seguro)",
-        desc: "Consulta 5 candidatos, pausa 15s entre cada uno. No escribe. Ideal servidor/otra IP.",
+        id: "img-sync-server-dry",
+        title: "Subir imágenes al servidor (dry-run)",
+        desc: "Simula rsync por SSH/WireGuard + SQL de primaryImageUrl. No escribe en el server.",
+        file: "sync-product-images-to-server.js",
+        args: ["--dry-run"],
+        danger: "low",
+      },
+      {
+        id: "img-sync-server",
+        title: "Subir imágenes al servidor (SSH)",
+        desc: "Copia sistema/products por SSH y aplica primaryImageUrl en la BD remota. WireGuard debe estar ON.",
+        file: "sync-product-images-to-server.js",
+        write: true,
+        danger: "med",
+      },
+      {
+        id: "img-goupc-list-skip",
+        title: "Ver omitidos Go-UPC (sin foto)",
+        desc: "Lista productos ya consultados sin imagen, guardados en goupc-skip.json.",
         file: "enrich-product-images-from-goupc.js",
-        args: ["--dry-run", "--limit=5", "--delay=15000"],
+        args: ["--list-skip"],
+        danger: "low",
+      },
+      {
+        id: "img-goupc-reset-skip",
+        title: "Limpiar omitidos Go-UPC",
+        desc: "Borra goupc-skip.json para volver a consultar también los sin foto.",
+        file: "enrich-product-images-from-goupc.js",
+        args: ["--reset-skip"],
+        write: true,
+        danger: "med",
+      },
+      {
+        id: "img-goupc-sim5",
+        title: "Simular Go-UPC · lote de 5",
+        desc: "Consulta 5 candidatos, ~5s entre cada uno. No escribe.",
+        file: "enrich-product-images-from-goupc.js",
+        args: ["--dry-run", "--limit=5", "--delay=5000"],
         danger: "low",
       },
       {
         id: "img-goupc-sim10",
-        title: "Simular Go-UPC · lote de 10 (seguro)",
-        desc: "Consulta 10 con pausa 15s. Entre lotes esperá 10–15 min a mano.",
+        title: "Simular Go-UPC · lote de 10",
+        desc: "Consulta 10 con ~5s entre cada uno. No escribe.",
         file: "enrich-product-images-from-goupc.js",
-        args: ["--dry-run", "--limit=10", "--delay=15000"],
+        args: ["--dry-run", "--limit=10", "--delay=5000"],
         danger: "low",
       },
       {
         id: "img-goupc-5",
-        title: "Aplicar Go-UPC · lote de 5 (seguro)",
-        desc: "Descarga hasta 5 imágenes, 15s entre cada una + reintentos 429.",
+        title: "Aplicar Go-UPC · lote de 5",
+        desc: "Descarga hasta 5 imágenes, ~5s entre cada una.",
         file: "enrich-product-images-from-goupc.js",
-        args: ["--limit=5", "--delay=15000"],
+        args: ["--limit=5", "--delay=5000"],
         write: true,
         danger: "med",
       },
       {
         id: "img-goupc-5-off5",
         title: "Aplicar Go-UPC · lote 5 (offset 5)",
-        desc: "Segundo lote seguro: offset=5, delay 15s. Esperá 10–15 min desde el anterior.",
+        desc: "Segundo lote: offset=5, ~5s entre cada uno.",
         file: "enrich-product-images-from-goupc.js",
-        args: ["--limit=5", "--offset=5", "--delay=15000"],
+        args: ["--limit=5", "--offset=5", "--delay=5000"],
         write: true,
         danger: "med",
       },
       {
         id: "img-goupc-5-off10",
         title: "Aplicar Go-UPC · lote 5 (offset 10)",
-        desc: "Tercer lote: offset=10, delay 15s.",
+        desc: "Tercer lote: offset=10, ~5s entre cada uno.",
         file: "enrich-product-images-from-goupc.js",
-        args: ["--limit=5", "--offset=10", "--delay=15000"],
+        args: ["--limit=5", "--offset=10", "--delay=5000"],
         write: true,
         danger: "med",
       },
       {
         id: "img-goupc-5-off15",
         title: "Aplicar Go-UPC · lote 5 (offset 15)",
-        desc: "Cuarto lote: offset=15, delay 15s.",
+        desc: "Cuarto lote: offset=15, ~5s entre cada uno.",
         file: "enrich-product-images-from-goupc.js",
-        args: ["--limit=5", "--offset=15", "--delay=15000"],
+        args: ["--limit=5", "--offset=15", "--delay=5000"],
         write: true,
         danger: "med",
       },
       {
         id: "img-goupc-10",
-        title: "Aplicar Go-UPC · lote de 10 (seguro)",
-        desc: "Hasta 10 con pausa 15s. Más lento pero más seguro en servidor.",
+        title: "Aplicar Go-UPC · lote de 10",
+        desc: "Hasta 10 con ~5s entre cada uno.",
         file: "enrich-product-images-from-goupc.js",
-        args: ["--limit=10", "--delay=15000"],
+        args: ["--limit=10", "--delay=5000"],
         write: true,
         danger: "med",
       },
       {
-        id: "img-goupc-all",
-        title: "Aplicar Go-UPC · todos (lento/seguro)",
-        desc: "Todos con delay 15s. Si sale 429, aborta. Preferible ir de a 5.",
+        id: "img-goupc-all-human",
+        title: "Aplicar Go-UPC · todos (humano variable)",
+        desc: "Uno por uno ~5s; cada 2–10 productos (al azar) pausa 5–10 min (al azar). Sin patrón fijo.",
         file: "enrich-product-images-from-goupc.js",
-        args: ["--delay=15000"],
+        args: ["--human", "--delay=5000"],
         write: true,
         danger: "med",
+      },
+      {
+        id: "img-goupc-all-human-dry",
+        title: "Simular Go-UPC · todos (humano variable)",
+        desc: "Igual ritmo variable, pero no descarga ni escribe.",
+        file: "enrich-product-images-from-goupc.js",
+        args: ["--human", "--dry-run", "--delay=5000"],
+        danger: "low",
       },
     ],
   },
@@ -562,7 +621,7 @@ function assertTty() {
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     console.error(
       "Este menú necesita una terminal interactiva (TTY).\n" +
-        "Abrí una terminal en AppsWeb/eddeli/backend y corré: npm run scripts",
+        `Abrí una terminal en el backend de ${APP_LABEL} y corré: npm run scripts`,
     );
     process.exit(1);
   }
@@ -601,7 +660,7 @@ async function selectList(title, rows, detailFn) {
       `${c.brightMagenta}${c.bold}╔══════════════════════════════════════════╗${c.reset}`,
     );
     lines.push(
-      `${c.brightMagenta}${c.bold}║${c.reset}  ${c.brightCyan}${c.bold}Eddeli${c.reset} ${c.white}·${c.reset} ${c.brightYellow}${c.bold}Scripts Launcher${c.reset}          ${c.brightMagenta}${c.bold}║${c.reset}`,
+      `${c.brightMagenta}${c.bold}║${c.reset}  ${c.brightCyan}${c.bold}${APP_LABEL}${c.reset} ${c.white}·${c.reset} ${c.brightYellow}${c.bold}Scripts Launcher${c.reset}          ${c.brightMagenta}${c.bold}║${c.reset}`,
     );
     lines.push(
       `${c.brightMagenta}${c.bold}╚══════════════════════════════════════════╝${c.reset}`,

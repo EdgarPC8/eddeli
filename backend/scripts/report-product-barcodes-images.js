@@ -134,7 +134,7 @@ async function main() {
   );
   const soldNoBarcode = enriched.filter((p) => p.soldTimes > 0 && !p.hasBarcode);
 
-  console.log(`\n${c.magenta}${c.bold}═══ Eddeli · Barcodes e imágenes ═══${c.reset}\n`);
+  console.log(`\n${c.magenta}${c.bold}═══ Barcodes e imágenes ═══${c.reset}\n`);
   console.log(`${c.cyan}${c.bold}Resumen${c.reset}`);
   line("Productos totales", total, c.white);
   line(`Con barcode (${pct(withBarcode.length, total)})`, withBarcode.length, c.yellow);

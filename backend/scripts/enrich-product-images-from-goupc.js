@@ -5,13 +5,21 @@
  * Solo toca productos con barcode y sin imagen usable (URL vacía o archivo inexistente).
  * Ante HTTP 429 (rate limit) reintenta con espera larga; no confunde 429 con "sin foto".
  *
- * Uso (desde AppsWeb/eddeli/backend):
+ * Uso (desde el backend):
  *   node scripts/enrich-product-images-from-goupc.js --dry-run --limit=5
  *   node scripts/enrich-product-images-from-goupc.js --limit=5 --delay=15000
- *   node scripts/enrich-product-images-from-goupc.js --limit=5 --offset=5
+ *   node scripts/enrich-product-images-from-goupc.js --human
+ *   node scripts/enrich-product-images-from-goupc.js --human --dry-run
  *
- * Defaults seguros (otra IP / servidor): delay 15s, lotes de 5.
- * Entre lotes: esperá 10–15 min a mano. Si hay 429: pará 30–60 min.
+ * Modo --human / todos:
+ *   - busca uno por uno (~5s entre cada uno)
+ *   - cada cierto número VARIABLE de productos (2–10) pausa VARIABLE (5–10 min)
+ *
+ * Persistencia (para no reconsultar eternos “sin foto”):
+ *   scripts/data/goupc-skip.json
+ *   --ignore-skip   incluye también los omitidos
+ *   --list-skip     muestra omitidos y sale
+ *   --reset-skip    borra omitidos y sale
  */
 import "dotenv/config";
 import fs from "fs";
@@ -29,14 +37,59 @@ const DEST_FOLDER = "sistema/products";
 const DEST_ABS = path.join(IMG_BASE, DEST_FOLDER);
 
 const dryRun = process.argv.includes("--dry-run");
+const human = process.argv.includes("--human");
+const ignoreSkip = process.argv.includes("--ignore-skip");
+const listSkip = process.argv.includes("--list-skip");
+const resetSkip = process.argv.includes("--reset-skip");
 const limitArg = process.argv.find((a) => a.startsWith("--limit="));
 const offsetArg = process.argv.find((a) => a.startsWith("--offset="));
 const delayArg = process.argv.find((a) => a.startsWith("--delay="));
 const retriesArg = process.argv.find((a) => a.startsWith("--retries="));
+const batchSizeArg = process.argv.find((a) => a.startsWith("--batch-size="));
+const batchPauseArg = process.argv.find((a) => a.startsWith("--batch-pause="));
+
+const SKIP_PATH = path.join(__dirname, "data", "goupc-skip.json");
+const PERMANENT_SKIP_REASONS = new Set([
+  "sin_imagen_en_pagina",
+  "http_400",
+  "http_404",
+]);
+
 const LIMIT = limitArg ? Math.max(1, Number(limitArg.split("=")[1]) || 0) : Infinity;
 const OFFSET = offsetArg ? Math.max(0, Number(offsetArg.split("=")[1]) || 0) : 0;
-const DELAY_MS = delayArg ? Math.max(0, Number(delayArg.split("=")[1]) || 0) : 15_000;
+
+// Sin --limit o con --human = “todos” uno por uno + descansos variables.
+const HUMANISH = human || !limitArg || process.argv.includes("--all");
+const DELAY_MS = delayArg
+  ? Math.max(0, Number(delayArg.split("=")[1]) || 0)
+  : 5_000;
 const MAX_RETRIES = retriesArg ? Math.max(0, Number(retriesArg.split("=")[1]) || 0) : 5;
+
+// Overrides opcionales; si no, en modo humano se eligen al azar en runtime.
+const BATCH_SIZE_FIXED = batchSizeArg
+  ? Math.max(1, Number(batchSizeArg.split("=")[1]) || 0)
+  : 0;
+const BATCH_PAUSE_FIXED_MS = batchPauseArg
+  ? Math.max(0, Number(batchPauseArg.split("=")[1]) || 0)
+  : 0;
+
+function randInt(min, max) {
+  return Math.floor(Math.random() * (max - min + 1)) + min;
+}
+
+/** Próximo tamaño de bloque: 2–10 (o fijo si --batch-size). */
+function nextBlockSize() {
+  if (BATCH_SIZE_FIXED > 0) return BATCH_SIZE_FIXED;
+  if (!HUMANISH) return 0;
+  return randInt(2, 10);
+}
+
+/** Próxima pausa larga: 5–10 min (o fija si --batch-pause). */
+function nextBlockPauseMs() {
+  if (BATCH_PAUSE_FIXED_MS > 0) return BATCH_PAUSE_FIXED_MS;
+  if (!HUMANISH) return 0;
+  return randInt(5, 10) * 60 * 1000;
+}
 
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
@@ -67,6 +120,75 @@ function normalizeBarcode(raw) {
 
 function sleep(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+async function loadSkipStore() {
+  try {
+    const raw = await fsp.readFile(SKIP_PATH, "utf8");
+    const data = JSON.parse(raw);
+    if (!data || typeof data !== "object") return { items: {} };
+    if (!data.items || typeof data.items !== "object") data.items = {};
+    return data;
+  } catch {
+    return { items: {} };
+  }
+}
+
+async function saveSkipStore(store) {
+  await fsp.mkdir(path.dirname(SKIP_PATH), { recursive: true });
+  store.updatedAt = new Date().toISOString();
+  await fsp.writeFile(SKIP_PATH, JSON.stringify(store, null, 2), "utf8");
+}
+
+function skipKey(productId) {
+  return String(productId);
+}
+
+function isSkipped(store, productId, barcode) {
+  const byId = store.items[skipKey(productId)];
+  if (byId) return true;
+  if (!barcode) return false;
+  return Object.values(store.items).some((it) => it && it.barcode === barcode);
+}
+
+async function markSkipped(store, { id, name, barcode, reason }) {
+  store.items[skipKey(id)] = {
+    id,
+    name: String(name || "").slice(0, 120),
+    barcode: barcode || null,
+    reason,
+    checkedAt: new Date().toISOString(),
+  };
+  await saveSkipStore(store);
+}
+
+/** Delay entre productos: ~5s ± un poco (modo humano). */
+function nextItemDelayMs() {
+  if (!HUMANISH) return DELAY_MS;
+  const jitter = Math.floor(Math.random() * 2000) - 500; // -0.5s … +1.5s
+  return Math.max(3_000, DELAY_MS + jitter);
+}
+
+function formatDuration(ms) {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r ? `${m}m ${r}s` : `${m}m`;
+}
+
+async function sleepWithCountdown(totalMs, label) {
+  const started = Date.now();
+  while (Date.now() - started < totalMs) {
+    const left = totalMs - (Date.now() - started);
+    writeProgress(
+      0,
+      1,
+      `${c.yellow}${label}${c.reset} ${c.dim}· quedan ${formatDuration(left)}${c.reset}`,
+    );
+    await sleep(Math.min(1000, left));
+  }
+  endProgressLine();
 }
 
 function randSuffix(len = 5) {
@@ -193,8 +315,32 @@ async function downloadImage(imageUrl, destAbs) {
 }
 
 async function main() {
+  if (listSkip) {
+    const store = await loadSkipStore();
+    const items = Object.values(store.items || {});
+    console.log(`\n${c.magenta}${c.bold}═══ Go-UPC omitidos ═══${c.reset}`);
+    console.log(`  ${c.dim}Archivo:${c.reset} ${SKIP_PATH}`);
+    console.log(`  ${c.dim}Cantidad:${c.reset} ${c.bold}${items.length}${c.reset}\n`);
+    for (const it of items.sort((a, b) => Number(a.id) - Number(b.id))) {
+      console.log(
+        `  ${c.dim}#${it.id}${c.reset}  ${c.yellow}${it.barcode || "-"}${c.reset}  ${it.name || ""}  ${c.red}${it.reason}${c.reset}`,
+      );
+    }
+    return;
+  }
+
+  if (resetSkip) {
+    await fsp.mkdir(path.dirname(SKIP_PATH), { recursive: true });
+    await saveSkipStore({ items: {} });
+    console.log(`${c.green}Omitidos borrados.${c.reset} ${c.dim}${SKIP_PATH}${c.reset}`);
+    return;
+  }
+
   await sequelize.authenticate();
   await fsp.mkdir(DEST_ABS, { recursive: true });
+
+  const skipStore = await loadSkipStore();
+  const skippedCount = Object.keys(skipStore.items || {}).length;
 
   const rows = await InventoryProduct.findAll({
     where: {
@@ -204,45 +350,76 @@ async function main() {
     order: [["id", "ASC"]],
   });
 
-  const candidates = rows.filter((r) => {
+  const missingImage = rows.filter((r) => {
     const code = normalizeBarcode(r.barcode);
     if (!code) return false;
     return !hasUsableImage(r.primaryImageUrl);
   });
+
+  const candidates = ignoreSkip
+    ? missingImage
+    : missingImage.filter(
+        (r) => !isSkipped(skipStore, r.id, normalizeBarcode(r.barcode)),
+      );
+  const omittedNow = missingImage.length - candidates.length;
 
   const end = Number.isFinite(LIMIT) ? OFFSET + LIMIT : candidates.length;
   const work = candidates.slice(OFFSET, end);
 
   console.log(`\n${c.magenta}${c.bold}═══ Go-UPC · enriquecer imágenes ═══${c.reset}\n`);
   console.log(
-    `  ${c.dim}Candidatos (barcode sin imagen):${c.reset} ${c.bold}${c.yellow}${candidates.length}${c.reset}`,
+    `  ${c.dim}Sin imagen usable:${c.reset} ${c.bold}${missingImage.length}${c.reset}`,
+  );
+  console.log(
+    `  ${c.dim}Omitidos (ya chequeados sin foto):${c.reset} ${c.bold}${c.yellow}${omittedNow}${c.reset}` +
+      ` ${c.dim}(archivo: ${skippedCount})${c.reset}` +
+      (ignoreSkip ? ` ${c.cyan}[--ignore-skip]${c.reset}` : ""),
+  );
+  console.log(
+    `  ${c.dim}Cola a consultar:${c.reset} ${c.bold}${c.green}${candidates.length}${c.reset}`,
   );
   console.log(
     `  ${c.dim}Lote actual:${c.reset} ${c.bold}${work.length}${c.reset}` +
       `  ${c.dim}(offset=${OFFSET}` +
       `${Number.isFinite(LIMIT) ? `, limit=${LIMIT}` : ", sin limit"})${c.reset}`,
   );
+  console.log(`  ${c.dim}Skip file:${c.reset} ${SKIP_PATH}`);
   console.log(`  ${c.dim}Destino:${c.reset} src/img/${DEST_FOLDER}/`);
   console.log(
     `  ${c.dim}Modo:${c.reset} ${
       dryRun
-        ? `${c.cyan}${c.bold}SIMULACIÓN (--dry-run)${c.reset} ${c.dim}no escribe${c.reset}`
+        ? `${c.cyan}${c.bold}SIMULACIÓN (--dry-run)${c.reset} ${c.dim}no descarga; sí marca omitidos sin foto${c.reset}`
         : `${c.yellow}${c.bold}APLICAR${c.reset} ${c.dim}descarga + BD${c.reset}`
     }`,
   );
   console.log(
-    `  ${c.dim}Delay entre productos:${c.reset} ${DELAY_MS} ms  ${c.dim}| reintentos 429:${c.reset} ${MAX_RETRIES}\n`,
+    `  ${c.dim}Delay entre productos:${c.reset} ~${DELAY_MS} ms` +
+      (HUMANISH ? ` ${c.dim}(+variación)${c.reset}` : "") +
+      `  ${c.dim}| reintentos 429:${c.reset} ${MAX_RETRIES}`,
   );
+  if (HUMANISH) {
+    console.log(
+      `  ${c.green}${c.bold}Modo humano:${c.reset} bloques de ${c.bold}2–10${c.reset} productos (al azar) → pausa ${c.bold}5–10 min${c.reset} (al azar)`,
+    );
+  }
+  console.log("");
 
   if (!work.length) {
     console.log(`${c.green}Nada que enriquecer en este lote.${c.reset}`);
     return;
   }
 
-  const stats = { ok: 0, found: 0, fail: 0, rateLimited: 0 };
+  const stats = { ok: 0, found: 0, fail: 0, rateLimited: 0, skippedSaved: 0 };
   const fails = [];
   let abortedByRateLimit = false;
   let consecutiveHard429 = 0;
+  let inBlock = 0;
+  let blockTarget = HUMANISH ? nextBlockSize() : 0;
+  if (HUMANISH && blockTarget > 0) {
+    console.log(
+      `  ${c.dim}Primer bloque:${c.reset} ${blockTarget} producto(s) antes del próximo descanso\n`,
+    );
+  }
 
   for (let i = 0; i < work.length; i += 1) {
     const p = work[i];
@@ -290,6 +467,18 @@ async function main() {
         console.log(
           `  ${c.red}✗${c.reset} ${c.dim}[${i + 1}/${work.length}]${c.reset} #${p.id} ${p.name} ${c.dim}→${c.reset} ${c.red}sin foto${c.reset} ${c.dim}(${found.reason})${c.reset}`,
         );
+        if (PERMANENT_SKIP_REASONS.has(found.reason)) {
+          await markSkipped(skipStore, {
+            id: p.id,
+            name: p.name,
+            barcode,
+            reason: found.reason,
+          });
+          stats.skippedSaved += 1;
+          console.log(
+            `    ${c.yellow}→ omitido para próximas corridas${c.reset} ${c.dim}(no volverá a la cola)${c.reset}`,
+          );
+        }
       } else if (dryRun) {
         consecutiveHard429 = 0;
         stats.found += 1;
@@ -338,8 +527,32 @@ async function main() {
 
     writeProgress(i + 1, work.length, `${c.dim}listo${c.reset}`);
     if (abortedByRateLimit) break;
-    if (i < work.length - 1 && DELAY_MS > 0) {
-      await sleep(DELAY_MS);
+
+    const hasMore = i < work.length - 1;
+    if (HUMANISH && blockTarget > 0) {
+      inBlock += 1;
+    }
+
+    if (hasMore && HUMANISH && blockTarget > 0 && inBlock >= blockTarget) {
+      const pauseMs = nextBlockPauseMs();
+      endProgressLine();
+      console.log(
+        `\n${c.yellow}${c.bold}Pausa humana:${c.reset} bloque de ${blockTarget} listo. Descanso ${formatDuration(pauseMs)}…\n`,
+      );
+      await sleepWithCountdown(pauseMs, "descanso variable");
+      inBlock = 0;
+      blockTarget = nextBlockSize();
+      console.log(
+        `${c.green}Seguimos.${c.reset} Próximo bloque: ${c.bold}${blockTarget}${c.reset} producto(s)\n`,
+      );
+    } else if (hasMore && DELAY_MS > 0) {
+      const wait = nextItemDelayMs();
+      writeProgress(
+        i + 1,
+        work.length,
+        `${c.dim}espera ${formatDuration(wait)}…${c.reset}`,
+      );
+      await sleep(wait);
     }
   }
 
@@ -354,6 +567,9 @@ async function main() {
     console.log(`  ${c.cyan}guardadas en backend:${c.reset} ${c.bold}${stats.ok}${c.reset}`);
   }
   console.log(`  ${c.red}sin foto real:${c.reset} ${c.bold}${stats.fail}${c.reset}`);
+  console.log(
+    `  ${c.yellow}marcados omitidos (archivo):${c.reset} ${c.bold}${stats.skippedSaved}${c.reset}`,
+  );
   console.log(
     `  ${c.yellow}bloqueados por rate-limit (429):${c.reset} ${c.bold}${stats.rateLimited}${c.reset}`,
   );
