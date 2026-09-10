@@ -19,7 +19,8 @@ import {
   resolveCashFromBody,
 } from "../../utils/shiftCashUtils.js";
 import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
-import { getAppSettingsSync } from "../../services/appSettingsService.js";
+import { isMultiStockEnabled } from "../../services/appSettingsService.js";
+import { ensureSingleLocalOwnStore } from "../../services/storeStockService.js";
 
 const CAJA_POS_TAG = "[CAJA_POS]";
 const to2 = (n) => Number(Number(n || 0).toFixed(2));
@@ -621,64 +622,67 @@ export async function openShift(req, res) {
       });
     }
 
-    // Multistock: solo sucursales propias. Un solo local: cualquier local activo.
-    const multiStock = Boolean(getAppSettingsSync()?.multiStockEnabled);
-    const storeWhere = multiStock
-      ? { isActive: true, locationKind: "propia" }
-      : { isActive: true };
-
-    const activeStores = await Store.findAll({
-      where: storeWhere,
-      order: [["position", "ASC"], ["id", "ASC"]],
-      attributes: [
-        "id",
-        "name",
-        "address",
-        "establishmentCode",
-        "emissionPointCode",
-        "locationKind",
-        "isActive",
-      ],
-    });
+    // Multistock: solo sucursales propias. Un solo local: un único local propio (sin bodega).
+    const multiStock = isMultiStockEnabled();
 
     let store = null;
     let resolvedStoreId = storeId != null && storeId !== "" ? Number(storeId) : null;
 
-    if (activeStores.length > 0) {
-      if (!resolvedStoreId) {
-        if (activeStores.length === 1) {
-          resolvedStoreId = activeStores[0].id;
-        } else {
-          notifyFail("shift.open_failed", "Selecciona el local para abrir turno", { req, httpStatus: 400 });
+    if (!multiStock) {
+      store = await ensureSingleLocalOwnStore();
+      resolvedStoreId = store.id;
+    } else {
+      const storeWhere = { isActive: true, locationKind: "propia" };
+
+      const activeStores = await Store.findAll({
+        where: storeWhere,
+        order: [["position", "ASC"], ["id", "ASC"]],
+        attributes: [
+          "id",
+          "name",
+          "address",
+          "establishmentCode",
+          "emissionPointCode",
+          "locationKind",
+          "isActive",
+        ],
+      });
+
+      if (activeStores.length > 0) {
+        if (!resolvedStoreId) {
+          if (activeStores.length === 1) {
+            resolvedStoreId = activeStores[0].id;
+          } else {
+            notifyFail("shift.open_failed", "Selecciona el local para abrir turno", { req, httpStatus: 400 });
+            return res.status(400).json({
+              message: "Selecciona el local / panadería desde el que abres el turno.",
+              stores: activeStores,
+            });
+          }
+        }
+        store = activeStores.find((s) => Number(s.id) === Number(resolvedStoreId)) || null;
+        if (!store) {
+          store = await Store.findByPk(resolvedStoreId);
+        }
+        const isActiveVal =
+          store &&
+          (store.isActive === true || store.isActive === 1 || store.isActive === "1");
+        const isPropia =
+          store && String(store.locationKind || "").toLowerCase() === "propia";
+        const storeOk = Boolean(store && isPropia && isActiveVal);
+        if (!storeOk) {
+          notifyFail("shift.open_failed", "Elige una sucursal válida", { req, httpStatus: 400 });
           return res.status(400).json({
-            message: "Selecciona el local / panadería desde el que abres el turno.",
-            stores: activeStores,
+            message:
+              "Elige una sucursal propia activa (no bodega ni vitrina). Créala o actívala en Locales.",
           });
         }
-      }
-      store = activeStores.find((s) => Number(s.id) === Number(resolvedStoreId)) || null;
-      if (!store) {
+      } else if (resolvedStoreId) {
         store = await Store.findByPk(resolvedStoreId);
-      }
-      const isActiveVal =
-        store &&
-        (store.isActive === true || store.isActive === 1 || store.isActive === "1");
-      const isPropia =
-        store && String(store.locationKind || "").toLowerCase() === "propia";
-      const storeOk = multiStock ? Boolean(store && isPropia && isActiveVal) : Boolean(store && isActiveVal);
-      if (!storeOk) {
-        notifyFail("shift.open_failed", "Elige una sucursal válida", { req, httpStatus: 400 });
-        return res.status(400).json({
-          message: multiStock
-            ? "Elige una sucursal propia activa (no bodega ni vitrina). Créala o actívala en Locales."
-            : "Elige un local activo para abrir el turno.",
-        });
-      }
-    } else if (resolvedStoreId) {
-      store = await Store.findByPk(resolvedStoreId);
-      if (!store) {
-        notifyFail("shift.open_failed", "Local no encontrado", { req, httpStatus: 400 });
-        return res.status(400).json({ message: "Local no encontrado." });
+        if (!store) {
+          notifyFail("shift.open_failed", "Local no encontrado", { req, httpStatus: 400 });
+          return res.status(400).json({ message: "Local no encontrado." });
+        }
       }
     }
 
