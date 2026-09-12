@@ -612,3 +612,69 @@ export async function mapStoreStockByProduct(storeId) {
   for (const r of rows) map[r.productId] = numStock(r.quantity);
   return map;
 }
+
+function padSriCode(value, fallback = "001") {
+  const digits = String(value ?? "").replace(/\D/g, "");
+  if (!digits) return fallback;
+  return digits.padStart(3, "0").slice(-3);
+}
+
+/**
+ * Vincula un local a facturación SRI: lo deja como propia/activo y copia
+ * establecimiento + punto de emisión hacia (o desde) la config SRI.
+ */
+export async function linkStoreToSriBilling(storeId, { syncDirection = "store_to_sri" } = {}) {
+  const id = Number(storeId);
+  if (!Number.isFinite(id) || id <= 0) {
+    throw Object.assign(new Error("Local inválido"), { status: 400 });
+  }
+  const store = await Store.findByPk(id);
+  if (!store) {
+    throw Object.assign(new Error("Local no encontrado"), { status: 404 });
+  }
+
+  const { updateSriBillingSettings, loadSriBillingSettings, toPublicSriSettings } =
+    await import("./sriBillingService.js");
+
+  if (syncDirection === "sri_to_store") {
+    const sri = toPublicSriSettings(await loadSriBillingSettings());
+    const est = padSriCode(sri.establishmentCode, "001");
+    const emi = padSriCode(sri.emissionPointCode, "001");
+    await store.update({
+      locationKind: "propia",
+      isActive: true,
+      establishmentCode: est,
+      emissionPointCode: emi,
+    });
+    return {
+      storeId: store.id,
+      storeName: store.name,
+      establishmentCode: est,
+      emissionPointCode: emi,
+      direction: "sri_to_store",
+    };
+  }
+
+  // store_to_sri (default): códigos del local → SRI
+  if (normalizeStoreKind(store.locationKind) !== "propia") {
+    await store.update({ locationKind: "propia", isActive: true });
+  } else if (!store.isActive) {
+    await store.update({ isActive: true });
+  }
+  const est = padSriCode(store.establishmentCode, "001");
+  const emi = padSriCode(store.emissionPointCode, "001");
+  if (store.establishmentCode !== est || store.emissionPointCode !== emi) {
+    await store.update({ establishmentCode: est, emissionPointCode: emi });
+  }
+  await updateSriBillingSettings({
+    establishmentCode: est,
+    emissionPointCode: emi,
+  });
+  return {
+    storeId: store.id,
+    storeName: store.name,
+    establishmentCode: est,
+    emissionPointCode: emi,
+    direction: "store_to_sri",
+  };
+}

@@ -8,7 +8,7 @@ import {
 import { getTimeStatus } from "../services/timeStatusService.js";
 import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
 import { getFeatureGate } from "../services/entitlementService.js";
-import { unifyStockToSingleLocal } from "../services/storeStockService.js";
+import { unifyStockToSingleLocal, linkStoreToSriBilling } from "../services/storeStockService.js";
 
 const IANA_TIMEZONE_RE = /^[A-Za-z_]+\/[A-Za-z_]+(?:\/[A-Za-z_]+)?$/;
 
@@ -57,6 +57,7 @@ export async function putAppSettings(req, res) {
       "showPublicStoresPropia",
       "showPublicStoresVitrina",
       "multiStockEnabled",
+      "principalStoreId",
       "showProductCostInSelect",
       "moneyDisplayDecimals",
       "moneyRoundingMode",
@@ -141,6 +142,9 @@ export async function putAppSettings(req, res) {
                 ? principalStoreId
                 : undefined,
           });
+          if (unified?.principalStoreId) {
+            patch.principalStoreId = unified.principalStoreId;
+          }
           notifyOk("app.multistock_unified", "Stock unificado en un solo local", {
             req,
             extra: unified,
@@ -162,7 +166,26 @@ export async function putAppSettings(req, res) {
       patch.multiStockEnabled = wantOn;
     }
 
+    if ("principalStoreId" in b && patch.principalStoreId == null) {
+      const rawId = b.principalStoreId;
+      const sid =
+        rawId != null && rawId !== "" ? Number(rawId) : null;
+      patch.principalStoreId =
+        Number.isFinite(sid) && sid > 0 ? Math.floor(sid) : null;
+    }
+
     const data = await updateAppSettings(patch);
+
+    if (patch.principalStoreId) {
+      try {
+        await linkStoreToSriBilling(patch.principalStoreId, {
+          syncDirection: "store_to_sri",
+        });
+      } catch (err) {
+        console.warn("[appSettings] linkStoreToSriBilling:", err?.message || err);
+      }
+    }
+
     notifyOk("app.settings_updated", "Configuración app actualizada", {
       settings: toPublicSettings(data),
     });
