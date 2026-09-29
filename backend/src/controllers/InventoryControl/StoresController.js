@@ -457,7 +457,7 @@ export const deleteStore = async (req, res) => {
     const links = [];
     if (stockRows > 0) links.push(`${stockRows} fila(s) de stock`);
     if (registers > 0) links.push(`${registers} caja(s) POS`);
-    if (recurring > 0) links.push(`${recurring} gasto(s) recurrente(s)`);
+    if (recurring > 0) links.push(`${recurring} egreso(s) recurrente(s)`);
     if (productsLinked > 0) links.push(`${productsLinked} producto(s) asignado(s)`);
 
     if (blockers.length) {

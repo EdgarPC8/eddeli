@@ -42,3 +42,6 @@ backend/src/img/products/
 .DS_Store
 *.log
 *.bak
+
+# graphify
+graphify-out/

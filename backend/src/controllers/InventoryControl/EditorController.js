@@ -892,15 +892,37 @@ const buildResolvedDocFromTemplateRow = (templateRow) => {
     backgroundSrc: templateRow.backgroundSrc,
   });
 
+  let folders = Array.isArray(settings.folders) ? settings.folders : [];
+
+  // Recuperar carpetas desde props si settingsJson vino mal parseado
+  const used = new Set(folders.map((f) => f.id));
+  for (const l of layers) {
+    const fid = l.props?.folderId;
+    if (!fid || used.has(fid)) continue;
+    used.add(fid);
+    folders.push({
+      id: String(fid),
+      name: String(fid).replace(/^folder_/, "").replace(/_/g, " "),
+      parentId: null,
+    });
+  }
+
+  const layersWithFolders = layers.map((l) => ({
+    ...l,
+    folderId: l.props?.folderId || null,
+  }));
+
   return {
     canvas: { width: templateRow.canvasWidth, height: templateRow.canvasHeight },
     backgroundSrc: templateRow.backgroundSrc,
     meta: {
       name: templateRow.name,
       ...settingsToMeta(settings),
+      folders,
     },
     groups,
-    layers,
+    layers: layersWithFolders,
+    folders,
   };
 };
 
