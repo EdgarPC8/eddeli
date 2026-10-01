@@ -920,6 +920,11 @@ async function applyMovementRecord(
     err.statusCode = 400;
     throw err;
   }
+  if (type !== "ajuste" && qty <= 0) {
+    const err = new Error("La cantidad debe ser mayor a cero");
+    err.statusCode = 400;
+    throw err;
+  }
 
   if (type !== "ajuste" && !reason) {
     const err = new Error("Falta reason (motivo del movimiento)");

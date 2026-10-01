@@ -77,6 +77,9 @@ export async function putAppSettings(req, res) {
       "notificationsCreditEnabled",
       "notificationsExpiryEnabled",
       "toastPosition",
+      "passwordPolicyEnabled",
+      "loginAttemptLimitEnabled",
+      "maxInstallments",
       "receiptDetailSettings",
       "themePalette",
       "keyboardShortcuts",
@@ -93,6 +96,11 @@ export async function putAppSettings(req, res) {
           httpStatus: 400,
           extra: { reason: "invalid_timezone", timezone: tz },
         });
+        return res.status(400).json({ message: "Zona horaria IANA inválida (ej. America/Guayaquil)" });
+      }
+      try {
+        new Intl.DateTimeFormat("es-EC", { timeZone: tz }).format(new Date());
+      } catch {
         return res.status(400).json({ message: "Zona horaria IANA inválida (ej. America/Guayaquil)" });
       }
       patch.timezone = tz;
