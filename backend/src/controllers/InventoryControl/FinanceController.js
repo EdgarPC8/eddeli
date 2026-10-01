@@ -276,10 +276,17 @@ export const getFinanceSummary = async (req, res) => {
 export const createIncome = async (req, res) => {
   try {
     const { date, amount, concept, category, referenceId, referenceType } = req.body;
-    if (!Number.isFinite(Number(amount)) || Number(amount) < 0) {
+    const amountNumber = Number(amount);
+    if (amount == null || amount === "" || !Number.isFinite(amountNumber)) {
+      return res.status(400).json({ message: "El monto es obligatorio" });
+    }
+    if (amountNumber < 0) {
       return res.status(400).json({ message: "El monto no puede ser negativo" });
     }
-    const parsedAmount = Number(amount);
+    if (amountNumber > 999999999.99) {
+      return res.status(400).json({ message: "El monto es demasiado grande" });
+    }
+    const parsedAmount = amountNumber;
 
         const token = getHeaderToken(req);
       const user = await verifyJWT(token); // para createdBy
@@ -306,10 +313,17 @@ export const createIncome = async (req, res) => {
 export const createExpense = async (req, res) => {
   try {
     const { date, amount, concept, category, referenceId, referenceType } = req.body;
-    if (!Number.isFinite(Number(amount)) || Number(amount) < 0) {
+    const amountNumber = Number(amount);
+    if (amount == null || amount === "" || !Number.isFinite(amountNumber)) {
+      return res.status(400).json({ message: "El monto es obligatorio" });
+    }
+    if (amountNumber < 0) {
       return res.status(400).json({ message: "El monto no puede ser negativo" });
     }
-    const parsedAmount = Number(amount);
+    if (amountNumber > 999999999.99) {
+      return res.status(400).json({ message: "El monto es demasiado grande" });
+    }
+    const parsedAmount = amountNumber;
       const token = getHeaderToken(req);
       const user = await verifyJWT(token); // para createdBy
     const createdBy = user.accountId;
@@ -373,10 +387,17 @@ export const updateIncome = async (req, res) => {
   try {
     const { id } = req.params;
     const { date, amount, concept, category, referenceId, referenceType } = req.body;
-    if (!Number.isFinite(Number(amount)) || Number(amount) < 0) {
+    const amountNumber = Number(amount);
+    if (amount == null || amount === "" || !Number.isFinite(amountNumber)) {
+      return res.status(400).json({ message: "El monto es obligatorio" });
+    }
+    if (amountNumber < 0) {
       return res.status(400).json({ message: "El monto no puede ser negativo" });
     }
-    const parsedAmount = Number(amount);
+    if (amountNumber > 999999999.99) {
+      return res.status(400).json({ message: "El monto es demasiado grande" });
+    }
+    const parsedAmount = amountNumber;
     const income = await Income.findByPk(id);
     if (!income) {
       notifyFail("income.update_failed", `Ingreso #${id} no encontrado`, { req, httpStatus: 404 });
@@ -405,10 +426,17 @@ export const updateExpense = async (req, res) => {
   try {
     const { id } = req.params;
     const { date, amount, concept, category, referenceId, referenceType } = req.body;
-    if (!Number.isFinite(Number(amount)) || Number(amount) < 0) {
+    const amountNumber = Number(amount);
+    if (amount == null || amount === "" || !Number.isFinite(amountNumber)) {
+      return res.status(400).json({ message: "El monto es obligatorio" });
+    }
+    if (amountNumber < 0) {
       return res.status(400).json({ message: "El monto no puede ser negativo" });
     }
-    const parsedAmount = Number(amount);
+    if (amountNumber > 999999999.99) {
+      return res.status(400).json({ message: "El monto es demasiado grande" });
+    }
+    const parsedAmount = amountNumber;
     const expense = await Expense.findByPk(id);
     if (!expense) {
       notifyFail("expense.update_failed", `Egreso #${id} no encontrado`, { req, httpStatus: 404 });
