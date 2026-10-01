@@ -74,7 +74,8 @@ import {
   deleteMovement,
   updateMovementsDateBatch,
   registerProductionIntermediateFromPayload,
-  registerProductionFinalFromPayload
+  registerProductionFinalFromPayload,
+  anularProduccion,
 } from '../controllers/InventoryControl/MovementController.js';
 
 
@@ -302,6 +303,7 @@ router.get('/movements/:productId',isAuthenticated, getMovementsByProduct);
 
 router.post("/registerProductionIntermediateFromPayload", isAuthenticated,registerProductionIntermediateFromPayload);
 router.post("/registerProductionFinalFromPayload", isAuthenticated,registerProductionFinalFromPayload);
+router.post("/productions/anular", isAuthenticated, anularProduccion);
 
 // ----------------------------------
 // 🍳 RECETAS (opcional)
