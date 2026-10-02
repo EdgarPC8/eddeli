@@ -79,6 +79,7 @@ export async function putAppSettings(req, res) {
       "toastPosition",
       "passwordPolicyEnabled",
       "loginAttemptLimitEnabled",
+      "allowLoanFinancePurge",
       "maxInstallments",
       "receiptDetailSettings",
       "themePalette",
