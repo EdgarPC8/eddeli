@@ -45,7 +45,7 @@ export function packagingOpenEnabled() {
 
 function isPrivileged(user) {
   const rol = user?.loginRol;
-  return rol === "Administrador" || rol === "Programador";
+  return rol === "Administrador" || rol === "Propietario";
 }
 
 function gramsAddedWhenOpened(presentation, ingredientId) {
@@ -153,7 +153,7 @@ export function parseProductionQuantity(raw) {
 
 export function assertProductionRole(user) {
   const rol = user?.loginRol;
-  if (rol !== "Administrador" && rol !== "Programador") {
+  if (rol !== "Administrador" && rol !== "Propietario") {
     throw new ProductionInputError("No tenés permiso para registrar producción", 403);
   }
 }
@@ -556,7 +556,7 @@ export async function applyProductionPlan(plan, options) {
   });
 }
 
-/** Solo Administrador o Programador, y solo si Configuración permite abrir empaque. */
+/** Solo Administrador o Propietario, y solo si Configuración permite abrir empaque. */
 export function autocompleteAllowed(user, requested) {
   if (requested !== true) return false;
   if (!isPrivileged(user)) return false;

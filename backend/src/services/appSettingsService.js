@@ -22,6 +22,11 @@ import {
   normalizeKeyboardShortcuts,
   serializeKeyboardShortcuts,
 } from "../utils/keyboardShortcutsSettings.js";
+import {
+  DEFAULT_TABLE_COLUMN_VISIBILITY,
+  normalizeTableColumnVisibility,
+  serializeTableColumnVisibility,
+} from "../utils/tableColumnVisibility.js";
 
 const { __dirname } = fileDirName(import.meta);
 const IMG_BASE = path.resolve(__dirname, "../img");
@@ -74,6 +79,8 @@ export const DEFAULT_APP_SETTINGS = {
   allowLoanFinancePurge: false,
   maxInstallments: 200,
   receiptDetailSettings: { ...DEFAULT_RECEIPT_DETAIL_SETTINGS },
+  /** Columnas ocultas de las 5 tablas anchas (BD). Otras tablas = localStorage en el front. */
+  tableColumnVisibility: { ...DEFAULT_TABLE_COLUMN_VISIBILITY },
   themePalette: normalizeThemePalette(DEFAULT_THEME_PALETTE),
 };
 
@@ -292,6 +299,12 @@ async function ensureAppSettingsSchema() {
       allowNull: true,
     });
   }
+  if (!table.tableColumnVisibility) {
+    await qi.addColumn("app_settings", "tableColumnVisibility", {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    });
+  }
   if (!table.themePalette) {
     await qi.addColumn("app_settings", "themePalette", {
       type: DataTypes.TEXT,
@@ -413,6 +426,7 @@ export async function loadAppSettings() {
     moneyDisplayDecimals: normalizeMoneyDisplayDecimals(raw.moneyDisplayDecimals, 2),
     moneyRoundingMode: normalizeMoneyRoundingMode(raw.moneyRoundingMode, "up"),
     receiptDetailSettings: normalizeReceiptDetailSettings(raw.receiptDetailSettings),
+    tableColumnVisibility: normalizeTableColumnVisibility(raw.tableColumnVisibility),
     themePalette: normalizeThemePalette(raw.themePalette),
     keyboardShortcuts: normalizeKeyboardShortcuts(raw.keyboardShortcuts),
   };
@@ -531,6 +545,11 @@ export async function updateAppSettings(payload) {
       patch.receiptDetailSettings,
     );
   }
+  if ("tableColumnVisibility" in patch) {
+    patch.tableColumnVisibility = serializeTableColumnVisibility(
+      patch.tableColumnVisibility,
+    );
+  }
   if ("themePalette" in patch) {
     patch.themePalette = serializeThemePalette(patch.themePalette);
   }
@@ -579,6 +598,7 @@ export async function updateAppSettings(payload) {
     moneyDisplayDecimals: normalizeMoneyDisplayDecimals(raw.moneyDisplayDecimals, 2),
     moneyRoundingMode: normalizeMoneyRoundingMode(raw.moneyRoundingMode, "up"),
     receiptDetailSettings: normalizeReceiptDetailSettings(raw.receiptDetailSettings),
+    tableColumnVisibility: normalizeTableColumnVisibility(raw.tableColumnVisibility),
     themePalette: normalizeThemePalette(raw.themePalette),
     keyboardShortcuts: normalizeKeyboardShortcuts(raw.keyboardShortcuts),
   };
@@ -638,6 +658,7 @@ export function toPublicSettings(data = cache) {
     moneyDisplayDecimals: normalizeMoneyDisplayDecimals(data.moneyDisplayDecimals, 2),
     moneyRoundingMode: normalizeMoneyRoundingMode(data.moneyRoundingMode, "up"),
     receiptDetailSettings: normalizeReceiptDetailSettings(data.receiptDetailSettings),
+    tableColumnVisibility: normalizeTableColumnVisibility(data.tableColumnVisibility),
     themePalette: normalizeThemePalette(data.themePalette),
     keyboardShortcuts: normalizeKeyboardShortcuts(data.keyboardShortcuts),
   };

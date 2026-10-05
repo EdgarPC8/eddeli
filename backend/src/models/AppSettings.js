@@ -98,7 +98,7 @@ export const AppSettings = sequelize.define(
     },
     /**
      * Autocompletar stock: en caja (cobrar) y pedidos (entregar), si falta stock
-     * Admin/Programador puede registrar un ajuste y completar.
+     * Admin/Propietario puede registrar un ajuste y completar.
      */
     ordersAllowDeliverStockAdjust: {
       type: DataTypes.BOOLEAN,
@@ -106,7 +106,7 @@ export const AppSettings = sequelize.define(
       defaultValue: true,
     },
     /**
-     * Admin/Programador pueden anular cobros/pagos y borrar pedidos
+     * Admin/Propietario pueden anular cobros/pagos y borrar pedidos
      * eliminando ingresos/gastos vinculados en finanzas.
      */
     financeAllowAdminCorrections: {
@@ -126,7 +126,7 @@ export const AppSettings = sequelize.define(
     /**
      * Producción: permitir abrir un empaque hacia el insumo genérico,
      * registrar merma y autocompletar. Apagado por defecto.
-     * Solo Administrador y Programador.
+     * Solo Administrador y Propietario.
      */
     productionOpenPackaging: {
       type: DataTypes.BOOLEAN,
@@ -231,6 +231,15 @@ export const AppSettings = sequelize.define(
      * Ej: mayúsculas, código, número de línea, etc.
      */
     receiptDetailSettings: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    /**
+     * Columnas ocultas de las 5 tablas anchas del ERP (JSON).
+     * Keys: comprobantesPos, ventas, compras, locales, prestamos.
+     * Otras tablas del frontend NO usan este campo (solo localStorage).
+     */
+    tableColumnVisibility: {
       type: DataTypes.TEXT,
       allowNull: true,
     },

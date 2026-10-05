@@ -43,6 +43,26 @@ export const listSupplierProductCodes = async (req, res) => {
   }
 };
 
+export const listAllSupplierProductCodes = async (req, res) => {
+  try {
+    await ensureSchema();
+    const rows = await SupplierProductCode.findAll({
+      include: [
+        {
+          model: InventoryProduct,
+          as: "ERP_inventory_product",
+          attributes: ["id", "name", "sku", "barcode"],
+        },
+      ],
+      order: [["supplierCode", "ASC"]],
+    });
+    res.json({ codes: rows });
+  } catch (error) {
+    console.error("listAllSupplierProductCodes:", error);
+    res.status(500).json({ message: "Error al listar códigos de proveedor" });
+  }
+};
+
 /**
  * Resuelve productId por código del proveedor (principal o auxiliar).
  * GET ?supplierId=&code=

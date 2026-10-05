@@ -376,7 +376,9 @@ export const getOrdersForCharts = async (req, res) => {
     const { start, end } = req.query;
 
     const where = {};
-    if (start || end) {
+    if (!start && !end) {
+      where.createdAt = { [Op.between]: [startOfDay(subMonths(new Date(), 12)), endOfDay(new Date())] };
+    } else if (start || end) {
       const s = start ? startOfDay(parseISO(start)) : undefined;
       const e = end ? endOfDay(parseISO(end)) : undefined;
       if (s && e) where.createdAt = { $between: [s, e] };
