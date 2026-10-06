@@ -12,7 +12,7 @@ import {
   getFinanceSummary,
 } from "../controllers/InventoryControl/FinanceController.js";
 import { isAuthenticated, requireAdminOrProgrammer } from "../middlewares/authMiddelware.js";
-import { getOrderAnalytics, getWeeklySales,getTopProductsDailySales,getProductRotationAnalysis,getIncomeExpenseBreakdown,getCustomerSalesSummary, getOrdersForCharts,getExpensesForChart, getFinancialProfitabilityReport } from "../controllers/InventoryControl/AnalyticsController.js";
+import { getOrderAnalytics, getWeeklySales,getTopProductsDailySales,getProductRotationAnalysis,getIncomeExpenseBreakdown,getCustomerSalesSummary, getOrdersForCharts,getExpensesForChart, getFinancialProfitabilityReport, getBusinessIndicatorsReport } from "../controllers/InventoryControl/AnalyticsController.js";
 import { getFinanceDashboard, getFinanceDashboardHero, getFinanceDashboardRest } from "../controllers/InventoryControl/DashboardController.js";
 import { getCalendarMonthSummary, getCalendarDayDetail, getCalendarPeriodDetail, getCalendarYearSummary, getCalendarRangeSummary } from "../controllers/InventoryControl/CalendarFinanceController.js";
 import {
@@ -73,6 +73,7 @@ router.get("/getTopProductsDailySales", ...adminOnly, getTopProductsDailySales);
 router.get("/getProductRotationAnalysis", ...adminOnly, getProductRotationAnalysis);
 router.get("/getIncomeExpenseBreakdown", ...adminOnly, getIncomeExpenseBreakdown);
 router.get("/profitability-report", ...adminOnly, getFinancialProfitabilityReport);
+router.get("/business-indicators", ...adminOnly, getBusinessIndicatorsReport);
 router.get("/getCustomerSalesSummary", ...adminOnly, getCustomerSalesSummary);
 router.get("/getOrdersForCharts", ...adminOnly, getOrdersForCharts);
 router.get("/getExpensesForChart", ...adminOnly, getExpensesForChart);

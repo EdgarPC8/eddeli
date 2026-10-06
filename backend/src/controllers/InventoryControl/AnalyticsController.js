@@ -14,6 +14,7 @@ import { buildFinanceDateWhere, buildFinanceDateColumnWhere } from "../../utils/
 import {
   computePeriodReceivables,
   computeStoreInventorySnapshot,
+  computeBusinessIndicatorsReport,
   parseStoreIdsList,
   resolveOrderItemStoreId,
 } from "../../services/financialReportService.js";
@@ -1130,4 +1131,18 @@ export const getFinancialProfitabilityReport = async (req, res) => {
   }
 };
 
+/** GET /finance/business-indicators — tabla de indicadores del reporte financiero. */
+export const getBusinessIndicatorsReport = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query || {};
+    const data = await computeBusinessIndicatorsReport({ startDate, endDate });
+    return res.json(data);
+  } catch (error) {
+    console.error("Error en getBusinessIndicatorsReport:", error);
+    return res.status(500).json({
+      message: "Error al obtener indicadores financieros",
+      error: String(error?.message || error),
+    });
+  }
+};
 

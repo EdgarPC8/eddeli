@@ -1,5 +1,19 @@
 import { Op, fn, col, literal } from "sequelize";
-import { Order, OrderItem, Customer } from "../models/Orders.js";
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  parseISO,
+  isValid,
+} from "date-fns";
+import { es } from "date-fns/locale";
+import {
+  Order,
+  OrderItem,
+  Customer,
+  SupplierOrder,
+  SupplierOrderItem,
+} from "../models/Orders.js";
 import {
   InventoryProduct,
   InventoryCategory,
@@ -10,10 +24,16 @@ import {
   ItemGroup,
   ItemGroupItem,
   Payment,
+  Income,
+  Expense,
+  FinancialObligation,
+  ObligationPayment,
+  SupplierOrderPayment,
 } from "../models/Finance.js";
 import { buildFinanceDateColumnWhere } from "../utils/financeDateUtils.js";
 import { storeHoldsInventory } from "./storeStockService.js";
 import { CashShift } from "../models/CashShift.js";
+import { CashShiftMovement } from "../models/CashShiftMovement.js";
 
 export function parseStoreIdsList(value) {
   if (!value) return [];
@@ -314,5 +334,368 @@ export async function computeStoreInventorySnapshot({
     valueAtCost: round2(valueAtCost),
     valueAtSale: round2(valueAtSale),
     topProducts,
+  };
+}
+
+const PURCHASE_CATEGORIES = new Set(["Compras", "Compra de insumos"]);
+const BUSINESS_DEBT_RE =
+  /compra\s*(del)?\s*negocio|due[ñn]o\s*anterior|fondo\s*de\s*comercio|compra\s*negocio/i;
+const PERSONAL_WITHDRAW_RE =
+  /retiro|personal|due[ñn]o|propietario|owner\s*draw/i;
+
+function isPurchaseCategory(category) {
+  return PURCHASE_CATEGORIES.has(String(category || "").trim());
+}
+
+function isPersonalWithdrawExpense(row) {
+  const cat = String(row?.category || "");
+  const concept = String(row?.concept || "");
+  if (/^retiro$/i.test(cat.trim())) return true;
+  return PERSONAL_WITHDRAW_RE.test(`${cat} ${concept}`);
+}
+
+function isBusinessPurchaseDebt(obligation) {
+  const text = `${obligation?.concept || ""} ${obligation?.partyName || ""}`;
+  return BUSINESS_DEBT_RE.test(text);
+}
+
+/**
+ * Indicadores del reporte financiero (tabla: indicador / resultado / qué me dice).
+ * Periodo por defecto: mes actual.
+ */
+export async function computeBusinessIndicatorsReport({
+  startDate,
+  endDate,
+} = {}) {
+  const now = new Date();
+  const hasPeriod = Boolean(startDate || endDate);
+  const monthStart = hasPeriod
+    ? String(startDate || endDate).slice(0, 10)
+    : format(startOfMonth(now), "yyyy-MM-dd");
+  const monthEnd = hasPeriod
+    ? String(endDate || startDate).slice(0, 10)
+    : format(endOfMonth(now), "yyyy-MM-dd");
+  const periodWhere = buildFinanceDateColumnWhere(monthStart, monthEnd) || {};
+  const orderDateWhere = buildFinanceDateColumnWhere(monthStart, monthEnd) || {};
+
+  const periodLabel = (() => {
+    const a = parseISO(monthStart);
+    const b = parseISO(monthEnd);
+    if (!isValid(a) || !isValid(b)) return `${monthStart} → ${monthEnd}`;
+    if (!hasPeriod) return format(now, "MMMM yyyy", { locale: es });
+    return `${format(a, "d MMM yyyy", { locale: es })} – ${format(b, "d MMM yyyy", { locale: es })}`;
+  })();
+
+  const billable = (it) => {
+    const qty = toNum(it.quantity);
+    return Math.max(0, qty - toNum(it.damagedQty) - toNum(it.giftQty));
+  };
+
+  const [
+    orderRows,
+    expenses,
+    incomes,
+    inventory,
+    openPayableRows,
+    obligationPayments,
+    openShifts,
+    supplierOrders,
+    supplierPayments,
+    transferInPayments,
+    transferOutSupplier,
+    transferOutObligations,
+    shiftIdsInPeriod,
+  ] = await Promise.all([
+    Order.findAll({
+      where: orderDateWhere,
+      attributes: ["id"],
+      include: [
+        {
+          model: OrderItem,
+          as: "ERP_order_items",
+          attributes: ["price", "quantity", "damagedQty", "giftQty"],
+          required: false,
+        },
+      ],
+    }),
+    Expense.findAll({
+      where: periodWhere,
+      attributes: ["id", "amount", "category", "concept"],
+      raw: true,
+    }),
+    Income.findAll({
+      where: periodWhere,
+      attributes: ["id", "amount", "category", "concept"],
+      raw: true,
+    }),
+    computeStoreInventorySnapshot({ locationKinds: ["propia", "bodega"] }),
+    FinancialObligation.findAll({
+      where: { status: "open", direction: "payable" },
+      attributes: ["id", "concept", "partyName", "originalAmount", "partyType"],
+      raw: true,
+    }),
+    ObligationPayment.findAll({
+      where: { status: "completed" },
+      attributes: ["obligationId", "amount"],
+      raw: true,
+    }),
+    CashShift.findAll({
+      where: { status: "open" },
+      attributes: [
+        "id",
+        "openingCashTotal",
+        "salesCashTotal",
+        "salesTransferTotal",
+        "cashOutTotal",
+        "cashInTotal",
+        "expectedCashTotal",
+      ],
+    }),
+    SupplierOrder.findAll({
+      where: { status: { [Op.ne]: "cancelado" } },
+      attributes: ["id", "paidAt", "status"],
+      include: [
+        {
+          model: SupplierOrderItem,
+          as: "ERP_supplier_order_items",
+          attributes: ["quantity", "unitPrice", "taxRate"],
+          required: false,
+        },
+      ],
+    }),
+    SupplierOrderPayment.findAll({
+      where: { status: "completed" },
+      attributes: ["supplierOrderId", "amount"],
+      raw: true,
+    }),
+    Payment.findAll({
+      where: { status: "completed", method: "transferencia" },
+      attributes: ["amount"],
+      raw: true,
+    }),
+    SupplierOrderPayment.findAll({
+      where: { status: "completed", method: "transferencia" },
+      attributes: ["amount"],
+      raw: true,
+    }),
+    ObligationPayment.findAll({
+      where: { status: "completed", method: "transferencia" },
+      attributes: ["amount"],
+      raw: true,
+    }),
+    CashShift.findAll({
+      attributes: ["id"],
+      where: {
+        openedAt: {
+          [Op.between]: [`${monthStart} 00:00:00`, `${monthEnd} 23:59:59`],
+        },
+      },
+      raw: true,
+    }),
+  ]);
+
+  let monthSales = 0;
+  for (const order of orderRows) {
+    for (const it of order.ERP_order_items || []) {
+      monthSales += billable(it) * toNum(it.price);
+    }
+  }
+  monthSales = round2(monthSales);
+
+  let monthPurchases = 0;
+  let monthPersonalWithdrawals = 0;
+  let monthOperatingExpenses = 0;
+  let monthExpenseTotal = 0;
+  for (const row of expenses) {
+    const amt = toNum(row.amount);
+    monthExpenseTotal = round2(monthExpenseTotal + amt);
+    if (isPurchaseCategory(row.category)) {
+      monthPurchases = round2(monthPurchases + amt);
+      continue;
+    }
+    if (isPersonalWithdrawExpense(row)) {
+      monthPersonalWithdrawals = round2(monthPersonalWithdrawals + amt);
+      continue;
+    }
+    monthOperatingExpenses = round2(monthOperatingExpenses + amt);
+  }
+
+  const shiftIds = (shiftIdsInPeriod || []).map((s) => s.id).filter(Boolean);
+  if (shiftIds.length) {
+    const retiroMoves = await CashShiftMovement.findAll({
+      where: {
+        shiftId: { [Op.in]: shiftIds },
+        category: "retiro",
+        direction: "out",
+      },
+      attributes: ["amount", "expenseId"],
+      raw: true,
+    });
+    for (const m of retiroMoves) {
+      if (m.expenseId) continue;
+      monthPersonalWithdrawals = round2(
+        monthPersonalWithdrawals + toNum(m.amount),
+      );
+    }
+  }
+
+  const monthIncomeTotal = round2(
+    incomes.reduce((sum, row) => sum + toNum(row.amount), 0),
+  );
+  const grossMarginPct =
+    monthSales > 0
+      ? round2(((monthSales - monthPurchases) / monthSales) * 100)
+      : 0;
+
+  let cashAvailable = 0;
+  let openShiftTransfer = 0;
+  for (const shift of openShifts) {
+    const opening = toNum(shift.openingCashTotal);
+    const salesCash = toNum(shift.salesCashTotal);
+    const cashOut = toNum(shift.cashOutTotal);
+    const cashIn = toNum(shift.cashInTotal);
+    const expected =
+      shift.expectedCashTotal != null
+        ? toNum(shift.expectedCashTotal)
+        : round2(opening + salesCash - cashOut + cashIn);
+    cashAvailable = round2(cashAvailable + expected);
+    openShiftTransfer = round2(
+      openShiftTransfer + toNum(shift.salesTransferTotal),
+    );
+  }
+
+  // Sobra / falta de caja al cerrar turnos del periodo
+  const closedShifts = await CashShift.findAll({
+    where: {
+      status: "closed",
+      cashDifference: { [Op.ne]: null },
+      closedAt: {
+        [Op.between]: [`${monthStart} 00:00:00`, `${monthEnd} 23:59:59`],
+      },
+    },
+    attributes: ["id", "cashDifference"],
+    raw: true,
+  });
+  let cashSurplus = 0;
+  let cashShortage = 0;
+  for (const shift of closedShifts) {
+    const diff = toNum(shift.cashDifference);
+    if (diff > 0.009) cashSurplus = round2(cashSurplus + diff);
+    else if (diff < -0.009) cashShortage = round2(cashShortage + Math.abs(diff));
+  }
+
+  const transferIn = round2(
+    transferInPayments.reduce((s, r) => s + toNum(r.amount), 0),
+  );
+  const transferOut = round2(
+    transferOutSupplier.reduce((s, r) => s + toNum(r.amount), 0) +
+      transferOutObligations.reduce((s, r) => s + toNum(r.amount), 0),
+  );
+  const moneyInBanks = round2(
+    Math.max(0, transferIn - transferOut) + openShiftTransfer,
+  );
+  const totalAvailable = round2(cashAvailable + moneyInBanks);
+  const inventoryValue = round2(inventory?.valueAtCost || 0);
+
+  const paidByOrder = new Map();
+  for (const p of supplierPayments) {
+    const oid = Number(p.supplierOrderId);
+    paidByOrder.set(oid, round2((paidByOrder.get(oid) || 0) + toNum(p.amount)));
+  }
+  let supplierDebt = 0;
+  for (const order of supplierOrders) {
+    const items = order.ERP_supplier_order_items || [];
+    const total = round2(
+      items.reduce((sum, it) => {
+        const line =
+          toNum(it.quantity) *
+          toNum(it.unitPrice) *
+          (1 + toNum(it.taxRate) / 100);
+        return sum + line;
+      }, 0),
+    );
+    let paid = toNum(paidByOrder.get(Number(order.id)) || 0);
+    if (order.paidAt && paid <= 0 && total > 0) paid = total;
+    const remaining =
+      order.paidAt && paid >= total - 0.009
+        ? 0
+        : round2(Math.max(0, total - paid));
+    supplierDebt = round2(supplierDebt + remaining);
+  }
+
+  const paidByObligation = new Map();
+  for (const p of obligationPayments) {
+    const oid = Number(p.obligationId);
+    paidByObligation.set(
+      oid,
+      round2((paidByObligation.get(oid) || 0) + toNum(p.amount)),
+    );
+  }
+
+  let businessPurchaseDebt = 0;
+  let otherLoansDebt = 0;
+  for (const row of openPayableRows) {
+    const remaining = round2(
+      Math.max(
+        0,
+        toNum(row.originalAmount) - toNum(paidByObligation.get(Number(row.id))),
+      ),
+    );
+    if (remaining <= 0.009) continue;
+    if (isBusinessPurchaseDebt(row)) {
+      businessPurchaseDebt = round2(businessPurchaseDebt + remaining);
+    } else {
+      otherLoansDebt = round2(otherLoansDebt + remaining);
+    }
+  }
+
+  const netCashFlow = round2(monthIncomeTotal - monthExpenseTotal);
+
+  // Reserva mínima: 25% de egresos del mes (o egresos operativos si hay)
+  const minReserve = round2(
+    monthOperatingExpenses > 0
+      ? monthOperatingExpenses * 0.25
+      : monthExpenseTotal * 0.25,
+  );
+
+  const weeklyBurn =
+    monthExpenseTotal > 0 ? round2(monthExpenseTotal / 4.345) : 0;
+  const freeCash = round2(Math.max(0, totalAvailable - minReserve));
+  const weeksCovered =
+    weeklyBurn > 0 ? round2(freeCash / weeklyBurn) : freeCash > 0 ? null : 0;
+
+  return {
+    period: {
+      startDate: monthStart,
+      endDate: monthEnd,
+      label: periodLabel,
+      filtered: hasPeriod,
+    },
+    indicators: {
+      monthSales,
+      monthPurchases,
+      grossMarginPct,
+      cashAvailable,
+      cashSurplus,
+      cashShortage,
+      moneyInBanks,
+      totalAvailable,
+      inventoryValue,
+      supplierDebt,
+      businessPurchaseDebt,
+      otherLoansDebt,
+      monthOperatingExpenses,
+      monthPersonalWithdrawals,
+      netCashFlow,
+      minReserve,
+      weeksCovered,
+    },
+    meta: {
+      monthIncomeTotal,
+      monthExpenseTotal,
+      openShifts: openShifts.length,
+      closedShiftsWithDiff: closedShifts.length,
+      inventoryProductCount: inventory?.productCount || 0,
+    },
   };
 }
