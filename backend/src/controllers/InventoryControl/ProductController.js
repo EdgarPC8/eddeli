@@ -200,10 +200,14 @@ async function assertUniqueProductName(name, excludeId = null) {
   if (!trimmed) return;
   const where = { name: trimmed };
   if (excludeId != null) where.id = { [Op.ne]: Number(excludeId) };
-  const existing = await InventoryProduct.findOne({ where, attributes: ["id"] });
+  const existing = await InventoryProduct.findOne({
+    where,
+    attributes: ["id", "name", "barcode", "sku", "supplierPrice", "price", "taxRate"],
+  });
   if (existing) {
     const err = new Error("Ya existe un producto con ese nombre");
     err.statusCode = 409;
+    err.existingProduct = existing;
     throw err;
   }
 }
@@ -391,7 +395,13 @@ export const createProduct = async (req, res) => {
     try {
       await assertUniqueProductName(payload.name);
     } catch (e) {
-      if (e?.statusCode) return res.status(e.statusCode).json({ message: e.message });
+      if (e?.statusCode) {
+        return res.status(e.statusCode).json({
+          message: e.message,
+          existingProductId: e.existingProduct?.id ?? null,
+          product: e.existingProduct || null,
+        });
+      }
       throw e;
     }
     if (payload.price != null && Number(payload.price) < 0) {
