@@ -91,7 +91,13 @@ function formatUserRow(user) {
 }
 
 async function rejectProgrammerAssignment(roles, loginRol) {
-  if (!Array.isArray(roles) || loginRol === "Propietario") return;
+  if (
+    !Array.isArray(roles) ||
+    loginRol === "Propietario" ||
+    loginRol === "Programador"
+  ) {
+    return;
+  }
   const hidden = await Roles.findAll({
     where: { name: ["Propietario", "Programador"] },
   });

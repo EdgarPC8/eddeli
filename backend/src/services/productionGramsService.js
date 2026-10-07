@@ -153,7 +153,7 @@ export function parseProductionQuantity(raw) {
 
 export function assertProductionRole(user) {
   const rol = user?.loginRol;
-  if (rol !== "Administrador" && rol !== "Propietario") {
+  if (rol !== "Administrador" && rol !== "Propietario" && rol !== "Programador") {
     throw new ProductionInputError("No tenés permiso para registrar producción", 403);
   }
 }

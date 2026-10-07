@@ -7,9 +7,12 @@ import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
 import { passwordPolicyError, temporaryPassword } from "../services/passwordPolicy.js";
 import { normalizeRoleName } from "../utils/roleNames.js";
 
-/** Quita Propietario y Programador si quien pide no es Propietario. */
+const canManageInternalRoles = (loginRol) =>
+  loginRol === "Propietario" || loginRol === "Programador";
+
+/** Quita Propietario y Programador si quien pide no es Propietario ni Programador. */
 async function sanitizeRoleIdsForRequester(roleIds, loginRol) {
-  if (!Array.isArray(roleIds) || loginRol === "Propietario") return roleIds;
+  if (!Array.isArray(roleIds) || canManageInternalRoles(loginRol)) return roleIds;
   const hidden = await Roles.findAll({
     where: { name: ["Propietario", "Programador"] },
   });
@@ -20,11 +23,10 @@ async function sanitizeRoleIdsForRequester(roleIds, loginRol) {
 export const getRoles = async (req, res) => {
   try {
     const data = await Roles.findAll();
-    // Rol interno: solo visible si la sesión actual es Propietario
-    const roles =
-      req.user?.loginRol === "Propietario"
-        ? data
-        : data.filter((r) => r.name !== "Propietario" && r.name !== "Programador");
+    // Roles internos: visibles para Propietario y Programador
+    const roles = canManageInternalRoles(req.user?.loginRol)
+      ? data
+      : data.filter((r) => r.name !== "Propietario" && r.name !== "Programador");
     res.json(
       roles.map((role) => ({
         ...role.toJSON(),

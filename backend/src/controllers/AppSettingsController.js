@@ -115,7 +115,7 @@ export async function putAppSettings(req, res) {
     if ("multiStockEnabled" in patch) {
       const wantOn = asBool(patch.multiStockEnabled, false);
       const currentOn = asBool(getAppSettingsSync()?.multiStockEnabled, false);
-      const isProgrammer = req.user?.loginRol === "Propietario";
+      const isProgrammer = req.user?.loginRol === "Propietario" || req.user?.loginRol === "Programador";
 
       if (wantOn && !currentOn) {
         const gate = await getFeatureGate("multi_stock");
