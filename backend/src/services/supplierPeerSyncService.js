@@ -80,6 +80,70 @@ async function resolveOrCreatePeerSupplier(sourceApp) {
   return created;
 }
 
+/** Cliente local que representa a la app remota (se crea solo si no existe). */
+async function resolveOrCreatePeerCustomer(sourceApp) {
+  const key = String(sourceApp || "")
+    .trim()
+    .toLowerCase();
+  if (!key) return null;
+
+  const existing = await Customer.findOne({ where: { remoteApp: key } });
+  if (existing) return existing;
+
+  const label = peerAppLabel(key) || key;
+  return Customer.create({
+    name: label,
+    firstName: label,
+    isActive: true,
+    remoteApp: key,
+    identType: "07",
+  });
+}
+
+async function notifyPeerCustomerOrderReceived(
+  order,
+  customer,
+  sourceApp,
+  unmappedCount,
+  { updated = false } = {},
+) {
+  try {
+    const userIds = await resolveAdminUserIds();
+    const appLabel = peerAppLabel(sourceApp) || sourceApp || "sistema enlazado";
+    const title = updated
+      ? "Edición de pedido cliente del sistema enlazado"
+      : "Pedido cliente entrante del sistema enlazado";
+    const message = updated
+      ? unmappedCount > 0
+        ? `${appLabel} actualizó la venta #${order.id} (${customer?.name || "cliente"}). Hay ${unmappedCount} producto(s) por enlazar — aceptá los cambios.`
+        : `${appLabel} actualizó la venta #${order.id}. Revisá y aceptá los cambios.`
+      : unmappedCount > 0
+        ? `${appLabel} envió un pedido a proveedor que llegó como venta #${order.id} (${customer?.name || "cliente"}). Hay ${unmappedCount} producto(s) por enlazar.`
+        : `${appLabel} envió un pedido a proveedor que llegó como venta #${order.id}. Revisá y aceptá.`;
+    const link = `/ventas/pedidos?peerAcceptCustomerOrderId=${order.id}`;
+    const sourceKey = `peer_customer_order:${order.id}:${updated ? "rev" : "new"}:${Date.now()}`;
+    for (const userId of userIds) {
+      await createAndPushNotification({
+        userId,
+        type: "alert",
+        title,
+        message,
+        link,
+        sourceKey,
+        force: true,
+      });
+      sendPeerOrderUpdated(userId, {
+        kind: "customer",
+        orderId: order.id,
+        updated,
+        link,
+      });
+    }
+  } catch (error) {
+    console.warn("notifyPeerCustomerOrderReceived:", error?.message || error);
+  }
+}
+
 export async function ensurePeerSyncSchema() {
   const alters = [
     ["ERP_customers", "remoteApp", "VARCHAR(32) NULL"],
@@ -327,6 +391,43 @@ function hashPeerPayloadItems(items = []) {
     });
   return crypto.createHash("sha256").update(JSON.stringify(norm)).digest("hex");
 }
+
+
+function supplierPeerContentUnchanged(existingItems, resolved) {
+  const current = snapshotSupplierItems(existingItems || []);
+  return computePeerChanges(current, resolved).length === 0;
+}
+
+function customerPeerContentUnchanged(existingItems, resolved) {
+  const current = snapshotCustomerItems(existingItems || []);
+  const after = (resolved || []).map((r) => ({
+    ...r,
+    unitPrice: r.unitPrice ?? r.price,
+  }));
+  return computePeerChanges(current, after).length === 0;
+}
+
+function isPeerSyncBlockedError(error) {
+  const msg = String(error?.message || error || "");
+  return (
+    Number(error?.status) === 409 ||
+    /ya fue recibido o pagado|ya fue entregado o pagado/i.test(msg)
+  );
+}
+
+async function markOriginPushFailure(order, peerKey, error) {
+  const blocked = isPeerSyncBlockedError(error);
+  await order.update({
+    remoteSyncApp: peerKey,
+    remoteSyncStatus: blocked ? "synced_blocked" : "error",
+    remoteSyncError: blocked ? null : String(error?.message || error),
+    remotePeerAcceptStatus: blocked
+      ? order.remotePeerAcceptStatus || "accepted"
+      : "not_found",
+    remoteSyncedAt: new Date(),
+  });
+}
+
 
 function peerAcceptLabel(status) {
   const s = String(status || "").trim();
@@ -604,32 +705,6 @@ export async function receivePeerSupplierOrder({
 
   const invoiceMarker = `PEER-${srcApp.toUpperCase()}-${srcId}`.slice(0, 80);
   const itemInclude = [{ model: SupplierOrderItem, as: "ERP_supplier_order_items" }];
-  let existing = await SupplierOrder.findOne({
-    where: {
-      supplierId: supplier.id,
-      peerSourceApp: srcApp,
-      peerSourceOrderId: srcId,
-    },
-    include: itemInclude,
-  });
-  if (!existing) {
-    existing = await SupplierOrder.findOne({
-      where: {
-        supplierId: supplier.id,
-        notes: { [Op.like]: `%${marker}%` },
-      },
-      include: itemInclude,
-    });
-  }
-  if (!existing) {
-    existing = await SupplierOrder.findOne({
-      where: {
-        supplierId: supplier.id,
-        invoiceNumber: invoiceMarker,
-      },
-      include: itemInclude,
-    });
-  }
 
   const result = await sequelize.transaction(async (t) => {
     const { rows: resolved, unmappedCount } = await resolveIncomingPeerRows(
@@ -643,7 +718,56 @@ export async function receivePeerSupplierOrder({
       throw err;
     }
 
+    let existing = await SupplierOrder.findOne({
+      where: {
+        supplierId: supplier.id,
+        peerSourceApp: srcApp,
+        peerSourceOrderId: srcId,
+      },
+      include: itemInclude,
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+    if (!existing) {
+      existing = await SupplierOrder.findOne({
+        where: {
+          supplierId: supplier.id,
+          notes: { [Op.like]: `%${marker}%` },
+        },
+        include: itemInclude,
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+    }
+    if (!existing) {
+      existing = await SupplierOrder.findOne({
+        where: {
+          supplierId: supplier.id,
+          invoiceNumber: invoiceMarker,
+        },
+        include: itemInclude,
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+    }
+
     if (existing) {
+      if (existing.receivedAt || existing.paidAt) {
+        const err = new Error(
+          `El pedido #${existing.id} ya fue recibido o pagado en el destino; no se puede actualizar por enlace`,
+        );
+        err.status = 409;
+        throw err;
+      }
+      if (supplierPeerContentUnchanged(existing.ERP_supplier_order_items || [], resolved)) {
+        return {
+          orderId: existing.id,
+          unmappedCount,
+          updated: false,
+          unchanged: true,
+          changes: [],
+        };
+      }
       const baseline =
         parsePeerSnapshot(existing.peerAcceptedSnapshot) ||
         snapshotSupplierItems(existing.ERP_supplier_order_items || []);
@@ -674,7 +798,6 @@ export async function receivePeerSupplierOrder({
       const nextNotes = [noteBase, marker, "Pendiente de aceptación / enlace de productos"]
         .filter(Boolean)
         .join(" · ");
-      // update por id: fuerza pending_accept aunque el pedido ya estuviera accepted
       await SupplierOrder.update(
         {
           date: date ? new Date(date) : existing.date,
@@ -691,6 +814,7 @@ export async function receivePeerSupplierOrder({
         orderId: existing.id,
         unmappedCount,
         updated: true,
+        unchanged: false,
         changes: computePeerChanges(baseline, resolved),
       };
     }
@@ -700,67 +824,150 @@ export async function receivePeerSupplierOrder({
       marker,
       "Pendiente de aceptación / enlace de productos",
     ].filter(Boolean);
-    const order = await SupplierOrder.create(
-      {
-        supplierId: supplier.id,
-        date: date ? new Date(date) : new Date(),
-        notes: noteParts.join(" · "),
-        status: "pendiente",
-        invoiceNumber: `PEER-${srcApp.toUpperCase()}-${srcId}`.slice(0, 80),
-        peerAcceptStatus: "pending_accept",
-        peerSourceApp: srcApp,
-        peerSourceOrderId: srcId,
-        peerRevisionBaseline: null,
-        peerAcceptedSnapshot: null,
-      },
-      { transaction: t },
-    );
-    for (const row of resolved) {
-      await SupplierOrderItem.create(
+    try {
+      const order = await SupplierOrder.create(
         {
-          orderId: order.id,
-          productId: row.productId,
-          quantity: row.quantity,
-          unitPrice: row.unitPrice,
-          taxRate: row.taxRate,
-          remoteName: row.remoteName,
-          remoteBarcode: row.remoteBarcode,
-          remoteSku: row.remoteSku,
-          remoteCode: row.remoteCode,
+          supplierId: supplier.id,
+          date: date ? new Date(date) : new Date(),
+          notes: noteParts.join(" · "),
+          status: "pendiente",
+          invoiceNumber: `PEER-${srcApp.toUpperCase()}-${srcId}`.slice(0, 80),
+          peerAcceptStatus: "pending_accept",
+          peerSourceApp: srcApp,
+          peerSourceOrderId: srcId,
+          peerRevisionBaseline: null,
+          peerAcceptedSnapshot: null,
         },
         { transaction: t },
       );
+      for (const row of resolved) {
+        await SupplierOrderItem.create(
+          {
+            orderId: order.id,
+            productId: row.productId,
+            quantity: row.quantity,
+            unitPrice: row.unitPrice,
+            taxRate: row.taxRate,
+            remoteName: row.remoteName,
+            remoteBarcode: row.remoteBarcode,
+            remoteSku: row.remoteSku,
+            remoteCode: row.remoteCode,
+          },
+          { transaction: t },
+        );
+      }
+      return { orderId: order.id, unmappedCount, updated: false, unchanged: false, changes: [] };
+    } catch (createErr) {
+      const isDup =
+        createErr?.name === "SequelizeUniqueConstraintError" ||
+        createErr?.parent?.code === "ER_DUP_ENTRY" ||
+        /Duplicate|unique/i.test(String(createErr?.message || ""));
+      if (!isDup) throw createErr;
+      const raced = await SupplierOrder.findOne({
+        where: { peerSourceApp: srcApp, peerSourceOrderId: srcId },
+        include: itemInclude,
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+      if (!raced) throw createErr;
+      if (raced.receivedAt || raced.paidAt) {
+        const err = new Error(
+          `El pedido #${raced.id} ya fue recibido o pagado en el destino; no se puede actualizar por enlace`,
+        );
+        err.status = 409;
+        throw err;
+      }
+      if (supplierPeerContentUnchanged(raced.ERP_supplier_order_items || [], resolved)) {
+        return {
+          orderId: raced.id,
+          unmappedCount,
+          updated: false,
+          unchanged: true,
+          changes: [],
+        };
+      }
+      const baseline =
+        parsePeerSnapshot(raced.peerAcceptedSnapshot) ||
+        snapshotSupplierItems(raced.ERP_supplier_order_items || []);
+      await SupplierOrderItem.destroy({ where: { orderId: raced.id }, transaction: t });
+      for (const row of resolved) {
+        await SupplierOrderItem.create(
+          {
+            orderId: raced.id,
+            productId: row.productId,
+            quantity: row.quantity,
+            unitPrice: row.unitPrice,
+            taxRate: row.taxRate,
+            remoteName: row.remoteName,
+            remoteBarcode: row.remoteBarcode,
+            remoteSku: row.remoteSku,
+            remoteCode: row.remoteCode,
+          },
+          { transaction: t },
+        );
+      }
+      const noteBase = String(notes || raced.notes || "")
+        .replace(/\s*·\s*Pendiente de aceptación \/ enlace de productos/g, "")
+        .split(marker)
+        .join("")
+        .replace(/\s*·\s*·/g, " · ")
+        .replace(/^\s*·\s*|\s*·\s*$/g, "")
+        .trim();
+      const nextNotes = [noteBase, marker, "Pendiente de aceptación / enlace de productos"]
+        .filter(Boolean)
+        .join(" · ");
+      await SupplierOrder.update(
+        {
+          date: date ? new Date(date) : raced.date,
+          notes: nextNotes,
+          peerAcceptStatus: "pending_accept",
+          peerSourceApp: srcApp,
+          peerSourceOrderId: srcId,
+          peerRevisionBaseline: JSON.stringify(baseline),
+          status: raced.receivedAt ? raced.status : "pendiente",
+        },
+        { where: { id: raced.id }, transaction: t },
+      );
+      return {
+        orderId: raced.id,
+        unmappedCount,
+        updated: true,
+        unchanged: false,
+        changes: computePeerChanges(baseline, resolved),
+      };
     }
-    return { orderId: order.id, unmappedCount, updated: false, changes: [] };
   });
 
   const order = await SupplierOrder.findByPk(result.orderId);
-  await notifyPeerOrderReceived(order, supplier, sourceApp, result.unmappedCount, {
-    updated: result.updated,
-  });
+  if (!result.unchanged) {
+    await notifyPeerOrderReceived(order, supplier, sourceApp, result.unmappedCount, {
+      updated: result.updated,
+    });
+  }
 
   return {
-    reused: false,
+    reused: !!result.unchanged,
     updated: result.updated,
+    unchanged: !!result.unchanged,
     supplierOrderId: result.orderId,
-    peerAcceptStatus: "pending_accept",
+    peerAcceptStatus: result.unchanged
+      ? order?.peerAcceptStatus || "pending_accept"
+      : "pending_accept",
     unmappedCount: result.unmappedCount,
     changes: result.changes,
-    message: result.updated
-      ? `Pedido actualizado. Revisá y aceptá los cambios.${
-          result.unmappedCount ? ` ${result.unmappedCount} sin enlazar.` : ""
-        }`
-      : result.unmappedCount > 0
-        ? `Pedido recibido. ${result.unmappedCount} producto(s) pendientes de enlace.`
-        : "Pedido recibido. Pendiente de aceptación.",
+    message: result.unchanged
+      ? "Sin cambios: el pedido ya existe en el destino con los mismos ítems"
+      : result.updated
+        ? `Pedido actualizado. Revisá y aceptá los cambios.${
+            result.unmappedCount ? ` ${result.unmappedCount} sin enlazar.` : ""
+          }`
+        : result.unmappedCount > 0
+          ? `Pedido recibido. ${result.unmappedCount} producto(s) pendientes de enlace.`
+          : "Pedido recibido. Pendiente de aceptación.",
   };
 }
 
-/**
- * Acepta un pedido peer: enlaza ítems a productos locales y guarda códigos
- * para la próxima sincronización.
- * body.mappings = [{ itemId, productId }]
- */
+
 export async function acceptPeerSupplierOrder(orderId, mappings = []) {
   await ensurePeerSyncSchema();
   const id = Number(orderId);
@@ -1130,6 +1337,22 @@ export async function pushClientOrderToPeer(orderId) {
     throw err;
   }
 
+  if (order.peerAcceptStatus === "pending_accept") {
+    const err = new Error("Primero aceptá este pedido entrante antes de reenviarlo");
+    err.status = 400;
+    throw err;
+  }
+  if (
+    order.peerSourceApp &&
+    String(order.peerSourceApp).trim().toLowerCase() === String(peer.key).toLowerCase()
+  ) {
+    const err = new Error(
+      "No se puede reenviar este pedido al mismo sistema del que vino",
+    );
+    err.status = 400;
+    throw err;
+  }
+
   const baseUrl = normalizeBaseUrl(peer.baseUrl);
   const secret = PEER_SYNC_SECRET;
 
@@ -1213,17 +1436,13 @@ export async function pushClientOrderToPeer(orderId) {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(body?.message || `Error remoto HTTP ${res.status}`);
+      const err = new Error(body?.message || `Error remoto HTTP ${res.status}`);
+      err.status = res.status;
+      throw err;
     }
     remote = body;
   } catch (error) {
-    await order.update({
-      remoteSyncApp: peer.key,
-      remoteSyncStatus: "error",
-      remoteSyncError: String(error?.message || error),
-      remotePeerAcceptStatus: "not_found",
-      remoteSyncedAt: new Date(),
-    });
+    await markOriginPushFailure(order, peer.key, error);
     throw error;
   }
 
@@ -1237,11 +1456,16 @@ export async function pushClientOrderToPeer(orderId) {
   const peerAcceptStatus =
     status.peerAcceptStatus || remote.peerAcceptStatus || "pending_accept";
 
+  const unchanged = !!remote.unchanged;
   await order.update({
     remoteSyncApp: peer.key,
     remoteSyncSupplierOrderId:
       Number(remote.supplierOrderId) || Number(status.remoteOrderId) || null,
-    remoteSyncStatus: remote.updated ? "synced_update" : "synced",
+    remoteSyncStatus: unchanged
+      ? "synced"
+      : remote.updated
+        ? "synced_update"
+        : "synced",
     remoteSyncPayloadHash: payloadHash,
     remotePeerAcceptStatus: peerAcceptStatus,
     remoteSyncError: null,
@@ -1250,15 +1474,17 @@ export async function pushClientOrderToPeer(orderId) {
 
   return {
     ...remote,
-    skipped: false,
-    unchanged: false,
+    skipped: unchanged,
+    unchanged,
     peerAcceptStatus,
     remotePeerAcceptStatus: peerAcceptStatus,
     message:
       remote.message ||
-      (remote.updated
-        ? `Pedido actualizado. Estado remoto: ${peerAcceptLabel(peerAcceptStatus)}`
-        : `Pedido enviado. Estado remoto: ${peerAcceptLabel(peerAcceptStatus)}`),
+      (unchanged
+        ? `Sin cambios. Estado remoto: ${peerAcceptLabel(peerAcceptStatus)}`
+        : remote.updated
+          ? `Pedido actualizado. Estado remoto: ${peerAcceptLabel(peerAcceptStatus)}`
+          : `Pedido enviado. Estado remoto: ${peerAcceptLabel(peerAcceptStatus)}`),
   };
 }
 
@@ -1297,23 +1523,6 @@ export async function receivePeerCustomerOrder({
   const marker = `[peer-customer:${srcApp}:${srcId}]`;
 
   const itemInclude = [{ model: OrderItem, as: "ERP_order_items" }];
-  let existing = await Order.findOne({
-    where: {
-      customerId: customer.id,
-      peerSourceApp: srcApp,
-      peerSourceOrderId: srcId,
-    },
-    include: itemInclude,
-  });
-  if (!existing) {
-    existing = await Order.findOne({
-      where: {
-        customerId: customer.id,
-        notes: { [Op.like]: `%${marker}%` },
-      },
-      include: itemInclude,
-    });
-  }
 
   const result = await sequelize.transaction(async (t) => {
     const { rows: resolved, unmappedCount } = await resolveIncomingPeerRows(
@@ -1327,7 +1536,51 @@ export async function receivePeerCustomerOrder({
       throw err;
     }
 
+    let existing = await Order.findOne({
+      where: {
+        customerId: customer.id,
+        peerSourceApp: srcApp,
+        peerSourceOrderId: srcId,
+      },
+      include: itemInclude,
+      transaction: t,
+      lock: t.LOCK.UPDATE,
+    });
+    if (!existing) {
+      existing = await Order.findOne({
+        where: {
+          customerId: customer.id,
+          notes: { [Op.like]: `%${marker}%` },
+        },
+        include: itemInclude,
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+    }
+
     if (existing) {
+      const itemsLocked = existing.ERP_order_items || [];
+      const hasProgress =
+        existing.paidAt ||
+        existing.status === "pagado" ||
+        existing.status === "entregado" ||
+        itemsLocked.some((it) => it.paidAt || it.deliveredAt);
+      if (hasProgress) {
+        const err = new Error(
+          `El pedido cliente #${existing.id} ya fue entregado o pagado en el destino; no se puede actualizar por enlace`,
+        );
+        err.status = 409;
+        throw err;
+      }
+      if (customerPeerContentUnchanged(existing.ERP_order_items || [], resolved)) {
+        return {
+          orderId: existing.id,
+          unmappedCount,
+          updated: false,
+          unchanged: true,
+          changes: [],
+        };
+      }
       const baseline =
         parsePeerSnapshot(existing.peerAcceptedSnapshot) ||
         snapshotCustomerItems(existing.ERP_order_items || []);
@@ -1386,58 +1639,153 @@ export async function receivePeerCustomerOrder({
       marker,
       "Pendiente de aceptación / enlace de productos",
     ].filter(Boolean);
-    const order = await Order.create(
-      {
-        customerId: customer.id,
-        date: date ? new Date(date) : new Date(),
-        notes: noteParts.join(" · "),
-        status: "pendiente",
-        peerAcceptStatus: "pending_accept",
-        peerSourceApp: srcApp,
-        peerSourceOrderId: srcId,
-        peerRevisionBaseline: null,
-        peerAcceptedSnapshot: null,
-      },
-      { transaction: t },
-    );
-    for (const row of resolved) {
-      await OrderItem.create(
+    try {
+      const order = await Order.create(
         {
-          orderId: order.id,
-          productId: row.productId,
-          quantity: row.quantity,
-          soldQty: row.quantity,
-          price: row.price,
-          remoteName: row.remoteName,
-          remoteBarcode: row.remoteBarcode,
-          remoteSku: row.remoteSku,
-          remoteCode: row.remoteCode,
+          customerId: customer.id,
+          date: date ? new Date(date) : new Date(),
+          notes: noteParts.join(" · "),
+          status: "pendiente",
+          peerAcceptStatus: "pending_accept",
+          peerSourceApp: srcApp,
+          peerSourceOrderId: srcId,
+          peerRevisionBaseline: null,
+          peerAcceptedSnapshot: null,
         },
         { transaction: t },
       );
+      for (const row of resolved) {
+        await OrderItem.create(
+          {
+            orderId: order.id,
+            productId: row.productId,
+            quantity: row.quantity,
+            soldQty: row.quantity,
+            price: row.price,
+            remoteName: row.remoteName,
+            remoteBarcode: row.remoteBarcode,
+            remoteSku: row.remoteSku,
+            remoteCode: row.remoteCode,
+          },
+          { transaction: t },
+        );
+      }
+      return { orderId: order.id, unmappedCount, updated: false, changes: [] };
+    } catch (createErr) {
+      const isDup =
+        createErr?.name === "SequelizeUniqueConstraintError" ||
+        createErr?.parent?.code === "ER_DUP_ENTRY" ||
+        /Duplicate|unique/i.test(String(createErr?.message || ""));
+      if (!isDup) throw createErr;
+      const raced = await Order.findOne({
+        where: { peerSourceApp: srcApp, peerSourceOrderId: srcId },
+        include: itemInclude,
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+      if (!raced) throw createErr;
+      const racedItems = raced.ERP_order_items || [];
+      const hasProgress =
+        raced.paidAt ||
+        raced.status === "pagado" ||
+        raced.status === "entregado" ||
+        racedItems.some((it) => it.paidAt || it.deliveredAt);
+      if (hasProgress) {
+        const err = new Error(
+          `El pedido cliente #${raced.id} ya fue entregado o pagado en el destino; no se puede actualizar por enlace`,
+        );
+        err.status = 409;
+        throw err;
+      }
+      if (customerPeerContentUnchanged(racedItems, resolved)) {
+        return {
+          orderId: raced.id,
+          unmappedCount,
+          updated: false,
+          unchanged: true,
+          changes: [],
+        };
+      }
+      const baseline =
+        parsePeerSnapshot(raced.peerAcceptedSnapshot) ||
+        snapshotCustomerItems(racedItems);
+      await OrderItem.destroy({ where: { orderId: raced.id }, transaction: t });
+      for (const row of resolved) {
+        await OrderItem.create(
+          {
+            orderId: raced.id,
+            productId: row.productId,
+            quantity: row.quantity,
+            soldQty: row.quantity,
+            price: row.price,
+            remoteName: row.remoteName,
+            remoteBarcode: row.remoteBarcode,
+            remoteSku: row.remoteSku,
+            remoteCode: row.remoteCode,
+          },
+          { transaction: t },
+        );
+      }
+      const noteBase = String(notes || raced.notes || "")
+        .replace(/\s*·\s*Pendiente de aceptación \/ enlace de productos/g, "")
+        .split(marker)
+        .join("")
+        .replace(/\s*·\s*·/g, " · ")
+        .replace(/^\s*·\s*|\s*·\s*$/g, "")
+        .trim();
+      const nextNotes = [noteBase, marker, "Pendiente de aceptación / enlace de productos"]
+        .filter(Boolean)
+        .join(" · ");
+      await Order.update(
+        {
+          date: date ? new Date(date) : raced.date,
+          notes: nextNotes,
+          peerAcceptStatus: "pending_accept",
+          peerSourceApp: srcApp,
+          peerSourceOrderId: srcId,
+          peerRevisionBaseline: JSON.stringify(baseline),
+          status: raced.status === "entregado" ? raced.status : "pendiente",
+        },
+        { where: { id: raced.id }, transaction: t },
+      );
+      return {
+        orderId: raced.id,
+        unmappedCount,
+        updated: true,
+        changes: computePeerChanges(
+          baseline,
+          resolved.map((r) => ({ ...r, unitPrice: r.price })),
+        ),
+      };
     }
-    return { orderId: order.id, unmappedCount, updated: false, changes: [] };
   });
 
   const order = await Order.findByPk(result.orderId);
-  await notifyPeerCustomerOrderReceived(order, customer, sourceApp, result.unmappedCount, {
-    updated: result.updated,
-  });
+  if (!result.unchanged) {
+    await notifyPeerCustomerOrderReceived(order, customer, sourceApp, result.unmappedCount, {
+      updated: result.updated,
+    });
+  }
 
   return {
-    reused: false,
+    reused: !!result.unchanged,
     updated: result.updated,
+    unchanged: !!result.unchanged,
     customerOrderId: result.orderId,
-    peerAcceptStatus: "pending_accept",
+    peerAcceptStatus: result.unchanged
+      ? order?.peerAcceptStatus || "pending_accept"
+      : "pending_accept",
     unmappedCount: result.unmappedCount,
     changes: result.changes,
-    message: result.updated
-      ? `Pedido cliente actualizado. Revisá y aceptá los cambios.${
-          result.unmappedCount ? ` ${result.unmappedCount} sin enlazar.` : ""
-        }`
-      : result.unmappedCount > 0
-        ? `Pedido cliente recibido. ${result.unmappedCount} producto(s) pendientes de enlace.`
-        : "Pedido cliente recibido. Pendiente de aceptación.",
+    message: result.unchanged
+      ? "Sin cambios: el pedido ya existe en el destino con los mismos ítems"
+      : result.updated
+        ? `Pedido cliente actualizado. Revisá y aceptá los cambios.${
+            result.unmappedCount ? ` ${result.unmappedCount} sin enlazar.` : ""
+          }`
+        : result.unmappedCount > 0
+          ? `Pedido cliente recibido. ${result.unmappedCount} producto(s) pendientes de enlace.`
+          : "Pedido cliente recibido. Pendiente de aceptación.",
   };
 }
 
@@ -1659,6 +2007,17 @@ export async function pushSupplierOrderToPeer(supplierOrderId) {
     throw err;
   }
 
+  if (
+    order.peerSourceApp &&
+    String(order.peerSourceApp).trim().toLowerCase() === String(peer.key).toLowerCase()
+  ) {
+    const err = new Error(
+      "No se puede reenviar este pedido al mismo sistema del que vino",
+    );
+    err.status = 400;
+    throw err;
+  }
+
   const baseUrl = normalizeBaseUrl(peer.baseUrl);
   const secret = PEER_SYNC_SECRET;
 
@@ -1745,17 +2104,13 @@ export async function pushSupplierOrderToPeer(supplierOrderId) {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(body?.message || `Error remoto HTTP ${res.status}`);
+      const err = new Error(body?.message || `Error remoto HTTP ${res.status}`);
+      err.status = res.status;
+      throw err;
     }
     remote = body;
   } catch (error) {
-    await order.update({
-      remoteSyncApp: peer.key,
-      remoteSyncStatus: "error",
-      remoteSyncError: String(error?.message || error),
-      remotePeerAcceptStatus: "not_found",
-      remoteSyncedAt: new Date(),
-    });
+    await markOriginPushFailure(order, peer.key, error);
     throw error;
   }
 
@@ -1769,11 +2124,16 @@ export async function pushSupplierOrderToPeer(supplierOrderId) {
   const peerAcceptStatus =
     status.peerAcceptStatus || remote.peerAcceptStatus || "pending_accept";
 
+  const unchanged = !!remote.unchanged;
   await order.update({
     remoteSyncApp: peer.key,
     remoteSyncCustomerOrderId:
       Number(remote.customerOrderId) || Number(status.remoteOrderId) || null,
-    remoteSyncStatus: remote.updated ? "synced_update" : "synced",
+    remoteSyncStatus: unchanged
+      ? "synced"
+      : remote.updated
+        ? "synced_update"
+        : "synced",
     remoteSyncPayloadHash: payloadHash,
     remotePeerAcceptStatus: peerAcceptStatus,
     remoteSyncError: null,
@@ -1782,14 +2142,16 @@ export async function pushSupplierOrderToPeer(supplierOrderId) {
 
   return {
     ...remote,
-    skipped: false,
-    unchanged: false,
+    skipped: unchanged,
+    unchanged,
     peerAcceptStatus,
     remotePeerAcceptStatus: peerAcceptStatus,
     message:
       remote.message ||
-      (remote.updated
-        ? `Pedido actualizado. Estado remoto: ${peerAcceptLabel(peerAcceptStatus)}`
-        : `Pedido enviado. Estado remoto: ${peerAcceptLabel(peerAcceptStatus)}`),
+      (unchanged
+        ? `Sin cambios. Estado remoto: ${peerAcceptLabel(peerAcceptStatus)}`
+        : remote.updated
+          ? `Pedido actualizado. Estado remoto: ${peerAcceptLabel(peerAcceptStatus)}`
+          : `Pedido enviado. Estado remoto: ${peerAcceptLabel(peerAcceptStatus)}`),
   };
 }
