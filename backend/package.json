@@ -10,6 +10,7 @@
     "dev": "nodemon index.js",
     "start": "node index.js",
     "db:sync": "DB_SYNC_ALTER=1 node scripts/sync-schema.js",
+    "db:prepare": "node scripts/prepare-runtime-data.js",
     "db:sync:categories": "node scripts/sync-category-schema.js",
     "db:sync:editor": "node scripts/sync-editor-schema.js",
     "db:fix:expense-reference-fk": "node scripts/fix-expense-reference-fk.js",

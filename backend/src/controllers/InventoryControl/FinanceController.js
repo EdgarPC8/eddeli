@@ -15,16 +15,16 @@ import { notifyOk, notifyFail } from "../../services/notifyRaptorSolutions.js";
 
 const MONEY_CAP = 99999999.99;
 
-function strictCivilDate(value) {
+/** Acepta YYYY-MM-DD o datetime (con hora); conserva la hora al persistir. */
+function hasValidDatePrefix(value) {
   const match = String(value || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (!match) return null;
+  if (!match) return false;
   const year = Number(match[1]);
   const month = Number(match[2]);
   const day = Number(match[3]);
-  if (year < 2000 || year > 2100) return null;
+  if (year < 2000 || year > 2100) return false;
   const date = new Date(year, month - 1, day);
-  if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) return null;
-  return `${match[1]}-${match[2]}-${match[3]}`;
+  return date.getFullYear() === year && date.getMonth() === month - 1 && date.getDate() === day;
 }
 
 function financeEntryError({ date, amount, concept, category }) {
@@ -36,7 +36,7 @@ function financeEntryError({ date, amount, concept, category }) {
   const amountNumber = Number(Number(amount).toFixed(2));
   if (amountNumber <= 0) return "El monto debe ser mayor a cero";
   if (amountNumber > MONEY_CAP) return "El monto es demasiado grande";
-  if (!strictCivilDate(date)) return "La fecha no es válida";
+  if (!hasValidDatePrefix(date)) return "La fecha no es válida";
   return null;
 }
 
@@ -306,7 +306,7 @@ export const createIncome = async (req, res) => {
     const entryError = financeEntryError({ date, amount, concept, category });
     if (entryError) return res.status(400).json({ message: entryError });
     const parsedAmount = Number(Number(amount).toFixed(2));
-    const entryDate = toFinanceDateTime(strictCivilDate(date));
+    const entryDate = toFinanceDateTime(date);
 
         const token = getHeaderToken(req);
       const user = await verifyJWT(token); // para createdBy
@@ -336,7 +336,7 @@ export const createExpense = async (req, res) => {
     const entryError = financeEntryError({ date, amount, concept, category });
     if (entryError) return res.status(400).json({ message: entryError });
     const parsedAmount = Number(Number(amount).toFixed(2));
-    const entryDate = toFinanceDateTime(strictCivilDate(date));
+    const entryDate = toFinanceDateTime(date);
       const token = getHeaderToken(req);
       const user = await verifyJWT(token); // para createdBy
     const createdBy = user.accountId;
@@ -405,7 +405,7 @@ export const updateIncome = async (req, res) => {
     const entryError = financeEntryError({ date, amount, concept, category });
     if (entryError) return res.status(400).json({ message: entryError });
     const parsedAmount = Number(Number(amount).toFixed(2));
-    const entryDate = toFinanceDateTime(strictCivilDate(date));
+    const entryDate = toFinanceDateTime(date);
     const income = await Income.findByPk(id);
     if (!income) {
       notifyFail("income.update_failed", `Ingreso #${id} no encontrado`, { req, httpStatus: 404 });
@@ -437,7 +437,7 @@ export const updateExpense = async (req, res) => {
     const entryError = financeEntryError({ date, amount, concept, category });
     if (entryError) return res.status(400).json({ message: entryError });
     const parsedAmount = Number(Number(amount).toFixed(2));
-    const entryDate = toFinanceDateTime(strictCivilDate(date));
+    const entryDate = toFinanceDateTime(date);
     const expense = await Expense.findByPk(id);
     if (!expense) {
       notifyFail("expense.update_failed", `Egreso #${id} no encontrado`, { req, httpStatus: 404 });
