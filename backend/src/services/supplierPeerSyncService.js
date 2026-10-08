@@ -1426,7 +1426,8 @@ export async function pushClientOrderToPeer(orderId) {
 
   let remote;
   try {
-    const res = await fetch(`${baseUrl}/orders/peer-sync/supplier-orders`, {
+    const remoteUrl = `${baseUrl}/orders/peer-sync/supplier-orders`;
+    const res = await fetch(remoteUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -1436,7 +1437,9 @@ export async function pushClientOrderToPeer(orderId) {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const err = new Error(body?.message || `Error remoto HTTP ${res.status}`);
+      const err = new Error(
+        body?.message || `Error remoto HTTP ${res.status} → ${remoteUrl}`,
+      );
       err.status = res.status;
       throw err;
     }
@@ -2094,7 +2097,8 @@ export async function pushSupplierOrderToPeer(supplierOrderId) {
 
   let remote;
   try {
-    const res = await fetch(`${baseUrl}/orders/peer-sync/customer-orders`, {
+    const remoteUrl = `${baseUrl}/orders/peer-sync/customer-orders`;
+    const res = await fetch(remoteUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -2104,7 +2108,9 @@ export async function pushSupplierOrderToPeer(supplierOrderId) {
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const err = new Error(body?.message || `Error remoto HTTP ${res.status}`);
+      const err = new Error(
+        body?.message || `Error remoto HTTP ${res.status} → ${remoteUrl}`,
+      );
       err.status = res.status;
       throw err;
     }
