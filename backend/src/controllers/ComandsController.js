@@ -19,7 +19,6 @@ import {
   deleteStoredBackup,
   pruneStoredBackupsAndSaveFresh,
   resolveStoredBackupPath,
-  readBackupFileSummary,
   backupFilePath,
 } from "../database/insertData.js";
 import { notifyOk, notifyFail } from "../services/notifyRaptorSolutions.js";
@@ -387,8 +386,9 @@ export const downloadStoredBackupController = async (req, res) => {
 
 export const downloadMainBackupController = async (req, res) => {
   try {
-    const summary = await readBackupFileSummary();
-    if (!summary.exists) {
+    try {
+      await fs.access(backupFilePath);
+    } catch {
       return res.status(404).json({ message: "No existe backup.json en el servidor" });
     }
     res.download(backupFilePath, "backup.json", (err) => {
