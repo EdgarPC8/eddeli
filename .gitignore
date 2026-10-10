@@ -45,3 +45,7 @@ backend/src/img/products/
 
 # graphify
 graphify-out/
+
+# builds con permisos root (no commitear)
+assets.root-locked.*
+index.html.root-locked.*
