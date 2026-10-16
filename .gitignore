@@ -43,8 +43,6 @@ backend/src/img/products/
 *.log
 *.bak
 
-# graphify
-graphify-out/
 
 # builds con permisos root (no commitear)
 assets.root-locked.*

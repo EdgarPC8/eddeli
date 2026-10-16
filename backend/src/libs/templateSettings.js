@@ -13,12 +13,16 @@ function normalizeFolders(rawFolders) {
   if (!Array.isArray(rawFolders)) return undefined;
   return rawFolders
     .filter((f) => f && f.id)
-    .map((f) => ({
-      id: String(f.id),
-      name: String(f.name || f.id),
-      parentId: f.parentId ? String(f.parentId) : null,
-      ...(f.collapsed ? { collapsed: true } : {}),
-    }));
+    .map((f) => {
+      const slot = Number(f.productSlot);
+      return {
+        id: String(f.id),
+        name: String(f.name || f.id),
+        parentId: f.parentId ? String(f.parentId) : null,
+        ...(f.collapsed ? { collapsed: true } : {}),
+        ...(Number.isFinite(slot) && slot >= 0 ? { productSlot: Math.floor(slot) } : {}),
+      };
+    });
 }
 
 export function normalizeTemplateSettings(raw = {}, ctx = {}) {
@@ -52,12 +56,17 @@ export function normalizeTemplateSettings(raw = {}, ctx = {}) {
   }
 
   const folders = normalizeFolders(raw.folders);
+  const previewData =
+    raw.previewData && typeof raw.previewData === "object" && !Array.isArray(raw.previewData)
+      ? raw.previewData
+      : undefined;
 
   return {
     templateKind,
     requiresProduct,
     backgroundMode,
     ...(folders ? { folders } : {}),
+    ...(previewData ? { previewData } : {}),
   };
 }
 
@@ -98,6 +107,13 @@ export function extractTemplateSettings({
       fromBodySettings.folders ??
       fromMeta.folders ??
       doc.folders,
+    previewData:
+      body.previewData ??
+      fromBodySettings.previewData ??
+      fromMeta.previewData ??
+      (doc?.data && typeof doc.data === "object" && Object.keys(doc.data).length
+        ? doc.data
+        : undefined),
   };
 
   const layerSource = layers || templateJson?.layers || doc?.layers || [];
@@ -114,5 +130,6 @@ export function settingsToMeta(settings = {}) {
     backgroundMode: normalized.backgroundMode,
   };
   if (Array.isArray(normalized.folders)) out.folders = normalized.folders;
+  if (normalized.previewData) out.previewData = normalized.previewData;
   return out;
 }
