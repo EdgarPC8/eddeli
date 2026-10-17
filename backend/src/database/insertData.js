@@ -498,9 +498,8 @@ export function prepareBackupForRestore(jsonData) {
       if (next.showPublicStoresVitrina === undefined || next.showPublicStoresVitrina === null) {
         next.showPublicStoresVitrina = true;
       }
-      if (next.multiStockEnabled === undefined || next.multiStockEnabled === null) {
-        next.multiStockEnabled = true;
-      }
+      // Las 3 apps: un solo local. Aunque el backup traiga multistock, se fuerza off.
+      next.multiStockEnabled = false;
       return next;
     });
   }

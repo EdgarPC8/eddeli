@@ -64,7 +64,7 @@ export const AppSettings = sequelize.define(
     multiStockEnabled: {
       type: DataTypes.BOOLEAN,
       allowNull: false,
-      defaultValue: true,
+      defaultValue: false,
     },
     /**
      * Local vinculado a facturación SRI (establecimiento / punto de emisión).

@@ -19,6 +19,14 @@ import {
   ensureStoreIsVisibleColumn,
 } from "../src/services/storeStockService.js";
 import { ensureAccountIsActiveColumn } from "../src/models/Account.js";
+import {
+  enforceEntitlementSideEffectsOnBoot,
+} from "../src/services/entitlementService.js";
+import {
+  getAppSettingsSync,
+  updateAppSettings,
+  loadAppSettings,
+} from "../src/services/appSettingsService.js";
 
 try {
   await sequelize.authenticate();
@@ -34,6 +42,21 @@ try {
   await ensureCustomerNameSchema();
   await ensureAccountIsActiveColumn();
   await ensureEntitlementTable({ alter: true });
+
+  // Seed de producción: multistock siempre off (un solo local).
+  try {
+    await loadAppSettings();
+    const before = Boolean(getAppSettingsSync()?.multiStockEnabled);
+    await updateAppSettings({ multiStockEnabled: false });
+    await enforceEntitlementSideEffectsOnBoot();
+    if (before) {
+      console.log("  · multiStockEnabled: true → false (forzado en producción)");
+    } else {
+      console.log("  · multiStockEnabled: false (ok)");
+    }
+  } catch (msErr) {
+    console.warn("  · multiStockEnabled:", msErr?.message || msErr);
+  }
 
   if (result.patches?.length) {
     console.log(`Parches críticos aplicados: ${result.patches.join(", ")}`);

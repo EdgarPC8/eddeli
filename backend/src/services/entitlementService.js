@@ -154,6 +154,15 @@ export async function saveEntitlement(rawPayload, source = "gestor_push") {
   return getEntitlementResponse();
 }
 
+/** Al arrancar: las 3 apps usan un solo local (multistock off). */
+export async function enforceEntitlementSideEffectsOnBoot() {
+  try {
+    await updateAppSettings({ multiStockEnabled: false });
+  } catch (err) {
+    console.error("[entitlement] enforceEntitlementSideEffectsOnBoot:", err?.message || err);
+  }
+}
+
 /** Trae del gestor y guarda localmente (bootstrap / refresh manual). */
 export async function pullEntitlementFromGestor() {
   if (!GESTOR_SYNC_SECRET) {
