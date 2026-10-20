@@ -30,6 +30,7 @@ import {
   deleteRecipe,
   getRecipeCosting,
   getIngredientPriceAlerts,
+  getGenericCostProposal,
   applyIngredientPriceAlertsController,
 } from '../controllers/InventoryControl/RecipeController.js';
 
@@ -321,6 +322,7 @@ router.post("/productions/anular", isAuthenticated, anularProduccion);
 // Costeo y alertas de precio (antes de :productFinalId)
 router.get('/recipes/getRecipeCosting/:productFinalId', isAuthenticated, getRecipeCosting);
 router.get('/recipes/ingredient-price-alerts/:productFinalId', isAuthenticated, getIngredientPriceAlerts);
+router.get('/recipes/ingredient-cost-proposal/:genericId', isAuthenticated, getGenericCostProposal);
 router.post('/recipes/ingredient-price-alerts/apply', isAuthenticated, applyIngredientPriceAlertsController);
 
 // Obtener receta de un producto final
