@@ -148,22 +148,6 @@ export const getRecipeCosting = async (req, res) => {
       return productHasRecipe(raw.id);
     };
 
-    const resolveChildMult = async (raw, baseQty, isGr) => {
-      if (raw.unitId === 1) {
-        if (isGr) {
-          const std = Number(raw.standardWeightGrams || 0);
-          if (std > 0) return baseQty / std;
-          const { grams: batchGrams } = await computeProducedGrams(raw.id);
-          if (batchGrams > 0) return baseQty / batchGrams;
-          return baseQty;
-        }
-        return baseQty;
-      }
-      if (isGr) return baseQty;
-      const std = Number(raw.standardWeightGrams || 0);
-      return baseQty * std;
-    };
-
     const computeProducedGrams = async (productId) => {
       const p = await fetchProduct(productId);
       const manualYield = Number(p.productionYieldGrams);
@@ -188,6 +172,32 @@ export const getRecipeCosting = async (req, res) => {
         }
       }
       return { grams: sumaGramos, source: "receta" };
+    };
+
+    /**
+     * Convierte la cantidad configurada en la receta al multiplicador del hijo.
+     * - Masa/producto en unidades (unitId=1): gramos → fracción del lote; unidades → N lotes.
+     * - Masa/producto en gramos: gramos → g tal cual; unidades → N × peso del lote (o std).
+     */
+    const resolveChildMult = async (raw, baseQty, isGr) => {
+      if (raw.unitId === 1) {
+        if (isGr) {
+          const std = Number(raw.standardWeightGrams || 0);
+          if (std > 0) return baseQty / std;
+          const { grams: batchGrams } = await computeProducedGrams(raw.id);
+          if (batchGrams > 0) return baseQty / batchGrams;
+          return baseQty;
+        }
+        return baseQty;
+      }
+      if (isGr) return baseQty;
+      const std = Number(raw.standardWeightGrams || 0);
+      if (std > 0) return baseQty * std;
+      if (await isComposedProduct(raw)) {
+        const { grams: batchGrams } = await computeProducedGrams(raw.id);
+        if (batchGrams > 0) return baseQty * batchGrams;
+      }
+      return baseQty;
     };
 
     const buildCostNode = async (productId, mult = 1, path = []) => {

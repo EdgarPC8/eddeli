@@ -486,7 +486,19 @@ const SANITIZE_CONFIG = {
 };
 
 const BULK_OPT = { returning: false };
-const BULK_CHUNK_SIZE = 400;
+/** Chunks más grandes = menos round-trips en restores de 15k+ movimientos. */
+const BULK_CHUNK_SIZE = Number(process.env.BACKUP_BULK_CHUNK || 2000) || 2000;
+
+/**
+ * Tablas voluminosas y no críticas para operar la app.
+ * Por defecto se omiten en «Recargar BD» (acelera ~30–40 %).
+ * Forzar inclusión: BACKUP_RESTORE_INCLUDE_LOGS=1
+ */
+const SKIP_ON_RESTORE_KEYS = new Set(
+  String(process.env.BACKUP_RESTORE_INCLUDE_LOGS || "").trim() === "1"
+    ? []
+    : ["Logs"],
+);
 
 async function bulkCreateRows(model, rows, opt) {
   const list = Array.isArray(rows) ? rows : [];
@@ -753,9 +765,25 @@ export async function ensureBackupFileExists() {
   return { created: true, path: backupFilePath };
 }
 
-/** Borra tablas, las recrea e importa backup.json (Comandos / scripts). */
+/**
+ * Borra tablas, las recrea e importa backup.json (Comandos / scripts).
+ *
+ * Importante: prepareTablesForRestore hace TRUNCATE/DROP fuera de la transacción
+ * de insertData. Si el import falla a mitad, la BD queda vacía y no se puede
+ * iniciar sesión. Por eso:
+ * 1) validamos el JSON (usuarios/cuentas) ANTES de vaciar;
+ * 2) si el insert falla, reintentamos el import desde el mismo backup.json.
+ */
 export async function recreateDatabaseFromBackup({ forceFull = false } = {}) {
-  await requireValidBackupFile();
+  const summary = await requireValidBackupFile();
+  const accountRows = summary.counts?.Account ?? 0;
+  const userRows = summary.counts?.Users ?? 0;
+  if (accountRows <= 0 || userRows <= 0) {
+    throw new Error(
+      `backup.json no tiene cuentas/usuarios (Account=${accountRows}, Users=${userRows}). ` +
+        "Abortando recarga para no dejar la app sin login.",
+    );
+  }
 
   const prep = await prepareTablesForRestore(BACKUP_TABLE_ENTRIES, { forceFull });
   console.log(
@@ -764,13 +792,38 @@ export async function recreateDatabaseFromBackup({ forceFull = false } = {}) {
       (prep.truncated?.length ? `, truncadas=${prep.truncated.length} tablas` : ""),
   );
 
-  const insertResult = await insertData();
+  let insertResult;
+  let recoveredAfterInsertError = false;
+  let previousError = null;
+  try {
+    insertResult = await insertData();
+  } catch (err) {
+    previousError = err;
+    console.error(
+      "❌ Import falló después de vaciar tablas. Reintentando desde backup.json…",
+      err?.message || err,
+    );
+    try {
+      insertResult = await insertData();
+      recoveredAfterInsertError = true;
+      console.log("✅ Reintento de import OK — login y datos restaurados.");
+    } catch (err2) {
+      throw new Error(
+        `Recarga falló y la BD puede quedar vacía (sin login). ` +
+          `Error: ${err?.message || err}. Reintento: ${err2?.message || err2}. ` +
+          "Subí de nuevo backup.json y volvé a Recargar BD, o pedí restauración manual.",
+      );
+    }
+  }
+
   return {
     ...insertResult,
     resetMode: prep.mode,
     tablesRecreated: prep.recreated || [],
     tablesTruncated: prep.truncated || [],
     schemaAudit: prep.schemaAudit,
+    recoveredAfterInsertError,
+    previousError: previousError ? String(previousError.message || previousError) : null,
   };
 }
 
@@ -787,7 +840,12 @@ export const insertData = async () => {
     await setForeignKeyChecks(false, t);
     const opt = { ...BULK_OPT, transaction: t };
 
+    const skippedRestore = [];
     for (const entry of BACKUP_TABLE_ENTRIES) {
+      if (SKIP_ON_RESTORE_KEYS.has(entry.key)) {
+        skippedRestore.push(entry.key);
+        continue;
+      }
       let rows = jsonData[entry.key];
       if (entry.sanitize && SANITIZE_CONFIG[entry.sanitize]) {
         rows = deserializeJsonFields(rows, SANITIZE_CONFIG[entry.sanitize]);
@@ -799,6 +857,12 @@ export const insertData = async () => {
         throw new Error(`Error al importar tabla ${entry.key}: ${detail}`);
       }
     }
+    if (skippedRestore.length) {
+      console.log(
+        `⏩ Restore omitió tablas no críticas: [${skippedRestore.join(", ")}] ` +
+          `(BACKUP_RESTORE_INCLUDE_LOGS=1 para incluirlas)`,
+      );
+    }
 
     await setForeignKeyChecks(true, t);
     await t.commit();
@@ -808,7 +872,11 @@ export const insertData = async () => {
   }
 
   console.log("Datos insertados correctamente desde backup.json. Filas:", counts);
-  return { ok: true, tables: counts };
+  return {
+    ok: true,
+    tables: counts,
+    skippedOnRestore: [...SKIP_ON_RESTORE_KEYS],
+  };
 };
 
 /**

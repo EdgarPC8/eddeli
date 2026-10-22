@@ -190,11 +190,19 @@ export const reloadBdController = async (req, res) => {
 
     // Copia de seguridad del estado ACTUAL en src/backups/ — NO tocar backup.json
     // (el usuario pudo haber subido un JSON distinto que debe usarse en la recarga).
+    // Si la BD ya está vacía (recarga a medias previa), no guardamos esa copia “basura”.
     let safetyBackupPath = null;
     try {
-      const safety = await saveBackup({ updateMainBackup: false });
-      safetyBackupPath = safety.backupPath;
-      console.log("💾 Copia de seguridad previa (sin pisar backup.json):", safetyBackupPath);
+      const liveProducts = await InventoryProduct.count();
+      if (liveProducts > 0) {
+        const safety = await saveBackup({ updateMainBackup: false });
+        safetyBackupPath = safety.backupPath;
+        console.log("💾 Copia de seguridad previa (sin pisar backup.json):", safetyBackupPath);
+      } else {
+        console.warn(
+          "⚠️ BD actual sin productos — se omite copia de seguridad previa (evitar JSON vacío engañoso).",
+        );
+      }
     } catch (backupErr) {
       console.warn("⚠️ No se pudo guardar copia previa; se continúa con backup.json:", backupErr.message);
     }
@@ -211,14 +219,20 @@ export const reloadBdController = async (req, res) => {
     notifyOk("database.reloaded", "Base de datos recargada", {
       resetMode: insertResult.resetMode,
       tables: insertResult.tables,
+      recoveredAfterInsertError: Boolean(insertResult.recoveredAfterInsertError),
     });
     return res.json({
       ok: true,
-      message: `Base de datos restaurada desde backup.json (${modeLabel})`,
+      message:
+        `Base de datos restaurada desde backup.json (${modeLabel})` +
+        (insertResult.recoveredAfterInsertError
+          ? " · se recuperó tras un fallo intermedio del import"
+          : ""),
       resetMode: insertResult.resetMode,
       tablesRecreated: insertResult.tablesRecreated,
       tablesTruncated: insertResult.tablesTruncated,
       safetyBackup: safetyBackupPath,
+      recoveredAfterInsertError: Boolean(insertResult.recoveredAfterInsertError),
       tables: insertResult.tables,
     });
   } catch (error) {
