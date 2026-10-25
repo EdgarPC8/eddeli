@@ -1,7 +1,8 @@
 import { verifyJWT, getHeaderToken } from "../../libs/jwt.js";
 
-import { InventoryMovement, InventoryProduct, Store } from "../../models/Inventory.js";
+import { InventoryMovement, InventoryProduct, PricingTierGroup, Store } from "../../models/Inventory.js";
 import { Customer, Order, OrderItem } from "../../models/Orders.js";
+import { isEmployeePosUnitPriceAllowed } from "../../utils/productPricingUtils.js";
 import { Income, ItemGroupItem, Payment } from "../../models/Finance.js";
 import { findOpenShiftForAccount } from "./ShiftController.js";
 import { format } from 'date-fns';
@@ -409,6 +410,14 @@ export const posCheckout = async (req, res) => {
         { transaction: t },
       );
 
+      const tierGroups =
+        user?.loginRol === "Empleado"
+          ? await PricingTierGroup.findAll({
+              where: { isActive: true },
+              transaction: t,
+            })
+          : [];
+
       let orderTotal = 0;
       for (const row of items) {
         const productId = Number(row.productId);
@@ -419,15 +428,16 @@ export const posCheckout = async (req, res) => {
         const productForPrice = await InventoryProduct.findByPk(productId, { transaction: t });
         if (!productForPrice) throw new Error(`Producto #${productId} no encontrado.`);
         let price = Number(row.price);
-        const catalogPrice = Number(productForPrice.price);
         if (!Number.isFinite(price) || price < 0) {
           throw new Error("Precio inválido en el carrito.");
         }
+        // Empleado: no puede inventar precios, pero sí aplicar tramos/grupos de caja.
         if (user?.loginRol === "Empleado") {
-          if (Math.abs(price - catalogPrice) > 0.009) {
-            throw new Error(`El precio de ${productForPrice.name} no coincide con el catálogo`);
+          if (!isEmployeePosUnitPriceAllowed(productForPrice, qty, price, tierGroups)) {
+            throw new Error(
+              `El precio de ${productForPrice.name} no coincide con el catálogo ni con los tramos`,
+            );
           }
-          price = catalogPrice;
         }
         orderTotal += Number((price * qty).toFixed(2));
 
