@@ -85,6 +85,7 @@ import {
   createSupplierPack,
   paySupplierPack,
   updateSupplierPack,
+  addOrdersToSupplierPack,
   dissolveSupplierPack,
 } from "../controllers/InventoryControl/SupplierPayablesController.js";
 
@@ -262,6 +263,11 @@ router.put("/supplier-orders/:id/unmark-paid", isAuthenticated, unmarkSupplierOr
 router.get("/supplier-payables/workbench", isAuthenticated, getSupplierPayablesWorkbench);
 router.post("/supplier-payables/packs", isAuthenticated, createSupplierPack);
 router.put("/supplier-payables/packs/:packId", isAuthenticated, updateSupplierPack);
+router.post(
+  "/supplier-payables/packs/:packId/add-orders",
+  isAuthenticated,
+  addOrdersToSupplierPack
+);
 router.post("/supplier-payables/packs/:packId/dissolve", isAuthenticated, dissolveSupplierPack);
 router.post("/supplier-payables/packs/:packId/pay", isAuthenticated, paySupplierPack);
 router.post("/supplier-payables/orders/:orderId/pay", isAuthenticated, paySupplierOrder);

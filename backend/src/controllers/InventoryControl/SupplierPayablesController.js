@@ -1317,6 +1317,255 @@ export const updateSupplierPack = async (req, res) => {
 };
 
 /**
+ * POST /supplier-payables/packs/:packId/add-orders
+ * body: { orderIds: number[] }
+ * Suma pedidos con saldo a un grupo de pago (order_group) ya existente.
+ * Sube packAmount en el saldo de los pedidos nuevos (respeta abonos previos del grupo).
+ */
+export const addOrdersToSupplierPack = async (req, res) => {
+  try {
+    const token = getHeaderToken(req);
+    const user = await verifyJWT(token);
+    await ensureSupplierPayablesSchema();
+
+    const packId = Number(req.params.packId);
+    const orderIdsIn = Array.isArray(req.body?.orderIds)
+      ? [...new Set(req.body.orderIds.map((id) => Number(id)).filter((id) => id > 0))]
+      : [];
+
+    if (!Number.isFinite(packId) || packId <= 0) {
+      return res.status(400).json({ message: "Grupo inválido" });
+    }
+    if (orderIdsIn.length < 1) {
+      return res.status(400).json({ message: "Seleccioná al menos un pedido" });
+    }
+
+    const result = await sequelize.transaction(async (t) => {
+      const pack = await SupplierPack.findByPk(packId, {
+        include: [{ model: SupplierPackItem, as: "items" }],
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+      if (!pack || pack.status === "cancelled") {
+        return { status: 404, body: { message: "Grupo no encontrado" } };
+      }
+      if (pack.kind !== "order_group") {
+        return {
+          status: 400,
+          body: { message: "Solo se pueden agregar pedidos a un grupo de pago (no a una paca)" },
+        };
+      }
+
+      let memberOrderIds = [];
+      try {
+        const raw = pack.memberOrderIds;
+        if (raw) {
+          const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
+          if (Array.isArray(parsed)) {
+            memberOrderIds = parsed.map((x) => Number(x)).filter((id) => id > 0);
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+      if (memberOrderIds.length < 1 && (pack.items || []).length > 0) {
+        memberOrderIds = [
+          ...new Set(
+            (pack.items || [])
+              .map((r) => Number(r.supplierOrderId))
+              .filter((id) => id > 0)
+          ),
+        ];
+      }
+
+      const alreadyIn = new Set(memberOrderIds);
+      const toAdd = orderIdsIn.filter((id) => !alreadyIn.has(id));
+      if (toAdd.length < 1) {
+        return {
+          status: 400,
+          body: { message: "Esos pedidos ya están en este grupo" },
+        };
+      }
+
+      const orders = await SupplierOrder.findAll({
+        where: {
+          id: { [Op.in]: toAdd },
+          supplierId: pack.supplierId,
+          status: { [Op.ne]: "cancelado" },
+        },
+        include: [
+          {
+            model: SupplierOrderItem,
+            as: "ERP_supplier_order_items",
+          },
+        ],
+        transaction: t,
+        lock: t.LOCK.UPDATE,
+      });
+      if (orders.length !== toAdd.length) {
+        return {
+          status: 400,
+          body: {
+            message:
+              "Uno o más pedidos no existen, están cancelados o no son de este proveedor",
+          },
+        };
+      }
+
+      const openGroups = await SupplierPack.findAll({
+        where: {
+          supplierId: pack.supplierId,
+          kind: "order_group",
+          status: { [Op.ne]: "cancelled" },
+          id: { [Op.ne]: packId },
+        },
+        attributes: ["id", "memberOrderIds", "status"],
+        transaction: t,
+      });
+      const takenElsewhere = new Map();
+      for (const g of openGroups) {
+        let ids = [];
+        try {
+          const raw = g.memberOrderIds;
+          const parsed = raw ? (typeof raw === "string" ? JSON.parse(raw) : raw) : [];
+          if (Array.isArray(parsed)) ids = parsed.map((x) => Number(x));
+        } catch {
+          /* ignore */
+        }
+        for (const oid of ids) {
+          if (toAdd.includes(oid)) takenElsewhere.set(oid, g.id);
+        }
+      }
+      if (takenElsewhere.size > 0) {
+        const sample = [...takenElsewhere.entries()][0];
+        return {
+          status: 400,
+          body: {
+            message: `El pedido #${sample[0]} ya está en el grupo #${sample[1]}`,
+          },
+        };
+      }
+
+      const paidRows = await SupplierOrderPayment.findAll({
+        where: {
+          supplierOrderId: { [Op.in]: toAdd },
+          status: "completed",
+        },
+        attributes: ["supplierOrderId", "amount"],
+        transaction: t,
+      });
+      const paidByOrder = new Map();
+      for (const p of paidRows) {
+        const oid = Number(p.supplierOrderId);
+        paidByOrder.set(oid, round2((paidByOrder.get(oid) || 0) + toNum(p.amount)));
+      }
+
+      let sumNewRemaining = 0;
+      const remainingByOrder = new Map();
+      for (const order of orders) {
+        const oid = Number(order.id);
+        const total = orderTotal(order.ERP_supplier_order_items || []);
+        const paid = toNum(paidByOrder.get(oid) || 0);
+        const rem = round2(Math.max(0, total - paid));
+        if (rem <= 0.009) {
+          return {
+            status: 400,
+            body: { message: `El pedido #${oid} no tiene saldo pendiente` },
+          };
+        }
+        remainingByOrder.set(oid, rem);
+        sumNewRemaining = round2(sumNewRemaining + rem);
+      }
+
+      // Líneas de pack solo informativas (mismo criterio que al crear el grupo).
+      for (const order of orders) {
+        const oid = Number(order.id);
+        const rem = remainingByOrder.get(oid) || 0;
+        const lines = order.ERP_supplier_order_items || [];
+        if (lines.length === 0) continue;
+        const lineTotals = lines.map((it) => {
+          const qty = toNum(it.quantity);
+          const price = toNum(it.unitPrice);
+          const tax = toNum(it.taxRate);
+          const disc = Math.max(0, toNum(it.discount));
+          return round2(Math.max(0, qty * price - disc) * (1 + tax / 100));
+        });
+        const linesSum = round2(lineTotals.reduce((s, v) => s + v, 0));
+        let allocOrder = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const it = lines[i];
+          const isLast = i === lines.length - 1;
+          const lineTotal = isLast
+            ? round2(rem - allocOrder)
+            : linesSum > 0
+              ? round2((rem * lineTotals[i]) / linesSum)
+              : 0;
+          allocOrder = round2(allocOrder + lineTotal);
+          const qty = toNum(it.quantity);
+          await SupplierPackItem.create(
+            {
+              packId: pack.id,
+              supplierOrderId: oid,
+              supplierOrderItemId: it.id,
+              quantity: qty,
+              previousUnitPrice: toNum(it.unitPrice),
+              allocatedUnitPrice: toNum(it.unitPrice),
+              allocatedLineTotal: lineTotal,
+            },
+            { transaction: t }
+          );
+        }
+      }
+
+      const merged = [...new Set([...memberOrderIds, ...toAdd])];
+      pack.memberOrderIds = JSON.stringify(merged);
+      pack.packAmount = round2(toNum(pack.packAmount) + sumNewRemaining);
+      if (pack.status === "closed") pack.status = "open";
+      await pack.save({ transaction: t });
+
+      return {
+        status: 200,
+        body: {
+          packId: pack.id,
+          kind: "order_group",
+          concept: pack.concept,
+          packAmount: toNum(pack.packAmount),
+          addedOrderIds: toAdd,
+          orderIds: merged,
+          addedRemaining: sumNewRemaining,
+          createdBy: user.accountId,
+        },
+      };
+    });
+
+    if (result.status >= 400) {
+      notifyFail(
+        "supplier_pack.add_orders_failed",
+        result.body?.message || "Error agregando pedidos al grupo",
+        { req, httpStatus: result.status, extra: { packId } }
+      );
+    } else {
+      notifyOk(
+        "supplier_pack.orders_added",
+        `Pedidos agregados al grupo #${packId}`,
+        { packId, orderIds: result.body?.addedOrderIds }
+      );
+    }
+    return res.status(result.status).json(result.body);
+  } catch (error) {
+    console.error("addOrdersToSupplierPack:", error);
+    notifyFail(
+      "supplier_pack.add_orders_failed",
+      error.message || "Error agregando pedidos al grupo",
+      { error, req, httpStatus: 500 }
+    );
+    return res.status(500).json({
+      message: error.message || "Error agregando pedidos al grupo",
+    });
+  }
+};
+
+/**
  * POST /supplier-payables/packs/:packId/dissolve
  * Desglosa la paca: restaura precios anteriores y libera las líneas.
  */
