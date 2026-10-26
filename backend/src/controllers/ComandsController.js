@@ -237,6 +237,7 @@ export const reloadBdController = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error en reloadBdController:", error);
+    const detail = String(error?.message || error || "error desconocido").trim();
     notifyFail("database.reload_failed", "Error al reiniciar la base de datos", {
       error,
       req,
@@ -244,9 +245,11 @@ export const reloadBdController = async (req, res) => {
     });
     return res.status(500).json({
       ok: false,
-      message:
-        "Error al reiniciar la base de datos. Si quedó vacía, restaura desde src/database/backup.json o src/backups/.",
-      error: error.message,
+      // El detalle va en message para que el toast del front lo muestre (antes solo estaba en error).
+      message: `Error al reiniciar la base de datos: ${detail}`,
+      error: detail,
+      hint:
+        "Si el backup.json fijo está dañado o incompleto, elegí una copia de src/backups/ como fija (estrella) y volvé a Recargar BD.",
     });
   }
 };

@@ -98,7 +98,13 @@ export async function compareModelTableSchema(model) {
     description = await qi.describeTable(tableName);
   } catch (err) {
     const msg = String(err?.message || err).toLowerCase();
-    if (msg.includes("doesn't exist") || msg.includes("does not exist") || msg.includes("no existe")) {
+    // MySQL "doesn't exist" y Sequelize: 'No description found for "X" table'
+    if (
+      msg.includes("doesn't exist") ||
+      msg.includes("does not exist") ||
+      msg.includes("no existe") ||
+      msg.includes("no description found")
+    ) {
       return { match: false, reason: "tabla no existe", tableName };
     }
     throw err;

@@ -611,7 +611,16 @@ export async function getPanelBackupSummary() {
  * No genera un JSON vacío (evita resetear la BD con solo 4 roles).
  */
 export async function requireValidBackupFile() {
-  const summary = await readBackupFileSummary();
+  let summary;
+  try {
+    summary = await readBackupFileSummary();
+  } catch (err) {
+    const detail = err?.message || String(err);
+    throw new Error(
+      `No se pudo leer/parsear backup.json (${backupFilePath}): ${detail}. ` +
+        "Si el archivo está incompleto, elegí una copia de src/backups/ como fija y reintentá.",
+    );
+  }
   if (!summary.exists) {
     throw new Error(
       `No existe backup.json en ${backupFilePath}. ` +
@@ -623,6 +632,12 @@ export async function requireValidBackupFile() {
     throw new Error(
       `backup.json no tiene usuarios ni productos (${summary.totalRows} filas, ${kb} KB). ` +
         "Reemplázalo con tu copia real (~3 MB desde tu PC) antes de resetear.",
+    );
+  }
+  if ((summary.counts.Account ?? 0) <= 0 || (summary.counts.Users ?? 0) <= 0) {
+    throw new Error(
+      `backup.json incompleto para login (Account=${summary.counts.Account ?? 0}, Users=${summary.counts.Users ?? 0}). ` +
+        "Elegí una copia guardada más reciente como fija (estrella) y volvé a Recargar BD.",
     );
   }
   return summary;

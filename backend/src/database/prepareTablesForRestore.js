@@ -13,7 +13,12 @@ async function truncateTable(model) {
     await sequelize.query(`TRUNCATE TABLE \`${tableName}\``);
   } catch (err) {
     const msg = String(err?.message || err).toLowerCase();
-    if (msg.includes("doesn't exist") || msg.includes("does not exist") || msg.includes("no existe")) {
+    if (
+      msg.includes("doesn't exist") ||
+      msg.includes("does not exist") ||
+      msg.includes("no existe") ||
+      msg.includes("no description found")
+    ) {
       await model.sync();
       return;
     }
