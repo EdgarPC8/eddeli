@@ -249,6 +249,11 @@ function padSriCode(v, fallback = "001") {
   return d ? d.padStart(3, "0") : fallback;
 }
 
+/** Importe de línea en dinero (2 decimales), igual que en checkout POS. */
+function lineAmountMoney(item) {
+  return to2(Number(item?.price || 0) * billableQty(item));
+}
+
 async function sumOrderTotals(orders) {
   let salesCash = 0;
   let salesTransfer = 0;
@@ -257,16 +262,13 @@ async function sumOrderTotals(orders) {
 
   for (const order of orders) {
     const items = await OrderItem.findAll({ where: { orderId: order.id } });
-    const orderTotal = items.reduce(
-      (acc, it) => acc + Number(it.price || 0) * billableQty(it),
-      0,
-    );
-    const t = to2(orderTotal);
-    salesTotal += t;
+    // Redondeo por línea (no sumar floats crudos): evita ±$0.01 en el arqueo.
+    const t = to2(items.reduce((acc, it) => acc + lineAmountMoney(it), 0));
+    salesTotal = to2(salesTotal + t);
     const method = String(order.paymentMethod || "").toLowerCase();
-    if (method === "transferencia") salesTransfer += t;
-    else if (method === "tarjeta") salesCard += t;
-    else salesCash += t;
+    if (method === "transferencia") salesTransfer = to2(salesTransfer + t);
+    else if (method === "tarjeta") salesCard = to2(salesCard + t);
+    else salesCash = to2(salesCash + t);
   }
 
   return {
@@ -1437,7 +1439,10 @@ function orderPaidDateKey(order) {
 function computeOrderTotalFromItems(order) {
   const items = order.ERP_order_items || [];
   return to2(
-    items.reduce((acc, it) => acc + Number(it.price || 0) * billableQtyFromItem(it), 0),
+    items.reduce(
+      (acc, it) => acc + to2(Number(it.price || 0) * billableQtyFromItem(it)),
+      0,
+    ),
   );
 }
 
@@ -1682,9 +1687,9 @@ export async function getDailyShiftReport(req, res) {
       const total = to2(items.reduce((acc, it) => acc + it.lineTotal, 0));
       salesTotal += total;
       const method = String(order.paymentMethod || "").toLowerCase();
-      if (method === "transferencia") salesTransfer += total;
-      else if (method === "tarjeta") salesCard += total;
-      else salesCash += total;
+      if (method === "transferencia") salesTransfer = to2(salesTransfer + total);
+      else if (method === "tarjeta") salesCard = to2(salesCard + total);
+      else salesCash = to2(salesCash + total);
 
       const shift = order.shift || shiftById.get(order.shiftId);
       const customer = order.ERP_customer;

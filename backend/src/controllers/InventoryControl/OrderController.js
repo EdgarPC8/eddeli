@@ -431,7 +431,18 @@ export const posCheckout = async (req, res) => {
         if (!Number.isFinite(price) || price < 0) {
           throw new Error("Precio inválido en el carrito.");
         }
+        // Preferir lineTotal de caja (ya redondeado a 2 decimales) para no perder 1¢
+        // al reconstruir precio unitario × cantidad.
+        let lineAmount = Number((price * qty).toFixed(2));
+        if (row.lineTotal != null && row.lineTotal !== "") {
+          const lt = Number(String(row.lineTotal).replace(",", "."));
+          if (Number.isFinite(lt) && lt >= 0) {
+            lineAmount = Number(lt.toFixed(2));
+            if (qty > 0) price = Number((lineAmount / qty).toFixed(6));
+          }
+        }
         // Empleado: no puede inventar precios, pero sí aplicar tramos/grupos de caja.
+        // Validar contra el unitario efectivo (puede venir de lineTotal/qty).
         if (user?.loginRol === "Empleado") {
           if (!isEmployeePosUnitPriceAllowed(productForPrice, qty, price, tierGroups)) {
             throw new Error(
@@ -439,7 +450,7 @@ export const posCheckout = async (req, res) => {
             );
           }
         }
-        orderTotal += Number((price * qty).toFixed(2));
+        orderTotal = Number((orderTotal + lineAmount).toFixed(2));
 
         const product = await InventoryProduct.findByPk(productId, {
           transaction: t,
@@ -540,7 +551,7 @@ export const posCheckout = async (req, res) => {
         );
 
         if (!isCredit) {
-          const amount = Number((price * qty).toFixed(2));
+          const amount = lineAmount;
           const concept = `Venta POS ${product.name} x${qty} (Ord #${order.id})`;
           await Income.create(
             {
