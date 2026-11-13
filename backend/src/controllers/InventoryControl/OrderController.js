@@ -1610,7 +1610,24 @@ export const markItemAsDelivered = async (req, res) => {
           });
           await product.reload({ transaction: t });
         }
-        const available = await getStoreStockQty(deliverStoreId, product.id, { transaction: t });
+        let available = await getStoreStockQty(deliverStoreId, product.id, { transaction: t });
+        if (available < qty) {
+          const deficit = qty - available;
+          try {
+            await autoOpenPacksToCoverProduct({
+              productId: product.id,
+              deficitQty: deficit,
+              storeId: deliverStoreId,
+              accountId: user.accountId,
+              transaction: t,
+              referenceType: "order_item",
+              referenceId: item.id,
+            });
+            available = await getStoreStockQty(deliverStoreId, product.id, { transaction: t });
+          } catch (openErr) {
+            console.warn("markDelivered auto-open:", openErr?.message || openErr);
+          }
+        }
         if (available < qty) {
           throw Object.assign(
             new Error(
