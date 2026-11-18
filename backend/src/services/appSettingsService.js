@@ -1,4 +1,5 @@
 import { AppSettings } from "../models/AppSettings.js";
+import { SYSTEM_VERSION } from "../config/systemVersion.js";
 import { sequelize } from "../database/connection.js";
 import { DataTypes } from "sequelize";
 import fs from "fs";
@@ -35,7 +36,7 @@ export const DEFAULT_APP_SETTINGS = {
   id: 1,
   name: "EdDeli - Panadería, Pastelería y Repostería",
   alias: "EdDeli",
-  version: "1.0.0",
+  version: SYSTEM_VERSION,
   description: "Sistema de Gestión de Negocios",
   author: "SoftEd",
   logoPath: "sistema/logos/logo.jpeg",
@@ -67,6 +68,9 @@ export const DEFAULT_APP_SETTINGS = {
   cajaAllowEditProductFromCart: false,
   cajaSuggestUpdateProductPrice: false,
   cajaAllowPercentDiscount: false,
+  cajaEmployeeAllowAutoCompleteStock: false,
+  cajaEmployeeAllowEditCartPrice: false,
+  festiveDecorEnabled: true,
   notificationsToastGreeting: false,
   notificationsToastStock: false,
   notificationsToastCredit: false,
@@ -236,6 +240,9 @@ async function ensureAppSettingsSchema() {
     ["cajaAllowEditProductFromCart", false],
     ["cajaSuggestUpdateProductPrice", false],
     ["cajaAllowPercentDiscount", false],
+    ["cajaEmployeeAllowAutoCompleteStock", false],
+    ["cajaEmployeeAllowEditCartPrice", false],
+    ["festiveDecorEnabled", true],
     ["notificationsToastGreeting", false],
     ["notificationsToastStock", false],
     ["notificationsToastCredit", false],
@@ -426,6 +433,9 @@ export async function loadAppSettings() {
     cajaAllowEditProductFromCart: asBool(raw.cajaAllowEditProductFromCart, false),
     cajaSuggestUpdateProductPrice: asBool(raw.cajaSuggestUpdateProductPrice, false),
     cajaAllowPercentDiscount: asBool(raw.cajaAllowPercentDiscount, false),
+    cajaEmployeeAllowAutoCompleteStock: asBool(raw.cajaEmployeeAllowAutoCompleteStock, false),
+    cajaEmployeeAllowEditCartPrice: asBool(raw.cajaEmployeeAllowEditCartPrice, false),
+    festiveDecorEnabled: asBool(raw.festiveDecorEnabled, true),
     notificationsToastGreeting: asBool(raw.notificationsToastGreeting, false),
     notificationsToastStock: asBool(raw.notificationsToastStock, false),
     notificationsToastCredit: asBool(raw.notificationsToastCredit, false),
@@ -445,6 +455,10 @@ export async function loadAppSettings() {
     keyboardShortcuts: normalizeKeyboardShortcuts(raw.keyboardShortcuts),
   };
   ensureStandardAssetDirs(cache.mediaFolderPrefix);
+  if (cache.version !== SYSTEM_VERSION) {
+    await AppSettings.update({ version: SYSTEM_VERSION }, { where: { id: 1 } });
+    cache.version = SYSTEM_VERSION;
+  }
   return cache;
 }
 
@@ -508,6 +522,21 @@ export async function updateAppSettings(payload) {
       patch.cajaAllowPercentDiscount,
       false,
     );
+  }
+  if ("cajaEmployeeAllowAutoCompleteStock" in patch) {
+    patch.cajaEmployeeAllowAutoCompleteStock = asBool(
+      patch.cajaEmployeeAllowAutoCompleteStock,
+      false,
+    );
+  }
+  if ("cajaEmployeeAllowEditCartPrice" in patch) {
+    patch.cajaEmployeeAllowEditCartPrice = asBool(
+      patch.cajaEmployeeAllowEditCartPrice,
+      false,
+    );
+  }
+  if ("festiveDecorEnabled" in patch) {
+    patch.festiveDecorEnabled = asBool(patch.festiveDecorEnabled, true);
   }
   if ("notificationsToastGreeting" in patch) {
     patch.notificationsToastGreeting = asBool(patch.notificationsToastGreeting, false);
@@ -601,6 +630,9 @@ export async function updateAppSettings(payload) {
     cajaAllowEditProductFromCart: asBool(raw.cajaAllowEditProductFromCart, false),
     cajaSuggestUpdateProductPrice: asBool(raw.cajaSuggestUpdateProductPrice, false),
     cajaAllowPercentDiscount: asBool(raw.cajaAllowPercentDiscount, false),
+    cajaEmployeeAllowAutoCompleteStock: asBool(raw.cajaEmployeeAllowAutoCompleteStock, false),
+    cajaEmployeeAllowEditCartPrice: asBool(raw.cajaEmployeeAllowEditCartPrice, false),
+    festiveDecorEnabled: asBool(raw.festiveDecorEnabled, true),
     notificationsToastGreeting: asBool(raw.notificationsToastGreeting, false),
     notificationsToastStock: asBool(raw.notificationsToastStock, false),
     notificationsToastCredit: asBool(raw.notificationsToastCredit, false),
@@ -661,6 +693,9 @@ export function toPublicSettings(data = cache) {
     cajaAllowEditProductFromCart: asBool(data.cajaAllowEditProductFromCart, false),
     cajaSuggestUpdateProductPrice: asBool(data.cajaSuggestUpdateProductPrice, false),
     cajaAllowPercentDiscount: asBool(data.cajaAllowPercentDiscount, false),
+    cajaEmployeeAllowAutoCompleteStock: asBool(data.cajaEmployeeAllowAutoCompleteStock, false),
+    cajaEmployeeAllowEditCartPrice: asBool(data.cajaEmployeeAllowEditCartPrice, false),
+    festiveDecorEnabled: asBool(data.festiveDecorEnabled, true),
     notificationsToastGreeting: asBool(data.notificationsToastGreeting, false),
     notificationsToastStock: asBool(data.notificationsToastStock, false),
     notificationsToastCredit: asBool(data.notificationsToastCredit, false),

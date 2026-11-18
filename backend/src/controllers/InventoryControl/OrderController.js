@@ -441,10 +441,17 @@ export const posCheckout = async (req, res) => {
             if (qty > 0) price = Number((lineAmount / qty).toFixed(6));
           }
         }
-        // Empleado: no puede inventar precios, pero sí aplicar tramos/grupos de caja.
+        // Empleado: no puede inventar precios salvo que Config lo habilite;
+        // sí puede aplicar tramos/grupos de caja.
         // Validar contra el unitario efectivo (puede venir de lineTotal/qty).
         if (user?.loginRol === "Empleado") {
-          if (!isEmployeePosUnitPriceAllowed(productForPrice, qty, price, tierGroups)) {
+          const employeeMayEditPrice = Boolean(
+            getAppSettingsSync()?.cajaEmployeeAllowEditCartPrice,
+          );
+          if (
+            !employeeMayEditPrice &&
+            !isEmployeePosUnitPriceAllowed(productForPrice, qty, price, tierGroups)
+          ) {
             throw new Error(
               `El precio de ${productForPrice.name} no coincide con el catálogo ni con los tramos`,
             );
