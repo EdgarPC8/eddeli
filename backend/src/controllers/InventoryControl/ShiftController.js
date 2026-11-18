@@ -39,6 +39,46 @@ const CATEGORY_EXPENSE_LABEL = {
 
 const DIFF_RESOLVED = new Set(["omitted", "income", "expense"]);
 let cashShiftDiffColumnsReady = false;
+let cashShiftMovementOccurredAtReady = false;
+
+/** Fecha contable del movimiento (no confundir con createdAt de auditoría). */
+function movementBusinessDate(m) {
+  return m?.occurredAt || m?.createdAt || null;
+}
+
+/** Asegura occurredAt en movimientos + backfill desde pedidos proveedor. */
+async function ensureCashShiftMovementOccurredAt() {
+  if (cashShiftMovementOccurredAtReady) return;
+  try {
+    const [rows] = await sequelize.query(
+      `SELECT COUNT(*) AS c FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'ERP_cash_shift_movements'
+         AND COLUMN_NAME = 'occurredAt'`,
+    );
+    const exists = Number(rows?.[0]?.c || 0) > 0;
+    if (!exists) {
+      await sequelize.query(
+        `ALTER TABLE \`ERP_cash_shift_movements\` ADD COLUMN \`occurredAt\` DATETIME NULL`,
+      );
+    }
+    await sequelize.query(
+      `UPDATE \`ERP_cash_shift_movements\`
+       SET \`occurredAt\` = \`createdAt\`
+       WHERE \`occurredAt\` IS NULL AND \`createdAt\` IS NOT NULL`,
+    );
+    await sequelize.query(
+      `UPDATE \`ERP_cash_shift_movements\` m
+       INNER JOIN \`ERP_supplier_orders\` o
+         ON m.\`notes\` = CONCAT('supplier_order:', o.\`id\`)
+       SET m.\`occurredAt\` = COALESCE(o.\`paidAt\`, o.\`date\`, m.\`createdAt\`)
+       WHERE m.\`notes\` LIKE 'supplier_order:%'`,
+    );
+  } catch (err) {
+    console.warn("[shifts] ensure occurredAt:", err?.message || err);
+  }
+  cashShiftMovementOccurredAtReady = true;
+}
 
 /** Asegura columnas de regularización de diferencia (idempotente). */
 async function ensureCashShiftDifferenceColumns() {
@@ -291,9 +331,13 @@ async function getShiftPosOrders(shiftId) {
 }
 
 async function getShiftMovementsSummary(shiftId) {
+  await ensureCashShiftMovementOccurredAt();
   const movements = await CashShiftMovement.findAll({
     where: { shiftId },
-    order: [["createdAt", "ASC"]],
+    order: [
+      ["occurredAt", "ASC"],
+      ["createdAt", "ASC"],
+    ],
   });
 
   let cashOut = 0;
@@ -459,7 +503,9 @@ function movementToJson(m) {
     notes: m.notes,
     productId: m.productId,
     quantity: m.quantity != null ? Number(m.quantity) : null,
+    occurredAt: movementBusinessDate(m),
     createdAt: m.createdAt,
+    updatedAt: m.updatedAt,
   };
 }
 
@@ -672,10 +718,16 @@ export async function createShiftMovement(req, res) {
 
     const amt = to2(amount);
     const conceptTrim = String(concept).trim();
-    const { createdAt: createdAtBody } = req.body;
-    let movementCreatedAt = new Date();
-    if (isProgrammer && createdAtBody) {
-      const parsed = parseOptionalIsoDate(createdAtBody);
+    const notesTrim = notes?.trim() || null;
+    const { createdAt: createdAtBody, occurredAt: occurredAtBody } = req.body;
+
+    await ensureCashShiftMovementOccurredAt();
+
+    // Fecha contable (reportes). createdAt/updatedAt = auditoría automática.
+    let occurredAt = nowApp();
+    const dateBody = occurredAtBody || createdAtBody;
+    if (dateBody) {
+      const parsed = parseOptionalIsoDate(dateBody);
       if (parsed === undefined) {
         notifyFail("shift_movement.create_failed", "Fecha del movimiento no válida", {
           req,
@@ -683,7 +735,26 @@ export async function createShiftMovement(req, res) {
         });
         return res.status(400).json({ message: "Fecha del movimiento no válida." });
       }
-      if (parsed) movementCreatedAt = parsed;
+      if (parsed) occurredAt = parsed;
+    }
+
+    const supplierOrderIdMatch = String(notesTrim || "").match(/supplier_order:(\d+)/);
+    if (supplierOrderIdMatch) {
+      try {
+        const { SupplierOrder } = await import("../../models/Orders.js");
+        const { resolveSupplierOrderPayDate } = await import(
+          "../../utils/supplierOrderFinanceUtils.js"
+        );
+        const order = await SupplierOrder.findByPk(Number(supplierOrderIdMatch[1]));
+        if (order) {
+          occurredAt = resolveSupplierOrderPayDate({
+            paidAt: order.paidAt,
+            order,
+          });
+        }
+      } catch (err) {
+        console.warn("[shifts] resolve supplier order date:", err?.message || err);
+      }
     }
 
     const movement = await sequelize.transaction(async (transaction) => {
@@ -696,11 +767,10 @@ export async function createShiftMovement(req, res) {
           category,
           amount: amt,
           concept: conceptTrim,
-          notes: notes?.trim() || null,
+          notes: notesTrim,
           productId: productId || null,
           quantity: quantity != null && quantity !== "" ? parseFloat(quantity) : null,
-          createdAt: movementCreatedAt,
-          updatedAt: movementCreatedAt,
+          occurredAt,
         },
         { transaction },
       );
@@ -736,7 +806,7 @@ export async function createShiftMovement(req, res) {
         referenceId: row.id,
         referenceType: "cash_shift_movement",
         transaction,
-        date: movementCreatedAt,
+        date: occurredAt,
       });
       if (!expenseId && expense) expenseId = expense.id;
 
@@ -1414,8 +1484,15 @@ function formatDateKey(value) {
   return `${y}-${m}-${day}`;
 }
 
-function computeClosingTotal(opening, sales) {
-  return to2(Number(opening || 0) + Number(sales || 0));
+/** Cierre teórico del día: inicial + ventas − egresos + ingresos caja ± sobrante/faltante. */
+function computeClosingTotal(opening, sales, cashOut = 0, cashDifference = 0, cashIn = 0) {
+  return to2(
+    Number(opening || 0) +
+      Number(sales || 0) -
+      Number(cashOut || 0) +
+      Number(cashIn || 0) +
+      Number(cashDifference || 0),
+  );
 }
 
 function emptyDaySummary(date) {
@@ -1428,6 +1505,8 @@ function emptyDaySummary(date) {
     salesTransfer: 0,
     salesCard: 0,
     cashOutTotal: 0,
+    cashInTotal: 0,
+    cashDifferenceTotal: 0,
     ordersCount: 0,
   };
 }
@@ -1454,6 +1533,10 @@ function addDaySummaries(target, source) {
   target.salesTransfer = to2(target.salesTransfer + source.salesTransfer);
   target.salesCard = to2(target.salesCard + source.salesCard);
   target.cashOutTotal = to2(target.cashOutTotal + source.cashOutTotal);
+  target.cashInTotal = to2(Number(target.cashInTotal || 0) + Number(source.cashInTotal || 0));
+  target.cashDifferenceTotal = to2(
+    Number(target.cashDifferenceTotal || 0) + Number(source.cashDifferenceTotal || 0),
+  );
   target.ordersCount += source.ordersCount;
 }
 
@@ -1461,6 +1544,7 @@ function addDaySummaries(target, source) {
 export async function getWeeklyShiftReport(req, res) {
   try {
     await ensureCashShiftDifferenceColumns();
+    await ensureCashShiftMovementOccurredAt();
     const { loginRol } = req.user;
     if (!ADMIN_ROLES.has(loginRol)) {
       return res.status(403).json({ message: "Solo administradores pueden ver el reporte semanal." });
@@ -1468,7 +1552,7 @@ export async function getWeeklyShiftReport(req, res) {
 
     const week = parseWeekRange(req.query.date);
 
-    const [posOrders, shiftsInWeek, outflows] = await Promise.all([
+    const [posOrders, shiftsInWeek, outflows, inflows] = await Promise.all([
       Order.findAll({
         where: {
           status: "pagado",
@@ -1491,14 +1575,21 @@ export async function getWeeklyShiftReport(req, res) {
         where: {
           openedAt: { [Op.between]: [week.weekStartDate, week.weekEndDate] },
         },
-        attributes: ["openedAt", "openingCashTotal"],
+        attributes: ["openedAt", "openingCashTotal", "cashDifference", "status"],
       }),
       CashShiftMovement.findAll({
         where: {
           direction: "out",
-          createdAt: { [Op.between]: [week.weekStartDate, week.weekEndDate] },
+          occurredAt: { [Op.between]: [week.weekStartDate, week.weekEndDate] },
         },
-        attributes: ["amount", "createdAt"],
+        attributes: ["amount", "occurredAt", "createdAt"],
+      }),
+      CashShiftMovement.findAll({
+        where: {
+          direction: "in",
+          occurredAt: { [Op.between]: [week.weekStartDate, week.weekEndDate] },
+        },
+        attributes: ["amount", "occurredAt", "createdAt"],
       }),
     ]);
 
@@ -1519,24 +1610,42 @@ export async function getWeeklyShiftReport(req, res) {
 
     for (const shift of shiftsInWeek) {
       const openKey = formatDateKey(shift.openedAt);
-      if (byDay[openKey]) {
-        byDay[openKey].openingCashTotal = to2(
-          byDay[openKey].openingCashTotal + Number(shift.openingCashTotal || 0),
+      if (!byDay[openKey]) continue;
+      byDay[openKey].openingCashTotal = to2(
+        byDay[openKey].openingCashTotal + Number(shift.openingCashTotal || 0),
+      );
+      if (shift.cashDifference != null && Number.isFinite(Number(shift.cashDifference))) {
+        byDay[openKey].cashDifferenceTotal = to2(
+          byDay[openKey].cashDifferenceTotal + Number(shift.cashDifference),
         );
       }
     }
 
     for (const movement of outflows) {
-      const key = formatDateKey(movement.createdAt);
+      const key = formatDateKey(movementBusinessDate(movement));
       if (!byDay[key]) continue;
       byDay[key].cashOutTotal = to2(
         byDay[key].cashOutTotal + Number(movement.amount || 0),
       );
     }
 
+    for (const movement of inflows) {
+      const key = formatDateKey(movementBusinessDate(movement));
+      if (!byDay[key]) continue;
+      byDay[key].cashInTotal = to2(
+        byDay[key].cashInTotal + Number(movement.amount || 0),
+      );
+    }
+
     const days = week.dayKeys.map((key) => {
       const row = byDay[key];
-      row.closingCashTotal = computeClosingTotal(row.openingCashTotal, row.salesTotal);
+      row.closingCashTotal = computeClosingTotal(
+        row.openingCashTotal,
+        row.salesTotal,
+        row.cashOutTotal,
+        row.cashDifferenceTotal,
+        row.cashInTotal,
+      );
       const dt = new Date(`${key}T12:00:00`);
       row.weekday = dt.toLocaleDateString("es-EC", { weekday: "long" });
       row.weekdayShort = dt.toLocaleDateString("es-EC", { weekday: "short" });
@@ -1563,6 +1672,7 @@ export async function getWeeklyShiftReport(req, res) {
 export async function getDailyShiftReport(req, res) {
   try {
     await ensureCashShiftDifferenceColumns();
+    await ensureCashShiftMovementOccurredAt();
     const { loginRol } = req.user;
     if (!ADMIN_ROLES.has(loginRol)) {
       return res.status(403).json({ message: "Solo administradores pueden ver el reporte diario." });
@@ -1574,7 +1684,7 @@ export async function getDailyShiftReport(req, res) {
       CashShiftMovement.findAll({
         where: {
           direction: "out",
-          createdAt: { [Op.between]: [dayStart, dayEnd] },
+          occurredAt: { [Op.between]: [dayStart, dayEnd] },
         },
         include: [
           {
@@ -1583,12 +1693,15 @@ export async function getDailyShiftReport(req, res) {
             attributes: USER_LIST_ATTRS,
           },
         ],
-        order: [["createdAt", "ASC"]],
+        order: [
+          ["occurredAt", "ASC"],
+          ["createdAt", "ASC"],
+        ],
       }),
       CashShiftMovement.findAll({
         where: {
           direction: "in",
-          createdAt: { [Op.between]: [dayStart, dayEnd] },
+          occurredAt: { [Op.between]: [dayStart, dayEnd] },
         },
         include: [
           {
@@ -1597,7 +1710,10 @@ export async function getDailyShiftReport(req, res) {
             attributes: USER_LIST_ATTRS,
           },
         ],
-        order: [["createdAt", "ASC"]],
+        order: [
+          ["occurredAt", "ASC"],
+          ["createdAt", "ASC"],
+        ],
       }),
       Order.findAll({
         where: {
@@ -1726,7 +1842,22 @@ export async function getDailyShiftReport(req, res) {
         return acc + Number(shift.openingCashTotal || 0);
       }, 0),
     );
-    const closingCashTotal = computeClosingTotal(openingCashTotal, salesTotal);
+    const cashDifferenceTotal = to2(
+      shifts.reduce((acc, shift) => {
+        if (!shiftOpenedOnDay(shift, dayStart, dayEnd)) return acc;
+        if (shift.cashDifference == null || !Number.isFinite(Number(shift.cashDifference))) {
+          return acc;
+        }
+        return acc + Number(shift.cashDifference);
+      }, 0),
+    );
+    const closingCashTotal = computeClosingTotal(
+      openingCashTotal,
+      salesTotal,
+      cashOutTotal,
+      cashDifferenceTotal,
+      cashInMovementsTotal,
+    );
 
     res.json({
       date: dateStr,
@@ -1741,6 +1872,7 @@ export async function getDailyShiftReport(req, res) {
         salesCard: to2(salesCard),
         cashOutTotal: to2(cashOutTotal),
         cashInMovementsTotal: to2(cashInMovementsTotal),
+        cashDifferenceTotal,
         cashEnteredTotal,
         outflowsCount: outflows.length,
         inflowsCount: inflows.length,
@@ -1749,6 +1881,8 @@ export async function getDailyShiftReport(req, res) {
         const dayMetrics = buildShiftDayMetrics(shift.id, sales, outflows, inflows);
         const openedOnDay = shiftOpenedOnDay(shift, dayStart, dayEnd);
         const openingCashOnDay = openedOnDay ? to2(shift.openingCashTotal) : null;
+        const cashDifference =
+          shift.cashDifference != null ? to2(shift.cashDifference) : null;
         return {
           id: shift.id,
           status: shift.status,
@@ -1756,17 +1890,25 @@ export async function getDailyShiftReport(req, res) {
           openedAt: shift.openedAt,
           closedAt: shift.closedAt,
           openingCashOnDay,
-          closingCashOnDay: computeClosingTotal(openingCashOnDay, dayMetrics.salesTotalDay),
+          closingCashOnDay: computeClosingTotal(
+            openingCashOnDay || 0,
+            dayMetrics.salesTotalDay,
+            dayMetrics.cashOutDay,
+            cashDifference || 0,
+            dayMetrics.cashInDay,
+          ),
           ...dayMetrics,
-          cashDifference: shift.cashDifference != null ? to2(shift.cashDifference) : null,
+          cashDifference,
         };
       }),
       outflows: outflows.map((m) => {
         const shift = shiftById.get(m.shiftId);
+        const occurredAt = movementBusinessDate(m);
         return {
           id: m.id,
           shiftId: m.shiftId,
-          createdAt: m.createdAt,
+          occurredAt,
+          createdAt: occurredAt,
           category: m.category,
           concept: m.concept,
           amount: to2(m.amount),
@@ -1776,10 +1918,12 @@ export async function getDailyShiftReport(req, res) {
       }),
       inflows: inflows.map((m) => {
         const shift = shiftById.get(m.shiftId);
+        const occurredAt = movementBusinessDate(m);
         return {
           id: m.id,
           shiftId: m.shiftId,
-          createdAt: m.createdAt,
+          occurredAt,
+          createdAt: occurredAt,
           category: m.category,
           concept: m.concept,
           amount: to2(m.amount),
@@ -1894,7 +2038,8 @@ export async function updateShiftMovementProgrammer(req, res) {
       return res.status(404).json({ message: "Movimiento no encontrado." });
     }
 
-    const { direction, category, amount, concept, notes, createdAt } = req.body;
+    await ensureCashShiftMovementOccurredAt();
+    const { direction, category, amount, concept, notes, createdAt, occurredAt } = req.body;
     const patch = {};
 
     if (direction != null) {
@@ -1922,16 +2067,15 @@ export async function updateShiftMovementProgrammer(req, res) {
       patch.concept = conceptTrim;
     }
     if (notes !== undefined) patch.notes = notes?.trim() || null;
-    if (createdAt !== undefined) {
-      const parsed = parseOptionalIsoDate(createdAt);
+    // Fecha contable (no tocar createdAt de auditoría).
+    const dateBody = occurredAt !== undefined ? occurredAt : createdAt;
+    if (dateBody !== undefined) {
+      const parsed = parseOptionalIsoDate(dateBody);
       if (parsed === undefined) {
         notifyFail("shift_movement.update_failed", "Fecha no válida", { req, httpStatus: 400 });
         return res.status(400).json({ message: "Fecha no válida." });
       }
-      if (parsed) {
-        patch.createdAt = parsed;
-        patch.updatedAt = parsed;
-      }
+      if (parsed) patch.occurredAt = parsed;
     }
 
     await sequelize.transaction(async (transaction) => {
@@ -1941,7 +2085,7 @@ export async function updateShiftMovementProgrammer(req, res) {
         const expensePatch = {};
         if (patch.amount != null) expensePatch.amount = patch.amount;
         if (patch.concept != null) expensePatch.concept = patch.concept;
-        if (patch.createdAt) expensePatch.date = patch.createdAt;
+        if (patch.occurredAt) expensePatch.date = patch.occurredAt;
         if (Object.keys(expensePatch).length) {
           const expense = await Expense.findByPk(movement.expenseId, { transaction });
           if (expense) await expense.update(expensePatch, { transaction });
