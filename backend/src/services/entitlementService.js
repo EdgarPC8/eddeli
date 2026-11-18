@@ -183,6 +183,53 @@ export async function enforceEntitlementSideEffectsOnBoot() {
   }
 }
 
+/**
+ * El usuario terminó la UI de actualización (Continuar).
+ * Limpia flags locales y avisa al gestor para apagar el ícono en la tabla.
+ */
+export async function acknowledgeUpdateComplete(version) {
+  const current = await getEntitlementResponse();
+  const cleared = {
+    ...current,
+    maintenance: Boolean(current.maintenance),
+    updating: false,
+    update_force: true,
+    update_available: false,
+    subscribed: Boolean(current.subscribed),
+    features: current.features || [],
+    subscription: current.subscription ?? null,
+  };
+  // Quitar meta antes de guardar
+  delete cleared.meta;
+
+  const saved = await saveEntitlement(cleared, "update_ack");
+
+  if (GESTOR_SYNC_SECRET) {
+    const url = `${String(gestorConfig.api).replace(/\/$/, "")}/apps/update-ack`;
+    try {
+      await axios.post(
+        url,
+        { version: version ? String(version).trim() : undefined },
+        {
+          headers: {
+            Authorization: `Bearer ${GESTOR_SYNC_SECRET}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 15000,
+        },
+      );
+    } catch (err) {
+      console.error(
+        "[entitlement] update-ack al gestor falló:",
+        err?.response?.status || err?.message || err,
+      );
+      // Local ya quedó limpio; el gestor se puede sincronizar luego
+    }
+  }
+
+  return saved;
+}
+
 /** Trae del gestor y guarda localmente (bootstrap / refresh manual). */
 export async function pullEntitlementFromGestor() {
   if (!GESTOR_SYNC_SECRET) {
