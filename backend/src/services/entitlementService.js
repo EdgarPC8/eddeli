@@ -13,6 +13,7 @@ const EMPTY = {
   updating: false,
   update_force: true,
   update_available: false,
+  update_force_logout: false,
   subscribed: false,
   features: [],
   subscription: null,
@@ -51,6 +52,7 @@ function normalizePayload(body) {
   const update_force =
     parsed.update_force === false || parsed.update_force === 0 ? false : true;
   const update_available = Boolean(parsed.update_available);
+  const update_force_logout = Boolean(parsed.update_force_logout);
   // Solo bloquear si viene forzada
   const updating = Boolean(parsed.updating) && update_force;
   const subscription = parsed.subscription ?? null;
@@ -60,6 +62,7 @@ function normalizePayload(body) {
     updating,
     update_force,
     update_available: update_available || (Boolean(parsed.updating) && !update_force),
+    update_force_logout,
     subscribed,
     subscription,
     features,
@@ -122,6 +125,7 @@ export async function getEntitlementResponse() {
     update_available:
       Boolean(payload.update_available) ||
       (Boolean(payload.updating) && !update_force),
+    update_force_logout: Boolean(payload.update_force_logout),
     subscribed: Boolean(payload.subscribed),
     features: stripHiddenFeatures(normalizeFeatures(payload.features)),
     subscription: stripHiddenFromSubscription(payload.subscription ?? null),
@@ -195,6 +199,7 @@ export async function acknowledgeUpdateComplete(version) {
     updating: false,
     update_force: true,
     update_available: false,
+    update_force_logout: false,
     subscribed: Boolean(current.subscribed),
     features: current.features || [],
     subscription: current.subscription ?? null,
