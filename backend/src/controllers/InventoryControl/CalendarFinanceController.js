@@ -14,9 +14,10 @@ import {
 } from "date-fns";
 import { toFinanceDayKey, buildPaddedFinanceDateColumnWhere, filterByFinanceDayKeyRange } from "../../utils/financeDateUtils.js";
 import { formatAppDateTime } from "../../utils/appDateTime.js";
+import { addMoney, round2Money } from "../../utils/moneyPrecision.js";
 
 const CAJA_POS_TAG = "[CAJA_POS]";
-const round2 = (n) => Number(Number(n ?? 0).toFixed(2));
+const round2 = round2Money;
 const dayKey = (d) => toFinanceDayKey(d);
 
 function isPosOrder(order) {
@@ -89,8 +90,8 @@ function addOrdersToDays(daysMap, orders) {
     const items = o.ERP_order_items || [];
     for (const it of items) {
       const qty = Number(it.quantity ?? 0);
-      const sub = qty * Number(it.price ?? 0);
-      bucket.ordersAmount = round2(bucket.ordersAmount + sub);
+      const sub = round2(qty * Number(it.price ?? 0));
+      bucket.ordersAmount = addMoney(bucket.ordersAmount, sub);
       if (it.deliveredAt) bucket.deliveredUnits += qty;
     }
   }
@@ -108,10 +109,10 @@ function addIncomesSplitToDays(daysMap, incomes, posOrderItemIds) {
       posOrderItemIds.has(Number(inc.referenceId));
 
     if (isCaja) {
-      bucket.posIncomeAmount = round2(bucket.posIncomeAmount + amt);
+      bucket.posIncomeAmount = addMoney(bucket.posIncomeAmount, amt);
       bucket.posIncomeCount += 1;
     } else {
-      bucket.collectedAmount = round2(bucket.collectedAmount + amt);
+      bucket.collectedAmount = addMoney(bucket.collectedAmount, amt);
     }
   }
 }
@@ -157,7 +158,7 @@ function addPosSalesToDays(daysMap, orders) {
     bucket.posSalesCount += 1;
     const items = o.ERP_order_items || [];
     for (const it of items) {
-      bucket.posSalesAmount = round2(bucket.posSalesAmount + posLineTotal(it));
+      bucket.posSalesAmount = addMoney(bucket.posSalesAmount, posLineTotal(it));
     }
   }
 }
@@ -167,7 +168,7 @@ function addExpensesToDays(daysMap, expenses) {
     const key = dayKey(e.date);
     if (!key) continue;
     const bucket = ensureDay(daysMap, key);
-    bucket.expensesAmount = round2(bucket.expensesAmount + Number(e.amount ?? 0));
+    bucket.expensesAmount = addMoney(bucket.expensesAmount, e.amount);
   }
 }
 
@@ -176,11 +177,11 @@ function sumMonthTotals(daysMap, monthStart, monthEnd) {
   for (const [key, m] of Object.entries(daysMap)) {
     const d = parseISO(key);
     if (d < monthStart || d > monthEnd) continue;
-    totals.orders = round2(totals.orders + m.ordersAmount);
-    totals.posSales = round2(totals.posSales + m.posSalesAmount);
-    totals.posIncome = round2(totals.posIncome + m.posIncomeAmount);
-    totals.collected = round2(totals.collected + m.collectedAmount);
-    totals.expenses = round2(totals.expenses + m.expensesAmount);
+    totals.orders = addMoney(totals.orders, m.ordersAmount);
+    totals.posSales = addMoney(totals.posSales, m.posSalesAmount);
+    totals.posIncome = addMoney(totals.posIncome, m.posIncomeAmount);
+    totals.collected = addMoney(totals.collected, m.collectedAmount);
+    totals.expenses = addMoney(totals.expenses, m.expensesAmount);
   }
   return totals;
 }
@@ -208,14 +209,14 @@ function aggregateDaysToMonths(daysMap) {
   for (const [key, m] of Object.entries(daysMap)) {
     const mk = key.slice(0, 7);
     const bucket = ensureMonth(months, mk);
-    bucket.ordersAmount = round2(bucket.ordersAmount + m.ordersAmount);
+    bucket.ordersAmount = addMoney(bucket.ordersAmount, m.ordersAmount);
     bucket.ordersCount += m.ordersCount;
-    bucket.posSalesAmount = round2(bucket.posSalesAmount + m.posSalesAmount);
+    bucket.posSalesAmount = addMoney(bucket.posSalesAmount, m.posSalesAmount);
     bucket.posSalesCount += m.posSalesCount;
-    bucket.posIncomeAmount = round2(bucket.posIncomeAmount + m.posIncomeAmount);
+    bucket.posIncomeAmount = addMoney(bucket.posIncomeAmount, m.posIncomeAmount);
     bucket.posIncomeCount += m.posIncomeCount;
-    bucket.collectedAmount = round2(bucket.collectedAmount + m.collectedAmount);
-    bucket.expensesAmount = round2(bucket.expensesAmount + m.expensesAmount);
+    bucket.collectedAmount = addMoney(bucket.collectedAmount, m.collectedAmount);
+    bucket.expensesAmount = addMoney(bucket.expensesAmount, m.expensesAmount);
   }
   return months;
 }
@@ -223,11 +224,11 @@ function aggregateDaysToMonths(daysMap) {
 function sumYearTotals(monthsMap) {
   const totals = { orders: 0, posSales: 0, posIncome: 0, collected: 0, expenses: 0 };
   for (const m of Object.values(monthsMap)) {
-    totals.orders = round2(totals.orders + m.ordersAmount);
-    totals.posSales = round2(totals.posSales + m.posSalesAmount);
-    totals.posIncome = round2(totals.posIncome + m.posIncomeAmount);
-    totals.collected = round2(totals.collected + m.collectedAmount);
-    totals.expenses = round2(totals.expenses + m.expensesAmount);
+    totals.orders = addMoney(totals.orders, m.ordersAmount);
+    totals.posSales = addMoney(totals.posSales, m.posSalesAmount);
+    totals.posIncome = addMoney(totals.posIncome, m.posIncomeAmount);
+    totals.collected = addMoney(totals.collected, m.collectedAmount);
+    totals.expenses = addMoney(totals.expenses, m.expensesAmount);
   }
   return totals;
 }
@@ -371,6 +372,7 @@ function shapeIncomeDetail(inc, posOrderItemIds) {
     referenceType: inc.referenceType || null,
     source: isCaja ? "caja" : "cobro",
     date: inc.date ? formatAppDateTime(inc.date) : null,
+    dayKey: dayKey(inc.date),
   };
 }
 
@@ -586,19 +588,20 @@ async function buildPeriodDetail(range) {
     productName: expenseProductName(e),
     amount: round2(e.amount),
     date: e.date ? formatAppDateTime(e.date) : null,
+    dayKey: dayKey(e.date),
   }));
 
   const totals = emptyDayMetrics();
   for (const m of Object.values(days)) {
-    totals.ordersAmount = round2(totals.ordersAmount + m.ordersAmount);
+    totals.ordersAmount = addMoney(totals.ordersAmount, m.ordersAmount);
     totals.ordersCount += m.ordersCount;
     totals.deliveredUnits += m.deliveredUnits;
-    totals.posSalesAmount = round2(totals.posSalesAmount + m.posSalesAmount);
+    totals.posSalesAmount = addMoney(totals.posSalesAmount, m.posSalesAmount);
     totals.posSalesCount += m.posSalesCount;
-    totals.posIncomeAmount = round2(totals.posIncomeAmount + m.posIncomeAmount);
+    totals.posIncomeAmount = addMoney(totals.posIncomeAmount, m.posIncomeAmount);
     totals.posIncomeCount += m.posIncomeCount;
-    totals.collectedAmount = round2(totals.collectedAmount + m.collectedAmount);
-    totals.expensesAmount = round2(totals.expensesAmount + m.expensesAmount);
+    totals.collectedAmount = addMoney(totals.collectedAmount, m.collectedAmount);
+    totals.expensesAmount = addMoney(totals.expensesAmount, m.expensesAmount);
   }
 
   return {

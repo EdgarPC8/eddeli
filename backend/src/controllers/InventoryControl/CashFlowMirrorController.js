@@ -18,10 +18,11 @@ import {
 import { es } from "date-fns/locale";
 import { Income, Expense } from "../../models/Finance.js";
 import { financeBucketKey, buildPaddedFinanceDateColumnWhere, filterByFinanceDayKeyRange } from "../../utils/financeDateUtils.js";
+import { addMoney, subMoney, round2Money } from "../../utils/moneyPrecision.js";
 const VALID_GRANULARITY = new Set(["day", "week", "month"]);
 
 function round2(n) {
-  return Number(Number(n || 0).toFixed(2));
+  return round2Money(n);
 }
 
 function toNum(v) {
@@ -99,13 +100,15 @@ function buildEmptyBuckets(granularity, start, end) {
 
 function finalizeBuckets(map) {
   const buckets = [...map.values()].map((b) => {
-    const expenseTotal = round2(b.expense);
-    const netBalance = round2(b.income - expenseTotal);
-    const marginPct = b.income > 0 ? round2((netBalance / b.income) * 100) : 0;
+    const income = round2(b.income);
+    const expense = round2(b.expense);
+    const expenseTotal = expense;
+    const netBalance = subMoney(income, expenseTotal);
+    const marginPct = income > 0 ? round2((netBalance / income) * 100) : 0;
     return {
       ...b,
-      income: round2(b.income),
-      expense: round2(b.expense),
+      income,
+      expense,
       merma: 0,
       expenseTotal,
       netBalance,
@@ -115,19 +118,16 @@ function finalizeBuckets(map) {
 
   const totals = buckets.reduce(
     (acc, b) => {
-      acc.income += b.income;
-      acc.expense += b.expense;
-      acc.expenseTotal += b.expenseTotal;
+      acc.income = addMoney(acc.income, b.income);
+      acc.expense = addMoney(acc.expense, b.expense);
+      acc.expenseTotal = addMoney(acc.expenseTotal, b.expenseTotal);
       return acc;
     },
     { income: 0, expense: 0, expenseTotal: 0 }
   );
 
-  totals.income = round2(totals.income);
-  totals.expense = round2(totals.expense);
   totals.merma = 0;
-  totals.expenseTotal = round2(totals.expenseTotal);
-  totals.netBalance = round2(totals.income - totals.expenseTotal);
+  totals.netBalance = subMoney(totals.income, totals.expenseTotal);
   totals.marginPct = totals.income > 0 ? round2((totals.netBalance / totals.income) * 100) : 0;
 
   return { buckets, totals };
@@ -136,7 +136,8 @@ function finalizeBuckets(map) {
 function addToBucket(map, date, granularity, field, amount) {
   const key = bucketKeyFromDate(date, granularity);
   if (!map.has(key)) return;
-  map.get(key)[field] += toNum(amount);
+  const bucket = map.get(key);
+  bucket[field] = addMoney(bucket[field], amount);
 }
 
 export const getCashFlowMirror = async (req, res) => {
