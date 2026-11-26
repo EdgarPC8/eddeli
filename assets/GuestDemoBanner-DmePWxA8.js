@@ -1,0 +1,1 @@
+import{j as o,A as e}from"./mui-B-ZCpEWR.js";import{a8 as s}from"./index-BxVfS6DN.js";function i(){return s()?o(e,{severity:"info",variant:"outlined",sx:{mb:2},children:"Demo · modo invitado — los datos son ficticios (~$10k de saldo) y no se guardan."}):null}export{i as G};

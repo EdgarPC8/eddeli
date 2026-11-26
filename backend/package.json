@@ -1,6 +1,6 @@
 {
   "name": "backend-eddeli",
-  "version": "1.0.0.10",
+  "version": "1.0.0.12",
   "description": "",
   "main": "index.js",
   "type": "module",
